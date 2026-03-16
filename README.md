@@ -31,6 +31,27 @@ int main() {
 }
 ```
 
+### C API (for C, Lua, Python FFI, etc.)
+
+```c
+#include <signalwire/signalwire_agents_c.h>
+
+sw_function_result_t get_time_handler(const char* args, const char* raw, void* ud) {
+    sw_function_result_t result = sw_result_create("The current time is 3:00 PM");
+    return result;
+}
+
+int main() {
+    sw_agent_t agent = sw_agent_create("my-agent");
+    sw_agent_set_prompt(agent, "You are a helpful assistant.");
+    sw_agent_define_tool(agent, "get_time", "Get the current time",
+                         "{}", get_time_handler, NULL);
+    sw_agent_run(agent);
+    sw_agent_destroy(agent);
+    return 0;
+}
+```
+
 ## Features
 
 - **AgentBase** -- structured prompts (POM), SWAIG tools, skills, contexts, sessions
@@ -41,7 +62,7 @@ int main() {
 - **Skills System** -- 18 built-in skills (datetime, math, web_search, datasphere, etc.)
 - **Prefabs** -- InfoGatherer, Survey, Receptionist, FAQBot, Concierge
 - **REST Client** -- synchronous HTTP client with 21 API namespaces
-- **RELAY Client** -- real-time call control over WebSocket (header stubs)
+- **RELAY Client** -- real-time call control over WebSocket (raw TCP + OpenSSL TLS)
 - **Security** -- HMAC-SHA256 session tokens, basic auth, timing-safe compare
 - **C API** -- `extern "C"` wrapper for FFI from C, Python, Ruby, etc.
 

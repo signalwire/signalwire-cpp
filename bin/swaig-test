@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# swaig-test -- Test SWAIG functions on a running agent
+#
+# Usage:
+#   swaig-test <url> --list-tools
+#   swaig-test <url> --exec <tool> [--param key=value ...]
+#   swaig-test <url> --dump-swml
+#
+# Examples:
+#   swaig-test http://localhost:3000/my-agent --list-tools
+#   swaig-test http://localhost:3000/my-agent --exec get_weather --param location=NYC
+#   swaig-test http://user:pass@localhost:3000/my-agent --dump-swml
+#
+# The agent URL can include basic auth credentials in the URL.
+
+set -euo pipefail
+
+VERSION="1.0.0"
+
+usage() {
+    cat <<EOF
+swaig-test v${VERSION} -- Test SWAIG functions on a running agent
+
+USAGE:
+    swaig-test <agent-url> [OPTIONS]
+
+OPTIONS:
+    --list-tools              List all SWAIG tools registered on the agent
+    --exec <tool-name>        Execute a specific SWAIG tool
+    --param <key=value>       Pass a parameter (repeatable)
+    --dump-swml               Dump the SWML document
+    --verbose                 Show HTTP response headers
+    --help                    Show this help
+
+EXAMPLES:
+    swaig-test http://localhost:3000/agent --list-tools
+    swaig-test http://localhost:3000/agent --exec get_time
+    swaig-test http://localhost:3000/agent --exec get_weather --param location=NYC
+    swaig-test http://user:pass@localhost:3000/agent --dump-swml
+
+AUTHENTICATION:
+    Embed credentials in the URL: http://user:pass@host:port/route
+    Or set SWML_BASIC_AUTH_USER and SWML_BASIC_AUTH_PASSWORD env vars.
+EOF
+    exit 0
+}
+
+die() { echo "ERROR: $1" >&2; exit 1; }
+
+# Check for curl
+command -v curl >/dev/null 2>&1 || die "curl is required but not found"
+command -v python3 >/dev/null 2>&1 && HAS_PYTHON=1 || HAS_PYTHON=0
+
+json_pp() {
+    if [ "$HAS_PYTHON" -eq 1 ]; then
+        python3 -m json.tool 2>/dev/null || cat
+    else
+        cat
+    fi
+}
+
+# Parse arguments
+AGENT_URL=""
+MODE=""
+TOOL_NAME=""
+VERBOSE=0
+declare -a PARAMS=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h)      usage ;;
+        --list-tools)   MODE="list"; shift ;;
+        --exec)         MODE="exec"; TOOL_NAME="${2:-}"; [ -z "$TOOL_NAME" ] && die "--exec requires a tool name"; shift 2 ;;
+        --param)        PARAMS+=("${2:-}"); [ -z "${2:-}" ] && die "--param requires key=value"; shift 2 ;;
+        --dump-swml)    MODE="swml"; shift ;;
+        --verbose|-v)   VERBOSE=1; shift ;;
+        -*)             die "Unknown option: $1" ;;
+        *)
+            if [ -z "$AGENT_URL" ]; then
+                AGENT_URL="$1"
+            else
+                die "Unexpected argument: $1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+[ -z "$AGENT_URL" ] && die "Agent URL is required. Usage: swaig-test <url> --list-tools"
+[ -z "$MODE" ] && die "Specify an action: --list-tools, --exec <tool>, or --dump-swml"
+
+# Extract auth from URL if present (http://user:pass@host...)
+CURL_AUTH=""
+if [[ "$AGENT_URL" =~ ^(https?)://([^:]+):([^@]+)@(.+)$ ]]; then
+    SCHEME="${BASH_REMATCH[1]}"
+    AUTH_USER="${BASH_REMATCH[2]}"
+    AUTH_PASS="${BASH_REMATCH[3]}"
+    REST="${BASH_REMATCH[4]}"
+    AGENT_URL="${SCHEME}://${REST}"
+    CURL_AUTH="-u ${AUTH_USER}:${AUTH_PASS}"
+elif [ -n "${SWML_BASIC_AUTH_USER:-}" ] && [ -n "${SWML_BASIC_AUTH_PASSWORD:-}" ]; then
+    CURL_AUTH="-u ${SWML_BASIC_AUTH_USER}:${SWML_BASIC_AUTH_PASSWORD}"
+fi
+
+# Remove trailing slash
+AGENT_URL="${AGENT_URL%/}"
+
+CURL_OPTS="-s -f"
+[ "$VERBOSE" -eq 1 ] && CURL_OPTS="-s -f -i"
+
+case "$MODE" in
+    list)
+        echo "Listing tools on ${AGENT_URL}..."
+        echo ""
+        # POST to the SWAIG endpoint with action=get_signature
+        RESPONSE=$(curl $CURL_OPTS $CURL_AUTH \
+            -X POST "${AGENT_URL}/swaig" \
+            -H "Content-Type: application/json" \
+            -d '{"action":"get_signature"}' 2>&1) || {
+            # Fallback: try GET on the SWML endpoint and extract function names
+            RESPONSE=$(curl $CURL_OPTS $CURL_AUTH \
+                -X POST "${AGENT_URL}" \
+                -H "Content-Type: application/json" \
+                -d '{}' 2>&1) || die "Failed to connect to ${AGENT_URL}"
+        }
+        echo "$RESPONSE" | json_pp
+        ;;
+
+    exec)
+        # Build args JSON from --param flags
+        ARGS_JSON="{"
+        FIRST=1
+        for p in "${PARAMS[@]+"${PARAMS[@]}"}"; do
+            KEY="${p%%=*}"
+            VAL="${p#*=}"
+            [ "$FIRST" -eq 1 ] && FIRST=0 || ARGS_JSON+=","
+            ARGS_JSON+="\"${KEY}\":\"${VAL}\""
+        done
+        ARGS_JSON+="}"
+
+        BODY=$(cat <<ENDJSON
+{
+    "action": "execute",
+    "function": "${TOOL_NAME}",
+    "argument": {
+        "parsed": [${ARGS_JSON}]
+    },
+    "call_id": "swaig-test-$(date +%s)",
+    "call": {
+        "call_id": "swaig-test-$(date +%s)",
+        "node_id": "swaig-test"
+    }
+}
+ENDJSON
+)
+
+        echo "Executing tool '${TOOL_NAME}' on ${AGENT_URL}..."
+        [ ${#PARAMS[@]} -gt 0 ] && echo "Parameters: ${ARGS_JSON}"
+        echo ""
+
+        RESPONSE=$(curl $CURL_OPTS $CURL_AUTH \
+            -X POST "${AGENT_URL}/swaig" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" 2>&1) || die "Failed to execute tool '${TOOL_NAME}'"
+        echo "$RESPONSE" | json_pp
+        ;;
+
+    swml)
+        echo "Dumping SWML from ${AGENT_URL}..."
+        echo ""
+        RESPONSE=$(curl $CURL_OPTS $CURL_AUTH \
+            -X POST "${AGENT_URL}" \
+            -H "Content-Type: application/json" \
+            -d '{}' 2>&1) || die "Failed to fetch SWML from ${AGENT_URL}"
+        echo "$RESPONSE" | json_pp
+        ;;
+esac

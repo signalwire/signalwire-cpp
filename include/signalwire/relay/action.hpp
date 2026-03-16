@@ -3,8 +3,10 @@
 #pragma once
 
 #include <string>
-#include <optional>
 #include <functional>
+#include <mutex>
+#include <condition_variable>
+#include <memory>
 #include <nlohmann/json.hpp>
 
 namespace signalwire {
@@ -12,62 +14,66 @@ namespace relay {
 
 using json = nlohmann::json;
 
+class RelayClient;
+
 /// Represents a controllable in-progress operation (play, record, collect, etc.)
-///
-/// NOTE: This is a stub. Full implementation requires the WebSocket transport
-/// layer to send control commands and receive state updates.
+/// Uses shared internal state so the object can be copied/moved freely while
+/// maintaining a single underlying condition_variable for synchronization.
 class Action {
 public:
-    Action() = default;
-    explicit Action(const std::string& control_id) : control_id_(control_id) {}
+    using CompletedCallback = std::function<void(const Action&)>;
 
-    const std::string& control_id() const { return control_id_; }
-    const std::string& state() const { return state_; }
-    bool completed() const { return completed_; }
-    const json& result() const { return result_; }
+    Action();
+    explicit Action(const std::string& control_id);
+    Action(const std::string& control_id, RelayClient* client,
+           const std::string& call_id, const std::string& node_id);
+
+    const std::string& control_id() const { return state_->control_id; }
+    const std::string& state() const;
+    bool completed() const;
+    const json& result() const;
+    const std::string& call_id() const { return state_->call_id; }
+    const std::string& node_id() const { return state_->node_id; }
 
     /// Block until the action completes or times out.
-    /// @param timeout_ms  Maximum wait in milliseconds (0 = infinite).
-    /// @return true if completed, false on timeout.
-    /// STUB: Always returns true immediately.
-    bool wait(int timeout_ms = 0) {
-        (void)timeout_ms;
-        // TODO: implement with condition_variable once WebSocket transport exists
-        return true;
-    }
+    bool wait(int timeout_ms = 0);
 
     /// Request the server to stop this action.
-    /// STUB: No-op until WebSocket transport is implemented.
-    void stop() {
-        // TODO: send control command via WebSocket
-    }
+    void stop();
 
     /// Request the server to pause this action (play only).
-    /// STUB: No-op until WebSocket transport is implemented.
-    void pause() {
-        // TODO: send control command via WebSocket
-    }
+    void pause();
 
     /// Request the server to resume this action (play only).
-    /// STUB: No-op until WebSocket transport is implemented.
-    void resume() {
-        // TODO: send control command via WebSocket
-    }
+    void resume();
 
-    /// Update internal state (called by Call when events arrive)
-    void update_state(const std::string& state, const json& result = json::object()) {
-        state_ = state;
-        result_ = result;
-        if (state == "finished" || state == "error" || state == "no_input") {
-            completed_ = true;
-        }
-    }
+    /// Set a callback to fire when the action completes.
+    void on_completed(CompletedCallback cb);
+
+    /// Update internal state (called by Call/Client when events arrive).
+    void update_state(const std::string& new_state, const json& result = json::object());
+
+    /// Resolve the action immediately (used for call-gone scenarios).
+    void resolve(const std::string& final_state = "finished", const json& result = json::object());
 
 private:
-    std::string control_id_;
-    std::string state_;
-    bool completed_ = false;
-    json result_;
+    void send_control_command(const std::string& operation);
+
+    struct SharedState {
+        std::string control_id;
+        std::string call_id;
+        std::string node_id;
+        RelayClient* client = nullptr;
+
+        mutable std::mutex mutex;
+        std::condition_variable cv;
+        std::string current_state;
+        bool is_completed = false;
+        json result_data;
+        CompletedCallback completed_callback;
+    };
+
+    std::shared_ptr<SharedState> state_;
 };
 
 } // namespace relay

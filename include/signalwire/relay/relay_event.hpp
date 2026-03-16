@@ -12,7 +12,7 @@ namespace relay {
 
 using json = nlohmann::json;
 
-/// Base class for all RELAY events
+/// Base class for all RELAY events parsed from signalwire.event JSON-RPC messages.
 struct RelayEvent {
     std::string event_type;
     json params;
@@ -23,7 +23,8 @@ struct RelayEvent {
     RelayEvent() = default;
     explicit RelayEvent(const std::string& type) : event_type(type) {}
 
-    /// Parse from a Blade event JSON
+    /// Parse from a signalwire.event params JSON.
+    /// The outer params contains event_type and the inner params with event-specific data.
     static RelayEvent from_json(const json& j) {
         RelayEvent ev;
         ev.event_type = j.value("event_type", "");
@@ -33,12 +34,13 @@ struct RelayEvent {
     }
 };
 
-/// Call-specific event
+/// Call-specific event parsed from calling.call.state and other call events.
 struct CallEvent : public RelayEvent {
     std::string call_id;
     std::string node_id;
     std::string call_state;
     std::optional<std::string> peer_call_id;
+    std::string tag;
 
     static CallEvent from_relay_event(const RelayEvent& ev) {
         CallEvent ce;
@@ -49,6 +51,7 @@ struct CallEvent : public RelayEvent {
         ce.call_id = ev.params.value("call_id", "");
         ce.node_id = ev.params.value("node_id", "");
         ce.call_state = ev.params.value("call_state", "");
+        ce.tag = ev.params.value("tag", "");
         if (ev.params.contains("peer")) {
             auto& peer = ev.params["peer"];
             if (peer.contains("call_id")) {
@@ -59,7 +62,7 @@ struct CallEvent : public RelayEvent {
     }
 };
 
-/// Play/Record/Collect component event
+/// Play/Record/Collect component event with control_id for action routing.
 struct ComponentEvent : public RelayEvent {
     std::string call_id;
     std::string control_id;
@@ -78,7 +81,7 @@ struct ComponentEvent : public RelayEvent {
     }
 };
 
-/// Messaging event
+/// Messaging event for SMS/MMS state changes and inbound messages.
 struct MessageEvent : public RelayEvent {
     std::string message_id;
     std::string message_state;
@@ -98,6 +101,25 @@ struct MessageEvent : public RelayEvent {
         me.to = ev.params.value("to_number", "");
         me.body = ev.params.value("body", "");
         return me;
+    }
+};
+
+/// Dial-specific event with nested call info and tag-based correlation.
+struct DialEvent : public RelayEvent {
+    std::string tag;
+    std::string dial_state;
+    json call_info;
+
+    static DialEvent from_relay_event(const RelayEvent& ev) {
+        DialEvent de;
+        de.event_type = ev.event_type;
+        de.params = ev.params;
+        de.event_channel = ev.event_channel;
+        de.timestamp = ev.timestamp;
+        de.tag = ev.params.value("tag", "");
+        de.dial_state = ev.params.value("dial_state", "");
+        de.call_info = ev.params.value("call", json::object());
+        return de;
     }
 };
 

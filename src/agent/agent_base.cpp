@@ -1012,7 +1012,10 @@ void AgentBase::serve() {
     get_logger().info("Starting agent '" + name_ + "' on " + host_ + ":" + std::to_string(port_) + route_);
     get_logger().info("Auth user: " + auth_user_);
 
-    server_->listen(host_, port_);
+    if (!server_->listen(host_, port_)) {
+        get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
+                           " -- is the port already in use?");
+    }
 }
 
 void AgentBase::run() {

@@ -162,7 +162,10 @@ void AgentServer::run() {
     get_logger().info("Starting AgentServer on " + host_ + ":" + std::to_string(port_));
     get_logger().info("Registered " + std::to_string(agents_.size()) + " agent(s)");
 
-    server_->listen(host_, port_);
+    if (!server_->listen(host_, port_)) {
+        get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
+                           " -- is the port already in use?");
+    }
 }
 
 void AgentServer::stop() {

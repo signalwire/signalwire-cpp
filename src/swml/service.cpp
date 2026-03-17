@@ -222,7 +222,10 @@ void Service::serve() {
     server_->set_payload_max_length(1024 * 1024); // 1MB limit
     setup_routes(*server_);
     get_logger().info("Starting SWML service on " + host_ + ":" + std::to_string(port_) + route_);
-    server_->listen(host_, port_);
+    if (!server_->listen(host_, port_)) {
+        get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
+                           " -- is the port already in use?");
+    }
 }
 
 void Service::stop() {

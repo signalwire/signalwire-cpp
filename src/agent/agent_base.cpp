@@ -1,6 +1,7 @@
 // Copyright (c) 2025 SignalWire
 // SPDX-License-Identifier: MIT
 #include "signalwire/agent/agent_base.hpp"
+#include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/common.hpp"
 #include "httplib.h"
 #include <openssl/crypto.h>
@@ -375,6 +376,36 @@ bool AgentBase::has_contexts() const {
 AgentBase& AgentBase::add_skill(const std::string& skill_name, const json& params) {
     loaded_skills_.push_back(skill_name);
     skill_configs_[skill_name] = params;
+
+    // Resolve the skill from the registry and register its tools/prompts
+    skills::ensure_builtin_skills_registered();
+    auto& reg = skills::SkillRegistry::instance();
+    auto skill = reg.create(skill_name);
+    if (!skill) return *this;
+    if (!skill->setup(params)) return *this;
+
+    // Register tools from the skill
+    for (auto& tool : skill->register_tools()) {
+        define_tool(tool);
+    }
+
+    // Register DataMap functions
+    for (const auto& dm_fn : skill->get_datamap_functions()) {
+        register_swaig_function(dm_fn);
+    }
+
+    // Add prompt sections
+    for (const auto& section : skill->get_prompt_sections()) {
+        std::vector<std::string> bullets;
+        for (const auto& b : section.bullets) bullets.push_back(b);
+        prompt_add_section(section.title, section.body, bullets);
+    }
+
+    // Add hints
+    for (const auto& h : skill->get_hints()) {
+        add_hints({h});
+    }
+
     return *this;
 }
 

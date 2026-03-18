@@ -117,8 +117,9 @@ jobs:
       - name: Package source tarball
         run: |
           VERSION="${{ steps.ref.outputs.version }}"
-          tar czf "signalwire-agents-cpp-${VERSION}.tar.gz" \
+          tar czf "/tmp/signalwire-agents-cpp-${VERSION}.tar.gz" \
             --exclude='.git' --exclude='build' .
+          mv "/tmp/signalwire-agents-cpp-${VERSION}.tar.gz" .
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4

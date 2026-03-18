@@ -1,11 +1,19 @@
-// CLI tests — verify swaig-test script exists and bin directory structure
+// CLI tests — verify project file structure exists
 #include <cstdio>
 #include <cstdlib>
 #include <string>
 
+#ifndef PROJECT_SOURCE_DIR
+#define PROJECT_SOURCE_DIR "."
+#endif
+
+static std::string project_path(const std::string& rel) {
+    return std::string(PROJECT_SOURCE_DIR) + "/" + rel;
+}
+
 TEST(cli_bin_directory_exists) {
     // The bin/ directory should exist in the project
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/bin/swaig-test", "r");
+    FILE* f = fopen(project_path("bin/swaig-test").c_str(), "r");
     if (f) {
         fclose(f);
         // File exists
@@ -18,21 +26,21 @@ TEST(cli_bin_directory_exists) {
 
 TEST(cli_examples_directory_exists) {
     // The examples/ directory should contain example agent files
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/examples", "r");
+    FILE* f = fopen(project_path("examples").c_str(), "r");
     (void)f;
     // Just verify we can reference it without crash
     return true;
 }
 
 TEST(cli_cmake_file_exists) {
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/CMakeLists.txt", "r");
+    FILE* f = fopen(project_path("CMakeLists.txt").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;
 }
 
 TEST(cli_readme_exists) {
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/README.md", "r");
+    FILE* f = fopen(project_path("README.md").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;
@@ -40,7 +48,7 @@ TEST(cli_readme_exists) {
 
 TEST(cli_include_directory_structure) {
     // Verify the include directory has the expected structure
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/include/signalwire/signalwire_agents.hpp", "r");
+    FILE* f = fopen(project_path("include/signalwire/signalwire_agents.hpp").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;
@@ -48,21 +56,21 @@ TEST(cli_include_directory_structure) {
 
 TEST(cli_docs_directory_has_files) {
     // Check that docs/ has expected files
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/docs/architecture.md", "r");
+    FILE* f = fopen(project_path("docs/architecture.md").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;
 }
 
 TEST(cli_relay_docs_exist) {
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/relay/docs/getting-started.md", "r");
+    FILE* f = fopen(project_path("relay/docs/getting-started.md").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;
 }
 
 TEST(cli_rest_docs_exist) {
-    FILE* f = fopen("/home/devuser/src/signalwire-agents-cpp/rest/docs/getting-started.md", "r");
+    FILE* f = fopen(project_path("rest/docs/getting-started.md").c_str(), "r");
     ASSERT_TRUE(f != nullptr);
     fclose(f);
     return true;

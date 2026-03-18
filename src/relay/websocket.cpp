@@ -4,6 +4,33 @@
 #include "signalwire/relay/websocket.hpp"
 #include "signalwire/logging.hpp"
 
+#ifdef _WIN32
+// Windows: RELAY WebSocket transport not yet implemented.
+// Provide stub implementations so the library links.
+
+namespace signalwire {
+namespace relay {
+
+WebSocketClient::WebSocketClient() = default;
+WebSocketClient::~WebSocketClient() { close(); }
+
+bool WebSocketClient::connect(const std::string&, int) { return false; }
+void WebSocketClient::close(int, const std::string&) {}
+bool WebSocketClient::send(const std::string&) { return false; }
+bool WebSocketClient::do_tls_handshake(const std::string&) { return false; }
+bool WebSocketClient::do_ws_upgrade(const std::string&) { return false; }
+std::vector<uint8_t> WebSocketClient::encode_frame(const std::string&) { return {}; }
+bool WebSocketClient::read_frame(std::string&, uint8_t&) { return false; }
+bool WebSocketClient::raw_read(void*, size_t) { return false; }
+bool WebSocketClient::raw_write(const void*, size_t) { return false; }
+void WebSocketClient::read_loop() {}
+void WebSocketClient::cleanup() {}
+
+} // namespace relay
+} // namespace signalwire
+
+#else // POSIX
+
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
@@ -413,3 +440,5 @@ void WebSocketClient::cleanup() {
 
 } // namespace relay
 } // namespace signalwire
+
+#endif // _WIN32

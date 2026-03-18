@@ -16,7 +16,7 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build matrix: Linux x64, macOS ARM64, Windows x64
+  # Build matrix: Linux x64, Linux ARM64, macOS ARM64
   # ---------------------------------------------------------------------------
   build:
     strategy:
@@ -25,16 +25,10 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux-x64
-            lib: libsignalwire_agents.a
-            archive_ext: tar.gz
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
           - os: macos-latest
             name: macos-arm64
-            lib: libsignalwire_agents.a
-            archive_ext: tar.gz
-          - os: windows-latest
-            name: windows-x64
-            lib: Release/signalwire_agents.lib
-            archive_ext: zip
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,13 +59,8 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install openssl@3 cmake
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: choco install openssl -y
-
       # -- Build & test -------------------------------------------------------
-      - name: Build and test (Unix)
-        if: runner.os != 'Windows'
+      - name: Build and test
         shell: bash
         run: |
           mkdir build && cd build
@@ -84,37 +73,14 @@ jobs:
           make -j$(sysctl -n hw.ncpu 2>/dev/null || nproc)
           ./run_tests
 
-      - name: Build and test (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release \
-            -DOPENSSL_ROOT_DIR="C:/Program Files/OpenSSL"
-          cmake --build . --config Release
-          ./Release/run_tests.exe
-
       # -- Package static library ---------------------------------------------
-      - name: Package library (Unix)
-        if: runner.os != 'Windows'
+      - name: Package library
         shell: bash
         run: |
           VERSION="${{ steps.ref.outputs.version }}"
           tar czf "libsignalwire-agents-${VERSION}-${{ matrix.name }}.tar.gz" \
-            -C build ${{ matrix.lib }} \
+            -C build libsignalwire_agents.a \
             -C .. include/
-
-      - name: Package library (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $VERSION = "${{ steps.ref.outputs.version }}"
-          $ARCHIVE = "libsignalwire-agents-${VERSION}-${{ matrix.name }}.zip"
-          # Stage files into a temp directory for clean zip layout
-          New-Item -ItemType Directory -Path staging | Out-Null
-          Copy-Item "build/${{ matrix.lib }}" -Destination staging/signalwire_agents.lib
-          Copy-Item -Recurse include -Destination staging/include
-          Compress-Archive -Path staging/* -DestinationPath $ARCHIVE
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

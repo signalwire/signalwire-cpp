@@ -1,27 +1,67 @@
-# SignalWire AI Agents SDK for C++
+<!-- Header -->
+<div align="center">
+    <a href="https://signalwire.com" target="_blank">
+        <img src="https://github.com/user-attachments/assets/0c8ed3b9-8c50-4dc6-9cc4-cc6cd137fd50" width="500" />
+    </a>
 
-A C++17 framework for building, deploying, and managing AI agents as microservices. The SDK provides tools for creating self-contained HTTP services that expose endpoints to interact with the SignalWire platform.
+# SignalWire SDK for C++
 
-## Quick Start
+_Build AI voice agents, control live calls over WebSocket, and manage every SignalWire resource over REST -- all from modern C++17._
+
+<p align="center">
+  <a href="https://developer.signalwire.com/sdks/agents-sdk" target="_blank">Documentation</a> &middot;
+  <a href="https://github.com/signalwire/signalwire-docs/issues/new/choose" target="_blank">Report an Issue</a> &middot;
+  <a href="https://github.com/signalwire/signalwire-cpp" target="_blank">GitHub</a>
+</p>
+
+<a href="https://discord.com/invite/F2WNYTNjuF" target="_blank"><img src="https://img.shields.io/badge/Discord%20Community-5865F2" alt="Discord" /></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/MIT-License-blue" alt="MIT License" /></a>
+<a href="https://github.com/signalwire/signalwire-cpp" target="_blank"><img src="https://img.shields.io/github/stars/signalwire/signalwire-cpp" alt="GitHub Stars" /></a>
+
+</div>
+
+---
+
+## What's in this SDK
+
+| Capability | What it does | Quick link |
+|-----------|-------------|------------|
+| **AI Agents** | Build voice agents that handle calls autonomously -- the platform runs the AI pipeline, your code defines the persona, tools, and call flow | [Agent Guide](#ai-agents) |
+| **RELAY Client** | Control live calls and SMS/MMS in real time over WebSocket -- answer, play, record, collect DTMF, conference, transfer, and more | [RELAY docs](relay/README.md) |
+| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 21 API namespaces | [REST docs](rest/README.md) |
+
+```bash
+# Requirements: C++17 compiler, CMake 3.16+, OpenSSL
+git clone https://github.com/signalwire/signalwire-cpp.git
+cd signalwire-cpp && mkdir build && cd build
+cmake .. && make -j$(nproc)
+```
+
+---
+
+## AI Agents
+
+Each agent is a self-contained microservice that generates [SWML](docs/swml_service_guide.md) (SignalWire Markup Language) and handles [SWAIG](docs/swaig_reference.md) (SignalWire AI Gateway) tool calls. The SignalWire platform runs the entire AI pipeline (STT, LLM, TTS) -- your agent just defines the behavior.
 
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
-#include <nlohmann/json.hpp>
+#include <ctime>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 class MyAgent : public agent::AgentBase {
 public:
-    MyAgent() : AgentBase("my-agent", "/my-agent") {
-        prompt_add_section("Personality", "You are a friendly assistant.");
+    MyAgent() : AgentBase("my-agent", "/agent") {
+        add_language({"English", "en-US", "inworld.Mark"});
+        prompt_add_section("Role", "You are a helpful assistant.");
 
         define_tool("get_time", "Get the current time",
             {{"type", "object"}, {"properties", json::object()}},
-            [](const json& args, const json& raw) -> swaig::FunctionResult {
-                auto t = std::time(nullptr);
-                char buf[64];
-                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&t));
+            [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
+                auto now = std::time(nullptr);
+                char buf[32];
+                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
                 return swaig::FunctionResult(std::string("The time is ") + buf);
             });
     }
@@ -29,46 +69,119 @@ public:
 
 int main() {
     MyAgent agent;
-    agent.run();  // Serves on http://0.0.0.0:3000/my-agent
+    agent.run();  // Serves on http://0.0.0.0:3000/agent
 }
 ```
 
-### C API (for C, Lua, Python FFI, etc.)
+Test locally without running a server:
 
-```c
-#include <signalwire/signalwire_c.h>
+```bash
+bin/swaig-test http://localhost:3000/agent --list-tools
+bin/swaig-test http://localhost:3000/agent --dump-swml
+bin/swaig-test http://localhost:3000/agent --exec get_time
+```
 
-sw_function_result_t get_time_handler(const char* args, const char* raw, void* ud) {
-    sw_function_result_t result = sw_result_create("The current time is 3:00 PM");
-    return result;
-}
+### Agent Features
+
+- **Prompt Object Model (POM)** -- structured prompt composition via `prompt_add_section()`
+- **SWAIG tools** -- define functions with `define_tool()` that the AI calls mid-conversation, with native access to the call's media stack
+- **Skills system** -- add capabilities with one-liners: `agent.add_skill("datetime")`
+- **Contexts and steps** -- structured multi-step workflows with navigation control
+- **DataMap tools** -- tools that execute on SignalWire's servers, calling REST APIs without your own webhook
+- **Dynamic configuration** -- per-request agent customization for multi-tenant deployments
+- **Call flow control** -- pre-answer, post-answer, and post-AI verb insertion
+- **Prefab agents** -- ready-to-use archetypes (InfoGatherer, Survey, FAQ, Receptionist, Concierge)
+- **Multi-agent hosting** -- serve multiple agents on a single server with `AgentServer`
+- **SIP routing** -- route SIP calls to agents based on usernames
+- **Session state** -- persistent conversation state with global data and post-prompt summaries
+- **Security** -- auto-generated basic auth, function-specific HMAC tokens, SSL support
+- **C API** -- `extern "C"` wrapper for FFI from C, Python, Ruby, Lua, etc.
+
+### Agent Examples
+
+The [`examples/`](examples/) directory contains 37+ working examples:
+
+| Example | What it demonstrates |
+|---------|---------------------|
+| [simple_agent.cpp](examples/simple_agent.cpp) | POM prompts, SWAIG tools, hints, languages, SIP routing |
+| [contexts_demo.cpp](examples/contexts_demo.cpp) | Multi-persona workflow with context switching and step navigation |
+| [datamap_demo.cpp](examples/datamap_demo.cpp) | Server-side API tools without webhooks |
+| [skills_demo.cpp](examples/skills_demo.cpp) | Loading built-in skills (datetime, math, web_search) |
+| [call_flow.cpp](examples/call_flow.cpp) | 5-phase verb pipeline: pre-answer, answer, post-answer, post-AI |
+| [session_state.cpp](examples/session_state.cpp) | Global data, session tokens, callbacks |
+| [multi_agent_server.cpp](examples/multi_agent_server.cpp) | Multiple agents on one server |
+| [comprehensive_dynamic.cpp](examples/comprehensive_dynamic.cpp) | Per-request dynamic configuration, multi-tenant routing |
+
+See [examples/README.md](examples/README.md) for the full list organized by category.
+
+---
+
+## RELAY Client
+
+Real-time call control and messaging over WebSocket. The RELAY client connects to SignalWire via the Blade protocol and gives you imperative control over live phone calls and SMS/MMS.
+
+```cpp
+#include <signalwire/relay/client.hpp>
+
+using namespace signalwire::relay;
 
 int main() {
-    sw_agent_t agent = sw_agent_create("my-agent");
-    sw_agent_set_prompt(agent, "You are a helpful assistant.");
-    sw_agent_define_tool(agent, "get_time", "Get the current time",
-                         "{}", get_time_handler, NULL);
-    sw_agent_run(agent);
-    sw_agent_destroy(agent);
-    return 0;
+    auto client = RelayClient::from_env();
+
+    client.on_call([](Call& call) {
+        call.answer();
+        auto action = call.play({
+            {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
+        });
+        action.wait();
+        call.hangup();
+    });
+
+    client.run();
 }
 ```
 
-## Features
+- 57+ calling methods (play, record, collect, detect, tap, stream, AI, conferencing, and more)
+- SMS/MMS messaging with delivery tracking
+- Action objects with `wait()`, `stop()`, `pause()`, `resume()`
+- Auto-reconnect with exponential backoff
 
-- **AgentBase** -- structured prompts (POM), SWAIG tools, skills, contexts, sessions
-- **SWMLService** -- low-level SWML document builder with all 38 verbs
-- **AgentServer** -- multi-agent hosting on a single port
-- **DataMap** -- server-side API tools without webhooks
-- **Contexts & Steps** -- multi-phase conversation workflows
-- **Skills System** -- 18 built-in skills (datetime, math, web_search, datasphere, etc.)
-- **Prefabs** -- InfoGatherer, Survey, Receptionist, FAQBot, Concierge
-- **REST Client** -- synchronous HTTP client with 21 API namespaces
-- **RELAY Client** -- real-time call control over WebSocket (raw TCP + OpenSSL TLS)
-- **Security** -- HMAC-SHA256 session tokens, basic auth, timing-safe compare
-- **C API** -- `extern "C"` wrapper for FFI from C, Python, Ruby, etc.
+See the **[RELAY documentation](relay/README.md)** for the full guide, API reference, and examples.
 
-## Building
+---
+
+## REST Client
+
+Synchronous REST client for managing SignalWire resources and controlling calls over HTTP. No WebSocket required.
+
+```cpp
+#include <signalwire/rest/rest_client.hpp>
+
+using namespace signalwire::rest;
+using json = nlohmann::json;
+
+int main() {
+    auto client = RestClient::from_env();
+
+    auto agents = client.fabric().agents.list();
+    auto call   = client.calling().dial({
+        {"to", "+15551234567"}, {"from", "+15559876543"},
+        {"url", "https://example.com/handler"}
+    });
+    auto numbers = client.phone_numbers().search({{"area_code", "512"}});
+    auto results = client.datasphere().documents.search({{"query_string", "billing policy"}});
+}
+```
+
+- 21 namespaced API surfaces: Fabric (13 resource types), Calling (37 commands), Video, Datasphere, Compat (Twilio-compatible), Phone Numbers, SIP, Queues, Recordings, and more
+- Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `del()`
+- JSON dict returns via nlohmann/json -- no wrapper objects
+
+See the **[REST documentation](rest/README.md)** for the full guide, API reference, and examples.
+
+---
+
+## Installation
 
 ### Prerequisites
 
@@ -77,189 +190,105 @@ int main() {
 - OpenSSL development libraries
 - pthreads
 
-### Build Steps
+### Build from Source
 
 ```bash
+git clone https://github.com/signalwire/signalwire-cpp.git
+cd signalwire-cpp
 mkdir build && cd build
 cmake ..
 make -j$(nproc)
 ```
 
-### Run Tests
+### Link to Your Project
 
-```bash
-cd build
-./run_tests
-```
-
-The test suite contains 258 tests covering all components.
-
-### Build Your Own Agent
-
-```bash
-# Compile against the static library
-g++ -std=c++17 -I include -I deps my_agent.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o my_agent
-```
-
-Or add to your CMakeLists.txt:
+Add to your `CMakeLists.txt`:
 
 ```cmake
+add_subdirectory(signalwire-cpp)
 add_executable(my_agent my_agent.cpp)
 target_link_libraries(my_agent signalwire)
 ```
 
-## Project Structure
-
-```
-signalwire-agents-cpp/
-    include/signalwire/         # Public headers
-        agent/agent_base.hpp    # AgentBase class
-        server/agent_server.hpp # Multi-agent server
-        swml/                   # SWML document, service, schema
-        swaig/                  # FunctionResult, ToolDefinition
-        datamap/datamap.hpp     # DataMap builder
-        contexts/contexts.hpp   # Contexts, Steps, GatherInfo
-        skills/                 # SkillBase, SkillManager, SkillRegistry
-        prefabs/prefabs.hpp     # Pre-built agent types
-        rest/                   # REST client + HTTP client
-        security/               # SessionManager (HMAC tokens)
-        signalwire.hpp   # Umbrella header
-        signalwire_c.h   # C wrapper API
-    src/                        # Implementation files
-    tests/                      # 258 unit tests
-    examples/                   # 37+ standalone examples
-    relay/                      # RELAY client docs + examples
-    rest/                       # REST client docs + examples
-    docs/                       # Guides (architecture, agent, SWAIG, etc.)
-    deps/                       # Vendored: nlohmann/json, cpp-httplib
-    bin/                        # CLI tools (swaig-test)
-```
-
-## Core Concepts
-
-### Prompt Object Model (POM)
-
-Build structured prompts from sections, bullets, and subsections:
-
-```cpp
-agent.prompt_add_section("Role", "You are a technical support agent.");
-agent.prompt_add_section("Instructions", "",
-    {"Always verify the customer's account first",
-     "Escalate to a human if the issue is unresolved after 3 attempts"});
-agent.prompt_add_subsection("Instructions", "Tone", "Be empathetic and patient.");
-```
-
-### SWAIG Tools
-
-Define functions the AI can call during conversations:
-
-```cpp
-agent.define_tool("lookup_order", "Look up an order by ID",
-    {{"type", "object"},
-     {"properties", {{"order_id", {{"type", "string"}, {"description", "The order ID"}}}}}},
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
-        std::string id = args.value("order_id", "");
-        // ... look up order ...
-        return swaig::FunctionResult("Order " + id + " shipped on March 1.");
-    });
-```
-
-### DataMap Tools (Server-Side)
-
-Create API-calling tools that run on SignalWire servers -- no webhook needed:
-
-```cpp
-auto weather = datamap::DataMap("get_weather")
-    .purpose("Get current weather for a city")
-    .parameter("city", "string", "City name", true)
-    .webhook("GET", "https://api.weather.com/v1?q=${args.city}&key=KEY")
-    .output(swaig::FunctionResult("Weather: ${response.current.condition}"));
-agent.register_swaig_function(weather.to_swaig_function());
-```
-
-### Contexts & Steps
-
-Build multi-phase conversation workflows:
-
-```cpp
-auto& ctx = agent.define_contexts().add_context("sales");
-ctx.add_step("greet")
-    .add_section("Task", "Welcome the customer and ask how you can help.")
-    .set_step_criteria("Customer has stated their need")
-    .set_valid_steps({"recommend"});
-ctx.add_step("recommend")
-    .add_section("Task", "Recommend a product based on the customer's needs.")
-    .set_step_criteria("Customer has received a recommendation");
-```
-
-### Skills
-
-One-liner capability injection:
-
-```cpp
-agent.add_skill("datetime");
-agent.add_skill("math");
-agent.add_skill("web_search", {{"api_key", "..."}, {"search_engine_id", "..."}});
-```
-
-### Prefabs
-
-Pre-built agent types for common patterns:
-
-```cpp
-prefabs::InfoGathererAgent gatherer;
-gatherer.set_questions({
-    {{"key", "name"}, {"question", "What is your name?"}},
-    {{"key", "email"}, {"question", "What is your email?"}},
-});
-gatherer.run();
-```
-
-### REST Client
-
-```cpp
-auto client = rest::RestClient::from_env();
-auto agents = client.fabric().agents.list();
-auto result = client.calling().dial({{"to", "+15551234567"}, {"from", "+15559876543"}});
-```
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `SWML_BASIC_AUTH_USER` | HTTP basic auth username | auto-generated |
-| `SWML_BASIC_AUTH_PASSWORD` | HTTP basic auth password | auto-generated |
-| `SWML_PROXY_URL_BASE` | Public URL base for webhooks | auto-detected |
-| `SWML_SSL_ENABLED` | Enable HTTPS | `false` |
-| `SIGNALWIRE_PROJECT_ID` | Project ID for REST/RELAY | -- |
-| `SIGNALWIRE_API_TOKEN` | API token for REST/RELAY | -- |
-| `SIGNALWIRE_SPACE` | Space hostname for REST | -- |
-| `SIGNALWIRE_LOG_LEVEL` | Log level (debug/info/warn/error) | `info` |
-| `SIGNALWIRE_LOG_MODE` | Set to `off` to suppress all logging | -- |
-
-## CLI Tool
+Or compile directly:
 
 ```bash
-# Test SWAIG functions against a running agent
-bin/swaig-test http://localhost:3000/my-agent --list-tools
-bin/swaig-test http://localhost:3000/my-agent --exec get_time
-bin/swaig-test http://localhost:3000/my-agent --exec get_weather --param location=NYC
+g++ -std=c++17 -I include -I deps my_agent.cpp \
+    -L build -lsignalwire -lssl -lcrypto -lpthread -o my_agent
 ```
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) -- system design and component overview
-- [Agent Guide](docs/agent_guide.md) -- building agents step by step
-- [SWAIG Reference](docs/swaig_reference.md) -- function definitions, results, actions
-- [DataMap Guide](docs/datamap_guide.md) -- server-side API tools
-- [Contexts Guide](docs/contexts_guide.md) -- multi-phase workflows
-- [Skills System](docs/skills_system.md) -- built-in and custom skills
-- [SWML Service Guide](docs/swml_service_guide.md) -- low-level SWML document builder
-- [Security](docs/security.md) -- authentication and session management
-- [LLM Parameters](docs/llm_parameters.md) -- tuning AI behavior
+Full reference documentation is available at **[developer.signalwire.com/sdks/agents-sdk](https://developer.signalwire.com/sdks/agents-sdk)**.
+
+Guides are also available in the [`docs/`](docs/) directory:
+
+### Getting Started
+
+- [Agent Guide](docs/agent_guide.md) -- creating agents, prompt configuration, dynamic setup
+- [Architecture](docs/architecture.md) -- SDK architecture and core concepts
+- [SDK Features](docs/sdk_features.md) -- feature overview, SDK vs raw SWML comparison
+
+### Core Features
+
+- [SWAIG Reference](docs/swaig_reference.md) -- function results, actions, post_data lifecycle
+- [Contexts and Steps](docs/contexts_guide.md) -- structured workflows, navigation, gather mode
+- [DataMap Guide](docs/datamap_guide.md) -- serverless API tools without webhooks
+- [LLM Parameters](docs/llm_parameters.md) -- temperature, top_p, barge confidence tuning
+- [SWML Service Guide](docs/swml_service_guide.md) -- low-level construction of SWML documents
+
+### Skills and Extensions
+
+- [Skills System](docs/skills_system.md) -- built-in skills and the modular framework
+- [Third-Party Skills](docs/third_party_skills.md) -- creating and publishing custom skills
+- [MCP Gateway](docs/mcp_gateway_reference.md) -- Model Context Protocol integration
+
+### Deployment
+
+- [CLI Guide](docs/cli_guide.md) -- `swaig-test` command reference
+- [Cloud Functions](docs/cloud_functions_guide.md) -- containerized deployment
+- [Configuration](docs/configuration.md) -- environment variables, SSL, proxy setup
+- [Security](docs/security.md) -- authentication and security model
+
+### Reference
+
+- [API Reference](docs/api_reference.md) -- complete class and method reference
+- [Web Service](docs/web_service.md) -- HTTP server and endpoint details
 - [REST Client](rest/README.md) -- REST API client
 - [RELAY Client](relay/README.md) -- real-time call control
 
+## Environment Variables
+
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `SIGNALWIRE_PROJECT_ID` | RELAY, REST | Project identifier |
+| `SIGNALWIRE_API_TOKEN` | RELAY, REST | API token |
+| `SIGNALWIRE_SPACE` | RELAY, REST | Space hostname (e.g. `example.signalwire.com`) |
+| `SWML_BASIC_AUTH_USER` | Agents | Basic auth username (default: auto-generated) |
+| `SWML_BASIC_AUTH_PASSWORD` | Agents | Basic auth password (default: auto-generated) |
+| `SWML_PROXY_URL_BASE` | Agents | Base URL when behind a reverse proxy |
+| `SWML_SSL_ENABLED` | Agents | Enable HTTPS (`true`, `1`, `yes`) |
+| `SWML_SSL_CERT_PATH` | Agents | Path to SSL certificate |
+| `SWML_SSL_KEY_PATH` | Agents | Path to SSL private key |
+| `SIGNALWIRE_LOG_LEVEL` | All | Logging level (`debug`, `info`, `warn`, `error`) |
+| `SIGNALWIRE_LOG_MODE` | All | Set to `off` to suppress all logging |
+
+## Testing
+
+```bash
+# Build and run the test suite
+mkdir build && cd build
+cmake .. && make -j$(nproc)
+./run_tests
+
+# Run by category via ctest
+ctest -R agent
+ctest -R relay
+ctest -R rest
+```
+
+The test suite contains 258 tests covering all components.
+
 ## License
 
-MIT License. Copyright (c) 2025 SignalWire.
+MIT -- see [LICENSE](LICENSE) for details.

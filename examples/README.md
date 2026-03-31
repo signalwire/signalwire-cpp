@@ -18,11 +18,13 @@ g++ -std=c++17 -I include -I deps examples/simple_agent.cpp \
 |------|-------------|
 | [simple_agent.cpp](simple_agent.cpp) | POM prompts, tools, hints, languages, SIP routing |
 | [simple_dynamic_agent.cpp](simple_dynamic_agent.cpp) | Per-request customization via DynamicConfigCallback |
+| [simple_dynamic_enhanced.cpp](simple_dynamic_enhanced.cpp) | Enhanced dynamic config: VIP, department, customer ID, language |
 | [simple_static.cpp](simple_static.cpp) | Static prompt-only agent (no tools) |
 | [declarative.cpp](declarative.cpp) | Agent built from JSON-like config |
 | [multi_agent_server.cpp](multi_agent_server.cpp) | Multiple agents on a single port via AgentServer |
 | [custom_path.cpp](custom_path.cpp) | Agent at a custom HTTP route |
 | [kubernetes.cpp](kubernetes.cpp) | Production-ready with health checks and signal handling |
+| [lambda_agent.cpp](lambda_agent.cpp) | Serverless Lambda handler with global agent for cold-start reuse |
 | [comprehensive_dynamic.cpp](comprehensive_dynamic.cpp) | Full dynamic config: tenant, voice, model, instructions |
 
 ## Tool & Action Examples
@@ -49,6 +51,7 @@ g++ -std=c++17 -I include -I deps examples/simple_agent.cpp \
 |------|-------------|
 | [contexts_demo.cpp](contexts_demo.cpp) | Multi-persona workflow (sales, tech support, manager) |
 | [gather_info.cpp](gather_info.cpp) | GatherInfo with question collection |
+| [dynamic_info_gatherer.cpp](dynamic_info_gatherer.cpp) | Dynamic InfoGatherer with callback-based question selection |
 
 ## Skills Examples
 
@@ -56,9 +59,14 @@ g++ -std=c++17 -I include -I deps examples/simple_agent.cpp \
 |------|-------------|
 | [skills_demo.cpp](skills_demo.cpp) | datetime, math, web_search skills |
 | [joke_agent.cpp](joke_agent.cpp) | Joke skill for entertainment |
+| [joke_skill.cpp](joke_skill.cpp) | Joke skill via modular skills system with DataMap |
 | [web_search.cpp](web_search.cpp) | Google web search skill |
+| [web_search_multi_instance.cpp](web_search_multi_instance.cpp) | Multiple web search instances (general, news, quick) |
 | [wikipedia.cpp](wikipedia.cpp) | Wikipedia search skill |
 | [datasphere.cpp](datasphere.cpp) | SignalWire Datasphere knowledge search |
+| [datasphere_multi_instance.cpp](datasphere_multi_instance.cpp) | Multiple DataSphere instances with custom tool names |
+| [datasphere_serverless_env.cpp](datasphere_serverless_env.cpp) | DataSphere serverless from environment variables |
+| [datasphere_webhook_env.cpp](datasphere_webhook_env.cpp) | Webhook-based DataSphere from environment variables |
 | [mcp_gateway.cpp](mcp_gateway.cpp) | MCP gateway tool integration |
 
 ## Prefab Examples
@@ -75,6 +83,7 @@ g++ -std=c++17 -I include -I deps examples/simple_agent.cpp \
 
 | File | Description |
 |------|-------------|
+| [auto_vivified.cpp](auto_vivified.cpp) | Auto-vivified verb methods on SWMLService |
 | [swml_service.cpp](swml_service.cpp) | Low-level SWML document builder |
 | [swml_service_routing.cpp](swml_service_routing.cpp) | Multi-section routing with goto/label |
 | [dynamic_swml_service.cpp](dynamic_swml_service.cpp) | Dynamic SWML per request |

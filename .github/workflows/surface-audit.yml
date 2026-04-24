@@ -1,0 +1,77 @@
+# Symbol-level surface audit (Layer B) against the Python reference.
+#
+# Every PR and nightly run regenerates port_surface.json from the C++ headers
+# and diffs it against porting-sdk/python_surface.json. Unexcused missing or
+# extra symbols fail the job. See:
+#   - scripts/enumerate_surface.py   -- emitter
+#   - PORT_OMISSIONS.md              -- Python symbols we deliberately skip
+#   - PORT_ADDITIONS.md              -- C++-only symbols with no Python peer
+#   - porting-sdk/scripts/diff_port_surface.py  -- diff tool (upstream)
+name: Surface Audit
+
+on:
+  pull_request:
+    paths:
+      - 'include/**'
+      - 'scripts/enumerate_surface.py'
+      - 'PORT_OMISSIONS.md'
+      - 'PORT_ADDITIONS.md'
+      - 'port_surface.json'
+      - '.github/workflows/surface-audit.yml'
+  push:
+    branches: [main]
+  schedule:
+    # Nightly: every day at 04:00 UTC. Catches drift introduced by upstream
+    # python_surface.json updates without any C++ PR.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  surface-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout signalwire-cpp
+        uses: actions/checkout@v5
+
+      - name: Checkout porting-sdk (reference surface)
+        uses: actions/checkout@v5
+        with:
+          repository: signalwire/porting-sdk
+          path: porting-sdk
+          # Unauthenticated clone of the public reference. If the repo moves
+          # private, add a token here.
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Regenerate port_surface.json
+        run: python3 scripts/enumerate_surface.py --output port_surface.json
+
+      - name: Check port_surface.json is committed and up-to-date
+        run: |
+          if ! git diff --exit-code port_surface.json; then
+            echo "::error::port_surface.json is stale. Regenerate with:"
+            echo "    python3 scripts/enumerate_surface.py"
+            exit 1
+          fi
+
+      - name: Diff against Python reference
+        run: |
+          python3 porting-sdk/scripts/diff_port_surface.py \
+              --reference porting-sdk/python_surface.json \
+              --port-surface port_surface.json \
+              --omissions PORT_OMISSIONS.md \
+              --additions PORT_ADDITIONS.md
+
+      # On failure, print the full JSON report for debugging.
+      - name: Emit JSON report on failure
+        if: failure()
+        run: |
+          python3 porting-sdk/scripts/diff_port_surface.py \
+              --reference porting-sdk/python_surface.json \
+              --port-surface port_surface.json \
+              --omissions PORT_OMISSIONS.md \
+              --additions PORT_ADDITIONS.md \
+              --json || true

@@ -1,9 +1,12 @@
 // Copyright (c) 2025 SignalWire — MIT License
-// Dynamic InfoGatherer: selects questions based on request parameters.
-// Test: ?set=support, ?set=medical, ?set=onboarding
+// Dynamic-intake InfoGatherer: pick one of several static question sets
+// at configuration time. The C++ port exposes a static set_questions()
+// surface; per-request dynamic selection is not yet implemented in C++.
 
 #include <signalwire/agent/agent_base.hpp>
-#include <signalwire/prefabs/info_gatherer.hpp>
+#include <signalwire/prefabs/prefabs.hpp>
+#include <signalwire/common.hpp>
+#include <iostream>
 
 using namespace signalwire;
 using json = nlohmann::json;
@@ -40,21 +43,23 @@ int main() {
         {{"key_name", "start_date"}, {"question_text", "What is your start date?"}}
     });
 
+    // Choose the question set at startup via the QUESTION_SET env var.
+    std::string set_name = signalwire::get_env("QUESTION_SET", "default");
+    auto selected = question_sets.find(set_name);
+    if (selected == question_sets.end()) {
+        std::cout << "Unknown QUESTION_SET=" << set_name << "; using default.\n";
+        selected = question_sets.find("default");
+    }
+
+    std::vector<json> questions;
+    for (const auto& q : selected->second) {
+        questions.push_back(q);
+    }
+
     prefabs::InfoGathererAgent gatherer("dynamic-intake", "/contact");
+    gatherer.set_questions(questions);
 
-    gatherer.set_question_callback([&question_sets](
-        const std::map<std::string, std::string>& query_params) -> json {
-        auto it = query_params.find("set");
-        std::string set = (it != query_params.end()) ? it->second : "default";
-        std::cout << "Dynamic question set: " << set << "\n";
-        auto qs = question_sets.find(set);
-        return (qs != question_sets.end()) ? qs->second : question_sets["default"];
-    });
-
-    std::cout << "Dynamic InfoGatherer at http://0.0.0.0:3000/contact\n";
-    std::cout << "  /contact            (default)\n";
-    std::cout << "  /contact?set=support (customer support)\n";
-    std::cout << "  /contact?set=medical (medical intake)\n";
-    std::cout << "  /contact?set=onboarding (employee onboarding)\n";
+    std::cout << "InfoGatherer (" << set_name << ") at http://0.0.0.0:3000/contact\n";
+    std::cout << "Select a set at startup with QUESTION_SET={default|support|medical|onboarding}\n";
     gatherer.run();
 }

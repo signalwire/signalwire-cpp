@@ -2,6 +2,8 @@
 // Datasphere agent: knowledge search via SignalWire Datasphere.
 
 #include <signalwire/agent/agent_base.hpp>
+#include <signalwire/common.hpp>
+#include <iostream>
 
 using namespace signalwire;
 

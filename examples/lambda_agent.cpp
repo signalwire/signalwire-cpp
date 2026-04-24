@@ -1,6 +1,7 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Serverless Lambda handler pattern. Agent created at global scope for
-// cold-start reuse. In production, wrap agent.as_router() with a Lambda adapter.
+// cold-start reuse. In production, wrap agent.render_swml() / HTTP handlers
+// with a Lambda adapter (API Gateway proxy integration).
 // For local testing, runs as a normal HTTP server.
 
 #include <signalwire/agent/agent_base.hpp>
@@ -46,11 +47,11 @@ static agent::AgentBase& get_agent() {
     return a;
 }
 
-// In production: wrap get_agent().as_router() with a Lambda adapter.
+// In production: wrap get_agent() HTTP endpoints with a Lambda adapter.
 // For local testing:
 int main() {
     auto& agent = get_agent();
     std::cout << "Starting Lambda agent (local testing) at http://0.0.0.0:3000/\n";
-    std::cout << "In production, wrap agent.as_router() with a Lambda adapter.\n";
+    std::cout << "In production, wrap render_swml() / HTTP handlers with a Lambda adapter.\n";
     agent.run();
 }

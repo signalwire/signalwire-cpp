@@ -1,0 +1,88 @@
+# Doc/example audit (Layer C) — catch phantom-API references.
+#
+# Every method call in docs/, rest/docs/, relay/docs/, examples/, rest/examples/,
+# relay/examples/ must resolve to a real symbol in port_surface.json, OR be
+# explicitly listed in DOC_AUDIT_IGNORE.md with a rationale. The job also
+# compiles every example against the built library so doc snippets stay
+# grounded in real code.
+#
+# History: the rest/docs/fabric.md doc once promised assign_phone_route +
+# swml_webhooks.create + cxml_webhooks.create — methods that never existed.
+# This audit ensures that class of drift is caught in CI.
+name: Doc Audit
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'rest/docs/**'
+      - 'relay/docs/**'
+      - 'examples/**'
+      - 'rest/examples/**'
+      - 'relay/examples/**'
+      - 'include/**'
+      - 'src/**'
+      - 'port_surface.json'
+      - 'DOC_AUDIT_IGNORE.md'
+      - 'CMakeLists.txt'
+      - '.github/workflows/doc-audit.yml'
+  push:
+    branches: [main]
+  schedule:
+    # Nightly: every day at 04:30 UTC (30m after surface audit).
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  doc-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout signalwire-cpp
+        uses: actions/checkout@v5
+
+      - name: Checkout porting-sdk (audit tool)
+        uses: actions/checkout@v5
+        with:
+          repository: signalwire/porting-sdk
+          path: porting-sdk
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev
+
+      - name: Build library + examples
+        run: |
+          mkdir -p build
+          cd build
+          cmake ..
+          cmake --build . -j"$(nproc)"
+          cmake --build . --target examples -j"$(nproc)"
+
+      - name: Run existing tests
+        run: |
+          cd build
+          ./run_tests
+
+      - name: Audit docs and examples against port surface
+        run: |
+          python3 porting-sdk/scripts/audit_docs.py \
+              --root . \
+              --surface port_surface.json \
+              --ignore DOC_AUDIT_IGNORE.md
+
+      # On failure, print the JSON report so reviewers can see the exact
+      # unresolved names + file:line locations.
+      - name: Emit JSON report on failure
+        if: failure()
+        run: |
+          python3 porting-sdk/scripts/audit_docs.py \
+              --root . \
+              --surface port_surface.json \
+              --ignore DOC_AUDIT_IGNORE.md \
+              --json || true

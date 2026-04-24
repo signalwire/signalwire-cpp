@@ -2,6 +2,8 @@
 // Web search agent using the web_search skill.
 
 #include <signalwire/agent/agent_base.hpp>
+#include <signalwire/common.hpp>
+#include <iostream>
 
 using namespace signalwire;
 

@@ -1,15 +1,17 @@
 // Copyright (c) 2025 SignalWire — MIT License
-// Auto-vivified SWML service: voicemail, IVR, and call transfer.
+// Auto-built SWML services: voicemail, IVR, and call transfer.
 
-#include <signalwire/swml/swml_service.hpp>
+#include <signalwire/swml/service.hpp>
+#include <iostream>
 
 using namespace signalwire;
 
 int main() {
     // --- Voicemail Service ---
-    swml::SWMLService voicemail("voicemail", "/voicemail");
+    swml::Service voicemail;
+    voicemail.set_route("/voicemail");
 
-    voicemail.add_answer_verb();
+    voicemail.answer();
     voicemail.play({{"url", "say:Hello, you have reached the voicemail service. Please leave a message after the beep."}});
     voicemail.sleep(1000);
     voicemail.play({{"url", "https://example.com/beep.wav"}});
@@ -22,26 +24,27 @@ int main() {
         {"status_url", "https://example.com/voicemail-status"}
     });
     voicemail.play({{"url", "say:Thank you for your message. Goodbye!"}});
-    voicemail.add_hangup_verb();
+    voicemail.hangup();
 
     // --- IVR Menu Service ---
-    swml::SWMLService ivr("ivr", "/ivr");
+    swml::Service ivr;
+    ivr.set_route("/ivr");
 
-    ivr.add_answer_verb();
-    ivr.add_section("main_menu");
-    ivr.add_verb_to_section("main_menu", "prompt", {
+    ivr.answer();
+    ivr.prompt({
         {"play", "say:Press 1 for sales, 2 for support."},
         {"max_digits", 1},
         {"terminators", "#"}
     });
-    ivr.add_verb("transfer", {{"dest", "main_menu"}});
+    ivr.transfer({{"dest", "main_menu"}});
 
     // --- Call Transfer Service ---
-    swml::SWMLService transfer("transfer", "/transfer");
+    swml::Service transfer;
+    transfer.set_route("/transfer");
 
-    transfer.add_answer_verb();
-    transfer.add_verb("play", {{"url", "say:Connecting you with the next available agent."}});
-    transfer.add_verb("connect", {
+    transfer.answer();
+    transfer.play({{"url", "say:Connecting you with the next available agent."}});
+    transfer.connect({
         {"from", "+15551234567"},
         {"timeout", 30},
         {"parallel", nlohmann::json::array({
@@ -49,9 +52,10 @@ int main() {
             {{"to", "+15554445555"}}
         })}
     });
-    transfer.add_verb("record", {{"format", "mp3"}, {"beep", true}, {"max_length", 120}});
-    transfer.add_hangup_verb();
+    transfer.record({{"format", "mp3"}, {"beep", true}, {"max_length", 120}});
+    transfer.hangup();
 
+    std::cout << "Voicemail SWML:\n" << voicemail.render_swml().dump(2) << "\n";
     std::cout << "Starting voicemail service at http://0.0.0.0:3000/voicemail\n";
-    voicemail.run();
+    voicemail.serve();
 }

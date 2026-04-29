@@ -24,6 +24,18 @@ public:
     /// Initialize from environment variables
     static RestClient from_env();
 
+    /// Construct with an explicit pre-built base URL (`http://...` or
+    /// `https://...`) instead of synthesizing one from the SignalWire
+    /// space hostname. Used by audit harnesses pointing the client at
+    /// loopback fixtures. The space-based constructor remains the
+    /// production path.
+    static RestClient with_base_url(const std::string& base_url,
+                                     const std::string& project_id,
+                                     const std::string& token);
+
+    /// Project ID accessor (read-only).
+    const std::string& project_id() const { return project_id_; }
+
     // ========================================================================
     // API Namespaces (all 21)
     // ========================================================================
@@ -373,6 +385,12 @@ public:
     const HttpClient& http_client() const { return *client_; }
 
 private:
+    /// Helper used by both constructors to wire all 21 namespaces against
+    /// the (already-built) HttpClient.
+    void init_namespaces();
+
+    std::string project_id_;
+
     std::unique_ptr<HttpClient> client_;
 
     std::unique_ptr<FabricNamespace> fabric_;

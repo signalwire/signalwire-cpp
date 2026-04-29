@@ -3,6 +3,9 @@
 #include "httplib.h"
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
+#include <algorithm>
+#include <cstdlib>
+#include <iostream>
 #include <regex>
 
 namespace signalwire {
@@ -267,6 +270,57 @@ std::vector<std::string> Service::list_tool_names() const {
     return tool_order_;
 }
 
+std::string Service::build_tool_registry_json() const {
+    // Build `{"tools":[...]}` capturing the runtime registry. Iterate
+    // tool_order_ first (preserves registration order), then any
+    // register_swaig_function entries whose name didn't surface there.
+    json arr = json::array();
+    std::vector<std::string> seen;
+    for (const auto& name : tool_order_) {
+        auto it = tools_.find(name);
+        if (it != tools_.end()) {
+            arr.push_back(it->second.to_swaig_json());
+            seen.push_back(name);
+            continue;
+        }
+        // Fall back to a raw entry registered via register_swaig_function.
+        for (const auto& raw : registered_swaig_functions_) {
+            if (raw.contains("function") &&
+                raw["function"].is_string() &&
+                raw["function"].get<std::string>() == name) {
+                arr.push_back(raw);
+                seen.push_back(name);
+                break;
+            }
+        }
+    }
+    // Catch any define_tool entries somehow not in tool_order_.
+    for (const auto& [name, td] : tools_) {
+        if (std::find(seen.begin(), seen.end(), name) == seen.end()) {
+            arr.push_back(td.to_swaig_json());
+        }
+    }
+    json body;
+    body["tools"] = arr;
+    return body.dump();
+}
+
+std::string Service::extract_introspect_payload(const std::string& stdout_capture) {
+    static const std::string kBegin = "__SWAIG_TOOLS_BEGIN__";
+    static const std::string kEnd = "__SWAIG_TOOLS_END__";
+    auto begin = stdout_capture.find(kBegin);
+    if (begin == std::string::npos) return std::string();
+    size_t after_begin = begin + kBegin.size();
+    auto end = stdout_capture.find(kEnd, after_begin);
+    if (end == std::string::npos) return std::string();
+    std::string slice = stdout_capture.substr(after_begin, end - after_begin);
+    // Trim leading/trailing whitespace (newlines).
+    size_t s = slice.find_first_not_of(" \t\r\n");
+    if (s == std::string::npos) return std::string();
+    size_t e = slice.find_last_not_of(" \t\r\n");
+    return slice.substr(s, e - s + 1);
+}
+
 void Service::handle_swaig_endpoint(const httplib::Request& req, httplib::Response& res) {
     add_security_headers(res);
     if (!validate_auth(req, res)) return;
@@ -358,6 +412,18 @@ void Service::setup_routes(httplib::Server& server) {
 }
 
 void Service::serve() {
+    // Introspect path: when SWAIG_LIST_TOOLS is set, dump the runtime tool
+    // registry to stdout between sentinel markers and exit BEFORE binding
+    // any port. This is how the swaig-test --example CLI lists tools on a
+    // compiled SWMLService example without standing up an HTTP server.
+    if (std::getenv("SWAIG_LIST_TOOLS")) {
+        std::cout << "__SWAIG_TOOLS_BEGIN__\n"
+                  << build_tool_registry_json() << "\n"
+                  << "__SWAIG_TOOLS_END__\n";
+        std::cout.flush();
+        std::exit(0);
+    }
+
     init_auth();
 
     const char* env_port = std::getenv("PORT");

@@ -124,3 +124,57 @@ TEST(service_sidecar_pattern_emits_verb_and_registers_tool) {
     ASSERT_TRUE(resp.find("$79") != std::string::npos);
     return true;
 }
+
+TEST(service_build_tool_registry_json_dumps_runtime_registry) {
+    // build_tool_registry_json is the introspect helper the SDK's serve()
+    // calls when SWAIG_LIST_TOOLS=1 is set. It must produce
+    // {"tools":[<each tool's SWAIG definition>]} in tool_order_, capturing
+    // whatever shape define_tool / register_swaig_function actually stored.
+    Service svc;
+    svc.define_tool(ToolDefinition{
+        "lookup_competitor",
+        "Look up competitor pricing.",
+        json::object({
+            {"type", "object"},
+            {"properties", json::object({
+                {"competitor", json::object({{"type", "string"}})},
+            })},
+        }),
+        [](const json&, const json&) -> FunctionResult {
+            return FunctionResult("ok");
+        },
+        false,
+    });
+    svc.define_tool(ToolDefinition{
+        "get_weather",
+        "Get the weather.",
+        json::object({{"type", "object"}}),
+        [](const json&, const json&) -> FunctionResult { return FunctionResult("sunny"); },
+        false,
+    });
+
+    auto payload = svc.build_tool_registry_json();
+    auto parsed = json::parse(payload);
+    ASSERT_TRUE(parsed.contains("tools"));
+    ASSERT_TRUE(parsed["tools"].is_array());
+    ASSERT_EQ(parsed["tools"].size(), 2u);
+    ASSERT_EQ(parsed["tools"][0]["function"].get<std::string>(), "lookup_competitor");
+    ASSERT_EQ(parsed["tools"][1]["function"].get<std::string>(), "get_weather");
+    ASSERT_EQ(parsed["tools"][0]["description"].get<std::string>(), "Look up competitor pricing.");
+    return true;
+}
+
+TEST(service_extract_introspect_payload_finds_json_between_sentinels) {
+    // The companion extractor used by the swaig-test --example CLI.
+    std::string captured =
+        "noise\n__SWAIG_TOOLS_BEGIN__\n{\"tools\":[]}\n__SWAIG_TOOLS_END__\nmore noise\n";
+    auto payload = Service::extract_introspect_payload(captured);
+    ASSERT_EQ(payload, std::string("{\"tools\":[]}"));
+    return true;
+}
+
+TEST(service_extract_introspect_payload_returns_empty_when_markers_missing) {
+    ASSERT_EQ(Service::extract_introspect_payload("no markers anywhere"), std::string());
+    ASSERT_EQ(Service::extract_introspect_payload("__SWAIG_TOOLS_BEGIN__\n{}"), std::string());
+    return true;
+}

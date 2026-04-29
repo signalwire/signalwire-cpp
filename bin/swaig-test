@@ -1,21 +1,31 @@
 #!/usr/bin/env bash
-# swaig-test -- Test SWAIG functions on a running agent
+# swaig-test -- Test SWAIG functions on a running agent OR introspect a
+# compiled SWMLService example binary.
 #
 # Usage:
 #   swaig-test <url> --list-tools
 #   swaig-test <url> --exec <tool> [--param key=value ...]
 #   swaig-test <url> --dump-swml
+#   swaig-test --example <name> --list-tools
 #
 # Examples:
 #   swaig-test http://localhost:3000/my-agent --list-tools
 #   swaig-test http://localhost:3000/my-agent --exec get_weather --param location=NYC
 #   swaig-test http://user:pass@localhost:3000/my-agent --dump-swml
+#   swaig-test --example swmlservice_swaig_standalone --list-tools
 #
 # The agent URL can include basic auth credentials in the URL.
+#
+# --example mode locates the built example binary under build/ (where CMake
+# emits `example_<name>`), spawns it with `SWAIG_LIST_TOOLS=1`, captures the
+# JSON between `__SWAIG_TOOLS_BEGIN__` / `__SWAIG_TOOLS_END__` sentinels the
+# SDK prints from Service::serve(), and displays the registered tools — all
+# without binding any port or talking HTTP. Use this for SWMLService-only
+# examples that don't have an `<ai>` verb to walk in URL mode.
 
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 
 usage() {
     cat <<EOF
@@ -23,13 +33,20 @@ swaig-test v${VERSION} -- Test SWAIG functions on a running agent
 
 USAGE:
     swaig-test <agent-url> [OPTIONS]
+    swaig-test --example <name> --list-tools
 
 OPTIONS:
     --list-tools              List all SWAIG tools registered on the agent
-    --exec <tool-name>        Execute a specific SWAIG tool
+    --exec <tool-name>        Execute a specific SWAIG tool (URL mode)
     --param <key=value>       Pass a parameter (repeatable)
-    --dump-swml               Dump the SWML document
-    --verbose                 Show HTTP response headers
+    --dump-swml               Dump the SWML document (URL mode)
+    --example <name>          Introspect a built example binary by name.
+                              Spawns build/example_<name> with
+                              SWAIG_LIST_TOOLS=1; the SDK's serve() dumps
+                              the tool registry and exits without binding.
+    --build-dir <path>        Where to look for example binaries (default: build)
+    --raw                     Print raw JSON (no formatting) for --example
+    --verbose                 Show HTTP response headers / extra diagnostics
     --help                    Show this help
 
 EXAMPLES:
@@ -37,6 +54,7 @@ EXAMPLES:
     swaig-test http://localhost:3000/agent --exec get_time
     swaig-test http://localhost:3000/agent --exec get_weather --param location=NYC
     swaig-test http://user:pass@localhost:3000/agent --dump-swml
+    swaig-test --example swmlservice_swaig_standalone --list-tools
 
 AUTHENTICATION:
     Embed credentials in the URL: http://user:pass@host:port/route
@@ -47,8 +65,7 @@ EOF
 
 die() { echo "ERROR: $1" >&2; exit 1; }
 
-# Check for curl
-command -v curl >/dev/null 2>&1 || die "curl is required but not found"
+# Check for curl (only required for URL mode)
 command -v python3 >/dev/null 2>&1 && HAS_PYTHON=1 || HAS_PYTHON=0
 
 json_pp() {
@@ -63,16 +80,22 @@ json_pp() {
 AGENT_URL=""
 MODE=""
 TOOL_NAME=""
+EXAMPLE_NAME=""
+BUILD_DIR="build"
 VERBOSE=0
+RAW=0
 declare -a PARAMS=()
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --help|-h)      usage ;;
-        --list-tools)   MODE="list"; shift ;;
+        --list-tools)   MODE="${MODE:-list}"; [ "$MODE" = "introspect" ] || MODE="list"; shift ;;
         --exec)         MODE="exec"; TOOL_NAME="${2:-}"; [ -z "$TOOL_NAME" ] && die "--exec requires a tool name"; shift 2 ;;
         --param)        PARAMS+=("${2:-}"); [ -z "${2:-}" ] && die "--param requires key=value"; shift 2 ;;
         --dump-swml)    MODE="swml"; shift ;;
+        --example)      MODE="introspect"; EXAMPLE_NAME="${2:-}"; [ -z "$EXAMPLE_NAME" ] && die "--example requires a name"; shift 2 ;;
+        --build-dir)    BUILD_DIR="${2:-build}"; shift 2 ;;
+        --raw)          RAW=1; shift ;;
         --verbose|-v)   VERBOSE=1; shift ;;
         -*)             die "Unknown option: $1" ;;
         *)
@@ -86,8 +109,85 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -z "$AGENT_URL" ] && die "Agent URL is required. Usage: swaig-test <url> --list-tools"
-[ -z "$MODE" ] && die "Specify an action: --list-tools, --exec <tool>, or --dump-swml"
+# --example mode: introspect a built example binary
+if [ "$MODE" = "introspect" ]; then
+    [ -n "$EXAMPLE_NAME" ] || die "--example requires a name"
+    # Locate the example binary. CMake emits example targets as
+    # `example_<name>` in the build/ root (see CMakeLists.txt foreach).
+    candidates=(
+        "${BUILD_DIR}/example_${EXAMPLE_NAME}"
+        "${BUILD_DIR}/examples/${EXAMPLE_NAME}"
+        "${BUILD_DIR}/${EXAMPLE_NAME}"
+    )
+    BIN=""
+    for c in "${candidates[@]}"; do
+        if [ -x "$c" ]; then BIN="$c"; break; fi
+    done
+    if [ -z "$BIN" ]; then
+        echo "ERROR: could not find example binary for '${EXAMPLE_NAME}'" >&2
+        echo "Tried:" >&2
+        for c in "${candidates[@]}"; do echo "  $c" >&2; done
+        echo "Build it first: cmake --build ${BUILD_DIR} --target example_${EXAMPLE_NAME}" >&2
+        exit 1
+    fi
+    [ "$VERBOSE" -eq 1 ] && echo "[verbose] running ${BIN} with SWAIG_LIST_TOOLS=1" >&2
+
+    # Run with introspect env, capture stdout. Allow non-zero from std::exit(0)
+    # in case the example wraps its main differently.
+    OUT="$(SWAIG_LIST_TOOLS=1 "$BIN" 2>/dev/null || true)"
+
+    # Slice between sentinels
+    if ! echo "$OUT" | grep -q '__SWAIG_TOOLS_BEGIN__'; then
+        echo "ERROR: example '${EXAMPLE_NAME}' did not emit __SWAIG_TOOLS_BEGIN__/__SWAIG_TOOLS_END__ markers." >&2
+        echo "Make sure it calls service.serve() and links a recent libsignalwire." >&2
+        if [ "$VERBOSE" -eq 1 ]; then
+            echo "--- raw stdout ---" >&2
+            echo "$OUT" >&2
+        fi
+        exit 1
+    fi
+    PAYLOAD="$(echo "$OUT" | sed -n '/__SWAIG_TOOLS_BEGIN__/,/__SWAIG_TOOLS_END__/p' \
+        | sed '1d;$d')"
+
+    if [ "$RAW" -eq 1 ]; then
+        echo "$PAYLOAD"
+        exit 0
+    fi
+
+    # Pretty-print: count tools and emit a compact list. Permissive about
+    # field names (function|name, description|purpose, parameters|argument)
+    # to match the rust CLI's introspect display.
+    if [ "$HAS_PYTHON" -eq 1 ]; then
+        echo "$PAYLOAD" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+tools = data.get("tools") if isinstance(data, dict) else None
+if not tools:
+    print("No tools registered.")
+    sys.exit(0)
+print(f"Registered SWAIG tools ({len(tools)}):")
+for i, t in enumerate(tools, 1):
+    name = t.get("function") or t.get("name") or "<unnamed>"
+    desc = t.get("description") or t.get("purpose") or ""
+    print(f"  {i}. {name} \u2014 {desc}")
+    arg = t.get("parameters") or t.get("argument") or {}
+    props = (arg or {}).get("properties") or {}
+    for pname, pdef in props.items():
+        ptype = (pdef or {}).get("type", "")
+        pdesc = (pdef or {}).get("description", "")
+        print(f"       - {pname} ({ptype}): {pdesc}")
+'
+    else
+        echo "$PAYLOAD"
+    fi
+    exit 0
+fi
+
+# URL-based modes from here on
+[ -z "$AGENT_URL" ] && die "Agent URL is required (or use --example <name>). Run with --help for usage."
+[ -z "$MODE" ] && die "Specify an action: --list-tools, --exec <tool>, --dump-swml, or --example <name>"
+
+command -v curl >/dev/null 2>&1 || die "curl is required for URL mode but not found"
 
 # Extract auth from URL if present (http://user:pass@host...)
 CURL_AUTH=""

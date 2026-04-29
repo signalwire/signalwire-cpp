@@ -144,6 +144,20 @@ public:
     bool has_tool(const std::string& name) const;
     std::vector<std::string> list_tool_names() const;
 
+    /// Build the introspect payload for the registered tools as a JSON string
+    /// shaped like `{"tools":[<each tool's SWAIG definition>]}`. Iterates
+    /// `tool_order_` first, falling back to map order for entries registered
+    /// only via `register_swaig_function`. Stable across SDKs so the
+    /// `swaig-test --example` CLI can parse output uniformly. Used by the
+    /// SWAIG_LIST_TOOLS env-var path; pulled out as a separate helper so
+    /// tests can assert content without invoking exit().
+    std::string build_tool_registry_json() const;
+    /// Pure-string extractor: slice the JSON payload between
+    /// `__SWAIG_TOOLS_BEGIN__` and `__SWAIG_TOOLS_END__` sentinels in a
+    /// captured stdout. Returns empty string if either marker is missing or
+    /// the order is wrong. Static so the swaig-test CLI / tests can reuse it.
+    static std::string extract_introspect_payload(const std::string& stdout_capture);
+
     // ========================================================================
     // HTTP Server
     // ========================================================================

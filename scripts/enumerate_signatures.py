@@ -340,6 +340,17 @@ def collect(raw_entries: list[dict], aliases: dict) -> tuple[dict, list]:
 
         if not methods_out:
             continue
+        # Synthesize __init__ when libclang didn't surface an explicit
+        # constructor — POD structs / classes with only the implicit
+        # default constructor still ARE constructible. Without this,
+        # every such class shows up with a missing-port __init__ even
+        # when port code can construct it. Matches the Perl adapter's
+        # synthetic __init__ for Moo classes.
+        if "__init__" not in methods_out:
+            methods_out["__init__"] = {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "void",
+            }
         out_modules.setdefault(mod, {"classes": {}})
         out_modules[mod]["classes"].setdefault(name, {"methods": {}})
         out_modules[mod]["classes"][name]["methods"].update(methods_out)

@@ -6,6 +6,15 @@
       "classes": {
         "LanguageConfig": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "to_json": {
               "params": [
                 {
@@ -23,6 +32,15 @@
       "classes": {
         "PomSection": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "to_json": {
               "params": [
                 {
@@ -40,6 +58,15 @@
       "classes": {
         "Pronunciation": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "to_json": {
               "params": [
                 {
@@ -3856,6 +3883,15 @@
       "classes": {
         "SkillBase": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "cleanup": {
               "params": [
                 {
@@ -4156,6 +4192,15 @@
       "classes": {
         "ToolDefinition": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "to_swaig_json": {
               "params": [
                 {
@@ -5064,6 +5109,15 @@
       "classes": {
         "Logger": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "debug": {
               "params": [
                 {
@@ -6502,6 +6556,15 @@
       "classes": {
         "CallEvent": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "from_relay_event": {
               "params": [
                 {
@@ -6812,6 +6875,15 @@
       "classes": {
         "ComponentEvent": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "from_relay_event": {
               "params": [
                 {
@@ -6830,6 +6902,15 @@
       "classes": {
         "DialEvent": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "from_relay_event": {
               "params": [
                 {
@@ -6945,6 +7026,15 @@
       "classes": {
         "MessageEvent": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "from_relay_event": {
               "params": [
                 {
@@ -8916,6 +9006,15 @@
       "classes": {
         "SkillRegistry": {
           "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
             "create": {
               "params": [
                 {

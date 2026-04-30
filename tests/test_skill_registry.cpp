@@ -2,6 +2,11 @@
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/skills/skill_manager.hpp"
 #include "signalwire/agent/agent_base.hpp"
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace sw_skills = signalwire::skills;
 using json = nlohmann::json;
@@ -104,5 +109,87 @@ TEST(skill_manager_duplicate_single_instance_rejected) {
     signalwire::agent::AgentBase agent;
     mgr.load_skill("datetime", json::object(), agent);
     ASSERT_FALSE(mgr.load_skill("datetime", json::object(), agent));
+    return true;
+}
+
+// ========================================================================
+// add_skill_directory — parity with Python's
+// signalwire.skills.registry.SkillRegistry.add_skill_directory
+// ========================================================================
+
+namespace {
+// tmp dir helper for parity tests; mkdtemp returns a unique directory.
+std::string make_temp_dir() {
+    char tmpl[] = "/tmp/swcpp_skill_dir_XXXXXX";
+    char* dir = mkdtemp(tmpl);
+    if (!dir) return std::string();
+    return std::string(dir);
+}
+} // namespace
+
+TEST(skill_registry_add_skill_directory_valid) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    std::string dir = make_temp_dir();
+    ASSERT_FALSE(dir.empty());
+    reg.add_skill_directory(dir);
+    auto paths = reg.external_paths();
+    bool found = false;
+    for (const auto& p : paths) {
+        if (p == dir) { found = true; break; }
+    }
+    ASSERT_TRUE(found);
+    // cleanup: remove directory (don't leak between tests)
+    rmdir(dir.c_str());
+    return true;
+}
+
+TEST(skill_registry_add_skill_directory_not_exists) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    bool threw = false;
+    try {
+        reg.add_skill_directory("/no/such/path/swcpp_abc123_does_not_exist");
+    } catch (const std::invalid_argument& e) {
+        threw = true;
+        std::string msg = e.what();
+        ASSERT_TRUE(msg.find("does not exist") != std::string::npos);
+    }
+    ASSERT_TRUE(threw);
+    return true;
+}
+
+TEST(skill_registry_add_skill_directory_not_a_directory) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    // Create a regular file
+    char file_tmpl[] = "/tmp/swcpp_skill_file_XXXXXX";
+    int fd = mkstemp(file_tmpl);
+    ASSERT_TRUE(fd >= 0);
+    close(fd);
+    bool threw = false;
+    try {
+        reg.add_skill_directory(file_tmpl);
+    } catch (const std::invalid_argument& e) {
+        threw = true;
+        std::string msg = e.what();
+        ASSERT_TRUE(msg.find("not a directory") != std::string::npos);
+    }
+    unlink(file_tmpl);
+    ASSERT_TRUE(threw);
+    return true;
+}
+
+TEST(skill_registry_add_skill_directory_dedup) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    std::string dir = make_temp_dir();
+    ASSERT_FALSE(dir.empty());
+    auto before = reg.external_paths();
+    int before_count = 0;
+    for (const auto& p : before) if (p == dir) before_count++;
+    reg.add_skill_directory(dir);
+    reg.add_skill_directory(dir); // second call, should not duplicate
+    auto after = reg.external_paths();
+    int after_count = 0;
+    for (const auto& p : after) if (p == dir) after_count++;
+    ASSERT_EQ(after_count, before_count + 1);
+    rmdir(dir.c_str());
     return true;
 }

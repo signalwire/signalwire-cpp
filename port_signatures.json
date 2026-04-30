@@ -543,6 +543,24 @@
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
             },
+            "get_contexts": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
+            },
+            "get_raw_prompt": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<string>"
+            },
             "handle_mcp_request": {
               "params": [
                 {
@@ -620,6 +638,15 @@
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
+            },
+            "pom": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
             },
             "register_sip_username": {
               "params": [
@@ -733,6 +760,20 @@
                 {
                   "name": "url",
                   "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.core.agent_base.AgentBase"
+            },
+            "set_prompt_pom": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "pom",
+                  "type": "int",
                   "required": true
                 }
               ],
@@ -3598,6 +3639,15 @@
                 }
               ],
               "returns": "class:signalwire.core.contexts.ContextBuilder"
+            },
+            "get_post_prompt": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<string>"
             },
             "get_prompt": {
               "params": [

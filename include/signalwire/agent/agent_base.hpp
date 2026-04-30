@@ -155,6 +155,47 @@ public:
     std::string get_prompt() const;
     AgentBase& set_use_pom(bool use_pom);
 
+    /// Read-only snapshot of the agent's POM section list as JSON.
+    ///
+    /// Python parity: ``agent.pom`` instance attribute (agent_base.py
+    /// line 209). Returns ``std::nullopt`` when ``use_pom`` is false
+    /// (mirroring Python's ``self.pom = None``); otherwise returns a
+    /// freshly built ``std::vector<json>`` by mapping every internal
+    /// PomSection through ``to_json()`` so callers cannot mutate the
+    /// agent's internal section/subsection structures.
+    std::optional<std::vector<json>> pom() const;
+
+    /// Returns the post-prompt text whatever ``set_post_prompt`` stored, or
+    /// ``std::nullopt`` when no post-prompt has been set.
+    ///
+    /// Mirrors Python's ``PromptManager.get_post_prompt`` /
+    /// ``PromptMixin.get_post_prompt`` — used by SWML rendering when a
+    /// post-prompt is configured.
+    std::optional<std::string> get_post_prompt() const;
+
+    /// Returns the raw prompt text whatever ``set_prompt_text`` stored, or
+    /// ``std::nullopt`` when no raw prompt has been set. Distinct from
+    /// ``get_prompt`` which renders the POM array when ``use_pom`` is
+    /// true.
+    ///
+    /// Mirrors Python's ``PromptManager.get_raw_prompt``.
+    std::optional<std::string> get_raw_prompt() const;
+
+    /// Sets the prompt as a list of POM section JSON objects. Each
+    /// section supports keys "title", "body", "bullets", "numbered",
+    /// "numbered_bullets", and "subsections". Switches the agent to POM
+    /// mode.
+    ///
+    /// Mirrors Python's ``PromptManager.set_prompt_pom``.
+    AgentBase& set_prompt_pom(const std::vector<json>& pom);
+
+    /// Returns the contexts dictionary as a serialised JSON object, or
+    /// ``std::nullopt`` when no contexts have been defined yet.
+    ///
+    /// Mirrors Python's ``PromptManager.get_contexts`` which returns the
+    /// contexts dict or ``None``.
+    std::optional<json> get_contexts() const;
+
     // ========================================================================
     // Tool Methods
     // ========================================================================

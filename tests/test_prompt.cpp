@@ -313,3 +313,48 @@ TEST(prompt_post_prompt_llm_params) {
     ASSERT_TRUE(false);
     return true;
 }
+
+// ========================================================================
+// pom() accessor (Python parity: agent.pom)
+//
+// Mirrors signalwire-python tests/unit/core/test_agent_base.py::
+//   TestAgentBasePromptMethods::test_set_prompt_pom_succeeds_when_use_pom_true
+// ========================================================================
+
+TEST(pom_returns_sections_after_prompt_add_section) {
+    AgentBase agent;
+    agent.prompt_add_section("Greeting", "Hello");
+    auto pom = agent.pom();
+    ASSERT_TRUE(pom.has_value());
+    ASSERT_EQ(pom->size(), 1u);
+    ASSERT_EQ((*pom)[0]["title"].get<std::string>(), "Greeting");
+    ASSERT_EQ((*pom)[0]["body"].get<std::string>(), "Hello");
+    return true;
+}
+
+TEST(pom_nullopt_when_use_pom_false) {
+    AgentBase agent;
+    agent.set_use_pom(false);
+    auto pom = agent.pom();
+    ASSERT_TRUE(!pom.has_value());
+    return true;
+}
+
+TEST(pom_returns_copy_not_internal_vector) {
+    AgentBase agent;
+    agent.prompt_add_section("Original", "Body");
+
+    auto pom = agent.pom();
+    ASSERT_TRUE(pom.has_value());
+    ASSERT_EQ(pom->size(), 1u);
+
+    // Mutate the returned vector; agent state must be unaffected.
+    pom->push_back(json::object({{"title", "Injected"}}));
+    (*pom)[0]["title"] = "Hijacked";
+
+    auto fresh = agent.pom();
+    ASSERT_TRUE(fresh.has_value());
+    ASSERT_EQ(fresh->size(), 1u);
+    ASSERT_EQ((*fresh)[0]["title"].get<std::string>(), "Original");
+    return true;
+}

@@ -179,6 +179,73 @@ AgentBase& AgentBase::set_use_pom(bool use_pom) {
     return *this;
 }
 
+std::optional<std::vector<json>> AgentBase::pom() const {
+    if (!use_pom_) {
+        return std::nullopt;
+    }
+    std::vector<json> result;
+    result.reserve(pom_sections_.size());
+    for (const auto& section : pom_sections_) {
+        // section.to_json() returns a fresh json value; safe to expose.
+        result.push_back(section.to_json());
+    }
+    return result;
+}
+
+std::optional<std::string> AgentBase::get_post_prompt() const {
+    return post_prompt_text_;
+}
+
+std::optional<std::string> AgentBase::get_raw_prompt() const {
+    return raw_prompt_text_;
+}
+
+namespace {
+
+PomSection json_to_section(const json& j) {
+    PomSection s;
+    if (j.contains("title") && j["title"].is_string()) {
+        s.title = j["title"].get<std::string>();
+    }
+    if (j.contains("body") && j["body"].is_string()) {
+        s.body = j["body"].get<std::string>();
+    }
+    if (j.contains("bullets") && j["bullets"].is_array()) {
+        for (const auto& b : j["bullets"]) {
+            if (b.is_string()) {
+                s.bullets.push_back(b.get<std::string>());
+            }
+        }
+    }
+    if (j.contains("subsections") && j["subsections"].is_array()) {
+        for (const auto& sub : j["subsections"]) {
+            s.subsections.push_back(json_to_section(sub));
+        }
+    }
+    return s;
+}
+
+}  // namespace
+
+AgentBase& AgentBase::set_prompt_pom(const std::vector<json>& pom) {
+    use_pom_ = true;
+    pom_sections_.clear();
+    pom_sections_.reserve(pom.size());
+    for (const auto& section_json : pom) {
+        if (section_json.is_object()) {
+            pom_sections_.push_back(json_to_section(section_json));
+        }
+    }
+    return *this;
+}
+
+std::optional<json> AgentBase::get_contexts() const {
+    if (!context_builder_.has_value()) {
+        return std::nullopt;
+    }
+    return context_builder_->to_json();
+}
+
 // ============================================================================
 // Tool Methods
 // ============================================================================

@@ -19,6 +19,20 @@ Service::Service() {
     schema_.load_embedded();
 }
 
+signalwire::utils::SchemaUtils& Service::schema_utils() {
+    if (!schema_utils_) {
+        schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>();
+    }
+    return *schema_utils_;
+}
+
+const signalwire::utils::SchemaUtils& Service::schema_utils() const {
+    if (!schema_utils_) {
+        schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>();
+    }
+    return *schema_utils_;
+}
+
 Service::~Service() {
     stop();
 }

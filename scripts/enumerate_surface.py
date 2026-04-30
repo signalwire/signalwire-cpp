@@ -103,6 +103,12 @@ CLASS_MODULE_MAP: dict[str, str] = {
     # ``Service`` in C++ == Python's ``SWMLService``; rename at emit time.
     # Handled via CLASS_RENAME_MAP below, not via module mapping.
 
+    # -- utils ------------------------------------------------------------
+    # SchemaUtils + SchemaValidationError both live under
+    # signalwire.utils.schema_utils per the canonical Python module layout.
+    "SchemaUtils": "signalwire.utils.schema_utils",
+    "SchemaValidationError": "signalwire.utils.schema_utils",
+
     # -- rest -------------------------------------------------------------
     "HttpClient": "signalwire.rest._base",
     "CrudResource": "signalwire.rest._base",

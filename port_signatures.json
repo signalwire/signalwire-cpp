@@ -5305,6 +5305,15 @@
               ],
               "returns": "string"
             },
+            "schema_utils": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.utils.schema_utils.SchemaUtils"
+            },
             "send_digits": {
               "params": [
                 {
@@ -9943,6 +9952,206 @@
         "is_serverless_mode": {
           "params": [],
           "returns": "bool"
+        }
+      }
+    },
+    "signalwire.utils.schema_utils": {
+      "classes": {
+        "SchemaUtils": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "schema_path",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_validation",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "void"
+            },
+            "full_validation_available": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "generate_method_body": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "string"
+            },
+            "generate_method_signature": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "string"
+            },
+            "get_all_verb_names": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
+            "get_verb_parameters": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "any"
+            },
+            "get_verb_properties": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "any"
+            },
+            "get_verb_required_properties": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "list<string>"
+            },
+            "load_schema": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "validate_document": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "document",
+                  "type": "any",
+                  "required": true
+                }
+              ],
+              "returns": "tuple<bool,list<string>>"
+            },
+            "validate_verb": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "verb_config",
+                  "type": "any",
+                  "required": true
+                }
+              ],
+              "returns": "tuple<bool,list<string>>"
+            }
+          }
+        },
+        "SchemaValidationError": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "errors",
+                  "type": "list<string>",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "errors": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
+            "verb_name": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            }
+          }
         }
       }
     },

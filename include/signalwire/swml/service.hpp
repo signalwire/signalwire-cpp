@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include "signalwire/swml/document.hpp"
 #include "signalwire/swml/schema.hpp"
+#include "signalwire/utils/schema_utils.hpp"
 #include "signalwire/swaig/tool_definition.hpp"
 #include "signalwire/swaig/function_result.hpp"
 #include "signalwire/logging.hpp"
@@ -136,6 +137,13 @@ public:
     /// Get the underlying SWML document
     Document& document() { return document_; }
     const Document& document() const { return document_; }
+
+    /// SchemaUtils helper bound to this Service.  Mirrors Python's
+    /// `self.schema_utils` instance attribute on `SWMLService`.  Built
+    /// lazily on first access; the underlying schema is cached so the
+    /// helper is cheap to build.
+    signalwire::utils::SchemaUtils& schema_utils();
+    const signalwire::utils::SchemaUtils& schema_utils() const;
 
     /// Render the SWML document to JSON
     json render_swml() const;
@@ -283,6 +291,9 @@ protected:
     bool auth_initialized_ = false;
 
     Schema schema_;
+    /// SchemaUtils helper exposed via schema_utils(). Mutable so the
+    /// const accessor can lazy-build it.
+    mutable std::unique_ptr<signalwire::utils::SchemaUtils> schema_utils_;
 
     // SWAIG tool registry — protected so subclasses can read/write directly
     // when needed (e.g. AgentBase's per-tool secure flag, BuildSwaigBlock).

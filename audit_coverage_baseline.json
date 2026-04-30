@@ -1,0 +1,9 @@
+{
+  "coverage_pct": 0.568,
+  "covered_methods": 3,
+  "covered_method_list": [
+    "signalwire.relay.client.RelayClient.connect",
+    "signalwire.relay.client.RelayClient.disconnect",
+    "signalwire.relay.client.RelayClient.subscribe"
+  ]
+}

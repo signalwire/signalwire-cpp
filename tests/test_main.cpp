@@ -77,6 +77,9 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest.cpp"
 #include "test_relay.cpp"
 
+// Utils
+#include "test_url_validator.cpp"
+
 // Mixin-equivalent test files
 #include "test_prompt.cpp"
 #include "test_tool.cpp"

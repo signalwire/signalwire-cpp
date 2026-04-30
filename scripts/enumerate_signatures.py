@@ -193,15 +193,44 @@ def _translate_sdk_class_ref(t: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def walk_translation_unit(tu: TranslationUnit, file_filter: Path) -> list[dict]:
-    """Walk a clang TU and emit raw type entries (one per class)."""
+def walk_translation_unit(tu: TranslationUnit, file_filter: Path) -> tuple[list[dict], list[dict]]:
+    """Walk a clang TU and emit (class entries, free-function entries)."""
     entries: list[dict] = []
+    free_functions: list[dict] = []
 
     def visit(cursor, ns_path: list[str]):
         if cursor.kind in (CursorKind.NAMESPACE,):
             new_ns = ns_path + [cursor.spelling]
             for child in cursor.get_children():
                 visit(child, new_ns)
+            return
+        # Module-level / namespace-scope free functions. C++ exposes
+        # signalwire::utils::url_validator::validate_url etc. as plain
+        # FUNCTION_DECLs inside a namespace; lift them into the
+        # canonical inventory's per-module ``functions`` map below.
+        if cursor.kind == CursorKind.FUNCTION_DECL:
+            try:
+                fn = cursor.location.file
+            except Exception:
+                fn = None
+            if fn is None or not str(fn.name).startswith(str(file_filter)):
+                return
+            fname = cursor.spelling
+            if not fname or fname.startswith("_"):
+                return
+            params = []
+            for arg in cursor.get_arguments():
+                params.append({
+                    "name": arg.spelling,
+                    "type": arg.type.spelling,
+                    "has_default": _has_default_value(arg),
+                })
+            free_functions.append({
+                "namespace": "::".join(ns_path),
+                "name": fname,
+                "parameters": params,
+                "return_type": cursor.result_type.spelling,
+            })
             return
         if cursor.kind in (CursorKind.CLASS_DECL, CursorKind.STRUCT_DECL):
             if not cursor.is_definition():
@@ -250,7 +279,7 @@ def walk_translation_unit(tu: TranslationUnit, file_filter: Path) -> list[dict]:
             visit(child, ns_path)
 
     visit(tu.cursor, [])
-    return entries
+    return entries, free_functions
 
 
 def extract_method(cursor, is_ctor: bool) -> dict:
@@ -284,9 +313,14 @@ def _has_default_value(arg) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def collect(raw_entries: list[dict], aliases: dict) -> tuple[dict, list]:
+def collect(
+    raw_entries: list[dict],
+    aliases: dict,
+    raw_free_functions: list[dict] | None = None,
+) -> tuple[dict, list]:
     out_modules: dict = {}
     failures: list = []
+    raw_free_functions = raw_free_functions or []
 
     by_class: dict = {}
     for entry in raw_entries:
@@ -380,20 +414,80 @@ def collect(raw_entries: list[dict], aliases: dict) -> tuple[dict, list]:
             if not out_modules["signalwire.core.agent_base"]["classes"]:
                 out_modules.pop("signalwire.core.agent_base")
 
+    # Free-function projection: lift namespace-scope C++ functions onto
+    # Python module-level functions. Only emit functions whose canonical
+    # module + name appear in the Python reference's
+    # ``modules.X.functions`` map — port-only extras flow through
+    # PORT_ADDITIONS.md instead. This also drops any free function whose
+    # parent namespace doesn't translate cleanly.
+    ref_free_fn_targets = _load_python_free_function_targets()
+    for entry in raw_free_functions:
+        ns = entry["namespace"]
+        if not ns.startswith("signalwire"):
+            continue
+        py_module = native_ns_to_module(ns) or ns.replace("::", ".")
+        if not py_module.startswith("signalwire"):
+            py_module = "signalwire." + py_module
+        # camel_to_snake: C++ module functions are already snake-case.
+        fname = camel_to_snake(entry["name"])
+        if (py_module, fname) not in ref_free_fn_targets:
+            continue
+        ctx = f"{py_module}.{fname}"
+        try:
+            sig = build_signature(
+                {
+                    "name": entry["name"],
+                    "is_static": True,  # free functions have no receiver
+                    "is_constructor": False,
+                    "parameters": entry["parameters"],
+                    "return_type": entry["return_type"],
+                },
+                aliases,
+                ctx,
+            )
+        except TypeTranslationError as e:
+            failures.append(str(e))
+            continue
+        out_modules.setdefault(py_module, {"classes": {}})
+        out_modules[py_module].setdefault("functions", {})
+        out_modules[py_module]["functions"][fname] = sig
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
-        sorted_modules[k] = {
-            "classes": {
+        out_entry: dict = {}
+        if entry.get("classes"):
+            out_entry["classes"] = {
                 cls: {"methods": dict(sorted(entry["classes"][cls]["methods"].items()))}
                 for cls in sorted(entry["classes"])
             }
-        }
+        if entry.get("functions"):
+            out_entry["functions"] = {
+                fn: entry["functions"][fn] for fn in sorted(entry["functions"])
+            }
+        if out_entry:
+            sorted_modules[k] = out_entry
     return {
         "version": "2",
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
     }, failures
+
+
+def _load_python_free_function_targets() -> set[tuple[str, str]]:
+    """Read the Python reference's module-level ``functions`` map so the
+    walker only emits things the Python oracle also exposes at module
+    level. Keeps port-only extras out of the canonical inventory; they
+    belong in PORT_ADDITIONS.md."""
+    targets: set[tuple[str, str]] = set()
+    try:
+        ref = json.loads((PSDK / "python_signatures.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return targets
+    for mod, entry in ref.get("modules", {}).items():
+        for fn in (entry.get("functions") or {}).keys():
+            targets.add((mod, fn))
+    return targets
 
 
 def build_signature(method: dict, aliases: dict, context: str) -> dict:
@@ -431,6 +525,7 @@ def main() -> int:
     index = Index.create()
     headers = sorted(args.include.rglob("*.hpp")) + sorted(args.include.rglob("*.h"))
     raw_entries: list[dict] = []
+    raw_free_functions: list[dict] = []
     parse_args = ["-x", "c++", "-std=c++17", f"-I{args.include}"]
     # Project deps (e.g. nlohmann/json.hpp) live under deps/ at the SDK
     # root.  Without -Ideps libclang resolves the bundled ``json``
@@ -456,9 +551,11 @@ def main() -> int:
         except Exception as e:
             print(f"skip {header}: {e}", file=sys.stderr)
             continue
-        raw_entries.extend(walk_translation_unit(tu, args.include))
+        cls_entries, fn_entries = walk_translation_unit(tu, args.include)
+        raw_entries.extend(cls_entries)
+        raw_free_functions.extend(fn_entries)
 
-    canonical, failures = collect(raw_entries, aliases)
+    canonical, failures = collect(raw_entries, aliases, raw_free_functions)
     if failures:
         print(f"enumerate_signatures: {len(failures)} translation failure(s)", file=sys.stderr)
         for f in failures[:30]:

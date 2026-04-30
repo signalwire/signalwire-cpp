@@ -79,6 +79,7 @@ static std::vector<TestCase>& get_tests() {
 
 // Utils
 #include "test_url_validator.cpp"
+#include "test_execution_mode.cpp"
 
 // Mixin-equivalent test files
 #include "test_prompt.cpp"

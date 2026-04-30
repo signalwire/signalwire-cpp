@@ -479,3 +479,45 @@ TEST(agent_dynamic_config) {
 
     return true;
 }
+
+// ========================================================================
+// Tool token methods
+//
+// Parity: signalwire-python tests/unit/core/test_agent_base.py
+//   ::TestAgentBaseTokenMethods::test_validate_tool_token
+//   ::TestAgentBaseTokenMethods::test_create_tool_token
+// Python's StateMixin._create_tool_token catches all exceptions and
+// returns ""; validate_tool_token rejects unknown function names up front.
+// ========================================================================
+
+TEST(agent_create_tool_token_round_trip) {
+    AgentBase agent;
+    agent.define_tool("test_tool", "t", json::object(), nullptr, true);
+
+    std::string token = agent.create_tool_token("test_tool", "call_123");
+    ASSERT_FALSE(token.empty());
+    ASSERT_TRUE(agent.validate_tool_token("test_tool", token, "call_123"));
+    return true;
+}
+
+TEST(agent_validate_tool_token_rejects_unknown_function) {
+    AgentBase agent;
+    ASSERT_FALSE(agent.validate_tool_token("not_registered", "any", "call_123"));
+    return true;
+}
+
+TEST(agent_validate_tool_token_rejects_bad_token) {
+    AgentBase agent;
+    agent.define_tool("test_tool", "t", json::object(), nullptr, true);
+    ASSERT_FALSE(agent.validate_tool_token("test_tool", "garbage_token_value", "call_123"));
+    return true;
+}
+
+TEST(agent_validate_tool_token_rejects_wrong_call_id) {
+    AgentBase agent;
+    agent.define_tool("test_tool", "t", json::object(), nullptr, true);
+    std::string token = agent.create_tool_token("test_tool", "call_A");
+    ASSERT_FALSE(token.empty());
+    ASSERT_FALSE(agent.validate_tool_token("test_tool", token, "call_B"));
+    return true;
+}

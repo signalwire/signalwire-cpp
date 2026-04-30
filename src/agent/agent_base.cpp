@@ -232,6 +232,28 @@ std::vector<std::string> AgentBase::list_tools() const {
     return tool_order_;
 }
 
+std::string AgentBase::create_tool_token(const std::string& tool_name,
+                                          const std::string& call_id) const {
+    try {
+        return session_manager_.create_token(tool_name, call_id);
+    } catch (...) {
+        return "";
+    }
+}
+
+bool AgentBase::validate_tool_token(const std::string& function_name,
+                                     const std::string& token,
+                                     const std::string& call_id) const {
+    if (!has_function(function_name)) {
+        return false;
+    }
+    try {
+        return session_manager_.validate_token(token, function_name, call_id);
+    } catch (...) {
+        return false;
+    }
+}
+
 // ============================================================================
 // AI Config Methods
 // ============================================================================

@@ -225,6 +225,25 @@ public:
                                             const json& raw_data) override;
     std::vector<std::string> list_tools() const;
 
+    /// Mint a per-call SWAIG-function token via the agent's SessionManager.
+    ///
+    /// Python parity: ``state_mixin.StateMixin._create_tool_token`` —
+    /// delegates to ``SessionManager::create_token`` and returns an empty
+    /// string on any thrown exception (Python catches all exceptions and
+    /// returns "" on error).
+    std::string create_tool_token(const std::string& tool_name,
+                                   const std::string& call_id) const;
+
+    /// Validate a per-call SWAIG-function token. Returns ``false`` when
+    /// the function is not registered, when the SessionManager rejects the
+    /// token, or on any underlying exception.
+    ///
+    /// Python parity: ``state_mixin.StateMixin.validate_tool_token`` —
+    /// rejects unknown function names up-front and swallows exceptions.
+    bool validate_tool_token(const std::string& function_name,
+                              const std::string& token,
+                              const std::string& call_id) const;
+
     // ========================================================================
     // AI Config Methods
     // ========================================================================

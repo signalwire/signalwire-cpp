@@ -274,8 +274,7 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "add_skill", "has_skill", "list_skills", "remove_skill",
     ],
     ("signalwire.core.mixins.state_mixin", "StateMixin"): [
-        # validate_tool_token lives on SessionManager in C++, not AgentBase;
-        # tracked as PORT_OMISSIONS.
+        "validate_tool_token",
     ],
     ("signalwire.core.mixins.tool_mixin", "ToolMixin"): [
         "define_tool", "on_function_call", "register_swaig_function",

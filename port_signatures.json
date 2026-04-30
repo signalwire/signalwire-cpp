@@ -509,6 +509,25 @@
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
             },
+            "create_tool_token": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "tool_name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "call_id",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "string"
+            },
             "enable_sip_routing": {
               "params": [
                 {
@@ -3787,6 +3806,38 @@
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
+            }
+          }
+        }
+      }
+    },
+    "signalwire.core.mixins.state_mixin": {
+      "classes": {
+        "StateMixin": {
+          "methods": {
+            "validate_tool_token": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "function_name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "token",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "call_id",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "bool"
             }
           }
         }

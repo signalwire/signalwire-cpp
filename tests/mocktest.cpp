@@ -14,6 +14,7 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -87,9 +88,57 @@ void post_no_body(const std::string& base_url, const std::string& path) {
     }
 }
 
+// Walk this source file's directory upward looking for an adjacent
+// porting-sdk/test_harness/<name>/<name>/__init__.py. Returns the
+// absolute path to the directory containing the Python package (the
+// value to put on PYTHONPATH so that `python -m <name>` resolves), or
+// the empty string when no adjacent porting-sdk is reachable.
+//
+// We anchor at PROJECT_SOURCE_DIR (injected via target_compile_definitions
+// from CMakeLists.txt) so the walk is independent of the build directory
+// or the working directory at test-run time. Fresh adjacent clones —
+// porting-sdk next to signalwire-cpp — are all that's required.
+std::string discover_porting_sdk_package(const std::string& name) {
+#ifndef PROJECT_SOURCE_DIR
+    // Fall back to compile-time __FILE__ if the cmake macro wasn't injected.
+    std::string anchor = __FILE__;
+    auto last = anchor.find_last_of('/');
+    if (last != std::string::npos) anchor = anchor.substr(0, last);
+#else
+    std::string anchor = PROJECT_SOURCE_DIR;
+#endif
+    std::string dir = anchor;
+    while (true) {
+        // Strip trailing slash for consistent parent computation.
+        while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
+        auto last = dir.find_last_of('/');
+        if (last == std::string::npos || last == 0) {
+            // No more parents to walk to.
+            return std::string();
+        }
+        std::string parent = dir.substr(0, last);
+        std::string candidate = parent + "/porting-sdk/test_harness/" + name;
+        std::string init = candidate + "/" + name + "/__init__.py";
+        struct stat st;
+        if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+            return candidate;
+        }
+        if (parent == dir) return std::string();
+        dir = parent;
+    }
+}
+
 // Spawn `python -m mock_signalwire --port <port>` and detach it so the test
 // process isn't blocked waiting on its pipes when the test binary exits.
 void spawn_mock_server(int port) {
+    // Resolve adjacency once in the parent so we don't fork pointlessly
+    // and so the child can simply read the value rather than re-walking.
+    // When the walk fails (e.g. porting-sdk is not adjacent), we still
+    // spawn — the child falls back to whatever is on the system Python's
+    // sys.path, and the readiness probe surfaces a clear timeout error
+    // if neither mode is available.
+    std::string pkg_dir = discover_porting_sdk_package("mock_signalwire");
+
     pid_t pid = fork();
     if (pid < 0) {
         throw std::runtime_error("mocktest: fork() failed");
@@ -106,6 +155,19 @@ void spawn_mock_server(int port) {
             close(devnull);
         }
         setsid();
+        // Inject porting-sdk/test_harness/mock_signalwire/ into PYTHONPATH
+        // so `python -m mock_signalwire` resolves without a prior
+        // `pip install -e ...`. When pkg_dir is empty (no adjacent
+        // porting-sdk) the child relies on the system Python's sys.path.
+        if (!pkg_dir.empty()) {
+            const char* existing = std::getenv("PYTHONPATH");
+            std::string new_pp = pkg_dir;
+            if (existing && *existing) {
+                new_pp.push_back(':');
+                new_pp.append(existing);
+            }
+            ::setenv("PYTHONPATH", new_pp.c_str(), 1);
+        }
         std::string port_str = std::to_string(port);
         execlp("python", "python",
                "-m", "mock_signalwire",
@@ -161,7 +223,9 @@ std::string ensure_server() {
         "mocktest: `python -m mock_signalwire` did not become ready within "
         + std::to_string(kStartupTimeoutSeconds) + "s on port "
         + std::to_string(port)
-        + " (set MOCK_SIGNALWIRE_PORT to use a pre-running instance)");
+        + " (clone porting-sdk next to signalwire-cpp so tests can find "
+        + "porting-sdk/test_harness/mock_signalwire/, pip install the "
+        + "mock_signalwire package, or set MOCK_SIGNALWIRE_PORT to a pre-running instance)");
 }
 
 void journal_reset() {

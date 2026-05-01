@@ -149,14 +149,49 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_mock_compat_phone_numbers.cpp"
 #include "test_rest_mock_calling.cpp"
 #include "test_rest_mock_small.cpp"
+#include "test_rest_mock_compat_accounts.cpp"
+#include "test_rest_mock_compat_misc.cpp"
+#include "test_rest_mock_compat_conferences.cpp"
+#include "test_rest_mock_compat_queues.cpp"
+#include "test_rest_mock_compat_tokens.cpp"
+#include "test_rest_mock_compat_recordings_transcriptions.cpp"
+#include "test_rest_mock_video.cpp"
+#include "test_rest_mock_fabric.cpp"
+#include "test_rest_mock_logs.cpp"
+#include "test_rest_mock_registry.cpp"
+#include "test_rest_mock_pagination.cpp"
 
-int main() {
+int main(int argc, char** argv) {
     // Suppress logging during tests
     signalwire::Logger::instance().suppress();
 
-    std::cerr << "Running " << get_tests().size() << " tests...\n\n";
+    // Optional filter argument. Catch2-style "[tag]" (e.g. "[rest_mock]")
+    // is treated as a substring match against the test name with the
+    // brackets stripped. A bare substring (no brackets) is also matched
+    // verbatim so callers can run a single test by exact name.
+    std::string filter;
+    if (argc > 1) {
+        filter = argv[1];
+        if (!filter.empty() && filter.front() == '[' && filter.back() == ']') {
+            filter = filter.substr(1, filter.size() - 2);
+        }
+    }
 
+    auto matches_filter = [&filter](const std::string& name) {
+        if (filter.empty()) return true;
+        return name.find(filter) != std::string::npos;
+    };
+
+    std::vector<TestCase> selected;
     for (const auto& tc : get_tests()) {
+        if (matches_filter(tc.name)) selected.push_back(tc);
+    }
+
+    std::cerr << "Running " << selected.size() << " tests";
+    if (!filter.empty()) std::cerr << " (filter: " << filter << ")";
+    std::cerr << "...\n\n";
+
+    for (const auto& tc : selected) {
         tests_total++;
         std::cerr << "  " << tc.name << "... ";
         try {

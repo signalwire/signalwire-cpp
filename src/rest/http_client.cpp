@@ -176,5 +176,117 @@ json CrudResource::del(const std::string& id) const {
     return client_.del(base_path_ + "/" + id);
 }
 
+// ============================================================================
+// PaginatedIterator
+//
+// Mirrors signalwire-python's signalwire.rest._pagination.PaginatedIterator.
+// fetch_next() walks links.next when present; ``data_key`` selects which
+// array of items to consume from the response.
+// ============================================================================
+
+namespace {
+
+// Naive query-string parser: splits "k=v&k2=v2" into a map of last-value-wins.
+// Mirrors urllib.parse.parse_qs(...) flattened to single values, which is the
+// behaviour Python's PaginatedIterator gets when ``len(v) == 1``.
+std::map<std::string, std::string>
+parse_query_string(const std::string& url) {
+    std::map<std::string, std::string> out;
+    auto qpos = url.find('?');
+    if (qpos == std::string::npos) return out;
+    std::string qs = url.substr(qpos + 1);
+    // Strip a trailing fragment if any.
+    auto frag = qs.find('#');
+    if (frag != std::string::npos) qs = qs.substr(0, frag);
+
+    auto decode_one = [](std::string s) {
+        std::string out;
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == '+') {
+                out.push_back(' ');
+            } else if (s[i] == '%' && i + 2 < s.size()) {
+                auto hex = s.substr(i + 1, 2);
+                try {
+                    out.push_back(static_cast<char>(std::stoi(hex, nullptr, 16)));
+                    i += 2;
+                } catch (...) {
+                    out.push_back(s[i]);
+                }
+            } else {
+                out.push_back(s[i]);
+            }
+        }
+        return out;
+    };
+
+    size_t start = 0;
+    while (start <= qs.size()) {
+        size_t end = qs.find('&', start);
+        if (end == std::string::npos) end = qs.size();
+        std::string pair = qs.substr(start, end - start);
+        if (!pair.empty()) {
+            auto eq = pair.find('=');
+            if (eq == std::string::npos) {
+                out[decode_one(pair)] = std::string();
+            } else {
+                out[decode_one(pair.substr(0, eq))] =
+                    decode_one(pair.substr(eq + 1));
+            }
+        }
+        if (end == qs.size()) break;
+        start = end + 1;
+    }
+    return out;
+}
+
+} // namespace
+
+PaginatedIterator::PaginatedIterator(const HttpClient& http,
+                                     const std::string& path,
+                                     const std::map<std::string, std::string>& params,
+                                     const std::string& data_key)
+    : http_(http), path_(path), params_(params), data_key_(data_key) {}
+
+bool PaginatedIterator::has_next() {
+    while (index_ >= items_.size()) {
+        if (done_) return false;
+        fetch_next();
+    }
+    return true;
+}
+
+json PaginatedIterator::next() {
+    if (!has_next()) {
+        throw std::out_of_range("PaginatedIterator: exhausted");
+    }
+    return items_.at(index_++);
+}
+
+void PaginatedIterator::fetch_next() {
+    auto resp = http_.get(path_, params_);
+    if (resp.is_object() && resp.contains(data_key_) && resp[data_key_].is_array()) {
+        for (const auto& it : resp[data_key_]) items_.push_back(it);
+    }
+
+    std::string next_url;
+    bool had_data = !resp.is_object() ? false :
+                    (resp.contains(data_key_)
+                     && resp[data_key_].is_array()
+                     && !resp[data_key_].empty());
+
+    if (resp.is_object() && resp.contains("links") && resp["links"].is_object()) {
+        const auto& links = resp["links"];
+        if (links.contains("next") && links["next"].is_string()) {
+            next_url = links["next"].get<std::string>();
+        }
+    }
+
+    if (!next_url.empty() && had_data) {
+        params_ = parse_query_string(next_url);
+    } else {
+        done_ = true;
+    }
+}
+
 } // namespace rest
 } // namespace signalwire

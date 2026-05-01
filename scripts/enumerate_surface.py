@@ -138,6 +138,56 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "VerifiedCallersNamespace": "signalwire.rest.namespaces.verified_callers",
     "VideoNamespace": "signalwire.rest.namespaces.video",
 
+    # -- rest sub-resources (Python parity) -------------------------------
+    # Compat sub-resources -- all live in compat module.
+    "CompatAccounts": "signalwire.rest.namespaces.compat",
+    "CompatApplications": "signalwire.rest.namespaces.compat",
+    "CompatCalls": "signalwire.rest.namespaces.compat",
+    "CompatConferences": "signalwire.rest.namespaces.compat",
+    "CompatFaxes": "signalwire.rest.namespaces.compat",
+    "CompatLamlBins": "signalwire.rest.namespaces.compat",
+    "CompatMessages": "signalwire.rest.namespaces.compat",
+    "CompatPhoneNumbers": "signalwire.rest.namespaces.compat",
+    "CompatQueues": "signalwire.rest.namespaces.compat",
+    "CompatRecordings": "signalwire.rest.namespaces.compat",
+    "CompatTokens": "signalwire.rest.namespaces.compat",
+    "CompatTranscriptions": "signalwire.rest.namespaces.compat",
+
+    # Fabric sub-resources.
+    "FabricAddresses": "signalwire.rest.namespaces.fabric",
+    "FabricCallFlows": "signalwire.rest.namespaces.fabric",
+    "FabricConferenceRooms": "signalwire.rest.namespaces.fabric",
+    "FabricCxmlApplications": "signalwire.rest.namespaces.fabric",
+    "FabricGenericResources": "signalwire.rest.namespaces.fabric",
+    "FabricResource": "signalwire.rest.namespaces.fabric",
+    "FabricResourcePUT": "signalwire.rest.namespaces.fabric",
+    "FabricSubscribers": "signalwire.rest.namespaces.fabric",
+    "FabricTokens": "signalwire.rest.namespaces.fabric",
+
+    # Logs sub-resources.
+    "LogsConferences": "signalwire.rest.namespaces.logs",
+    "LogsFax": "signalwire.rest.namespaces.logs",
+    "LogsMessages": "signalwire.rest.namespaces.logs",
+    "LogsVoice": "signalwire.rest.namespaces.logs",
+
+    # Registry sub-resources.
+    "RegistryBrands": "signalwire.rest.namespaces.registry",
+    "RegistryCampaigns": "signalwire.rest.namespaces.registry",
+    "RegistryNumbers": "signalwire.rest.namespaces.registry",
+    "RegistryOrders": "signalwire.rest.namespaces.registry",
+
+    # Video sub-resources.
+    "VideoConferences": "signalwire.rest.namespaces.video",
+    "VideoConferenceTokens": "signalwire.rest.namespaces.video",
+    "VideoRoomRecordings": "signalwire.rest.namespaces.video",
+    "VideoRoomSessions": "signalwire.rest.namespaces.video",
+    "VideoRoomTokens": "signalwire.rest.namespaces.video",
+    "VideoRooms": "signalwire.rest.namespaces.video",
+    "VideoStreams": "signalwire.rest.namespaces.video",
+
+    # Pagination helper -- Python: signalwire.rest._pagination.PaginatedIterator.
+    "PaginatedIterator": "signalwire.rest._pagination",
+
     # -- relay ------------------------------------------------------------
     "RelayClient": "signalwire.relay.client",
     "Call": "signalwire.relay.call",
@@ -234,6 +284,38 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # namespaces/datasphere.py.
     ("signalwire::rest", "DatasphereDocuments"): (
         "signalwire.rest.namespaces.datasphere", "DatasphereDocuments",
+    ),
+    # Fabric: C++ uses ``FabricXxx`` names for sub-resources; Python uses
+    # ``XxxResource`` (or shorter names). Map at emit time so the audit
+    # treats them as the same class.
+    ("signalwire::rest", "FabricCallFlows"): (
+        "signalwire.rest.namespaces.fabric", "CallFlowsResource",
+    ),
+    ("signalwire::rest", "FabricConferenceRooms"): (
+        "signalwire.rest.namespaces.fabric", "ConferenceRoomsResource",
+    ),
+    ("signalwire::rest", "FabricCxmlApplications"): (
+        "signalwire.rest.namespaces.fabric", "CxmlApplicationsResource",
+    ),
+    ("signalwire::rest", "FabricGenericResources"): (
+        "signalwire.rest.namespaces.fabric", "GenericResources",
+    ),
+    ("signalwire::rest", "FabricSubscribers"): (
+        "signalwire.rest.namespaces.fabric", "SubscribersResource",
+    ),
+    # Logs: Python names are ``MessageLogs`` / ``VoiceLogs`` etc; C++ uses
+    # ``LogsMessages`` / ``LogsVoice`` for namespace-prefix consistency.
+    ("signalwire::rest", "LogsMessages"): (
+        "signalwire.rest.namespaces.logs", "MessageLogs",
+    ),
+    ("signalwire::rest", "LogsVoice"): (
+        "signalwire.rest.namespaces.logs", "VoiceLogs",
+    ),
+    ("signalwire::rest", "LogsFax"): (
+        "signalwire.rest.namespaces.logs", "FaxLogs",
+    ),
+    ("signalwire::rest", "LogsConferences"): (
+        "signalwire.rest.namespaces.logs", "ConferenceLogs",
     ),
 }
 

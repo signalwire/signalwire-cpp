@@ -40,15 +40,204 @@ public:
     // API Namespaces (all 21)
     // ========================================================================
 
+    // ---------------------------------------------------------------------
+    // Fabric resource sub-types (Python parity).
+    //
+    // Most fabric resources sit under /api/fabric/resources/{type}, with
+    // some using PUT for updates (FabricResourcePUT) and some PATCH
+    // (FabricResource). The CallFlows / ConferenceRooms / Subscribers /
+    // CxmlApplications classes layer on Python-parity sub-collection
+    // helpers, including the singularised "/call_flow" / "/conference_room"
+    // address sub-paths.
+    //
+    // FabricAddresses + FabricTokens + GenericResources are special: they
+    // sit at non-/resources base paths (or under /api/fabric directly).
+    // ---------------------------------------------------------------------
+    struct FabricResource : public CrudResource {
+        FabricResource(const HttpClient& c, const std::string& base)
+            : CrudResource(c, base) {}
+        // Python parity: list_addresses sub-collection.
+        json list_addresses(const std::string& resource_id,
+                            const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + resource_id + "/addresses", params);
+        }
+    };
+
+    struct FabricResourcePUT : public FabricResource {
+        FabricResourcePUT(const HttpClient& c, const std::string& base)
+            : FabricResource(c, base) {}
+        // Python: _update_method = "PUT".
+        json update(const std::string& resource_id, const json& data) const {
+            return client_.put(base_path_ + "/" + resource_id, data);
+        }
+    };
+
+    struct FabricCallFlows : public FabricResourcePUT {
+        FabricCallFlows(const HttpClient& c)
+            : FabricResourcePUT(c, "/api/fabric/resources/call_flows") {}
+
+        // Python parity: API uses singular 'call_flow' for sub-resource paths.
+        // Python rewrites /call_flows -> /call_flow at call time.
+        std::string singular_base() const {
+            return "/api/fabric/resources/call_flow";
+        }
+        json list_addresses(const std::string& flow_id,
+                            const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(singular_base() + "/" + flow_id + "/addresses", params);
+        }
+        json list_versions(const std::string& flow_id,
+                           const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(singular_base() + "/" + flow_id + "/versions", params);
+        }
+        json deploy_version(const std::string& flow_id, const json& data) const {
+            return client_.post(singular_base() + "/" + flow_id + "/versions", data);
+        }
+    };
+
+    struct FabricConferenceRooms : public FabricResourcePUT {
+        FabricConferenceRooms(const HttpClient& c)
+            : FabricResourcePUT(c, "/api/fabric/resources/conference_rooms") {}
+
+        // Python parity: singular 'conference_room' for sub-resources.
+        std::string singular_base() const {
+            return "/api/fabric/resources/conference_room";
+        }
+        json list_addresses(const std::string& room_id,
+                            const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(singular_base() + "/" + room_id + "/addresses", params);
+        }
+    };
+
+    struct FabricSubscribers : public FabricResourcePUT {
+        FabricSubscribers(const HttpClient& c)
+            : FabricResourcePUT(c, "/api/fabric/resources/subscribers") {}
+
+        json list_sip_endpoints(const std::string& subscriber_id,
+                                const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + subscriber_id + "/sip_endpoints", params);
+        }
+        json create_sip_endpoint(const std::string& subscriber_id, const json& data) const {
+            return client_.post(base_path_ + "/" + subscriber_id + "/sip_endpoints", data);
+        }
+        json get_sip_endpoint(const std::string& subscriber_id,
+                              const std::string& endpoint_id) const {
+            return client_.get(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id);
+        }
+        // Python parity: PATCH for sub-resource update.
+        json update_sip_endpoint(const std::string& subscriber_id,
+                                 const std::string& endpoint_id,
+                                 const json& data) const {
+            return client_.patch(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id, data);
+        }
+        json delete_sip_endpoint(const std::string& subscriber_id,
+                                 const std::string& endpoint_id) const {
+            return client_.del(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id);
+        }
+    };
+
+    struct FabricCxmlApplications : public FabricResourcePUT {
+        FabricCxmlApplications(const HttpClient& c)
+            : FabricResourcePUT(c, "/api/fabric/resources/cxml_applications") {}
+        // Python parity: deliberately refuses create.
+        json create(const json& /*data*/) const {
+            throw std::runtime_error(
+                "cXML applications cannot be created via this API");
+        }
+    };
+
+    struct FabricAddresses {
+        const HttpClient& client;
+        std::string base_path = "/api/fabric/addresses";
+        FabricAddresses(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& address_id) const {
+            return client.get(base_path + "/" + address_id);
+        }
+    };
+
+    struct FabricGenericResources {
+        const HttpClient& client;
+        std::string base_path = "/api/fabric/resources";
+        FabricGenericResources(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& resource_id) const {
+            return client.get(base_path + "/" + resource_id);
+        }
+        json delete_(const std::string& resource_id) const {
+            return client.del(base_path + "/" + resource_id);
+        }
+        json list_addresses(const std::string& resource_id,
+                            const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + resource_id + "/addresses", params);
+        }
+        json assign_domain_application(const std::string& resource_id,
+                                       const json& data) const {
+            return client.post(base_path + "/" + resource_id + "/domain_applications", data);
+        }
+        // Deprecated for the common binding cases; see Python parity.
+        json assign_phone_route(const std::string& resource_id, const json& data) const {
+            return client.post(base_path + "/" + resource_id + "/phone_routes", data);
+        }
+    };
+
+    struct FabricTokens {
+        const HttpClient& client;
+        std::string base_path = "/api/fabric";
+        FabricTokens(const HttpClient& c) : client(c) {}
+
+        json create_subscriber_token(const json& data) const {
+            return client.post(base_path + "/subscribers/tokens", data);
+        }
+        json refresh_subscriber_token(const json& data) const {
+            return client.post(base_path + "/subscribers/tokens/refresh", data);
+        }
+        json create_invite_token(const json& data) const {
+            return client.post(base_path + "/subscriber/invites", data);
+        }
+        json create_guest_token(const json& data) const {
+            return client.post(base_path + "/guests/tokens", data);
+        }
+        json create_embed_token(const json& data) const {
+            return client.post(base_path + "/embeds/tokens", data);
+        }
+    };
+
     struct FabricNamespace {
-        CrudResource subscribers;
-        CrudResource addresses;
-        CrudResource sip_endpoints;
-        CrudResource call_flows;
-        CrudResource swml_scripts;
+        // Python-parity sub-resources (live under /api/fabric/resources).
+        // PUT-update resources.
+        FabricResourcePUT swml_scripts;
+        FabricResourcePUT relay_applications;
+        FabricCallFlows call_flows;
+        FabricConferenceRooms conference_rooms;
+        FabricResourcePUT freeswitch_connectors;
+        FabricSubscribers subscribers;
+        FabricResourcePUT sip_endpoints;
+        FabricResourcePUT cxml_scripts;
+        FabricCxmlApplications cxml_applications;
+        // PATCH-update resources (default in CrudResource).
+        FabricResource swml_webhooks;
+        FabricResource ai_agents;
+        FabricResource sip_gateways;
+        FabricResource cxml_webhooks;
+        // Top-level fabric resources (different bases).
+        FabricGenericResources resources;
+        FabricAddresses addresses;
+        FabricTokens tokens;
+
+        // ``conferences`` alias retained -- it's not in Python (Python
+        // uses ``conference_rooms``) but legacy C++ examples reference
+        // ``fabric().conferences.create(...)``. We point it at the same
+        // /conference_rooms path so the wire is consistent.
         CrudResource conferences;
-        CrudResource resources;
-        CrudResource tokens;
+
+        // Legacy synonym fields kept for older test_rest_fabric.cpp accessor
+        // checks. Their REST methods aren't expected to be called from any
+        // test that ports a Python file (Python doesn't have these names);
+        // they exist so ``(void)f.routing`` etc keeps compiling.
         CrudResource routing;
         CrudResource agents;
         CrudResource domains;
@@ -56,14 +245,23 @@ public:
         CrudResource webhooks;
 
         FabricNamespace(const HttpClient& c)
-            : subscribers(c, "/api/fabric/subscribers"),
-              addresses(c, "/api/fabric/addresses"),
-              sip_endpoints(c, "/api/fabric/sip_endpoints"),
-              call_flows(c, "/api/fabric/call_flows"),
-              swml_scripts(c, "/api/fabric/swml_scripts"),
-              conferences(c, "/api/fabric/conferences"),
-              resources(c, "/api/fabric/resources"),
-              tokens(c, "/api/fabric/tokens"),
+            : swml_scripts(c, "/api/fabric/resources/swml_scripts"),
+              relay_applications(c, "/api/fabric/resources/relay_applications"),
+              call_flows(c),
+              conference_rooms(c),
+              freeswitch_connectors(c, "/api/fabric/resources/freeswitch_connectors"),
+              subscribers(c),
+              sip_endpoints(c, "/api/fabric/resources/sip_endpoints"),
+              cxml_scripts(c, "/api/fabric/resources/cxml_scripts"),
+              cxml_applications(c),
+              swml_webhooks(c, "/api/fabric/resources/swml_webhooks"),
+              ai_agents(c, "/api/fabric/resources/ai_agents"),
+              sip_gateways(c, "/api/fabric/resources/sip_gateways"),
+              cxml_webhooks(c, "/api/fabric/resources/cxml_webhooks"),
+              resources(c),
+              addresses(c),
+              tokens(c),
+              conferences(c, "/api/fabric/resources/conference_rooms"),
               routing(c, "/api/fabric/routing"),
               agents(c, "/api/fabric/agents"),
               domains(c, "/api/fabric/domains"),
@@ -445,15 +643,154 @@ public:
         }
     };
 
+    // ---------------------------------------------------------------------
+    // Video sub-resources (Python parity).
+    //
+    // VideoRooms is a CrudResource that uses PUT for updates (not PATCH)
+    // and adds /streams sub-collection helpers.
+    //
+    // VideoRoomSessions, VideoRoomRecordings, VideoConferenceTokens, and
+    // VideoStreams are read-mostly resources without full CRUD.
+    //
+    // VideoConferences mirrors VideoRooms (PUT update) plus conference
+    // tokens + streams sub-collections.
+    // ---------------------------------------------------------------------
+    struct VideoRooms : public CrudResource {
+        VideoRooms(const HttpClient& c) : CrudResource(c, "/api/video/rooms") {}
+        // Python parity: PUT (CrudResource default is PATCH).
+        json update(const std::string& room_id, const json& data) const {
+            return client_.put(base_path_ + "/" + room_id, data);
+        }
+        json list_streams(const std::string& room_id,
+                          const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + room_id + "/streams", params);
+        }
+        json create_stream(const std::string& room_id, const json& data) const {
+            return client_.post(base_path_ + "/" + room_id + "/streams", data);
+        }
+    };
+
+    struct VideoRoomTokens {
+        const HttpClient& client;
+        std::string base_path = "/api/video/room_tokens";
+        VideoRoomTokens(const HttpClient& c) : client(c) {}
+        json create(const json& data) const { return client.post(base_path, data); }
+    };
+
+    struct VideoRoomSessions {
+        const HttpClient& client;
+        std::string base_path = "/api/video/room_sessions";
+        VideoRoomSessions(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& session_id) const {
+            return client.get(base_path + "/" + session_id);
+        }
+        json list_events(const std::string& session_id,
+                         const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + session_id + "/events", params);
+        }
+        json list_members(const std::string& session_id,
+                          const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + session_id + "/members", params);
+        }
+        json list_recordings(const std::string& session_id,
+                             const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + session_id + "/recordings", params);
+        }
+    };
+
+    struct VideoRoomRecordings {
+        const HttpClient& client;
+        std::string base_path = "/api/video/room_recordings";
+        VideoRoomRecordings(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& recording_id) const {
+            return client.get(base_path + "/" + recording_id);
+        }
+        json delete_(const std::string& recording_id) const {
+            return client.del(base_path + "/" + recording_id);
+        }
+        json list_events(const std::string& recording_id,
+                         const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + recording_id + "/events", params);
+        }
+    };
+
+    struct VideoConferences : public CrudResource {
+        VideoConferences(const HttpClient& c)
+            : CrudResource(c, "/api/video/conferences") {}
+        // Python parity: PUT.
+        json update(const std::string& conf_id, const json& data) const {
+            return client_.put(base_path_ + "/" + conf_id, data);
+        }
+        json list_conference_tokens(const std::string& conf_id,
+                                    const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + conf_id + "/conference_tokens", params);
+        }
+        json list_streams(const std::string& conf_id,
+                          const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + conf_id + "/streams", params);
+        }
+        json create_stream(const std::string& conf_id, const json& data) const {
+            return client_.post(base_path_ + "/" + conf_id + "/streams", data);
+        }
+    };
+
+    struct VideoConferenceTokens {
+        const HttpClient& client;
+        std::string base_path = "/api/video/conference_tokens";
+        VideoConferenceTokens(const HttpClient& c) : client(c) {}
+        json get(const std::string& token_id) const {
+            return client.get(base_path + "/" + token_id);
+        }
+        json reset(const std::string& token_id) const {
+            return client.post(base_path + "/" + token_id + "/reset");
+        }
+    };
+
+    struct VideoStreams {
+        const HttpClient& client;
+        std::string base_path = "/api/video/streams";
+        VideoStreams(const HttpClient& c) : client(c) {}
+        json get(const std::string& stream_id) const {
+            return client.get(base_path + "/" + stream_id);
+        }
+        // Python parity: PUT.
+        json update(const std::string& stream_id, const json& data) const {
+            return client.put(base_path + "/" + stream_id, data);
+        }
+        json delete_(const std::string& stream_id) const {
+            return client.del(base_path + "/" + stream_id);
+        }
+    };
+
     struct VideoNamespace {
-        CrudResource rooms;
-        CrudResource room_sessions;
+        VideoRooms rooms;
+        VideoRoomTokens room_tokens;
+        VideoRoomSessions room_sessions;
+        VideoRoomRecordings room_recordings;
+        VideoConferences conferences;
+        VideoConferenceTokens conference_tokens;
+        VideoStreams streams;
+
+        // Legacy alias retained so the older test_rest_namespaces.cpp
+        // (which references ``v.recordings``) keeps compiling. New code
+        // should use ``room_recordings``.
         CrudResource recordings;
 
         VideoNamespace(const HttpClient& c)
-            : rooms(c, "/api/video/rooms"),
-              room_sessions(c, "/api/video/room_sessions"),
-              recordings(c, "/api/video/recordings") {}
+            : rooms(c),
+              room_tokens(c),
+              room_sessions(c),
+              room_recordings(c),
+              conferences(c),
+              conference_tokens(c),
+              streams(c),
+              recordings(c, "/api/video/room_recordings") {}
     };
 
     // ---------------------------------------------------------------------
@@ -579,23 +916,213 @@ public:
         }
     };
 
+    // ---------------------------------------------------------------------
+    // Additional Compat sub-resources (Python parity).
+    //
+    // Most extend CrudResource and override update with POST (Twilio-compat
+    // semantics). CompatTokens uses BaseResource semantics with PATCH update.
+    // CompatAccounts lives at the unscoped /api/laml/.../Accounts path.
+    // CompatConferences hangs participants/recordings/streams off itself.
+    // ---------------------------------------------------------------------
+    struct CompatAccounts {
+        const HttpClient& client;
+        std::string base_path = "/api/laml/2010-04-01/Accounts";
+        CompatAccounts(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json create(const json& data) const { return client.post(base_path, data); }
+        json get(const std::string& sid) const {
+            return client.get(base_path + "/" + sid);
+        }
+        // Python: POST (Twilio-compat).
+        json update(const std::string& sid, const json& data) const {
+            return client.post(base_path + "/" + sid, data);
+        }
+    };
+
+    struct CompatApplications : public CrudResource {
+        CompatApplications(const HttpClient& c, const std::string& base)
+            : CrudResource(c, base) {}
+        json update(const std::string& sid, const json& data) const {
+            return client_.post(base_path_ + "/" + sid, data);
+        }
+    };
+
+    struct CompatLamlBins : public CrudResource {
+        CompatLamlBins(const HttpClient& c, const std::string& base)
+            : CrudResource(c, base) {}
+        json update(const std::string& sid, const json& data) const {
+            return client_.post(base_path_ + "/" + sid, data);
+        }
+    };
+
+    struct CompatConferences {
+        const HttpClient& client;
+        std::string base_path;
+        CompatConferences(const HttpClient& c, const std::string& base)
+            : client(c), base_path(base) {}
+
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& sid) const {
+            return client.get(base_path + "/" + sid);
+        }
+        json update(const std::string& sid, const json& data) const {
+            return client.post(base_path + "/" + sid, data);
+        }
+
+        // Participants
+        json list_participants(const std::string& conference_sid,
+                               const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + conference_sid + "/Participants", params);
+        }
+        json get_participant(const std::string& conference_sid,
+                             const std::string& call_sid) const {
+            return client.get(base_path + "/" + conference_sid + "/Participants/" + call_sid);
+        }
+        json update_participant(const std::string& conference_sid,
+                                const std::string& call_sid,
+                                const json& data) const {
+            return client.post(base_path + "/" + conference_sid + "/Participants/" + call_sid, data);
+        }
+        json remove_participant(const std::string& conference_sid,
+                                const std::string& call_sid) const {
+            return client.del(base_path + "/" + conference_sid + "/Participants/" + call_sid);
+        }
+
+        // Conference recordings
+        json list_recordings(const std::string& conference_sid,
+                             const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + conference_sid + "/Recordings", params);
+        }
+        json get_recording(const std::string& conference_sid,
+                           const std::string& recording_sid) const {
+            return client.get(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
+        }
+        json update_recording(const std::string& conference_sid,
+                              const std::string& recording_sid,
+                              const json& data) const {
+            return client.post(base_path + "/" + conference_sid + "/Recordings/" + recording_sid, data);
+        }
+        json delete_recording(const std::string& conference_sid,
+                              const std::string& recording_sid) const {
+            return client.del(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
+        }
+
+        // Conference streams
+        json start_stream(const std::string& conference_sid, const json& data) const {
+            return client.post(base_path + "/" + conference_sid + "/Streams", data);
+        }
+        json stop_stream(const std::string& conference_sid,
+                         const std::string& stream_sid,
+                         const json& data) const {
+            return client.post(base_path + "/" + conference_sid + "/Streams/" + stream_sid, data);
+        }
+    };
+
+    struct CompatQueues : public CrudResource {
+        CompatQueues(const HttpClient& c, const std::string& base)
+            : CrudResource(c, base) {}
+        json update(const std::string& sid, const json& data) const {
+            return client_.post(base_path_ + "/" + sid, data);
+        }
+        json list_members(const std::string& queue_sid,
+                          const std::map<std::string, std::string>& params = {}) const {
+            return client_.get(base_path_ + "/" + queue_sid + "/Members", params);
+        }
+        json get_member(const std::string& queue_sid,
+                        const std::string& call_sid) const {
+            return client_.get(base_path_ + "/" + queue_sid + "/Members/" + call_sid);
+        }
+        json dequeue_member(const std::string& queue_sid,
+                            const std::string& call_sid,
+                            const json& data) const {
+            return client_.post(base_path_ + "/" + queue_sid + "/Members/" + call_sid, data);
+        }
+    };
+
+    struct CompatRecordings {
+        const HttpClient& client;
+        std::string base_path;
+        CompatRecordings(const HttpClient& c, const std::string& base)
+            : client(c), base_path(base) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& sid) const {
+            return client.get(base_path + "/" + sid);
+        }
+        json delete_(const std::string& sid) const {
+            return client.del(base_path + "/" + sid);
+        }
+    };
+
+    struct CompatTranscriptions {
+        const HttpClient& client;
+        std::string base_path;
+        CompatTranscriptions(const HttpClient& c, const std::string& base)
+            : client(c), base_path(base) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& sid) const {
+            return client.get(base_path + "/" + sid);
+        }
+        json delete_(const std::string& sid) const {
+            return client.del(base_path + "/" + sid);
+        }
+    };
+
+    struct CompatTokens {
+        const HttpClient& client;
+        std::string base_path;
+        CompatTokens(const HttpClient& c, const std::string& base)
+            : client(c), base_path(base) {}
+        json create(const json& data) const { return client.post(base_path, data); }
+        // Python parity: PATCH for update (BaseResource default).
+        json update(const std::string& token_id, const json& data) const {
+            return client.patch(base_path + "/" + token_id, data);
+        }
+        json delete_(const std::string& token_id) const {
+            return client.del(base_path + "/" + token_id);
+        }
+    };
+
     struct CompatNamespace {
         const HttpClient& client;
         std::string account_base;
 
         // Sub-resources (Python parity).
+        CompatAccounts accounts;
         CompatCalls calls;
         CompatMessages messages;
         CompatFaxes faxes;
+        CompatConferences conferences;
         CompatPhoneNumbers phone_numbers;
+        CompatApplications applications;
+        CompatLamlBins laml_bins;
+        CompatQueues queues;
+        CompatRecordings recordings;
+        CompatTranscriptions transcriptions;
+        CompatTokens tokens;
 
         CompatNamespace(const HttpClient& c, const std::string& account_sid)
             : client(c),
               account_base("/api/laml/2010-04-01/Accounts/" + account_sid),
+              accounts(c),
               calls(c, account_base + "/Calls"),
               messages(c, account_base + "/Messages"),
               faxes(c, account_base + "/Faxes"),
-              phone_numbers(c, account_base) {}
+              conferences(c, account_base + "/Conferences"),
+              phone_numbers(c, account_base),
+              applications(c, account_base + "/Applications"),
+              laml_bins(c, account_base + "/LamlBins"),
+              queues(c, account_base + "/Queues"),
+              recordings(c, account_base + "/Recordings"),
+              transcriptions(c, account_base + "/Transcriptions"),
+              tokens(c, account_base + "/tokens") {}
 
         // Legacy convenience methods retained for backwards compatibility
         // (the existing rest_compat_laml.cpp example references these).
@@ -720,12 +1247,145 @@ public:
         json verify_code(const json& data) const { return client.post("/api/mfa/verify", data); }
     };
 
-    struct RegistryNamespace : public CrudResource {
-        RegistryNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/registry") {}
+    // ---------------------------------------------------------------------
+    // Registry (10DLC) sub-resources -- Python parity.
+    // All sit under /api/relay/rest/registry/beta.
+    // ---------------------------------------------------------------------
+    struct RegistryBrands {
+        const HttpClient& client;
+        std::string base_path = "/api/relay/rest/registry/beta/brands";
+        RegistryBrands(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json create(const json& data) const { return client.post(base_path, data); }
+        json get(const std::string& brand_id) const {
+            return client.get(base_path + "/" + brand_id);
+        }
+        json list_campaigns(const std::string& brand_id,
+                            const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + brand_id + "/campaigns", params);
+        }
+        json create_campaign(const std::string& brand_id, const json& data) const {
+            return client.post(base_path + "/" + brand_id + "/campaigns", data);
+        }
     };
 
-    struct LogsNamespace : public CrudResource {
-        LogsNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/logs") {}
+    struct RegistryCampaigns {
+        const HttpClient& client;
+        std::string base_path = "/api/relay/rest/registry/beta/campaigns";
+        RegistryCampaigns(const HttpClient& c) : client(c) {}
+        json get(const std::string& campaign_id) const {
+            return client.get(base_path + "/" + campaign_id);
+        }
+        // Python parity: PUT (CrudResource default would be PATCH).
+        json update(const std::string& campaign_id, const json& data) const {
+            return client.put(base_path + "/" + campaign_id, data);
+        }
+        json list_numbers(const std::string& campaign_id,
+                          const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + campaign_id + "/numbers", params);
+        }
+        json list_orders(const std::string& campaign_id,
+                         const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + campaign_id + "/orders", params);
+        }
+        json create_order(const std::string& campaign_id, const json& data) const {
+            return client.post(base_path + "/" + campaign_id + "/orders", data);
+        }
+    };
+
+    struct RegistryOrders {
+        const HttpClient& client;
+        std::string base_path = "/api/relay/rest/registry/beta/orders";
+        RegistryOrders(const HttpClient& c) : client(c) {}
+        json get(const std::string& order_id) const {
+            return client.get(base_path + "/" + order_id);
+        }
+    };
+
+    struct RegistryNumbers {
+        const HttpClient& client;
+        std::string base_path = "/api/relay/rest/registry/beta/numbers";
+        RegistryNumbers(const HttpClient& c) : client(c) {}
+        json delete_(const std::string& number_id) const {
+            return client.del(base_path + "/" + number_id);
+        }
+    };
+
+    struct RegistryNamespace {
+        RegistryBrands brands;
+        RegistryCampaigns campaigns;
+        RegistryOrders orders;
+        RegistryNumbers numbers;
+        RegistryNamespace(const HttpClient& c)
+            : brands(c), campaigns(c), orders(c), numbers(c) {}
+    };
+
+    // ---------------------------------------------------------------------
+    // Logs sub-resources -- Python parity.
+    //
+    // The four log kinds live at four different sub-APIs:
+    //   /api/messaging/logs   /api/voice/logs
+    //   /api/fax/logs         /api/logs/conferences
+    // Each is a small read-only resource (list / get / optional events).
+    // ---------------------------------------------------------------------
+    struct LogsMessages {
+        const HttpClient& client;
+        std::string base_path = "/api/messaging/logs";
+        LogsMessages(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& log_id) const {
+            return client.get(base_path + "/" + log_id);
+        }
+    };
+
+    struct LogsVoice {
+        const HttpClient& client;
+        std::string base_path = "/api/voice/logs";
+        LogsVoice(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& log_id) const {
+            return client.get(base_path + "/" + log_id);
+        }
+        json list_events(const std::string& log_id,
+                         const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path + "/" + log_id + "/events", params);
+        }
+    };
+
+    struct LogsFax {
+        const HttpClient& client;
+        std::string base_path = "/api/fax/logs";
+        LogsFax(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+        json get(const std::string& log_id) const {
+            return client.get(base_path + "/" + log_id);
+        }
+    };
+
+    struct LogsConferences {
+        const HttpClient& client;
+        std::string base_path = "/api/logs/conferences";
+        LogsConferences(const HttpClient& c) : client(c) {}
+        json list(const std::map<std::string, std::string>& params = {}) const {
+            return client.get(base_path, params);
+        }
+    };
+
+    struct LogsNamespace {
+        LogsMessages messages;
+        LogsVoice voice;
+        LogsFax fax;
+        LogsConferences conferences;
+        LogsNamespace(const HttpClient& c)
+            : messages(c), voice(c), fax(c), conferences(c) {}
     };
 
     // Project tokens (Python: client.project.tokens.{create,update,delete}).

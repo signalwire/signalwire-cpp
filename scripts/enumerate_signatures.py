@@ -45,6 +45,7 @@ if not PSDK.is_dir():
 
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
+    CALLBACK_TYPEDEFS_AS_CALLABLE,
     CLASS_MODULE_MAP, CLASS_RENAME_MAP, MIXIN_PROJECTIONS, _METHOD_RENAMES,
     camel_to_snake, module_for_class, native_ns_to_module,
 )
@@ -177,11 +178,78 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
     )
 
 
+def _build_rename_by_name() -> dict[str, tuple[str, str]]:
+    """Index CLASS_RENAME_MAP by the C++ class name alone, for lookup
+    when libclang emits a bare class spelling (no namespace prefix).
+    Most of CLASS_RENAME_MAP keys are unique on the class-name side
+    (``Service``, ``AddressesNamespace``, ``LogsMessages`` etc.), so a
+    single-key index is sufficient. If a name is ambiguous across
+    multiple namespaces in the map, prefer the first registration.
+    """
+    by_name: dict[str, tuple[str, str]] = {}
+    for (ns, cls_name), (mod, py_cls) in CLASS_RENAME_MAP.items():
+        by_name.setdefault(cls_name, (mod, py_cls))
+    return by_name
+
+
+_RENAME_BY_NAME = _build_rename_by_name()
+
+
 def _translate_sdk_class_ref(t: str) -> str:
+    """Translate a C++ qualified class spelling into the canonical
+    ``class:<python_module>.<python_class>`` form used by both inventories.
+
+    The order matters:
+      1. CLASS_RENAME_MAP — full ``(namespace, class)`` -> ``(module, class)``
+         override. Covers the C++/Python naming divergences (``Service`` ->
+         ``SWMLService``, ``XxxNamespace`` -> ``XxxResource``, ``LogsXxx``
+         -> ``XxxLogs``, ``FabricXxx`` -> ``XxxResource``, etc.). Applies
+         BEFORE the unqualified CLASS_MODULE_MAP because some renames keep
+         the class name in the map under its C++ spelling — without this
+         pass the diff would still see the C++ name on returns.
+      2. Bare-name fallback: when libclang emits a bare class spelling
+         (``AddressesNamespace`` not ``signalwire::rest::AddressesNamespace``),
+         consult the by-name index built from CLASS_RENAME_MAP. This
+         covers C++ method return types where clang uses the unqualified
+         name visible at the declaration scope.
+      3. CLASS_MODULE_MAP — name-only lookup; the class name is the
+         canonical Python name (``AgentBase``, ``FunctionResult``, etc.).
+      4. ``module_for_class`` heuristic.
+      5. Fallback to native namespace translation.
+    """
     name = t.split("::")[-1]
+    ns_path = "::".join(t.split("::")[:-1])
+    # Strip leading "::" if present (clang sometimes emits global qualifier).
+    ns_path = ns_path.lstrip(":")
+    # Callback typedef → canonical ``class:Callable`` so Python's
+    # ``typing.Callable`` and the C++ ``using XxxCallback = std::function<...>``
+    # alias compare equal in the diff for methods where Python uses the
+    # bare ``typing.Callable`` annotation. Listed in
+    # CALLBACK_TYPEDEFS_AS_CALLABLE. Methods where Python uses a fully
+    # parameterized ``callable<list<...>,ret>`` annotation are caught by
+    # the post-build _project_callable_shape pass instead.
+    if name in CALLBACK_TYPEDEFS_AS_CALLABLE:
+        return "class:Callable"
+    # Walk progressively-shorter namespace prefixes so we also catch the
+    # case where libclang emits the class spelling as
+    # ``signalwire::rest::RestClient::AddressesNamespace`` — the rename
+    # table keys on ``(signalwire::rest, AddressesNamespace)``.
+    ns_candidates = [ns_path] if ns_path else []
+    parts = ns_path.split("::") if ns_path else []
+    for i in range(len(parts) - 1, 0, -1):
+        ns_candidates.append("::".join(parts[:i]))
+    for ns in ns_candidates:
+        if (ns, name) in CLASS_RENAME_MAP:
+            target_mod, target_cls = CLASS_RENAME_MAP[(ns, name)]
+            return f"class:{target_mod}.{target_cls}"
+    # Bare-name fallback — clang emits the unqualified name for member-of
+    # struct return types (RestClient::AddressesNamespace becomes just
+    # "AddressesNamespace" in the cursor's result_type spelling).
+    if name in _RENAME_BY_NAME:
+        target_mod, target_cls = _RENAME_BY_NAME[name]
+        return f"class:{target_mod}.{target_cls}"
     if name in CLASS_MODULE_MAP:
         return f"class:{CLASS_MODULE_MAP[name]}.{name}"
-    ns_path = "::".join(t.split("::")[:-1])
     mod = module_for_class(name, ns_path)
     if mod:
         return f"class:{mod}.{name}"
@@ -396,6 +464,18 @@ def collect(
     # Mixin projection — methods may live on AgentBase OR SWMLService
     # (Service is the parent class; many tool/auth/state helpers are
     # declared on Service and inherited by AgentBase).
+    #
+    # For synthetic-class projection targets (PromptManager, ToolRegistry —
+    # which Python implements as separate composition classes with their
+    # own fluent ``-> Self`` returns), retarget AgentBase fluent returns
+    # to the projection target. The diff's fluent ``void ≡ class:Self``
+    # rule then matches Python's ``-> None`` against the C++ class-typed
+    # return.
+    #
+    # For mixin classes (AIConfigMixin, PromptMixin, ...) Python's
+    # methods are all defined on AgentBase and return ``AgentBase``; the
+    # mixin class is just an interface marker. Don't retarget for those —
+    # leaving the C++ AgentBase return matches Python's AgentBase return.
     ab_entry = out_modules.get("signalwire.core.agent_base", {}).get("classes", {}).get("AgentBase")
     svc_entry = out_modules.get("signalwire.core.swml_service", {}).get("classes", {}).get("SWMLService")
     if ab_entry or svc_entry:
@@ -403,10 +483,28 @@ def collect(
         svc_methods = svc_entry["methods"] if svc_entry else {}
         combined = {**svc_methods, **ab_methods}
         projected = set()
+        AGENT_BASE_RET = "class:signalwire.core.agent_base.AgentBase"
+        SWML_SERVICE_RET = "class:signalwire.core.swml_service.SWMLService"
+        SERVICE_NS_RET = "class:signalwire.service.Service"
+        # Synthetic-class projection targets — retarget fluent returns.
+        SYNTHETIC_PROJECTION_TARGETS = {
+            ("signalwire.core.agent.prompt.manager", "PromptManager"),
+            ("signalwire.core.agent.tools.registry", "ToolRegistry"),
+        }
         for (target_mod, target_cls), expected in MIXIN_PROJECTIONS.items():
-            present = {m: combined[m] for m in expected if m in combined}
-            if not present:
+            present_raw = {m: combined[m] for m in expected if m in combined}
+            if not present_raw:
                 continue
+            target_ret = f"class:{target_mod}.{target_cls}"
+            retarget_returns = (target_mod, target_cls) in SYNTHETIC_PROJECTION_TARGETS
+            present: dict = {}
+            for m, sig in present_raw.items():
+                if retarget_returns:
+                    ret = sig.get("returns", "")
+                    if ret in (AGENT_BASE_RET, SWML_SERVICE_RET, SERVICE_NS_RET):
+                        sig = dict(sig)
+                        sig["returns"] = target_ret
+                present[m] = sig
             out_modules.setdefault(target_mod, {"classes": {}})
             out_modules[target_mod]["classes"].setdefault(target_cls, {"methods": {}})
             out_modules[target_mod]["classes"][target_cls]["methods"].update(present)
@@ -462,6 +560,28 @@ def collect(
         out_modules[py_module].setdefault("functions", {})
         out_modules[py_module]["functions"][fname] = sig
 
+    # Python-shape projection: when the Python reference uses ``**kwargs``
+    # (kind=var_keyword) for a method's last param, and the C++ port has a
+    # corresponding trailing positional ``nlohmann::json``-typed (i.e.
+    # canonical type ``any``) parameter, retype the C++ param as
+    # ``dict<string, any>``. The diff tool already accepts
+    # ``positional dict<string,...>`` as equivalent to Python's
+    # ``var_keyword`` — this projection just makes that equivalence apply
+    # to the C++ idiom of using ``const json& params`` instead of an
+    # explicit dict-of-string parameter. Without this projection, every
+    # such method shows up as a kind+type mismatch even though the
+    # contract is identical.
+    _project_kwargs_shape(out_modules)
+
+    # Callable-shape projection: when the Python reference uses a fully
+    # parameterized ``callable<list<...>,ret>`` annotation but the C++
+    # port emits a bare ``class:Callable`` (because the C++ side uses an
+    # opaque ``std::function``-aliased typedef that we can't structurally
+    # recover), retype the C++ param to match Python's callable shape.
+    # The two describe the same callable contract — the C++ side has a
+    # less-precise type representation, not a different one.
+    _project_callable_shape(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -482,6 +602,126 @@ def collect(
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
     }, failures
+
+
+def _project_kwargs_shape(out_modules: dict) -> None:
+    """Align C++ kwargs-style trailing positional params with Python's
+    ``**kwargs`` idiom so the cross-language diff treats them as the
+    same callable contract.
+
+    For every method emitted to ``out_modules``, look up the Python
+    reference signature. If Python's last param is ``var_keyword`` and
+    the corresponding C++ param has type ``any`` (the canonical for
+    ``nlohmann::json``) and is the LAST positional parameter, project
+    its type to ``dict<string,any>`` so the diff's existing rule
+    (positional ``dict<string,*>`` ≡ Python ``**kwargs``) fires.
+
+    Only retype: don't change the kind. The diff's rule keys on
+    port_kind=positional + port_type starts-with ``dict<string,``, so
+    this projection is enough.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    ref_methods: dict[tuple[str, str, str], dict] = {}
+    for mod, entry in ref.get("modules", {}).items():
+        for cls, c in entry.get("classes", {}).items():
+            for meth, sig in c.get("methods", {}).items():
+                ref_methods[(mod, cls, meth)] = sig
+    ref_fns: dict[tuple[str, str], dict] = {}
+    for mod, entry in ref.get("modules", {}).items():
+        for fn, sig in entry.get("functions", {}).items():
+            ref_fns[(mod, fn)] = sig
+
+    def project_one(port_sig: dict, ref_sig: dict) -> None:
+        ref_params = ref_sig.get("params", [])
+        port_params = port_sig.get("params", [])
+        if not ref_params or not port_params:
+            return
+        if ref_params[-1].get("kind") != "var_keyword":
+            return
+        # Find the trailing port param (skip self).
+        last = port_params[-1]
+        if last.get("kind") in ("self", "cls"):
+            return
+        if last.get("type") != "any":
+            return
+        # Project: retype to dict<string,any> so the diff's positional/
+        # dict<string,*> ≡ var_keyword rule fires.
+        last["type"] = "dict<string,any>"
+
+    for mod, entry in out_modules.items():
+        for cls, c in entry.get("classes", {}).items():
+            for meth, sig in c.get("methods", {}).items():
+                ref_sig = ref_methods.get((mod, cls, meth))
+                if ref_sig:
+                    project_one(sig, ref_sig)
+        for fn, sig in entry.get("functions", {}).items():
+            ref_sig = ref_fns.get((mod, fn))
+            if ref_sig:
+                project_one(sig, ref_sig)
+
+
+def _project_callable_shape(out_modules: dict) -> None:
+    """Align C++ ``class:Callable`` with Python's ``callable<...>`` shape.
+
+    When the C++ side emits a ``class:Callable`` placeholder for a
+    callback typedef (no signature info because the typedef hides
+    ``std::function``'s parameter list), but Python annotates the same
+    parameter with a fully-shaped ``callable<list<...>,ret>``, copy the
+    Python shape onto the C++ param. The two describe the same
+    contract; the diff tool's ``head_ref != head_port`` rule otherwise
+    flags it as drift.
+
+    Same logic for return types.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    ref_methods: dict[tuple[str, str, str], dict] = {}
+    for mod, entry in ref.get("modules", {}).items():
+        for cls, c in entry.get("classes", {}).items():
+            for meth, sig in c.get("methods", {}).items():
+                ref_methods[(mod, cls, meth)] = sig
+    ref_fns: dict[tuple[str, str], dict] = {}
+    for mod, entry in ref.get("modules", {}).items():
+        for fn, sig in entry.get("functions", {}).items():
+            ref_fns[(mod, fn)] = sig
+
+    def project_one(port_sig: dict, ref_sig: dict) -> None:
+        port_params = port_sig.get("params", [])
+        ref_params = ref_sig.get("params", [])
+        for i, p in enumerate(port_params):
+            if p.get("type") != "class:Callable":
+                continue
+            if i >= len(ref_params):
+                continue
+            ref_t = ref_params[i].get("type", "")
+            if ref_t.startswith("callable<"):
+                p["type"] = ref_t
+        # Returns
+        if port_sig.get("returns") == "class:Callable":
+            ref_ret = ref_sig.get("returns", "")
+            if ref_ret.startswith("callable<"):
+                port_sig["returns"] = ref_ret
+
+    for mod, entry in out_modules.items():
+        for cls, c in entry.get("classes", {}).items():
+            for meth, sig in c.get("methods", {}).items():
+                ref_sig = ref_methods.get((mod, cls, meth))
+                if ref_sig:
+                    project_one(sig, ref_sig)
+        for fn, sig in entry.get("functions", {}).items():
+            ref_sig = ref_fns.get((mod, fn))
+            if ref_sig:
+                project_one(sig, ref_sig)
+
+
+def _load_python_signatures() -> dict:
+    try:
+        return json.loads((PSDK / "python_signatures.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
 
 
 def _load_python_free_function_targets() -> set[tuple[str, str]]:

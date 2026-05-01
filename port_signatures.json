@@ -335,7 +335,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             },
             "prompt_add_subsection": {
               "params": [
@@ -366,7 +366,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             },
             "prompt_add_to_section": {
               "params": [
@@ -392,7 +392,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             },
             "prompt_has_section": {
               "params": [
@@ -420,7 +420,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             },
             "set_prompt_pom": {
               "params": [
@@ -434,7 +434,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             },
             "set_prompt_text": {
               "params": [
@@ -448,7 +448,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
             }
           }
         }
@@ -470,7 +470,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.tools.registry.ToolRegistry"
             },
             "get_all_functions": {
               "params": [
@@ -521,7 +521,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
+              "returns": "class:signalwire.core.agent.tools.registry.ToolRegistry"
             },
             "remove_function": {
               "params": [
@@ -838,7 +838,7 @@
                 },
                 {
                   "name": "cb",
-                  "type": "class:signalwire.debug_event_callback.DebugEventCallback",
+                  "type": "class:Callable",
                   "required": true
                 }
               ],
@@ -852,7 +852,7 @@
                 },
                 {
                   "name": "cb",
-                  "type": "class:signalwire.summary_callback.SummaryCallback",
+                  "type": "class:Callable",
                   "required": true
                 }
               ],
@@ -3738,7 +3738,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -3752,7 +3752,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -4253,7 +4253,7 @@
                 },
                 {
                   "name": "cb",
-                  "type": "class:signalwire.dynamic_config_callback.DynamicConfigCallback",
+                  "type": "callable<list<dict<any,any>,dict<any,any>,dict<any,any>,class:signalwire.core.agent_base.AgentBase>,void>",
                   "required": true
                 }
               ],
@@ -4720,7 +4720,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "ai": {
               "params": [
@@ -4735,7 +4735,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "amazon_bedrock": {
               "params": [
@@ -4750,7 +4750,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "answer": {
               "params": [
@@ -4765,7 +4765,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "auth_password": {
               "params": [
@@ -4807,7 +4807,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "connect": {
               "params": [
@@ -4822,7 +4822,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "define_tool": {
               "params": [
@@ -4836,7 +4836,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "denoise": {
               "params": [
@@ -4851,7 +4851,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "detect_machine": {
               "params": [
@@ -4866,7 +4866,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "document": {
               "params": [
@@ -4890,7 +4890,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "execute": {
               "params": [
@@ -4905,7 +4905,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "extract_introspect_payload": {
               "params": [
@@ -4971,7 +4971,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "hangup": {
               "params": [
@@ -4986,7 +4986,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "has_function": {
               "params": [
@@ -5029,7 +5029,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "join_room": {
               "params": [
@@ -5044,7 +5044,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "label": {
               "params": [
@@ -5059,7 +5059,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "list_tool_names": {
               "params": [
@@ -5083,7 +5083,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "live_translate": {
               "params": [
@@ -5098,7 +5098,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "name": {
               "params": [
@@ -5188,7 +5188,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "play": {
               "params": [
@@ -5203,7 +5203,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "port": {
               "params": [
@@ -5227,7 +5227,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "receive_fax": {
               "params": [
@@ -5242,7 +5242,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "record": {
               "params": [
@@ -5257,7 +5257,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "record_call": {
               "params": [
@@ -5272,7 +5272,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "register_swaig_function": {
               "params": [
@@ -5286,7 +5286,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "remove_function": {
               "params": [
@@ -5324,7 +5324,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "return_section": {
               "params": [
@@ -5339,7 +5339,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "route": {
               "params": [
@@ -5372,7 +5372,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "send_fax": {
               "params": [
@@ -5387,7 +5387,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "send_sms": {
               "params": [
@@ -5402,7 +5402,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "serve": {
               "params": [
@@ -5426,7 +5426,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "set_auth": {
               "params": [
@@ -5445,7 +5445,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "set_host": {
               "params": [
@@ -5459,7 +5459,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "set_name": {
               "params": [
@@ -5473,7 +5473,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "set_port": {
               "params": [
@@ -5487,7 +5487,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "set_route": {
               "params": [
@@ -5501,7 +5501,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "sip_refer": {
               "params": [
@@ -5516,7 +5516,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "sleep": {
               "params": [
@@ -5530,7 +5530,7 @@
                   "required": true
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "stop": {
               "params": [
@@ -5554,7 +5554,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "stop_record_call": {
               "params": [
@@ -5569,7 +5569,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "stop_tap": {
               "params": [
@@ -5584,7 +5584,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "switch_section": {
               "params": [
@@ -5599,7 +5599,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "tap": {
               "params": [
@@ -5614,7 +5614,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "timing_safe_compare": {
               "params": [
@@ -5644,7 +5644,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "unset": {
               "params": [
@@ -5659,7 +5659,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "user_event": {
               "params": [
@@ -5674,7 +5674,7 @@
                   "default": null
                 }
               ],
-              "returns": "class:signalwire.service.Service"
+              "returns": "class:signalwire.core.swml_service.SWMLService"
             },
             "validate_basic_auth": {
               "params": [
@@ -6378,6 +6378,38 @@
               ],
               "returns": "string"
             },
+            "event_type_filter": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
+            "event_type_matches": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "event_type",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "bool"
+            },
+            "method_prefix": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "node_id": {
               "params": [
                 {
@@ -6406,6 +6438,12 @@
                 {
                   "name": "self",
                   "kind": "self"
+                },
+                {
+                  "name": "extra_params",
+                  "type": "any",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -6431,6 +6469,24 @@
               ],
               "returns": "void"
             },
+            "resolve_on_detect": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "resolve_on_result": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
             "result": {
               "params": [
                 {
@@ -6441,6 +6497,71 @@
               "returns": "any"
             },
             "resume": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "set_event_type_filter": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "types",
+                  "type": "list<string>",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "set_method_prefix": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "prefix",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "set_resolve_on_detect": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "flag",
+                  "type": "bool",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "set_resolve_on_result": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "flag",
+                  "type": "bool",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "start_input_timers": {
               "params": [
                 {
                   "name": "self",
@@ -6487,6 +6608,20 @@
               ],
               "returns": "void"
             },
+            "volume": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "amount",
+                  "type": "float",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
             "wait": {
               "params": [
                 {
@@ -6529,6 +6664,12 @@
                   "name": "params",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -6561,6 +6702,12 @@
                   "name": "params",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -6573,7 +6720,7 @@
                 },
                 {
                   "name": "devices",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -6589,6 +6736,12 @@
                   "name": "params",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -6717,7 +6870,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -6746,7 +6899,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -6761,7 +6914,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -6791,6 +6944,26 @@
               ],
               "returns": "void"
             },
+            "pay": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.action.Action"
+            },
             "play": {
               "params": [
                 {
@@ -6805,6 +6978,37 @@
                 {
                   "name": "volume",
                   "type": "float",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.action.Action"
+            },
+            "play_and_collect": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "play_media",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "collect_params",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
                   "required": false,
                   "default": null
                 }
@@ -6826,6 +7030,12 @@
                   "name": "collect_params",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -6835,6 +7045,12 @@
                 {
                   "name": "self",
                   "kind": "self"
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -6848,6 +7064,12 @@
                 {
                   "name": "params",
                   "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
                   "required": false,
                   "default": null
                 }
@@ -6930,6 +7152,18 @@
                 },
                 {
                   "name": "header",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "identity",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "control_id",
                   "type": "string",
                   "required": false,
                   "default": null
@@ -7044,6 +7278,26 @@
               ],
               "returns": "class:signalwire.action.Action"
             },
+            "stream": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.action.Action"
+            },
             "tag": {
               "params": [
                 {
@@ -7052,6 +7306,26 @@
                 }
               ],
               "returns": "string"
+            },
+            "tap": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.action.Action"
             },
             "tap_audio": {
               "params": [
@@ -7063,6 +7337,12 @@
                   "name": "params",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.action.Action"
@@ -7076,7 +7356,7 @@
               ],
               "returns": "string"
             },
-            "transfer": {
+            "transcribe": {
               "params": [
                 {
                   "name": "self",
@@ -7085,6 +7365,27 @@
                 {
                   "name": "params",
                   "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "control_id",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.action.Action"
+            },
+            "transfer": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -7220,6 +7521,24 @@
                   "name": "devices",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "tag",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "dial_timeout_ms",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "max_duration",
+                  "type": "int",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.relay.call.Call"
@@ -7287,7 +7606,7 @@
                 },
                 {
                   "name": "handler",
-                  "type": "class:signalwire.inbound_call_handler.InboundCallHandler",
+                  "type": "class:signalwire.relay.client.CallHandler",
                   "required": true
                 }
               ],
@@ -7315,7 +7634,7 @@
                 },
                 {
                   "name": "handler",
-                  "type": "class:signalwire.inbound_message_handler.InboundMessageHandler",
+                  "type": "class:signalwire.relay.client.MessageHandler",
                   "required": true
                 }
               ],
@@ -7396,9 +7715,15 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "context",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
-              "returns": "string"
+              "returns": "class:signalwire.relay.message.Message"
             },
             "send_raw_request": {
               "params": [
@@ -7582,6 +7907,52 @@
                 }
               ],
               "returns": "void"
+            },
+            "reason": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "set_reason": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "r",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "set_state": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "s",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
+            "state": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "update_state": {
               "params": [
@@ -7843,7 +8214,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -7905,7 +8276,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8272,7 +8643,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.addresses.AddressesNamespace"
+              "returns": "class:signalwire.rest.namespaces.addresses.AddressesResource"
             },
             "calling": {
               "params": [
@@ -8290,7 +8661,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.chat.ChatNamespace"
+              "returns": "class:signalwire.rest.namespaces.chat.ChatResource"
             },
             "compat": {
               "params": [
@@ -8339,7 +8710,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.imported_numbers.ImportedNumbersNamespace"
+              "returns": "class:signalwire.rest.namespaces.imported_numbers.ImportedNumbersResource"
             },
             "logs": {
               "params": [
@@ -8357,7 +8728,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.lookup.LookupNamespace"
+              "returns": "class:signalwire.rest.namespaces.lookup.LookupResource"
             },
             "mfa": {
               "params": [
@@ -8366,7 +8737,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.mfa.MFANamespace"
+              "returns": "class:signalwire.rest.namespaces.mfa.MfaResource"
             },
             "number_groups": {
               "params": [
@@ -8375,7 +8746,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.number_groups.NumberGroupsNamespace"
+              "returns": "class:signalwire.rest.namespaces.number_groups.NumberGroupsResource"
             },
             "phone_numbers": {
               "params": [
@@ -8384,7 +8755,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.phone_numbers.PhoneNumbersNamespace"
+              "returns": "class:signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource"
             },
             "project": {
               "params": [
@@ -8411,7 +8782,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.pubsub.PubSubNamespace"
+              "returns": "class:signalwire.rest.namespaces.pubsub.PubSubResource"
             },
             "queues": {
               "params": [
@@ -8420,7 +8791,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.queues.QueuesNamespace"
+              "returns": "class:signalwire.rest.namespaces.queues.QueuesResource"
             },
             "recordings": {
               "params": [
@@ -8429,7 +8800,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.recordings.RecordingsNamespace"
+              "returns": "class:signalwire.rest.namespaces.recordings.RecordingsResource"
             },
             "registry": {
               "params": [
@@ -8447,7 +8818,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.short_codes.ShortCodesNamespace"
+              "returns": "class:signalwire.rest.namespaces.short_codes.ShortCodesResource"
             },
             "sip_profile": {
               "params": [
@@ -8456,7 +8827,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.sip_profile.SipProfileNamespace"
+              "returns": "class:signalwire.rest.namespaces.sip_profile.SipProfileResource"
             },
             "verified_callers": {
               "params": [
@@ -8465,7 +8836,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:signalwire.rest.namespaces.verified_callers.VerifiedCallersNamespace"
+              "returns": "class:signalwire.rest.namespaces.verified_callers.VerifiedCallersResource"
             },
             "video": {
               "params": [
@@ -8567,7 +8938,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8587,7 +8958,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8606,7 +8977,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8626,7 +8997,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8660,7 +9031,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8679,7 +9050,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8698,7 +9069,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8736,7 +9107,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8756,7 +9127,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8775,7 +9146,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8794,7 +9165,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8808,7 +9179,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8827,7 +9198,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8847,7 +9218,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -8963,7 +9334,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -8982,7 +9353,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9001,7 +9372,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9020,7 +9391,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9039,7 +9410,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9058,7 +9429,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9077,7 +9448,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9096,7 +9467,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -9116,7 +9487,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9135,7 +9506,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9154,7 +9525,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9173,7 +9544,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9192,7 +9563,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9230,7 +9601,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": false,
                   "default": null
                 }
@@ -9250,7 +9621,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9269,7 +9640,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9288,7 +9659,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9307,7 +9678,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9326,7 +9697,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9345,7 +9716,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9364,7 +9735,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9392,7 +9763,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9430,7 +9801,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9517,7 +9888,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9565,7 +9936,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9607,7 +9978,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9649,7 +10020,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9668,7 +10039,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9692,7 +10063,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9711,7 +10082,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9735,7 +10106,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9922,7 +10293,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9946,7 +10317,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9965,7 +10336,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -9989,7 +10360,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10013,7 +10384,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10113,7 +10484,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10155,7 +10526,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10255,7 +10626,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10401,7 +10772,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10445,7 +10816,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10504,7 +10875,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10551,7 +10922,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10609,7 +10980,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10712,7 +11083,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10745,7 +11116,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10905,7 +11276,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -10978,7 +11349,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11106,7 +11477,7 @@
                 },
                 {
                   "name": "_",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11288,7 +11659,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11302,7 +11673,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11316,7 +11687,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11330,7 +11701,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11344,7 +11715,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11381,7 +11752,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11400,7 +11771,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11500,7 +11871,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11582,7 +11953,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11618,7 +11989,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11906,7 +12277,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11934,7 +12305,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -11953,7 +12324,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12008,7 +12379,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12455,7 +12826,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12488,7 +12859,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12690,7 +13061,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12709,7 +13080,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12795,7 +13166,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12868,7 +13239,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -12991,7 +13362,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -13036,7 +13407,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -13145,7 +13516,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -13442,7 +13813,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -13479,7 +13850,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],
@@ -13583,7 +13954,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "any",
+                  "type": "dict<string,any>",
                   "required": true
                 }
               ],

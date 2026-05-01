@@ -317,6 +317,38 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     ("signalwire::rest", "LogsConferences"): (
         "signalwire.rest.namespaces.logs", "ConferenceLogs",
     ),
+
+    # -- Callback typedef projection -------------------------------------
+    # C++ uses ``using XxxHandler = std::function<...>`` aliases for
+    # callbacks. libclang emits the typedef name (``InboundCallHandler``
+    # etc.) as the parameter type. Python exposes the same callbacks
+    # under canonical class-style aliases that live in their owning
+    # module — ``CallHandler`` in ``signalwire.relay.client`` etc.
+    # Map at emit time so the diff treats handler signatures as the
+    # same callable contract regardless of the C++ typedef name.
+    ("signalwire::relay", "InboundCallHandler"): (
+        "signalwire.relay.client", "CallHandler",
+    ),
+    ("signalwire::relay", "InboundMessageHandler"): (
+        "signalwire.relay.client", "MessageHandler",
+    ),
+}
+
+
+# C++ typedef aliases for std::function callables that have no class
+# counterpart on the Python side — Python uses the bare ``typing.Callable``
+# for these. Translate the C++ typedef name to the canonical
+# ``class:Callable`` form so the cross-language diff treats them as the
+# same callable contract.
+#
+# Listed by C++ typedef NAME (libclang emits the typedef rather than
+# expanding to the full ``std::function<...>`` shape, so name-based
+# matching is sufficient and keeps the rule decoupled from the typedef's
+# specific signature).
+CALLBACK_TYPEDEFS_AS_CALLABLE: set[str] = {
+    "DebugEventCallback",
+    "DynamicConfigCallback",
+    "SummaryCallback",
 }
 
 

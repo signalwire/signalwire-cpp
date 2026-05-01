@@ -535,3 +535,13 @@ signalwire.relay.call.Call.transcribe: cpp_naming: alias for live_transcribe use
 signalwire.relay.call.Call.stream: cpp_unified_action: calling.stream verb — Python returns StreamAction; C++ exposes via the unified Action.
 signalwire.relay.call.Call.play_and_collect: cpp_naming: alias for prompt(play_media, collect_params) — Python uses `play_and_collect` as the verb name on the wire and on the Call method (call.play_and_collect). C++ keeps prompt as the documented method; play_and_collect is the alias used by mock-backed tests.
 signalwire.relay.call.Call.pay: cpp_unified_action: calling.pay verb — Python returns PayAction; C++ via the unified Action.
+
+# C++-only additions on AgentBase / SWMLService surfaced by the signature audit.
+
+signalwire.core.agent_base.AgentBase.create_tool_token: cpp_only: C++ adds a public token-mint helper on AgentBase for SWAIG webhook signing; Python keeps the same logic private inside the security session manager and exposes only validate_tool_token.
+signalwire.core.swml_service.SWMLService.get_basic_auth_credentials_with_source: cpp_only: C++-side overload that returns (user, pass, source) where ``source`` indicates whether credentials came from constructor / env / config; Python ships the same as the optional ``include_source`` flag on get_basic_auth_credentials. Both routes reach the same data — the C++ overload is the typed-overload variant of the Python kwarg flag.
+signalwire.core.swml_service.SWMLService.get_function: cpp_only: typed accessor on SWMLService for the verb-dispatch function map; Python keeps verb_registry exposed as a property and reaches the function via dict-keyed lookup.
+signalwire.core.swml_service.SWMLService.has_function: cpp_only: typed boolean predicate paired with get_function; Python uses ``key in service.verb_registry``.
+signalwire.core.swml_service.SWMLService.on_swml_request: cpp_only: SWMLService-level on_swml_request hook; Python places the same callback registration on the WebMixin (and thus on AgentBase). C++ folds the SWMLService and WebMixin operations together.
+signalwire.core.swml_service.SWMLService.remove_function: cpp_only: typed removal paired with has_function/get_function; Python removes via ``del service.verb_registry[key]``.
+signalwire.core.swml_service.SWMLService.validate_basic_auth: cpp_only: SWMLService-level basic-auth validator; Python places this on the AuthMixin (and thus on AgentBase). C++ folds AuthMixin operations onto SWMLService.

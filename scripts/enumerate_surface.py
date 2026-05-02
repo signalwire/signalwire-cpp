@@ -72,6 +72,12 @@ CLASS_MODULE_MAP: dict[str, str] = {
     # -- agent ------------------------------------------------------------
     "AgentBase": "signalwire.core.agent_base",
 
+    # -- pom --------------------------------------------------------------
+    # PromptObjectModel has no name conflict; Section does (swml::Section).
+    # PromptObjectModel can use the simple class-name map; Section is
+    # disambiguated via CLASS_RENAME_MAP keyed on (signalwire::pom, Section).
+    "PromptObjectModel": "signalwire.pom.pom",
+
     # -- contexts ---------------------------------------------------------
     "Context": "signalwire.core.contexts",
     "ContextBuilder": "signalwire.core.contexts",
@@ -218,6 +224,12 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # (source_ns, source_class) -> (target_module, target_class)
     ("signalwire::swml", "Service"): (
         "signalwire.core.swml_service", "SWMLService",
+    ),
+    # ``signalwire::pom::Section`` projects to ``signalwire.pom.pom.Section``;
+    # disambiguates from ``signalwire::swml::Section`` (which falls through
+    # to the native namespace translation as ``signalwire.swml.section``).
+    ("signalwire::pom", "Section"): (
+        "signalwire.pom.pom", "Section",
     ),
     # C++ uses ``XxxNamespace`` for all REST namespaces; Python uses
     # ``XxxResource`` for single-resource namespaces and ``XxxNamespace``

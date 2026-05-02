@@ -124,7 +124,7 @@ AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
                                              const std::string& body,
                                              const std::vector<std::string>& bullets) {
     for (auto& section : pom_sections_) {
-        if (section.title == parent_title) {
+        if (section.title.has_value() && *section.title == parent_title) {
             PomSection sub;
             sub.title = title;
             sub.body = body;
@@ -140,7 +140,7 @@ AgentBase& AgentBase::prompt_add_to_section(const std::string& title,
                                              const std::string& body,
                                              const std::vector<std::string>& bullets) {
     for (auto& section : pom_sections_) {
-        if (section.title == title) {
+        if (section.title.has_value() && *section.title == title) {
             if (!body.empty()) section.body += "\n" + body;
             for (const auto& b : bullets) section.bullets.push_back(b);
             return *this;
@@ -152,7 +152,7 @@ AgentBase& AgentBase::prompt_add_to_section(const std::string& title,
 
 bool AgentBase::prompt_has_section(const std::string& title) const {
     for (const auto& s : pom_sections_) {
-        if (s.title == title) return true;
+        if (s.title.has_value() && *s.title == title) return true;
     }
     return false;
 }
@@ -161,11 +161,13 @@ std::string AgentBase::get_prompt() const {
     if (raw_prompt_text_) return *raw_prompt_text_;
     std::string result;
     for (const auto& s : pom_sections_) {
-        result += "## " + s.title + "\n";
+        const std::string& title_str = s.title.has_value() ? *s.title : std::string();
+        result += "## " + title_str + "\n";
         if (!s.body.empty()) result += s.body + "\n";
         for (const auto& b : s.bullets) result += "- " + b + "\n";
         for (const auto& sub : s.subsections) {
-            result += "### " + sub.title + "\n";
+            const std::string& sub_title = sub.title.has_value() ? *sub.title : std::string();
+            result += "### " + sub_title + "\n";
             if (!sub.body.empty()) result += sub.body + "\n";
             for (const auto& b : sub.bullets) result += "- " + b + "\n";
         }
@@ -179,16 +181,15 @@ AgentBase& AgentBase::set_use_pom(bool use_pom) {
     return *this;
 }
 
-std::optional<std::vector<json>> AgentBase::pom() const {
+std::optional<signalwire::pom::PromptObjectModel> AgentBase::pom() const {
     if (!use_pom_) {
         return std::nullopt;
     }
-    std::vector<json> result;
-    result.reserve(pom_sections_.size());
-    for (const auto& section : pom_sections_) {
-        // section.to_json() returns a fresh json value; safe to expose.
-        result.push_back(section.to_json());
-    }
+    // Deep-copy the sections so the caller can't mutate the agent's state
+    // through the returned model. Each PomSection is itself a value type,
+    // so vector copy already deep-copies.
+    signalwire::pom::PromptObjectModel result;
+    result.sections = pom_sections_;
     return result;
 }
 

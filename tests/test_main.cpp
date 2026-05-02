@@ -83,6 +83,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_schema_utils_parity.cpp"
 
 // Mixin-equivalent test files
+#include "test_pom.cpp"
 #include "test_prompt.cpp"
 #include "test_tool.cpp"
 #include "test_aiconfig.cpp"

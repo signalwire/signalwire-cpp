@@ -43,8 +43,13 @@ Every symbol below is present in the C++ surface but not in
 
 signalwire.agent.language_config.LanguageConfig: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
 signalwire.agent.language_config.LanguageConfig.to_json: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
-signalwire.agent.pom_section.PomSection: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
-signalwire.agent.pom_section.PomSection.to_json: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
+# PomSection was extracted into signalwire::pom::Section under
+# include/signalwire/pom/pom.hpp; the old signalwire.agent.pom_section.*
+# entries are no longer emitted by enumerate_surface.py. The Section
+# class additionally exposes a to_json() helper that Python omits (Python
+# uses to_dict + the standard library json module). Tracked here as a
+# C++-idiomatic addition rather than an omission so the diff stays clean.
+signalwire.pom.pom.Section.to_json: cpp_only_helper: signalwire::pom::Section ships a to_json() helper that returns nlohmann::json directly; Python's Section uses to_dict() + json.dumps. Equivalent semantically.
 signalwire.agent.pronunciation.Pronunciation: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
 signalwire.agent.pronunciation.Pronunciation.to_json: cpp_only_pod: POD struct with to_json() used for AgentBase configuration; Python uses ad-hoc dicts.
 signalwire.agent_server.AgentServer.enable_sip_routing: cpp_naming: C++ AgentServer method; Python equivalent tracked in PORT_OMISSIONS.md as method-name alias (register_agent <-> register, list_routes <-> get_agents, set_static_dir <-> serve_static_files, map_sip_username <-> setup_sip_routing, enable_sip_routing matches).

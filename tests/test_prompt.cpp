@@ -326,9 +326,10 @@ TEST(pom_returns_sections_after_prompt_add_section) {
     agent.prompt_add_section("Greeting", "Hello");
     auto pom = agent.pom();
     ASSERT_TRUE(pom.has_value());
-    ASSERT_EQ(pom->size(), 1u);
-    ASSERT_EQ((*pom)[0]["title"].get<std::string>(), "Greeting");
-    ASSERT_EQ((*pom)[0]["body"].get<std::string>(), "Hello");
+    ASSERT_EQ(pom->sections.size(), 1u);
+    ASSERT_TRUE(pom->sections[0].title.has_value());
+    ASSERT_EQ(*pom->sections[0].title, std::string("Greeting"));
+    ASSERT_EQ(pom->sections[0].body, std::string("Hello"));
     return true;
 }
 
@@ -346,15 +347,17 @@ TEST(pom_returns_copy_not_internal_vector) {
 
     auto pom = agent.pom();
     ASSERT_TRUE(pom.has_value());
-    ASSERT_EQ(pom->size(), 1u);
+    ASSERT_EQ(pom->sections.size(), 1u);
 
-    // Mutate the returned vector; agent state must be unaffected.
-    pom->push_back(json::object({{"title", "Injected"}}));
-    (*pom)[0]["title"] = "Hijacked";
+    // Mutate the returned model; agent state must be unaffected.
+    pom->sections.emplace_back(std::optional<std::string>("Injected"),
+                                std::string("body"));
+    pom->sections[0].title = "Hijacked";
 
     auto fresh = agent.pom();
     ASSERT_TRUE(fresh.has_value());
-    ASSERT_EQ(fresh->size(), 1u);
-    ASSERT_EQ((*fresh)[0]["title"].get<std::string>(), "Original");
+    ASSERT_EQ(fresh->sections.size(), 1u);
+    ASSERT_TRUE(fresh->sections[0].title.has_value());
+    ASSERT_EQ(*fresh->sections[0].title, std::string("Original"));
     return true;
 }

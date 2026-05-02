@@ -20,6 +20,7 @@
 #include "signalwire/swaig/tool_definition.hpp"
 #include "signalwire/security/session_manager.hpp"
 #include "signalwire/contexts/contexts.hpp"
+#include "signalwire/pom/pom.hpp"
 #include "signalwire/logging.hpp"
 
 namespace httplib { class Server; class Request; class Response; }
@@ -31,27 +32,12 @@ namespace agent {
 
 using json = nlohmann::json;
 
-/// POM section for structured prompts
-struct PomSection {
-    std::string title;
-    std::string body;
-    std::vector<std::string> bullets;
-    std::vector<PomSection> subsections;
-
-    json to_json() const {
-        json j;
-        j["title"] = title;
-        if (!body.empty()) j["body"] = body;
-        if (!bullets.empty()) j["bullets"] = bullets;
-        if (!subsections.empty()) {
-            j["subsections"] = json::array();
-            for (const auto& s : subsections) {
-                j["subsections"].push_back(s.to_json());
-            }
-        }
-        return j;
-    }
-};
+/// Back-compat alias for the original ``signalwire::agent::PomSection``
+/// type. The implementation now lives in ``signalwire::pom::Section`` —
+/// see ``signalwire/pom/pom.hpp`` for the full API (render_markdown,
+/// render_xml, numbered/numberedBullets fields, etc.). New code should
+/// use ``signalwire::pom::Section`` directly.
+using PomSection = signalwire::pom::Section;
 
 /// Language configuration
 struct LanguageConfig {
@@ -155,15 +141,15 @@ public:
     std::string get_prompt() const;
     AgentBase& set_use_pom(bool use_pom);
 
-    /// Read-only snapshot of the agent's POM section list as JSON.
+    /// Read-only snapshot of the agent's POM as a ``PromptObjectModel``.
     ///
     /// Python parity: ``agent.pom`` instance attribute (agent_base.py
     /// line 209). Returns ``std::nullopt`` when ``use_pom`` is false
     /// (mirroring Python's ``self.pom = None``); otherwise returns a
-    /// freshly built ``std::vector<json>`` by mapping every internal
-    /// PomSection through ``to_json()`` so callers cannot mutate the
-    /// agent's internal section/subsection structures.
-    std::optional<std::vector<json>> pom() const;
+    /// freshly built ``signalwire::pom::PromptObjectModel`` whose
+    /// sections are deep-copied from the agent's internal section/
+    /// subsection structures so callers cannot mutate them in-place.
+    std::optional<signalwire::pom::PromptObjectModel> pom() const;
 
     /// Returns the post-prompt text whatever ``set_post_prompt`` stored, or
     /// ``std::nullopt`` when no post-prompt has been set.

@@ -1,17 +1,9 @@
 {
-  "generated_from": "signalwire-cpp @ ae36e0efab70152d2ff65ff50a0b1a8c656be0d2",
+  "generated_from": "signalwire-cpp @ 6fdc8b75a37f0e4c130f0a484960098d987f7107",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
         "LanguageConfig": [
-          "to_json"
-        ]
-      },
-      "functions": []
-    },
-    "signalwire.agent.pom_section": {
-      "classes": {
-        "PomSection": [
           "to_json"
         ]
       },
@@ -592,6 +584,34 @@
           "error",
           "info",
           "warn"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.pom.pom": {
+      "classes": {
+        "PromptObjectModel": [
+          "__init__",
+          "add_pom_as_subsection",
+          "add_section",
+          "find_section",
+          "from_json",
+          "from_yaml",
+          "render_markdown",
+          "render_xml",
+          "to_dict",
+          "to_json",
+          "to_yaml"
+        ],
+        "Section": [
+          "__init__",
+          "add_body",
+          "add_bullets",
+          "add_subsection",
+          "render_markdown",
+          "render_xml",
+          "to_dict",
+          "to_json"
         ]
       },
       "functions": []

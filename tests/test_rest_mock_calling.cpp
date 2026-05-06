@@ -20,8 +20,56 @@ const std::string kCallsPath = "/api/calling/calls";
 }
 
 // ---------------------------------------------------------------------------
-// Lifecycle: update / transfer / disconnect
+// Lifecycle: dial / update / transfer / disconnect
 // ---------------------------------------------------------------------------
+
+TEST(rest_mock_calling_dial_forwards_codecs_array) {
+    // OpenAPI spec for calling/calls dial gained an optional codecs param
+    // (porting-sdk PR #1). dial(json) forwards arbitrary fields, so codecs
+    // flows through without source changes; this test confirms the array
+    // form reaches the wire.
+    auto client = mocktest::make_client();
+    auto body = client.calling().dial({
+        {"url", "https://example.com/swml"},
+        {"to", "+15551234567"},
+        {"codecs", json::array({"OPUS", "G729", "VP8", "PCMA"})},
+    });
+    ASSERT_TRUE(body.is_object());
+    ASSERT_TRUE(body.contains("id"));
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_EQ(j.path, kCallsPath);
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(j.body.value("command", std::string()), std::string("dial"));
+    ASSERT_FALSE(j.body.contains("id"));
+    auto& params = j.body.at("params");
+    ASSERT_EQ(params.value("to", std::string()), std::string("+15551234567"));
+    ASSERT_TRUE(params.contains("codecs"));
+    ASSERT_TRUE(params.at("codecs").is_array());
+    ASSERT_EQ(params.at("codecs").size(), (size_t)4);
+    ASSERT_EQ(params.at("codecs")[0].get<std::string>(), std::string("OPUS"));
+    ASSERT_EQ(params.at("codecs")[1].get<std::string>(), std::string("G729"));
+    ASSERT_EQ(params.at("codecs")[2].get<std::string>(), std::string("VP8"));
+    ASSERT_EQ(params.at("codecs")[3].get<std::string>(), std::string("PCMA"));
+    return true;
+}
+
+TEST(rest_mock_calling_dial_forwards_codecs_string) {
+    // Same as above but with the comma-separated-string shape, which the
+    // OpenAPI spec also accepts.
+    auto client = mocktest::make_client();
+    auto body = client.calling().dial({
+        {"url", "https://example.com/swml"},
+        {"to", "+15551234567"},
+        {"codecs", "OPUS,G729,VP8,PCMA"},
+    });
+    ASSERT_TRUE(body.is_object());
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.body.value("command", std::string()), std::string("dial"));
+    ASSERT_EQ(j.body.at("params").value("codecs", std::string()),
+              std::string("OPUS,G729,VP8,PCMA"));
+    return true;
+}
 
 TEST(rest_mock_calling_update) {
     auto client = mocktest::make_client();

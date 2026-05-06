@@ -45,16 +45,13 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Regenerate port_surface.json
-        run: python3 scripts/enumerate_surface.py --output port_surface.json
-
       - name: Check port_surface.json is committed and up-to-date
-        run: |
-          if ! git diff --exit-code port_surface.json; then
-            echo "::error::port_surface.json is stale. Regenerate with:"
-            echo "    python3 scripts/enumerate_surface.py"
-            exit 1
-          fi
+        # `--check` regenerates in-memory and compares against the committed
+        # file, stripping the volatile `generated_from` SHA. A `git diff
+        # --exit-code` after a fresh regen could never pass because the script
+        # embeds the current HEAD SHA, which by definition differs from the
+        # SHA recorded when the committed file was generated.
+        run: python3 scripts/enumerate_surface.py --check --output port_surface.json
 
       - name: Diff against Python reference
         run: |

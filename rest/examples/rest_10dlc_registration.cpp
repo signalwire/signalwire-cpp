@@ -15,9 +15,9 @@ int main() {
         auto callers = client.verified_callers().list();
         std::cout << "Verified callers: " << callers.dump(2) << "\n";
 
-        // Registry entries
-        auto registry = client.registry().list();
-        std::cout << "Registry: " << registry.dump(2) << "\n";
+        // Registry entries (10DLC brand registrations)
+        auto registry = client.registry().brands.list();
+        std::cout << "Registry brands: " << registry.dump(2) << "\n";
 
         // Number groups
         auto groups = client.number_groups().list();

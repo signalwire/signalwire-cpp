@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 6fdc8b75a37f0e4c130f0a484960098d987f7107",
+  "generated_from": "signalwire-cpp @ c610fe7e1c847a5d23428ea50d33823ce3876138",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {

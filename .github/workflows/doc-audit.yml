@@ -57,6 +57,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ libssl-dev
 
+      - name: Install Python test harnesses (mock_relay + mock_signalwire)
+        run: |
+          pip install -e ./porting-sdk/test_harness/mock_relay
+          pip install -e ./porting-sdk/test_harness/mock_signalwire
+
       - name: Build library + examples
         run: |
           mkdir -p build

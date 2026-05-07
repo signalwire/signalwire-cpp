@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/agent/agent_base.hpp"
 #include "signalwire/skills/skill_registry.hpp"
+#include "signalwire/security/webhook_middleware.hpp"
 #include "signalwire/common.hpp"
 #include "httplib.h"
 #include <openssl/crypto.h>
@@ -30,6 +31,16 @@ AgentBase::AgentBase(const std::string& name, const std::string& route,
     std::string env_port = get_env("PORT", "");
     if (!env_port.empty()) {
         try { port_ = std::stoi(env_port); } catch (...) {}
+    }
+
+    // Webhook signature validation (porting-sdk/webhooks.md):
+    // pick up SIGNALWIRE_SIGNING_KEY at construction time as a fallback;
+    // explicit set_signing_key(...) wins. The actual route mounting + the
+    // "disabled" warning is emitted at serve() time so callers who set
+    // the key after construction don't get the misleading warning.
+    std::string env_key = get_env("SIGNALWIRE_SIGNING_KEY", "");
+    if (!env_key.empty()) {
+        signing_key_ = env_key;
     }
 }
 
@@ -86,6 +97,9 @@ AgentBase::AgentBase(const AgentBase& other)
     auto_map_sip_ = other.auto_map_sip_;
     summary_callback_ = other.summary_callback_;
     debug_event_callback_ = other.debug_event_callback_;
+    signing_key_ = other.signing_key_;
+    signing_key_warning_emitted_ = other.signing_key_warning_emitted_;
+    trust_proxy_for_signature_ = other.trust_proxy_for_signature_;
     // Note: server_ is NOT copied; session_manager_ gets a new secret
 }
 
@@ -841,6 +855,32 @@ AgentBase& AgentBase::set_auth(const std::string& username, const std::string& p
     return *this;
 }
 
+// ============================================================================
+// Webhook Signature Validation (porting-sdk/webhooks.md)
+// ============================================================================
+
+AgentBase& AgentBase::set_signing_key(const std::string& key) {
+    if (key.empty()) {
+        signing_key_.reset();
+    } else {
+        signing_key_ = key;
+    }
+    // Reset the one-shot warning so a later serve() will reflect the new
+    // configuration (e.g. user calls set_signing_key("") after a key was
+    // previously set).
+    signing_key_warning_emitted_ = false;
+    return *this;
+}
+
+std::optional<std::string> AgentBase::signing_key() const {
+    return signing_key_;
+}
+
+AgentBase& AgentBase::trust_proxy_for_signature(bool trust) {
+    trust_proxy_for_signature_ = trust;
+    return *this;
+}
+
 void AgentBase::init_auth() {
     if (auth_initialized_) return;
 
@@ -1348,6 +1388,34 @@ void AgentBase::setup_routes(httplib::Server& server) {
     if (base.empty()) base = "/";
     if (base.back() == '/' && base.size() > 1) base.pop_back();
 
+    // Webhook signature validation (porting-sdk/webhooks.md):
+    // when signing_key is set, wrap POST handlers with the validator;
+    // when unset, log a one-time warning matching the Python reference
+    // and let unsigned POSTs through.
+    auto wrap_post = [this](security::HttpHandler downstream)
+                         -> security::HttpHandler {
+        if (!signing_key_ || signing_key_->empty()) {
+            return downstream;
+        }
+        security::WebhookValidatorOptions opts;
+        opts.trust_proxy = trust_proxy_for_signature_;
+        return security::WrapWithSignatureValidation(*signing_key_,
+                                                     std::move(downstream),
+                                                     opts);
+    };
+
+    if (signing_key_ && !signing_key_->empty()) {
+        if (!signing_key_warning_emitted_) {
+            get_logger().info("webhook_signature_validation_enabled");
+            signing_key_warning_emitted_ = true;
+        }
+    } else if (!signing_key_warning_emitted_) {
+        get_logger().warn(
+            "[signalwire] webhook signature validation is disabled — "
+            "set signing_key or SIGNALWIRE_SIGNING_KEY to enable");
+        signing_key_warning_emitted_ = true;
+    }
+
     // Health (no auth)
     server.Get("/health", [](const httplib::Request&, httplib::Response& res) {
         res.set_content("{\"status\":\"healthy\"}", "application/json");
@@ -1358,24 +1426,31 @@ void AgentBase::setup_routes(httplib::Server& server) {
         res.set_content("{\"status\":\"ready\"}", "application/json");
     });
 
-    // SWML endpoint
-    auto swml_handler = [this](const httplib::Request& req, httplib::Response& res) {
+    // SWML endpoint — GET unsigned, POST signature-validated when key is set.
+    security::HttpHandler swml_get = [this](const httplib::Request& req,
+                                            httplib::Response& res) {
         handle_swml_request(req, res);
     };
-    server.Get(base.c_str(), swml_handler);
-    server.Post(base.c_str(), swml_handler);
+    security::HttpHandler swml_post = wrap_post(
+        [this](const httplib::Request& req, httplib::Response& res) {
+            handle_swml_request(req, res);
+        });
+    server.Get(base.c_str(), swml_get);
+    server.Post(base.c_str(), swml_post);
 
-    // SWAIG endpoint
+    // SWAIG endpoint — POST signature-validated when key is set.
     std::string swaig_path = base + (base.back() == '/' ? "" : "/") + "swaig";
-    server.Post(swaig_path.c_str(), [this](const httplib::Request& req, httplib::Response& res) {
-        handle_swaig_request(req, res);
-    });
+    server.Post(swaig_path.c_str(), wrap_post(
+        [this](const httplib::Request& req, httplib::Response& res) {
+            handle_swaig_request(req, res);
+        }));
 
-    // Post-prompt endpoint
+    // Post-prompt endpoint — POST signature-validated when key is set.
     std::string pp_path = base + (base.back() == '/' ? "" : "/") + "post_prompt";
-    server.Post(pp_path.c_str(), [this](const httplib::Request& req, httplib::Response& res) {
-        handle_post_prompt_request(req, res);
-    });
+    server.Post(pp_path.c_str(), wrap_post(
+        [this](const httplib::Request& req, httplib::Response& res) {
+            handle_post_prompt_request(req, res);
+        }));
 
     // MCP server endpoint (JSON-RPC 2.0)
     if (mcp_server_enabled_) {

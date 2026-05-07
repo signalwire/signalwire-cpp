@@ -142,6 +142,10 @@ static std::vector<TestCase>& get_tests() {
 // Top-level signalwire:: convenience entry points
 #include "test_signalwire_top_level.cpp"
 
+// Webhook signature validation (porting-sdk/webhooks.md)
+#include "test_webhook_validator.cpp"
+#include "test_webhook_middleware.cpp"
+
 // Mock-server-backed REST tests (translated from
 // signalwire-python/tests/unit/rest/*.py). These hit the local
 // mock_signalwire HTTP server on port 8772.

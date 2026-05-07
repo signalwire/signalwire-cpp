@@ -373,6 +373,26 @@ _METHOD_RENAMES: dict[str, str] = {
 }
 
 
+# -- Free-function rename map ------------------------------------------------
+# Maps a C++ (namespace, function-name) to the Python (module-path,
+# function-name) the reference inventory exposes at module level. Use this
+# when ``native_ns_to_module + camel/Pascal`` doesn't land on the right
+# Python module — for example C++ ``signalwire::security`` collapses
+# both webhook_validator and session_manager into one namespace, but
+# Python keeps them in separate modules under
+# ``signalwire.core.security.<file>``.
+FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
+    # Webhook signature validation (porting-sdk/webhooks.md). C++ uses
+    # PascalCase per its naming convention; Python uses snake_case.
+    ("signalwire::security", "ValidateWebhookSignature"): (
+        "signalwire.core.security.webhook_validator", "validate_webhook_signature",
+    ),
+    ("signalwire::security", "ValidateRequest"): (
+        "signalwire.core.security.webhook_validator", "validate_request",
+    ),
+}
+
+
 # Reserved identifiers that must never be emitted as methods.
 SKIP_METHOD_NAMES: set[str] = {
     # C++ constructs that can superficially look like methods

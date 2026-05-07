@@ -417,6 +417,35 @@ public:
     const std::string& auth_password() const { return auth_pass_; }
 
     // ========================================================================
+    // Webhook Signature Validation (porting-sdk/webhooks.md)
+    //
+    // When ``signing_key`` is set, the agent server auto-mounts the
+    // webhook validator on POST `/`, `/swaig`, and `/post_prompt`. Unsigned
+    // or wrongly-signed requests get a 403 and never reach the handler.
+    //
+    // Resolution order at runtime:
+    //   1. ``set_signing_key(...)`` (explicit)
+    //   2. ``SIGNALWIRE_SIGNING_KEY`` env var (fallback)
+    // When neither is set, AgentBase logs a startup warning matching the
+    // Python reference and accepts unsigned POSTs.
+    // ========================================================================
+
+    /// Set the SignalWire Signing Key (Dashboard → API Credentials).
+    /// Pass the empty string to clear and revert to env-fallback behavior.
+    AgentBase& set_signing_key(const std::string& key);
+
+    /// Read the resolved signing key (constructor / set_signing_key /
+    /// SIGNALWIRE_SIGNING_KEY env), or std::nullopt when unset.
+    /// The returned value is the secret — never log it.
+    std::optional<std::string> signing_key() const;
+
+    /// If true, ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` are honored
+    /// by the webhook middleware when reconstructing the URL. Default
+    /// false — proxy headers are spoofable so opt in only when the
+    /// reverse-proxy is trusted.
+    AgentBase& trust_proxy_for_signature(bool trust);
+
+    // ========================================================================
     // Lifecycle / Callbacks
     // ========================================================================
 
@@ -553,6 +582,14 @@ protected:
 
     // Security
     security::SessionManager session_manager_;
+
+    // Webhook signature validation (porting-sdk/webhooks.md)
+    // When set, the server auto-mounts the validator on POST `/`,
+    // `/swaig`, and `/post_prompt`. Resolution order:
+    //   explicit set_signing_key(...) > SIGNALWIRE_SIGNING_KEY env > none
+    std::optional<std::string> signing_key_;
+    bool signing_key_warning_emitted_ = false;
+    bool trust_proxy_for_signature_ = false;
 
     // Server
     std::unique_ptr<httplib::Server> server_;

@@ -315,3 +315,7 @@ signalwire.pom.pom.PromptObjectModel.from_json: cpp-typed-overload — C++ takes
 signalwire.pom.pom.PromptObjectModel.from_yaml: cpp-typed-overload — C++ takes const std::string& where Python's from_yaml takes Union[str, dict]
 signalwire.pom.pom.Section.__init__: cpp-overload-set — C++ exposes overloaded ctors (default, builder, copy) where Python has a single __init__ with positional+kwargs
 signalwire.pom.pom.Section.add_subsection: cpp-overload-set — C++ exposes 4 overloads (title-only / title+body / title+bullets / full) where Python uses single positional+kwargs
+
+## Webhook signature validation (signalwire.core.security.*) — C++ idiom
+
+signalwire.core.security.webhook_validator.validate_request: cpp-typed-overload — C++ ParamsOrBody is std::variant<string, vector<pair<string,vector<string>>>> covering raw-body and pre-parsed form-params; Python's Union additionally lists Mapping[str,Any] and None which collapse to the same Scheme B path. Same wire contract — different idiomatic typing.

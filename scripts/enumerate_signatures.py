@@ -46,7 +46,8 @@ if not PSDK.is_dir():
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
     CALLBACK_TYPEDEFS_AS_CALLABLE,
-    CLASS_MODULE_MAP, CLASS_RENAME_MAP, MIXIN_PROJECTIONS, _METHOD_RENAMES,
+    CLASS_MODULE_MAP, CLASS_RENAME_MAP, FREE_FUNCTION_RENAMES,
+    MIXIN_PROJECTIONS, _METHOD_RENAMES,
     camel_to_snake, module_for_class, native_ns_to_module,
 )
 
@@ -291,6 +292,13 @@ def walk_translation_unit(tu: TranslationUnit, file_filter: Path) -> tuple[list[
                 params.append({
                     "name": arg.spelling,
                     "type": arg.type.spelling,
+                    # Carry the canonical spelling alongside the
+                    # typedef-aware spelling so the translator can fall
+                    # back to it when a typedef (e.g. ``ParamsOrBody``
+                    # over ``std::variant<...>``) is opaque to its
+                    # bare-name lookup. Class methods use the same trick
+                    # via ``extract_method``.
+                    "canonical_type": arg.type.get_canonical().spelling,
                     "has_default": _has_default_value(arg),
                 })
             free_functions.append({
@@ -298,6 +306,7 @@ def walk_translation_unit(tu: TranslationUnit, file_filter: Path) -> tuple[list[
                 "name": fname,
                 "parameters": params,
                 "return_type": cursor.result_type.spelling,
+                "canonical_return_type": cursor.result_type.get_canonical().spelling,
             })
             return
         if cursor.kind in (CursorKind.CLASS_DECL, CursorKind.STRUCT_DECL):
@@ -356,6 +365,11 @@ def extract_method(cursor, is_ctor: bool) -> dict:
         params.append({
             "name": arg.spelling,
             "type": arg.type.spelling,
+            # Carry the canonical (typedef-expanded) spelling so the
+            # translator can fall back to it when a port-internal
+            # typedef hides a known type. See
+            # ``_translate_with_canonical_fallback``.
+            "canonical_type": arg.type.get_canonical().spelling,
             "has_default": _has_default_value(arg),
         })
     return {
@@ -364,6 +378,9 @@ def extract_method(cursor, is_ctor: bool) -> dict:
         "is_static": cursor.is_static_method() if not is_ctor else False,
         "parameters": params,
         "return_type": "void" if is_ctor else cursor.result_type.spelling,
+        "canonical_return_type": (
+            "void" if is_ctor else cursor.result_type.get_canonical().spelling
+        ),
     }
 
 
@@ -527,17 +544,30 @@ def collect(
         ns = entry["namespace"]
         if not ns.startswith("signalwire"):
             continue
-        py_module = native_ns_to_module(ns) or ns.replace("::", ".")
-        if not py_module.startswith("signalwire"):
-            py_module = "signalwire." + py_module
-        # camel_to_snake: C++ module functions are usually snake-case
-        # already, but Python's top-level ``signalwire.RestClient`` is a
-        # PascalCase factory function (mirroring the class name). Preserve
-        # that when the C++ source-side function is also PascalCase.
-        if entry["name"][:1].isupper():
-            fname = entry["name"]
+        # Free-function module/name override: a single registry that maps
+        # the C++ (namespace, function-name) to the Python (module, name)
+        # the reference inventory exposes. Used when the canonical
+        # ``native_ns_to_module + camel/Pascal`` rule doesn't land on the
+        # right Python module — for example
+        # ``signalwire::security::ValidateWebhookSignature`` lives under
+        # ``signalwire.core.security.webhook_validator`` in Python because
+        # that's where the validator module sits in the reference repo.
+        override = FREE_FUNCTION_RENAMES.get((ns, entry["name"]))
+        if override is not None:
+            py_module, fname = override
         else:
-            fname = camel_to_snake(entry["name"])
+            py_module = native_ns_to_module(ns) or ns.replace("::", ".")
+            if not py_module.startswith("signalwire"):
+                py_module = "signalwire." + py_module
+            # camel_to_snake: C++ module functions are usually snake-case
+            # already, but Python's top-level ``signalwire.RestClient`` is
+            # a PascalCase factory function (mirroring the class name).
+            # Preserve that when the C++ source-side function is also
+            # PascalCase.
+            if entry["name"][:1].isupper():
+                fname = entry["name"]
+            else:
+                fname = camel_to_snake(entry["name"])
         if (py_module, fname) not in ref_free_fn_targets:
             continue
         ctx = f"{py_module}.{fname}"
@@ -740,6 +770,60 @@ def _load_python_free_function_targets() -> set[tuple[str, str]]:
     return targets
 
 
+def _translate_with_canonical_fallback(spelling: str,
+                                        canonical_spelling: str,
+                                        aliases: dict,
+                                        ctx: str) -> str:
+    """Translate a C++ type spelling, with awareness of typedef expansion.
+
+    libclang reports the typedef name in ``arg.type.spelling``
+    (``ParamsOrBody``, ``InboundCallHandler``, etc.). Some typedefs have
+    explicit rules (CALLBACK_TYPEDEFS_AS_CALLABLE, CLASS_RENAME_MAP,
+    aliases.cpp) and translate cleanly via the spelling. Others
+    (``using ParamsOrBody = std::variant<...>``) don't, and we'd happily
+    invent ``class:signalwire.params_or_body.ParamsOrBody`` from the
+    bare-name heuristic — landing nowhere a Python signature could
+    match.
+
+    Strategy:
+      1. Try the spelling first. Preserves project-named types where
+         explicit rules exist.
+      2. If the spelling translation either fails OR resolves via the
+         "heuristic class ref" branch (last-resort PascalCase fallback)
+         to a signalwire.* path that doesn't appear in CLASS_MODULE_MAP
+         or CLASS_RENAME_MAP, fall back to the canonical (typedef-
+         expanded) spelling. This catches port-internal typedefs over
+         standard-library types without needing a per-typedef rule.
+    """
+    try:
+        primary = translate_cpp_type(spelling, aliases, ctx)
+    except TypeTranslationError:
+        if canonical_spelling and canonical_spelling != spelling:
+            return translate_cpp_type(canonical_spelling, aliases, ctx)
+        raise
+
+    # Detect the heuristic-fallback case: the translator emitted
+    # ``class:<module>.<TypedefName>`` invented from the typedef's
+    # bare name, but the typedef actually wraps a stdlib type the
+    # canonical spelling can decompose.
+    if canonical_spelling and canonical_spelling != spelling and \
+            primary.startswith("class:") and "." in primary:
+        # Look up the typedef name in CLASS_MODULE_MAP / CLASS_RENAME_MAP
+        # to see if there's an intentional class-rename target. If so,
+        # keep the primary translation; otherwise prefer canonical.
+        tail = primary.split(":", 1)[1]
+        cls_name = tail.rsplit(".", 1)[-1]
+        if cls_name not in CLASS_MODULE_MAP and \
+                not any(v[1] == cls_name for v in CLASS_RENAME_MAP.values()) and \
+                cls_name not in CALLBACK_TYPEDEFS_AS_CALLABLE:
+            try:
+                return translate_cpp_type(canonical_spelling, aliases, ctx)
+            except TypeTranslationError:
+                # Fall through and return whatever the spelling produced
+                pass
+    return primary
+
+
 def build_signature(method: dict, aliases: dict, context: str) -> dict:
     params_out: list = []
     is_static = method.get("is_static", False)
@@ -748,7 +832,9 @@ def build_signature(method: dict, aliases: dict, context: str) -> dict:
         params_out.append({"name": "self", "kind": "self"})
     for p in method.get("parameters", []):
         ctx = f"{context}[{p.get('name')}]"
-        canon_type = translate_cpp_type(p.get("type", ""), aliases, ctx)
+        canon_type = _translate_with_canonical_fallback(
+            p.get("type", ""), p.get("canonical_type", ""), aliases, ctx,
+        )
         param: dict = {
             "name": p.get("name", "_") or "_",
             "type": canon_type,
@@ -759,7 +845,12 @@ def build_signature(method: dict, aliases: dict, context: str) -> dict:
         else:
             param["required"] = True
         params_out.append(param)
-    return_canon = "void" if is_ctor else translate_cpp_type(method.get("return_type", "void"), aliases, context + "[->]")
+    return_canon = "void" if is_ctor else _translate_with_canonical_fallback(
+        method.get("return_type", "void"),
+        method.get("canonical_return_type", ""),
+        aliases,
+        context + "[->]",
+    )
     return {"params": params_out, "returns": return_canon}
 
 

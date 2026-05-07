@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ c610fe7e1c847a5d23428ea50d33823ce3876138",
+  "generated_from": "signalwire-cpp @ 567dc188dd53215308dd863066f6f00a45c95ea1",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -142,10 +142,13 @@
           "set_prompt_pom",
           "set_prompt_text",
           "set_pronunciations",
+          "set_signing_key",
           "set_use_pom",
           "set_webhook_url",
+          "signing_key",
           "stop",
           "supported_internal_filler_names",
+          "trust_proxy_for_signature",
           "update_global_data",
           "validate_tool_token"
         ]

@@ -92,6 +92,94 @@ TEST(skill_websearch_handler_works) {
     return true;
 }
 
+// ============================================================================
+// response_prefix / response_postfix (Python parity: 8aad242)
+// Wrap successful (non-empty) results only — error / transport-error paths
+// are NOT wrapped. SWML key stays snake_case.
+// ============================================================================
+
+namespace {
+// Helper: spin a fixture server returning a canned CSE body, point the
+// skill at it, call the handler, return the response string. Cleans up
+// the server + env var on the way out so test ordering doesn't matter.
+static std::string run_websearch_with_params(const json& extra_params,
+                                              const std::string& query = "test query") {
+    httplib::Server srv;
+    srv.Get("/customsearch/v1", [&](const httplib::Request&, httplib::Response& res) {
+        res.set_content(R"({"items":[{"title":"Test Result","link":"https://t/1","snippet":"hit for test query"}]})",
+                        "application/json");
+    });
+    int port = 0;
+    std::thread th([&]{ port = srv.bind_to_any_port("127.0.0.1"); srv.listen_after_bind(); });
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (port == 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    ::setenv("WEB_SEARCH_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
+
+    auto skill = sw_skills::SkillRegistry::instance().create("web_search");
+    json setup_params = json::object({{"api_key", "k"}, {"search_engine_id", "s"}});
+    for (auto& [k, v] : extra_params.items()) setup_params[k] = v;
+    skill->setup(setup_params);
+    auto tools = skill->register_tools();
+    auto result = tools[0].handler(json::object({{"query", query}}), json::object());
+    std::string resp = result.to_json()["response"].get<std::string>();
+
+    srv.stop();
+    th.join();
+    ::unsetenv("WEB_SEARCH_BASE_URL");
+    return resp;
+}
+}  // namespace
+
+TEST(skill_websearch_no_prefix_postfix_unchanged) {
+    // Baseline: without the params, the body has no wrapper text.
+    std::string resp = run_websearch_with_params(json::object());
+    ASSERT_TRUE(resp.find("Test Result") != std::string::npos);
+    ASSERT_TRUE(resp.find("AGENT_HINT") == std::string::npos);
+    ASSERT_TRUE(resp.find("SOURCE_NOTE") == std::string::npos);
+    return true;
+}
+
+TEST(skill_websearch_response_prefix_wraps_success) {
+    std::string resp = run_websearch_with_params(
+        json::object({{"response_prefix", "AGENT_HINT: from-public-web"}}));
+    // Prefix appears, response body appears, and prefix precedes the body.
+    auto p = resp.find("AGENT_HINT: from-public-web");
+    auto b = resp.find("Test Result");
+    ASSERT_TRUE(p != std::string::npos);
+    ASSERT_TRUE(b != std::string::npos);
+    ASSERT_TRUE(p < b);
+    return true;
+}
+
+TEST(skill_websearch_response_postfix_wraps_success) {
+    std::string resp = run_websearch_with_params(
+        json::object({{"response_postfix", "SOURCE_NOTE: public-search"}}));
+    auto b = resp.find("Test Result");
+    auto pf = resp.find("SOURCE_NOTE: public-search");
+    ASSERT_TRUE(b != std::string::npos);
+    ASSERT_TRUE(pf != std::string::npos);
+    ASSERT_TRUE(b < pf);
+    return true;
+}
+
+TEST(skill_websearch_response_prefix_and_postfix_both_wrap) {
+    std::string resp = run_websearch_with_params(json::object({
+        {"response_prefix", "AGENT_HINT: from-public-web"},
+        {"response_postfix", "SOURCE_NOTE: public-search"}
+    }));
+    auto p = resp.find("AGENT_HINT: from-public-web");
+    auto b = resp.find("Test Result");
+    auto pf = resp.find("SOURCE_NOTE: public-search");
+    ASSERT_TRUE(p != std::string::npos);
+    ASSERT_TRUE(b != std::string::npos);
+    ASSERT_TRUE(pf != std::string::npos);
+    ASSERT_TRUE(p < b);
+    ASSERT_TRUE(b < pf);
+    return true;
+}
+
 TEST(skill_websearch_has_prompt_sections) {
     auto skill = sw_skills::SkillRegistry::instance().create("web_search");
     skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));

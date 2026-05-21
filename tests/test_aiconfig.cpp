@@ -99,6 +99,126 @@ TEST(aiconfig_language_with_engine) {
 }
 
 // ========================================================================
+// Per-language params (Python parity: 029ca6f, TestPerLanguageParams)
+// ========================================================================
+// The Python reference adds add_language(params=...) +
+// set_language_params(code, params) + get_language_params(code).
+// C++ keeps add_language as a single LanguageConfig overload — params
+// is now a field on the struct (json), and the two new accessors are
+// pure-additions on AgentBase. SWML key stays snake_case ("params").
+
+TEST(aiconfig_add_language_with_params_attaches_params) {
+    AgentBase agent;
+    LanguageConfig lc{"English", "en-US", "josh", "elevenlabs", "",
+                      json::object({{"stability", 0.5}, {"similarity_boost", 0.75}})};
+    agent.add_language(lc);
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai["languages"][0].contains("params"));
+    ASSERT_EQ(ai["languages"][0]["params"]["stability"].get<double>(), 0.5);
+    ASSERT_EQ(ai["languages"][0]["params"]["similarity_boost"].get<double>(), 0.75);
+    return true;
+}
+
+TEST(aiconfig_add_language_without_params_omits_key) {
+    AgentBase agent;
+    agent.add_language({"French", "fr-FR", "fr-FR-Neural2-A", "", ""});
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai["languages"][0].contains("params"));
+    return true;
+}
+
+TEST(aiconfig_add_language_with_empty_params_omits_key) {
+    AgentBase agent;
+    LanguageConfig lc{"French", "fr-FR", "v", "", "", json::object()};
+    agent.add_language(lc);
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai["languages"][0].contains("params"));
+    return true;
+}
+
+TEST(aiconfig_get_language_params_returns_set_dict) {
+    AgentBase agent;
+    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    agent.add_language(lc);
+    auto got = agent.get_language_params("en-US");
+    ASSERT_TRUE(got.has_value());
+    ASSERT_EQ((*got)["a"].get<int>(), 1);
+    return true;
+}
+
+TEST(aiconfig_get_language_params_returns_nullopt_when_unset) {
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "v", "", ""});
+    auto got = agent.get_language_params("en-US");
+    ASSERT_FALSE(got.has_value());
+    return true;
+}
+
+TEST(aiconfig_get_language_params_returns_nullopt_for_unknown_code) {
+    AgentBase agent;
+    auto got = agent.get_language_params("zh-CN");
+    ASSERT_FALSE(got.has_value());
+    return true;
+}
+
+TEST(aiconfig_set_language_params_replaces_existing) {
+    AgentBase agent;
+    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    agent.add_language(lc);
+    agent.set_language_params("en-US", json::object({{"b", 2}}));
+    auto got = agent.get_language_params("en-US");
+    ASSERT_TRUE(got.has_value());
+    ASSERT_FALSE(got->contains("a"));
+    ASSERT_EQ((*got)["b"].get<int>(), 2);
+    return true;
+}
+
+TEST(aiconfig_set_language_params_adds_when_unset) {
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.set_language_params("en-US", json::object({{"c", 3}}));
+    auto got = agent.get_language_params("en-US");
+    ASSERT_TRUE(got.has_value());
+    ASSERT_EQ((*got)["c"].get<int>(), 3);
+    return true;
+}
+
+TEST(aiconfig_set_language_params_empty_object_removes_key) {
+    AgentBase agent;
+    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    agent.add_language(lc);
+    agent.set_language_params("en-US", json::object());
+    auto got = agent.get_language_params("en-US");
+    ASSERT_FALSE(got.has_value());
+    // And the wire shape doesn't carry the key any more either.
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai["languages"][0].contains("params"));
+    return true;
+}
+
+TEST(aiconfig_set_language_params_unknown_code_is_noop) {
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.set_language_params("zh-CN", json::object({{"a", 1}}));
+    // The known language remains untouched.
+    auto got = agent.get_language_params("en-US");
+    ASSERT_FALSE(got.has_value());
+    return true;
+}
+
+TEST(aiconfig_set_language_params_returns_self_for_chaining) {
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "v", "", ""});
+    AgentBase& ret = agent.set_language_params("en-US", json::object({{"a", 1}}));
+    ASSERT_TRUE(&ret == &agent);
+    return true;
+}
+
+// ========================================================================
 // Pronunciations
 // ========================================================================
 

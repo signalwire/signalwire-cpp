@@ -94,6 +94,9 @@ public:
 // fixture.
 class WebSearchSkillR : public SkillBase {
     std::string ak_,sid_,tn_="web_search"; int nr_=3;
+    // Per Python 8aad242 — optional prefix/postfix wrapped around the
+    // success response only (transport/HTTP/parse errors stay raw).
+    std::string rp_, rpf_;
 public:
     std::string skill_name() const override { return "web_search"; }
     std::string skill_description() const override { return "Search the web via Google Custom Search API"; }
@@ -107,15 +110,17 @@ public:
         if (sid_.empty()) sid_=get_env("GOOGLE_CSE_ID");
         tn_=get_param<std::string>(p,"tool_name","web_search");
         nr_=get_param<int>(p,"num_results",3);
+        rp_=get_param<std::string>(p,"response_prefix","");
+        rpf_=get_param<std::string>(p,"response_postfix","");
         return !ak_.empty()&&!sid_.empty();
     }
     std::vector<swaig::ToolDefinition> register_tools() override {
-        std::string ak=ak_, sid=sid_; int nr=nr_;
+        std::string ak=ak_, sid=sid_; int nr=nr_; std::string rp=rp_, rpf=rpf_;
         return {define_tool(tn_, "Search the web for high-quality information",
             json::object({{"type","object"},{"properties",json::object({
                 {"query",json::object({{"type","string"},{"description","Search query"}})}
             })},{"required",json::array({"query"})}}),
-            [ak,sid,nr](const json& a, const json&) -> swaig::FunctionResult {
+            [ak,sid,nr,rp,rpf](const json& a, const json&) -> swaig::FunctionResult {
                 std::string q=a.value("query","");
                 if (q.empty()) return swaig::FunctionResult("No search query provided");
                 std::string base=get_env("WEB_SEARCH_BASE_URL","https://www.googleapis.com");
@@ -147,7 +152,11 @@ public:
                 } else {
                     out << "(no results)";
                 }
-                return swaig::FunctionResult(out.str());
+                // Wrap the success response (parity with Python 8aad242).
+                std::string response = out.str();
+                if (!rp.empty()) response = rp + "\n\n" + response;
+                if (!rpf.empty()) response = response + "\n\n" + rpf;
+                return swaig::FunctionResult(response);
             })};
     }
     std::vector<SkillPromptSection> get_prompt_sections() const override { return {{"Web Search","",{"Use "+tn_}}}; }

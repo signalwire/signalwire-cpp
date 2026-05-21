@@ -46,6 +46,12 @@ struct LanguageConfig {
     std::string voice;
     std::string engine;
     std::string fillers;
+    /// Per-language params dict (engine-specific tuning, voice
+    /// settings, etc.). Emitted as the language object's ``params``
+    /// key in SWML only when non-empty — matches Python reference
+    /// commit 029ca6f. Treated as "unset" when null OR when an empty
+    /// object.
+    json params;
 
     json to_json() const {
         json j;
@@ -54,6 +60,12 @@ struct LanguageConfig {
         j["voice"] = voice;
         if (!engine.empty()) j["engine"] = engine;
         if (!fillers.empty()) j["fillers"] = fillers;
+        // Only emit the params key when non-empty so we don't pollute
+        // SWML with empty objects (parity with Python's
+        // ``if params:`` check).
+        if (params.is_object() && !params.empty()) {
+            j["params"] = params;
+        }
         return j;
     }
 };
@@ -280,6 +292,24 @@ public:
     AgentBase& add_pattern_hint(const std::string& pattern);
     AgentBase& add_language(const LanguageConfig& lang);
     AgentBase& set_languages(const std::vector<LanguageConfig>& langs);
+
+    /// Set (or replace) the per-language ``params`` dict on an
+    /// already-added language. Useful when language entries are built
+    /// via add_language() first and engine-specific tuning is added
+    /// later (e.g. from a config loader). Passing an empty object
+    /// removes the params key (treated as unset). No-op if ``code``
+    /// isn't found among previously-added languages.
+    ///
+    /// Python parity: ``AIConfigMixin.set_language_params`` (029ca6f).
+    AgentBase& set_language_params(const std::string& code, const json& params);
+
+    /// Read the per-language ``params`` dict for a previously-added
+    /// language. Returns ``std::nullopt`` when the code is unknown or
+    /// when params were never set on that language — no exception
+    /// path, mirroring Python's ``None`` return.
+    ///
+    /// Python parity: ``AIConfigMixin.get_language_params`` (029ca6f).
+    std::optional<json> get_language_params(const std::string& code) const;
     AgentBase& add_pronunciation(const std::string& replace_val,
                                   const std::string& with_val,
                                   bool ignore_case = false);

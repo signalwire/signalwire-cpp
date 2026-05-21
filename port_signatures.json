@@ -3638,6 +3638,20 @@
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
             },
+            "get_language_params": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "code",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "optional<any>"
+            },
             "set_function_includes": {
               "params": [
                 {
@@ -3674,6 +3688,25 @@
                 },
                 {
                   "name": "fillers",
+                  "type": "any",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.core.agent_base.AgentBase"
+            },
+            "set_language_params": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "code",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "params",
                   "type": "any",
                   "required": true
                 }

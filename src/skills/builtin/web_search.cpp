@@ -36,6 +36,12 @@ public:
         if (search_engine_id_.empty()) search_engine_id_ = get_env("GOOGLE_CSE_ID");
         tool_name_ = get_param<std::string>(params, "tool_name", "web_search");
         num_results_ = get_param<int>(params, "num_results", 3);
+        // Optional prefix/postfix wrapped around every successful (non-empty)
+        // search response. Mechanical cue for the calling agent (e.g. "tell
+        // the user this came from a public web search") without prompt-side
+        // rules. Mirrors response_format_callback in native_vector_search.
+        response_prefix_ = get_param<std::string>(params, "response_prefix", "");
+        response_postfix_ = get_param<std::string>(params, "response_postfix", "");
         return !api_key_.empty() && !search_engine_id_.empty();
     }
 
@@ -102,7 +108,17 @@ public:
                 } else {
                     out << "(no results)";
                 }
-                return swaig::FunctionResult(out.str());
+                // Wrap the success response with the configured prefix/postfix.
+                // Error / transport-error / no-API-key paths are NOT wrapped,
+                // matching the Python reference (8aad242).
+                std::string response = out.str();
+                if (!response_prefix_.empty()) {
+                    response = response_prefix_ + "\n\n" + response;
+                }
+                if (!response_postfix_.empty()) {
+                    response = response + "\n\n" + response_postfix_;
+                }
+                return swaig::FunctionResult(response);
             }
         )};
     }
@@ -127,6 +143,8 @@ private:
     std::string search_engine_id_;
     std::string tool_name_ = "web_search";
     int num_results_ = 3;
+    std::string response_prefix_;
+    std::string response_postfix_;
 };
 
 REGISTER_SKILL(WebSearchSkill)

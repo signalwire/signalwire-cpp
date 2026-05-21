@@ -366,6 +366,37 @@ AgentBase& AgentBase::set_languages(const std::vector<LanguageConfig>& langs) {
     return *this;
 }
 
+AgentBase& AgentBase::set_language_params(const std::string& code, const json& params) {
+    // Walk the already-added languages and update the first match.
+    // Empty-object params removes the key (treated as unset), matching
+    // Python's ``if params: ... else: language.pop('params', None)``.
+    for (auto& lang : languages_) {
+        if (lang.code == code) {
+            if (params.is_object() && !params.empty()) {
+                lang.params = params;
+            } else {
+                lang.params = json();  // null — to_json() skips it
+            }
+            break;
+        }
+    }
+    return *this;
+}
+
+std::optional<json> AgentBase::get_language_params(const std::string& code) const {
+    for (const auto& lang : languages_) {
+        if (lang.code == code) {
+            // Treat null OR empty-object as "unset" — same shape the
+            // setter writes when called with {} / never called.
+            if (lang.params.is_object() && !lang.params.empty()) {
+                return lang.params;
+            }
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
+}
+
 AgentBase& AgentBase::add_pronunciation(const std::string& replace_val,
                                          const std::string& with_val,
                                          bool ignore_case) {

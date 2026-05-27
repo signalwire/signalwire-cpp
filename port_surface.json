@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 567dc188dd53215308dd863066f6f00a45c95ea1",
+  "generated_from": "signalwire-cpp @ a64eb1fee2bcc555cecbff1c7d01a7b3fada393f",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -96,6 +96,7 @@
           "enable_mcp_server",
           "enable_sip_routing",
           "get_contexts",
+          "get_language_params",
           "get_post_prompt",
           "get_prompt",
           "get_raw_prompt",
@@ -129,6 +130,7 @@
           "set_function_includes",
           "set_global_data",
           "set_internal_fillers",
+          "set_language_params",
           "set_languages",
           "set_name",
           "set_native_functions",
@@ -333,9 +335,11 @@
           "add_pronunciation",
           "enable_debug_events",
           "enable_mcp_server",
+          "get_language_params",
           "set_function_includes",
           "set_global_data",
           "set_internal_fillers",
+          "set_language_params",
           "set_languages",
           "set_native_functions",
           "set_param",

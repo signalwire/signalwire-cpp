@@ -195,3 +195,268 @@ TEST(skill_websearch_global_data) {
     ASSERT_TRUE(gd.contains("web_search_enabled"));
     return true;
 }
+
+// ============================================================================
+// Latency-control params: per_page_timeout / overall_deadline / parallel_scrape
+// / snippets_only + snippet fallback.
+//
+// Ports Python 51101da + 295745b. overall_deadline + per_page_timeout are the
+// CONTRACT — a slow site must not blow past the kernel webhook timeout (~55s).
+// These tests drive the deadline path deterministically against a local
+// httplib content server that sleeps longer than the configured budget. The
+// CSE result links point back at the SAME server so the scrape phase actually
+// fetches the (slow) content endpoint.
+// ============================================================================
+
+namespace {
+
+// A latency fixture: serves the Google CSE call instantly with `num_items`
+// results (links point at this server's /pageK), and answers every OTHER path
+// (the content fetch) after sleeping `content_delay_ms` — but in short,
+// stop-checkable increments so srv.stop() in teardown returns fast even when a
+// content fetch is mid-sleep. `hits` counts how many content fetches started,
+// so a test can assert whether scraping was attempted.
+struct LatencyFixture {
+    httplib::Server srv;
+    std::atomic<int> hits{0};
+    std::atomic<bool> stopping{false};
+    std::thread th;
+    int port = 0;
+
+    LatencyFixture(int num_items, int content_delay_ms) {
+        srv.Get("/customsearch/v1", [this, num_items](const httplib::Request&,
+                                                      httplib::Response& res) {
+            json items = json::array();
+            for (int i = 0; i < num_items; ++i) {
+                items.push_back(json::object({
+                    {"title", "Result " + std::to_string(i)},
+                    {"link", "http://127.0.0.1:" + std::to_string(port) +
+                             "/page" + std::to_string(i)},
+                    {"snippet", "snippet " + std::to_string(i)}
+                }));
+            }
+            res.set_content(json::object({{"items", items}}).dump(),
+                            "application/json");
+        });
+        // Catch-all content endpoint: record the hit, then sleep in 25ms slices
+        // up to content_delay_ms (or until teardown), then return rich HTML.
+        srv.Get(R"(/page\d+)", [this, content_delay_ms](const httplib::Request&,
+                                                        httplib::Response& res) {
+            hits.fetch_add(1);
+            int slept = 0;
+            while (slept < content_delay_ms && !stopping.load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
+                slept += 25;
+            }
+            res.set_content("<html><body><article>"
+                            "Lots of relevant page content here. "
+                            "Lots of relevant page content here.</article></body></html>",
+                            "text/html");
+        });
+        th = std::thread([this] {
+            port = srv.bind_to_any_port("127.0.0.1");
+            srv.listen_after_bind();
+        });
+        auto dl = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (port == 0 && std::chrono::steady_clock::now() < dl) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        ::setenv("WEB_SEARCH_BASE_URL",
+                 ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
+    }
+
+    ~LatencyFixture() {
+        stopping.store(true);
+        srv.stop();
+        if (th.joinable()) th.join();
+        ::unsetenv("WEB_SEARCH_BASE_URL");
+    }
+};
+
+// Run the registered web_search handler with `extra` setup params merged over a
+// fast/deterministic baseline. Returns {response, elapsed_ms}.
+static std::pair<std::string, long> run_latency_handler(const json& extra,
+                                                        const std::string& query) {
+    auto skill = sw_skills::SkillRegistry::instance().create("web_search");
+    json setup = json::object({
+        {"api_key", "k"}, {"search_engine_id", "s"}, {"num_results", 2}
+    });
+    for (auto& [k, v] : extra.items()) setup[k] = v;
+    skill->setup(setup);
+    auto tools = skill->register_tools();
+    auto t0 = std::chrono::steady_clock::now();
+    auto result = tools[0].handler(json::object({{"query", query}}), json::object());
+    auto t1 = std::chrono::steady_clock::now();
+    std::string resp = result.to_json()["response"].get<std::string>();
+    long ms = std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count();
+    return {resp, ms};
+}
+
+}  // namespace
+
+// Defaults: per_page_timeout=2.0, overall_deadline=10.0, parallel_scrape=true,
+// snippets_only=false are advertised in the schema with the matching type +
+// default. (Setup() reads them; the schema is the observable surface.)
+TEST(skill_websearch_latency_defaults_in_schema) {
+    auto skill = sw_skills::SkillRegistry::instance().create("web_search");
+    skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+    auto schema = skill->get_parameter_schema();
+    ASSERT_TRUE(schema.contains("per_page_timeout"));
+    ASSERT_EQ(schema["per_page_timeout"]["type"].get<std::string>(), "number");
+    ASSERT_EQ(schema["per_page_timeout"]["default"].get<double>(), 2.0);
+    ASSERT_TRUE(schema.contains("overall_deadline"));
+    ASSERT_EQ(schema["overall_deadline"]["default"].get<double>(), 10.0);
+    ASSERT_TRUE(schema.contains("parallel_scrape"));
+    ASSERT_EQ(schema["parallel_scrape"]["type"].get<std::string>(), "boolean");
+    ASSERT_EQ(schema["parallel_scrape"]["default"].get<bool>(), true);
+    ASSERT_TRUE(schema.contains("snippets_only"));
+    ASSERT_EQ(schema["snippets_only"]["default"].get<bool>(), false);
+    return true;
+}
+
+// Schema drift guard (Python parity: test_every_setup_param_is_advertised).
+// All 6 latency/response params must be advertised, each not required.
+TEST(skill_websearch_schema_advertises_all_six) {
+    auto skill = sw_skills::SkillRegistry::instance().create("web_search");
+    skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+    auto schema = skill->get_parameter_schema();
+    for (const char* key : {"response_prefix", "response_postfix",
+                            "per_page_timeout", "overall_deadline",
+                            "parallel_scrape", "snippets_only"}) {
+        ASSERT_TRUE(schema.contains(key));
+        ASSERT_EQ(schema[key]["required"].get<bool>(), false);
+    }
+    ASSERT_EQ(schema["response_prefix"]["default"].get<std::string>(), "");
+    ASSERT_EQ(schema["response_postfix"]["default"].get<std::string>(), "");
+    return true;
+}
+
+// snippets_only must short-circuit BEFORE any page fetch. The content endpoint
+// would sleep 5s; if scraping ran the call would take ~5s. Instead it returns
+// immediately with snippet-only formatting and ZERO content hits.
+TEST(skill_websearch_snippets_only_skips_scraping) {
+    LatencyFixture fx(/*num_items=*/2, /*content_delay_ms=*/5000);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(
+        json::object({{"snippets_only", true}}), "golang");
+
+    ASSERT_EQ(fx.hits.load(), 0);          // proves no page was fetched
+    ASSERT_TRUE(ms < 2000);                // sub-second-ish, not the 5s stall
+    ASSERT_TRUE(resp.find("Snippet-only results for 'golang'") != std::string::npos);
+    ASSERT_TRUE(resp.find("snippet 0") != std::string::npos);  // snippet carried
+    ASSERT_TRUE(resp.find("page content not scraped") != std::string::npos);
+    return true;
+}
+
+// overall_deadline IS THE CONTRACT: a content server that stalls 5s with a 1s
+// budget must cause the call to return within ~deadline+slack (NOT 5s) AND fall
+// back to the CSE snippets — never an empty no-results message. Parallel mode.
+// per_page_timeout is set large so the DEADLINE (not per-page) is what truncates.
+TEST(skill_websearch_overall_deadline_truncates_to_snippet_fallback) {
+    LatencyFixture fx(/*num_items=*/3, /*content_delay_ms=*/5000);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(json::object({
+        {"overall_deadline", 1.0},   // budget well under the 5s content stall
+        {"per_page_timeout", 30.0},  // large, so the deadline truncates
+        {"parallel_scrape", true}
+    }), "kubernetes");
+
+    // Returned at the deadline, not after the full 5s stall (allow slack).
+    ASSERT_TRUE(ms < 3000);
+    // Non-empty snippet fallback, NOT the empty no-results / no-items message.
+    ASSERT_TRUE(resp.find("Snippet-only results for 'kubernetes'") != std::string::npos);
+    ASSERT_TRUE(resp.find("(no results)") == std::string::npos);
+    ASSERT_TRUE(resp.find("snippet 0") != std::string::npos);
+    ASSERT_FALSE(resp.empty());
+    return true;
+}
+
+// Same contract in sequential mode (parallel_scrape=false). With a 5s-per-page
+// stall and a 1s budget, per_page_timeout=0.5s force-fails each fetch; the loop
+// then sees the (already-)passed deadline and breaks, falling back to snippets.
+TEST(skill_websearch_overall_deadline_sequential_falls_back) {
+    LatencyFixture fx(/*num_items=*/3, /*content_delay_ms=*/5000);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(json::object({
+        {"overall_deadline", 1.0},
+        {"per_page_timeout", 0.5},   // a single fetch is force-failed at 0.5s
+        {"parallel_scrape", false}
+    }), "rustlang");
+
+    ASSERT_TRUE(ms < 3000);
+    ASSERT_TRUE(resp.find("Snippet-only results for 'rustlang'") != std::string::npos);
+    ASSERT_TRUE(resp.find("(no results)") == std::string::npos);
+    return true;
+}
+
+// per_page_timeout caps a single fetch independent of the overall budget. With
+// a 5s content stall, a 0.3s per-page timeout, a generous 8s overall budget and
+// parallel mode, every fetch errors near 0.3s, no page yields content, and we
+// fall back to snippets WELL before the 5s stall (and before the 8s budget).
+TEST(skill_websearch_per_page_timeout_honored) {
+    LatencyFixture fx(/*num_items=*/2, /*content_delay_ms=*/5000);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(json::object({
+        {"per_page_timeout", 0.3},
+        {"overall_deadline", 8.0},   // large, so it can't be what truncates
+        {"parallel_scrape", true}
+    }), "elixir");
+
+    ASSERT_TRUE(ms < 3000);                 // governed by 0.3s per-page, not 5s/8s
+    ASSERT_TRUE(fx.hits.load() > 0);        // fetches were attempted (then timed out)
+    ASSERT_TRUE(resp.find("Snippet-only results for 'elixir'") != std::string::npos);
+    return true;
+}
+
+// Happy path UNDER the deadline: a FAST content server (no stall) with parallel
+// scraping returns fully-scraped results (the scraped header), NOT the snippet
+// fallback — proving the std::async harvest path delivers real content when
+// pages are quick.
+TEST(skill_websearch_parallel_fast_path_scrapes_content) {
+    LatencyFixture fx(/*num_items=*/3, /*content_delay_ms=*/0);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(json::object({
+        {"overall_deadline", 10.0},
+        {"per_page_timeout", 5.0},
+        {"parallel_scrape", true}
+    }), "postgres");
+
+    ASSERT_TRUE(fx.hits.load() > 0);        // pages were actually fetched
+    // Fully-scraped output includes the page-content header + scraped marker.
+    ASSERT_TRUE(resp.find("page content scraped") != std::string::npos);
+    ASSERT_TRUE(resp.find("Content:") != std::string::npos);
+    ASSERT_TRUE(resp.find("Snippet-only results") == std::string::npos);
+    return true;
+}
+
+// Deadline fallback must still honor response_prefix/response_postfix wrapping
+// (the snippet fallback is a "non-empty success" path, unlike the no-items
+// branch). Proves wrapping composes with the latency machinery.
+TEST(skill_websearch_snippet_fallback_is_wrapped) {
+    LatencyFixture fx(/*num_items=*/2, /*content_delay_ms=*/5000);
+    ASSERT_TRUE(fx.port > 0);
+
+    auto [resp, ms] = run_latency_handler(json::object({
+        {"overall_deadline", 1.0},
+        {"per_page_timeout", 0.4},
+        {"parallel_scrape", true},
+        {"response_prefix", "WRAP_PRE"},
+        {"response_postfix", "WRAP_POST"}
+    }), "scala");
+
+    ASSERT_TRUE(ms < 3000);
+    auto pre = resp.find("WRAP_PRE");
+    auto body = resp.find("Snippet-only results for 'scala'");
+    auto post = resp.find("WRAP_POST");
+    ASSERT_TRUE(pre != std::string::npos);
+    ASSERT_TRUE(body != std::string::npos);
+    ASSERT_TRUE(post != std::string::npos);
+    ASSERT_TRUE(pre < body);
+    ASSERT_TRUE(body < post);
+    return true;
+}

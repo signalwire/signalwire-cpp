@@ -5,6 +5,7 @@
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skills_http.hpp"
+#include "signalwire/skills/web_search_core.hpp"
 #include "signalwire/datamap/datamap.hpp"
 #include "signalwire/common.hpp"
 #include <ctime>
@@ -97,6 +98,12 @@ class WebSearchSkillR : public SkillBase {
     // Per Python 8aad242 — optional prefix/postfix wrapped around the
     // success response only (transport/HTTP/parse errors stay raw).
     std::string rp_, rpf_;
+    // Latency-control params (Python parity: 51101da + 295745b). Shared
+    // implementation lives in web_search_core.hpp so this skill and the
+    // builtin WebSearchSkill can never drift. overall_deadline +
+    // per_page_timeout are the contract; parallel_scrape is best-effort.
+    web_search_core::LatencyParams lp_;
+    std::size_t mcl_ = 32768;  // max_content_length
 public:
     std::string skill_name() const override { return "web_search"; }
     std::string skill_description() const override { return "Search the web via Google Custom Search API"; }
@@ -112,15 +119,23 @@ public:
         nr_=get_param<int>(p,"num_results",3);
         rp_=get_param<std::string>(p,"response_prefix","");
         rpf_=get_param<std::string>(p,"response_postfix","");
+        // Latency-control params. Defaults match Python: per_page_timeout=2.0,
+        // overall_deadline=10.0, parallel_scrape=true, snippets_only=false.
+        lp_.per_page_timeout=get_param<double>(p,"per_page_timeout",2.0);
+        lp_.overall_deadline=get_param<double>(p,"overall_deadline",10.0);
+        lp_.parallel_scrape=get_param<bool>(p,"parallel_scrape",true);
+        lp_.snippets_only=get_param<bool>(p,"snippets_only",false);
+        mcl_=static_cast<std::size_t>(get_param<int>(p,"max_content_length",32768));
         return !ak_.empty()&&!sid_.empty();
     }
     std::vector<swaig::ToolDefinition> register_tools() override {
         std::string ak=ak_, sid=sid_; int nr=nr_; std::string rp=rp_, rpf=rpf_;
+        web_search_core::LatencyParams lp=lp_; std::size_t mcl=mcl_;
         return {define_tool(tn_, "Search the web for high-quality information",
             json::object({{"type","object"},{"properties",json::object({
                 {"query",json::object({{"type","string"},{"description","Search query"}})}
             })},{"required",json::array({"query"})}}),
-            [ak,sid,nr,rp,rpf](const json& a, const json&) -> swaig::FunctionResult {
+            [ak,sid,nr,rp,rpf,lp,mcl](const json& a, const json&) -> swaig::FunctionResult {
                 std::string q=a.value("query","");
                 if (q.empty()) return swaig::FunctionResult("No search query provided");
                 std::string base=get_env("WEB_SEARCH_BASE_URL","https://www.googleapis.com");
@@ -131,6 +146,8 @@ public:
                   << "&cx="  << url_encode(sid)
                   << "&q="   << url_encode(q)
                   << "&num=" << nr;
+                // The CSE fetch is the single non-cancelable step; the
+                // overall_deadline budget starts after it (inside core::run).
                 auto r = skills::http_get(u.str());
                 if (r.status==0) return swaig::FunctionResult("Web search transport error: "+r.error);
                 if (r.status<200 || r.status>=300)
@@ -140,27 +157,27 @@ public:
                 catch (const json::parse_error& e) {
                     return swaig::FunctionResult(std::string("Web search parse error: ")+e.what());
                 }
-                std::ostringstream out;
-                out << "Web search results for '" << q << "':\n";
-                if (parsed.contains("items") && parsed["items"].is_array()) {
-                    int idx=1;
-                    for (const auto& it : parsed["items"]) {
-                        out << idx++ << ". " << it.value("title","") << "\n"
-                            << "   " << it.value("link","")  << "\n"
-                            << "   " << it.value("snippet","") << "\n";
-                    }
-                } else {
-                    out << "(no results)";
+                auto cands = web_search_core::parse_cse_items(parsed);
+                std::string no_items = "Web search results for '" + q + "':\n(no results)";
+                // run() handles snippets_only / deadline-bounded scraping /
+                // snippet fallback. Returns UNWRAPPED body.
+                std::string response = web_search_core::run(
+                    q, std::move(cands), lp, nr, mcl, no_items);
+                // Wrap the success / snippet / scraped response (parity with
+                // Python 8aad242). The no-items message stays unwrapped.
+                if (response != no_items) {
+                    if (!rp.empty()) response = rp + "\n\n" + response;
+                    if (!rpf.empty()) response = response + "\n\n" + rpf;
                 }
-                // Wrap the success response (parity with Python 8aad242).
-                std::string response = out.str();
-                if (!rp.empty()) response = rp + "\n\n" + response;
-                if (!rpf.empty()) response = response + "\n\n" + rpf;
                 return swaig::FunctionResult(response);
             })};
     }
     std::vector<SkillPromptSection> get_prompt_sections() const override { return {{"Web Search","",{"Use "+tn_}}}; }
     json get_global_data() const override { return json::object({{"web_search_enabled",true}}); }
+    json get_parameter_schema() const override {
+        // Advertise the 6 latency / response params (Python parity: 295745b).
+        return web_search_core::schema_fragment();
+    }
 };
 
 // --- 6. wikipedia_search ---

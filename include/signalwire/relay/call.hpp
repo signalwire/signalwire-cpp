@@ -14,6 +14,7 @@
 #include "signalwire/relay/action.hpp"
 #include "signalwire/relay/relay_event.hpp"
 #include "signalwire/relay/constants.hpp"
+#include "signalwire/relay/tts_gender.hpp"
 
 namespace signalwire {
 namespace relay {
@@ -61,6 +62,17 @@ public:
                     const std::string& gender = "",
                     const std::string& voice = "",
                     double volume = 0.0);
+    // Typed-enum overload for the TTS gender closed set. Declared AFTER the
+    // std::string overload (above) so the enumerator's equal-arity dedup keeps
+    // the string version as the canonical signature; this overload just adds
+    // call-site typo checking. It normalizes Gender -> its wire string and
+    // delegates to the std::string play_tts, so the enum and the bare string
+    // emit the IDENTICAL TTS frame. Idiomatic C++ addition (PORT_ADDITIONS.md).
+    Action play_tts(const std::string& text,
+                    const std::string& language,
+                    Gender gender,
+                    const std::string& voice = "",
+                    double volume = 0.0);
     Action play_audio(const std::string& url, double volume = 0.0);
     Action play_silence(double duration);
     Action play_ringtone(const std::string& name,
@@ -79,6 +91,15 @@ public:
     Action prompt_tts(const std::string& text, const json& collect,
                       const std::string& language = "",
                       const std::string& gender = "",
+                      const std::string& voice = "",
+                      double volume = 0.0);
+    // Typed-enum overload for the TTS gender closed set — same rationale as
+    // the play_tts(Gender) overload above. Declared after the std::string
+    // prompt_tts so equal-arity dedup keeps the string signature; delegates
+    // to it via tts_gender_value() so both emit the identical TTS frame.
+    Action prompt_tts(const std::string& text, const json& collect,
+                      const std::string& language,
+                      Gender gender,
                       const std::string& voice = "",
                       double volume = 0.0);
     Action prompt_audio(const std::string& url, const json& collect,

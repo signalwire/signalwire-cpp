@@ -544,6 +544,7 @@ signalwire.relay.call.Call.transcribe: cpp_naming: alias for live_transcribe use
 signalwire.relay.call.Call.stream: cpp_unified_action: calling.stream verb — Python returns StreamAction; C++ exposes via the unified Action.
 signalwire.relay.call.Call.play_and_collect: cpp_naming: alias for prompt(play_media, collect_params) — Python uses `play_and_collect` as the verb name on the wire and on the Call method (call.play_and_collect). C++ keeps prompt as the documented method; play_and_collect is the alias used by mock-backed tests.
 signalwire.relay.call.Call.pay: cpp_unified_action: calling.pay verb — Python returns PayAction; C++ via the unified Action.
+signalwire.relay.tts_gender.Gender: cpp_enum_idiom: `enum class Gender` is the TTS speaker-gender closed set (the documented say_gender wire values male/female; female is the default). Call::play_tts / Call::prompt_tts carry a Gender overload next to the std::string one so a typo fails at the call site (a bare "femaie" only fails at the TTS engine). The string overload stays canonical (parity with Python's bare Optional[str] gender + engine/voice-specific values), declared first so it wins the enumerator's equal-arity overload dedup; the enum is type-safety sugar. Invisible to the surface/signature enumerators (both skip enum decls), so it's documented here for discoverability. tts_gender_value(Gender)/to_string(Gender) are the wire-string mapping; port_signatures.json is unchanged (drift 0).
 
 # C++-only additions on AgentBase / SWMLService surfaced by the signature audit.
 

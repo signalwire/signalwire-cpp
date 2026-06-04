@@ -125,6 +125,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_relay_action.cpp"
 #include "test_relay_event.cpp"
 #include "test_relay_message.cpp"
+#include "test_tts_gender_enum.cpp"
 
 // REST split test files
 #include "test_rest_calling.cpp"

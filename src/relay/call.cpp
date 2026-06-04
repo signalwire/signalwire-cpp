@@ -236,6 +236,14 @@ Action Call::play_tts(const std::string& text, const std::string& language,
     return play(media, volume);
 }
 
+// Typed-enum overload: normalize Gender -> its wire string and delegate to the
+// std::string play_tts above, so the enum and the bare string emit the
+// IDENTICAL TTS frame. See include/signalwire/relay/tts_gender.hpp.
+Action Call::play_tts(const std::string& text, const std::string& language,
+                      Gender gender, const std::string& voice, double volume) {
+    return play_tts(text, language, tts_gender_value(gender), voice, volume);
+}
+
 Action Call::play_audio(const std::string& url, double volume) {
     json media = json::array({ {{"type", "audio"}, {"params", {{"url", url}}}} });
     return play(media, volume);
@@ -321,6 +329,14 @@ Action Call::prompt_tts(const std::string& text, const json& collect,
     if (!voice.empty()) tts["voice"] = voice;
     json media = json::array({ {{"type", "tts"}, {"params", tts}} });
     return prompt_with_media(media, collect, volume);
+}
+
+// Typed-enum overload — same normalization as play_tts(Gender): delegate to
+// the std::string prompt_tts so both emit the IDENTICAL TTS frame.
+Action Call::prompt_tts(const std::string& text, const json& collect,
+                        const std::string& language, Gender gender,
+                        const std::string& voice, double volume) {
+    return prompt_tts(text, collect, language, tts_gender_value(gender), voice, volume);
 }
 
 Action Call::prompt_audio(const std::string& url, const json& collect,

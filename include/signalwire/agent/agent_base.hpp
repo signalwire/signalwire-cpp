@@ -22,6 +22,7 @@
 #include "signalwire/contexts/contexts.hpp"
 #include "signalwire/pom/pom.hpp"
 #include "signalwire/logging.hpp"
+#include "signalwire/skills/skill_name.hpp"
 
 namespace httplib { class Server; class Request; class Response; }
 
@@ -403,6 +404,16 @@ public:
     AgentBase& remove_skill(const std::string& skill_name);
     bool has_skill(const std::string& skill_name) const;
     std::vector<std::string> list_skills() const;
+
+    // Typed-enum overloads for the built-in skill closed set. They delegate
+    // to the string overloads above via skills::skill_name_value(), so the
+    // enum and the bare string load the IDENTICAL skill — the enum just adds
+    // call-site typo checking + autocompletion. The string overloads stay the
+    // canonical surface (parity with Python's bare str + custom skills); these
+    // are an idiomatic C++ addition (see PORT_ADDITIONS.md).
+    AgentBase& add_skill(skills::SkillName skill_name, const json& params = json::object());
+    AgentBase& remove_skill(skills::SkillName skill_name);
+    bool has_skill(skills::SkillName skill_name) const;
 
     // ========================================================================
     // MCP Integration

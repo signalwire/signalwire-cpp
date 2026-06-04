@@ -111,6 +111,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_skill_mcp.cpp"
 #include "test_skill_custom.cpp"
 #include "test_skill_registry.cpp"
+#include "test_skill_name_enum.cpp"
 
 // Prefab test files
 #include "test_prefab_info_gatherer.cpp"

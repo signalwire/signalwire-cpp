@@ -660,6 +660,20 @@ bool AgentBase::has_skill(const std::string& skill_name) const {
     return std::find(loaded_skills_.begin(), loaded_skills_.end(), skill_name) != loaded_skills_.end();
 }
 
+// Typed-enum overloads: normalize SkillName -> its wire string and delegate to
+// the string overloads, so enum and string load the identical skill.
+AgentBase& AgentBase::add_skill(skills::SkillName skill_name, const json& params) {
+    return add_skill(skills::skill_name_value(skill_name), params);
+}
+
+AgentBase& AgentBase::remove_skill(skills::SkillName skill_name) {
+    return remove_skill(skills::skill_name_value(skill_name));
+}
+
+bool AgentBase::has_skill(skills::SkillName skill_name) const {
+    return has_skill(skills::skill_name_value(skill_name));
+}
+
 std::vector<std::string> AgentBase::list_skills() const {
     return loaded_skills_;
 }

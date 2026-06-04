@@ -166,6 +166,16 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_mock_registry.cpp"
 #include "test_rest_mock_pagination.cpp"
 
+// TLS capability tests (template: signalwire-go b6b2b6d). Prove the SDK does
+// REAL, certificate-verified TLS: REST https:// + RELAY wss:// against the
+// porting-sdk --tls mocks, and the SDK's own httplib::SSLServer reached by a
+// verifying client. Each pairs a positive (verified) assertion with a negative
+// control (untrusted CA -> rejected). They skip cleanly when the --tls mocks
+// aren't reachable (infra); CI brings the mocks up so the assertions run.
+#include "test_tls_rest_https.cpp"
+#include "test_tls_relay_wss.cpp"
+#include "test_tls_server_https.cpp"
+
 // Mock-RELAY-backed tests (translated from
 // signalwire-python/tests/unit/relay/test_*_mock.py). These hit the local
 // mock_relay WebSocket server on port 8782.

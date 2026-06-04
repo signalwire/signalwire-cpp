@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ a64eb1fee2bcc555cecbff1c7d01a7b3fada393f",
+  "generated_from": "signalwire-cpp @ ebff013ed506f9be3005ebee3a8c793ef3349a81",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -720,6 +720,9 @@
           "collect",
           "connect",
           "detect",
+          "detect_answering_machine",
+          "detect_digit",
+          "detect_fax",
           "direction",
           "disconnect",
           "dispatch_event",
@@ -739,7 +742,13 @@
           "pay",
           "play",
           "play_and_collect",
+          "play_audio",
+          "play_ringtone",
+          "play_silence",
+          "play_tts",
           "prompt",
+          "prompt_audio",
+          "prompt_tts",
           "receive_fax",
           "record",
           "record_call",
@@ -765,7 +774,10 @@
           "unhold",
           "unregister_action",
           "update_state",
-          "wait_for_ended"
+          "wait_for_answered",
+          "wait_for_ended",
+          "wait_for_ending",
+          "wait_for_ringing"
         ]
       },
       "functions": []
@@ -891,6 +903,7 @@
           "patch",
           "post",
           "put",
+          "set_ca_cert_path",
           "set_header",
           "set_timeout"
         ],

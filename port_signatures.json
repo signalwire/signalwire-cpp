@@ -9078,6 +9078,20 @@
               ],
               "returns": "any"
             },
+            "set_ca_cert_path": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            },
             "set_header": {
               "params": [
                 {

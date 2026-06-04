@@ -8,6 +8,8 @@
 #include <vector>
 #include <nlohmann/json.hpp>
 
+namespace httplib { class Client; }
+
 namespace signalwire {
 namespace rest {
 
@@ -57,16 +59,26 @@ public:
     /// Set request timeout in seconds
     void set_timeout(int seconds);
 
+    /// Trust a private/self-signed CA bundle (PEM) for https:// requests.
+    /// Sets the underlying SSLClient's CA path and keeps server-certificate
+    /// verification ON. Production (public CAs) needs no call — the system
+    /// trust store is used, and SSL_CERT_FILE is also honored automatically.
+    /// C++-only ergonomic hook (Python's requests-based client trusts a custom
+    /// CA via the SSL_CERT_FILE / REQUESTS_CA_BUNDLE env vars instead).
+    void set_ca_cert_path(const std::string& path);
+
     const std::string& base_url() const { return base_url_; }
 
 private:
     json handle_response(int status, const std::string& body) const;
     std::string build_query_string(const std::map<std::string, std::string>& params) const;
+    void configure_client(httplib::Client& cli) const;
 
     std::string base_url_;
     std::string auth_header_;
     std::map<std::string, std::string> headers_;
     int timeout_ = 30;
+    std::string ca_cert_path_;
 };
 
 /// Generic CRUD resource for REST API namespaces

@@ -24,6 +24,32 @@ void HttpClient::set_timeout(int seconds) {
     timeout_ = seconds;
 }
 
+void HttpClient::set_ca_cert_path(const std::string& path) {
+    ca_cert_path_ = path;
+}
+
+// Apply per-request transport config: timeouts plus, for https:// targets, the
+// CA bundle to trust. With CPPHTTPLIB_OPENSSL_SUPPORT a Client on an https://
+// scheme is backed by an SSLClient that verifies the server cert against the
+// system store by default. To trust a private/self-signed CA we point it at an
+// explicit bundle: set_ca_cert_path() if the caller supplied one, else the
+// SSL_CERT_FILE env var (the cross-port idiom). Verification stays ENABLED.
+void HttpClient::configure_client(httplib::Client& cli) const {
+    cli.set_connection_timeout(timeout_, 0);
+    cli.set_read_timeout(timeout_, 0);
+
+    std::string ca = ca_cert_path_;
+    if (ca.empty()) {
+        if (const char* env = std::getenv("SSL_CERT_FILE")) {
+            if (env && *env) ca = env;
+        }
+    }
+    if (!ca.empty()) {
+        cli.set_ca_cert_path(ca.c_str());
+        cli.enable_server_certificate_verification(true);
+    }
+}
+
 std::string HttpClient::build_query_string(const std::map<std::string, std::string>& params) const {
     if (params.empty()) return "";
     std::string qs = "?";
@@ -89,8 +115,7 @@ json HttpClient::get(const std::string& path,
     auto hdrs = make_headers(auth_header_, headers_);
 
     httplib::Client cli(scheme + "://" + host);
-    cli.set_connection_timeout(timeout_, 0);
-    cli.set_read_timeout(timeout_, 0);
+    configure_client(cli);
 
     auto res = cli.Get(full_path, hdrs);
     if (!res) throw SignalWireRestError(0, "Connection failed to " + host);
@@ -103,8 +128,7 @@ json HttpClient::post(const std::string& path, const json& body) const {
     std::string body_str = body.dump();
 
     httplib::Client cli(scheme + "://" + host);
-    cli.set_connection_timeout(timeout_, 0);
-    cli.set_read_timeout(timeout_, 0);
+    configure_client(cli);
 
     auto res = cli.Post(path, hdrs, body_str, "application/json");
     if (!res) throw SignalWireRestError(0, "Connection failed");
@@ -117,7 +141,7 @@ json HttpClient::put(const std::string& path, const json& body) const {
     std::string body_str = body.dump();
 
     httplib::Client cli(scheme + "://" + host);
-    cli.set_connection_timeout(timeout_, 0);
+    configure_client(cli);
 
     auto res = cli.Put(path, hdrs, body_str, "application/json");
     if (!res) throw SignalWireRestError(0, "Connection failed");
@@ -130,7 +154,7 @@ json HttpClient::patch(const std::string& path, const json& body) const {
     std::string body_str = body.dump();
 
     httplib::Client cli(scheme + "://" + host);
-    cli.set_connection_timeout(timeout_, 0);
+    configure_client(cli);
 
     auto res = cli.Patch(path, hdrs, body_str, "application/json");
     if (!res) throw SignalWireRestError(0, "Connection failed");
@@ -142,7 +166,7 @@ json HttpClient::del(const std::string& path) const {
     auto hdrs = make_headers(auth_header_, headers_);
 
     httplib::Client cli(scheme + "://" + host);
-    cli.set_connection_timeout(timeout_, 0);
+    configure_client(cli);
 
     auto res = cli.Delete(path, hdrs);
     if (!res) throw SignalWireRestError(0, "Connection failed");

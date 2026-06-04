@@ -4,6 +4,7 @@
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/security/webhook_middleware.hpp"
 #include "signalwire/common.hpp"
+#include "server/tls_server.hpp"
 #include "httplib.h"
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
@@ -1538,12 +1539,23 @@ void AgentBase::setup_routes(httplib::Server& server) {
 void AgentBase::serve() {
     init_auth();
 
-    server_ = std::make_unique<httplib::Server>();
+    // TLS termination in-process when SWML_SSL_ENABLED + cert/key are set
+    // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
+    // unique_ptr<Server>; setup_routes() is unchanged.
+    auto tls = server::resolve_tls_config_from_env();
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+        get_logger().error("SSL enabled but cert/key failed to load (cert=" +
+                           tls.cert_path + " key=" + tls.key_path + ")");
+        return;
+    }
     server_->set_payload_max_length(1024 * 1024); // 1MB body limit
 
     setup_routes(*server_);
 
-    get_logger().info("Starting agent '" + name_ + "' on " + host_ + ":" + std::to_string(port_) + route_);
+    get_logger().info("Starting agent '" + name_ + "' on " +
+                      std::string(tls.usable() ? "https://" : "http://") +
+                      host_ + ":" + std::to_string(port_) + route_);
     get_logger().info("Auth user: " + auth_user_);
 
     if (!server_->listen(host_, port_)) {

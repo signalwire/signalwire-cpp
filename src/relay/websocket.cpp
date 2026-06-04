@@ -1,483 +1,193 @@
 // Copyright (c) 2025 SignalWire
 // SPDX-License-Identifier: MIT
+//
+// RELAY WebSocket transport, implemented on top of IXWebSocket.
+//
+// IXWebSocket is cross-platform (Linux/macOS/Windows) and provides RFC 6455
+// framing, ping/pong keepalive, and OpenSSL-backed TLS — so this file no
+// longer hand-rolls any of that, and there is no Windows-only stub: the same
+// code path now works on every platform.
+//
+// IXWebSocket's API is asynchronous (start() returns immediately and delivers
+// Open/Message/Close/Error events on a background thread). relay::RelayClient
+// depends on a *synchronous* connect() that returns success/failure, so this
+// wrapper bridges the two with a condition variable that connect() waits on
+// until the first Open (success) or Error/Close (failure) event arrives.
 
 #include "signalwire/relay/websocket.hpp"
 #include "signalwire/logging.hpp"
 
-#ifdef _WIN32
-// Windows: RELAY WebSocket transport not yet implemented.
-// Provide stub implementations so the library links.
+#include <ixwebsocket/IXWebSocket.h>
+#include <ixwebsocket/IXWebSocketMessage.h>
+#include <ixwebsocket/IXSocketTLSOptions.h>
+#include <ixwebsocket/IXNetSystem.h>
+
+#include <chrono>
+#include <cstdlib>
 
 namespace signalwire {
 namespace relay {
 
-WebSocketClient::WebSocketClient() = default;
-WebSocketClient::~WebSocketClient() { close(); }
+namespace {
 
-bool WebSocketClient::connect(const std::string&, int) { return false; }
-bool WebSocketClient::connect_plain(const std::string&, int) { return false; }
-void WebSocketClient::close(int, const std::string&) {}
-bool WebSocketClient::send(const std::string&) { return false; }
-bool WebSocketClient::do_tls_handshake(const std::string&) { return false; }
-bool WebSocketClient::do_ws_upgrade(const std::string&) { return false; }
-std::vector<uint8_t> WebSocketClient::encode_frame(const std::string&) { return {}; }
-bool WebSocketClient::read_frame(std::string&, uint8_t&) { return false; }
-bool WebSocketClient::raw_read(void*, size_t) { return false; }
-bool WebSocketClient::raw_write(const void*, size_t) { return false; }
-void WebSocketClient::read_loop() {}
-void WebSocketClient::cleanup() {}
-
-} // namespace relay
-} // namespace signalwire
-
-#else // POSIX
-
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-#include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <poll.h>
-
-#include <cstring>
-#include <random>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-
-namespace signalwire {
-namespace relay {
-
-// Base64 encode for WebSocket key
-static std::string base64_encode(const unsigned char* data, size_t len) {
-    static const char table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    std::string result;
-    result.reserve(4 * ((len + 2) / 3));
-    for (size_t i = 0; i < len; i += 3) {
-        unsigned int n = (static_cast<unsigned int>(data[i]) << 16);
-        if (i + 1 < len) n |= (static_cast<unsigned int>(data[i + 1]) << 8);
-        if (i + 2 < len) n |= static_cast<unsigned int>(data[i + 2]);
-        result.push_back(table[(n >> 18) & 0x3F]);
-        result.push_back(table[(n >> 12) & 0x3F]);
-        result.push_back((i + 1 < len) ? table[(n >> 6) & 0x3F] : '=');
-        result.push_back((i + 2 < len) ? table[n & 0x3F] : '=');
-    }
-    return result;
+// IXWebSocket requires one-time network-subsystem init (a no-op on POSIX, but
+// it initializes Winsock on Windows). Run it exactly once, process-wide.
+void ensure_net_system() {
+    static const bool initialized = []() {
+        ix::initNetSystem();
+        return true;
+    }();
+    (void)initialized;
 }
 
-WebSocketClient::WebSocketClient() = default;
+// How long connect() blocks waiting for the WebSocket to open before giving up.
+constexpr int kConnectTimeoutSecs = 15;
+
+} // namespace
+
+WebSocketClient::WebSocketClient() {
+    ensure_net_system();
+}
 
 WebSocketClient::~WebSocketClient() {
     close();
-    if (read_thread_.joinable()) {
-        read_thread_.join();
-    }
-}
-
-// Establish a TCP connection to host:port. On success sets sock_fd_; on
-// failure leaves sock_fd_ at -1 and reports via on_error_.
-static bool tcp_connect(int& sock_fd, const std::string& host, int port,
-                        WebSocketClient::ErrorCallback& on_error) {
-    struct addrinfo hints{}, *res = nullptr;
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    std::string port_str = std::to_string(port);
-
-    int rc = ::getaddrinfo(host.c_str(), port_str.c_str(), &hints, &res);
-    if (rc != 0 || !res) {
-        if (on_error) on_error("DNS resolution failed for " + host + ": " + gai_strerror(rc));
-        return false;
-    }
-
-    sock_fd = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (sock_fd < 0) {
-        ::freeaddrinfo(res);
-        if (on_error) on_error("Socket creation failed");
-        return false;
-    }
-
-    struct timeval tv;
-    tv.tv_sec = 10;
-    tv.tv_usec = 0;
-    ::setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    ::setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-    if (::connect(sock_fd, res->ai_addr, res->ai_addrlen) < 0) {
-        ::freeaddrinfo(res);
-        ::close(sock_fd);
-        sock_fd = -1;
-        if (on_error) on_error("TCP connect failed to " + host + ":" + port_str);
-        return false;
-    }
-    ::freeaddrinfo(res);
-    return true;
 }
 
 bool WebSocketClient::connect(const std::string& host, int port) {
-    plain_ = false;
-    if (!tcp_connect(sock_fd_, host, port, on_error_)) {
-        return false;
-    }
-
-    // TLS handshake
-    if (!do_tls_handshake(host)) {
-        ::close(sock_fd_);
-        sock_fd_ = -1;
-        return false;
-    }
-
-    // WebSocket upgrade
-    if (!do_ws_upgrade(host)) {
-        cleanup();
-        return false;
-    }
-
-    connected_.store(true);
-    closing_.store(false);
-
-    // Start read thread
-    read_thread_ = std::thread([this]() { read_loop(); });
-
-    return true;
+    return connect_impl(host, port, /*tls=*/true);
 }
 
 bool WebSocketClient::connect_plain(const std::string& host, int port) {
-    plain_ = true;
-    if (!tcp_connect(sock_fd_, host, port, on_error_)) {
-        return false;
+    return connect_impl(host, port, /*tls=*/false);
+}
+
+bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) {
+    if (connected_.load()) return true;
+
+    ws_ = std::make_unique<ix::WebSocket>();
+
+    const std::string scheme = tls ? "wss" : "ws";
+    ws_->setUrl(scheme + "://" + host + ":" + std::to_string(port) + "/");
+
+    // We manage reconnection at the RelayClient layer (exponential backoff +
+    // re-authentication for session resumption), so disable IXWebSocket's own
+    // auto-reconnect — otherwise a dropped socket would silently reopen here
+    // and bypass RelayClient::reconnect()/authenticate().
+    ws_->disableAutomaticReconnection();
+    ws_->setHandshakeTimeout(kConnectTimeoutSecs);
+
+    if (tls) {
+        ix::SocketTLSOptions tlsOpts;
+        tlsOpts.tls = true;
+        // Trust a private/self-signed CA when SSL_CERT_FILE points at one
+        // (the cross-port test idiom — see gen_certs.sh). Otherwise leave
+        // caFile at its "SYSTEM" default so production verifies against the
+        // OS trust store. Verification is NEVER disabled.
+        if (const char* ca = std::getenv("SSL_CERT_FILE")) {
+            if (ca && *ca) tlsOpts.caFile = ca;
+        }
+        ws_->setTLSOptions(tlsOpts);
     }
 
-    // No TLS — go straight to WS upgrade over plain TCP.
-    if (!do_ws_upgrade(host)) {
-        cleanup();
-        return false;
-    }
-
-    connected_.store(true);
     closing_.store(false);
+    {
+        std::lock_guard<std::mutex> lk(connect_mutex_);
+        connect_done_ = false;
+        connect_ok_ = false;
+    }
 
-    read_thread_ = std::thread([this]() { read_loop(); });
+    ws_->setOnMessageCallback([this](const ix::WebSocketMessagePtr& msg) {
+        switch (msg->type) {
+            case ix::WebSocketMessageType::Open: {
+                connected_.store(true);
+                std::lock_guard<std::mutex> lk(connect_mutex_);
+                connect_ok_ = true;
+                connect_done_ = true;
+                connect_cv_.notify_all();
+                break;
+            }
+            case ix::WebSocketMessageType::Message: {
+                if (on_message_) on_message_(msg->str);
+                break;
+            }
+            case ix::WebSocketMessageType::Error: {
+                // A handshake/TLS failure before Open: fail connect(). After
+                // Open, surface via on_error_.
+                bool was_connected = connected_.load();
+                if (on_error_) on_error_(msg->errorInfo.reason);
+                std::lock_guard<std::mutex> lk(connect_mutex_);
+                if (!was_connected && !connect_done_) {
+                    connect_ok_ = false;
+                    connect_done_ = true;
+                    connect_cv_.notify_all();
+                }
+                break;
+            }
+            case ix::WebSocketMessageType::Close: {
+                bool was_connected = connected_.exchange(false);
+                int code = static_cast<int>(msg->closeInfo.code);
+                const std::string& reason = msg->closeInfo.reason;
+                // If we close before ever opening, that also fails connect().
+                {
+                    std::lock_guard<std::mutex> lk(connect_mutex_);
+                    if (!connect_done_) {
+                        connect_ok_ = false;
+                        connect_done_ = true;
+                        connect_cv_.notify_all();
+                    }
+                }
+                if (was_connected && !closing_.load() && on_close_) {
+                    on_close_(code, reason);
+                }
+                break;
+            }
+            default:
+                // Ping/Pong/Fragment are handled internally by IXWebSocket.
+                break;
+        }
+    });
+
+    ws_->start();
+
+    // Block until the first Open (success) or Error/Close (failure), bounded
+    // by the handshake timeout plus slack.
+    std::unique_lock<std::mutex> lk(connect_mutex_);
+    bool signaled = connect_cv_.wait_for(
+        lk, std::chrono::seconds(kConnectTimeoutSecs + 2),
+        [this] { return connect_done_; });
+
+    if (!signaled || !connect_ok_) {
+        lk.unlock();
+        if (!signaled && on_error_) {
+            on_error_("WebSocket connect timed out to " + host + ":" + std::to_string(port));
+        }
+        closing_.store(true);
+        if (ws_) {
+            ws_->stop();
+            ws_.reset();
+        }
+        connected_.store(false);
+        return false;
+    }
     return true;
 }
 
 void WebSocketClient::close(int code, const std::string& reason) {
-    if (!connected_.load()) return;
+    if (!ws_) return;
     closing_.store(true);
     connected_.store(false);
-
-    // Send close frame (opcode 0x8) if we have any active transport
-    if (ssl_ || (plain_ && sock_fd_ >= 0)) {
-        std::vector<uint8_t> close_payload;
-        close_payload.push_back(static_cast<uint8_t>((code >> 8) & 0xFF));
-        close_payload.push_back(static_cast<uint8_t>(code & 0xFF));
-        for (char c : reason) close_payload.push_back(static_cast<uint8_t>(c));
-
-        // Build close frame
-        std::vector<uint8_t> frame;
-        frame.push_back(0x88); // FIN + opcode 8 (close)
-        uint8_t mask_bit = 0x80;
-        if (close_payload.size() <= 125) {
-            frame.push_back(mask_bit | static_cast<uint8_t>(close_payload.size()));
-        } else {
-            frame.push_back(mask_bit | 126);
-            frame.push_back(static_cast<uint8_t>((close_payload.size() >> 8) & 0xFF));
-            frame.push_back(static_cast<uint8_t>(close_payload.size() & 0xFF));
-        }
-
-        // Masking key
-        std::random_device rd;
-        uint8_t mask[4];
-        for (int i = 0; i < 4; i++) mask[i] = static_cast<uint8_t>(rd());
-        frame.insert(frame.end(), mask, mask + 4);
-        for (size_t i = 0; i < close_payload.size(); i++) {
-            frame.push_back(close_payload[i] ^ mask[i % 4]);
-        }
-
-        std::lock_guard<std::mutex> lock(write_mutex_);
-        raw_write(frame.data(), frame.size());
-    }
-
-    cleanup();
-
-    if (read_thread_.joinable() && read_thread_.get_id() != std::this_thread::get_id()) {
-        read_thread_.join();
-        read_thread_ = std::thread();
-    }
+    // stop() sends the close frame (with code/reason) and joins the background
+    // thread, so it is safe to call from any thread other than the event
+    // callback itself.
+    ws_->stop(static_cast<uint16_t>(code), reason);
+    ws_.reset();
 }
 
 bool WebSocketClient::send(const std::string& message) {
-    if (!connected_.load()) return false;
-    auto frame = encode_frame(message);
-    std::lock_guard<std::mutex> lock(write_mutex_);
-    return raw_write(frame.data(), frame.size());
-}
-
-bool WebSocketClient::do_tls_handshake(const std::string& host) {
-    SSL_library_init();
-    SSL_load_error_strings();
-    OpenSSL_add_all_algorithms();
-
-    const SSL_METHOD* method = TLS_client_method();
-    ssl_ctx_ = SSL_CTX_new(method);
-    if (!ssl_ctx_) {
-        if (on_error_) on_error_("SSL_CTX_new failed");
-        return false;
-    }
-
-    SSL_CTX_set_default_verify_paths(static_cast<SSL_CTX*>(ssl_ctx_));
-    SSL_CTX_set_verify(static_cast<SSL_CTX*>(ssl_ctx_), SSL_VERIFY_PEER, nullptr);
-
-    ssl_ = SSL_new(static_cast<SSL_CTX*>(ssl_ctx_));
-    if (!ssl_) {
-        if (on_error_) on_error_("SSL_new failed");
-        return false;
-    }
-
-    SSL_set_fd(static_cast<SSL*>(ssl_), sock_fd_);
-    SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_), host.c_str());
-
-    int ret = SSL_connect(static_cast<SSL*>(ssl_));
-    if (ret != 1) {
-        unsigned long err = ERR_get_error();
-        char buf[256];
-        ERR_error_string_n(err, buf, sizeof(buf));
-        if (on_error_) on_error_(std::string("SSL_connect failed: ") + buf);
-        return false;
-    }
-
-    return true;
-}
-
-bool WebSocketClient::do_ws_upgrade(const std::string& host) {
-    // Generate random 16-byte key
-    std::random_device rd;
-    unsigned char key_bytes[16];
-    for (int i = 0; i < 16; i++) key_bytes[i] = static_cast<unsigned char>(rd());
-    std::string ws_key = base64_encode(key_bytes, 16);
-
-    // Build HTTP upgrade request
-    std::ostringstream req;
-    req << "GET / HTTP/1.1\r\n"
-        << "Host: " << host << "\r\n"
-        << "Upgrade: websocket\r\n"
-        << "Connection: Upgrade\r\n"
-        << "Sec-WebSocket-Key: " << ws_key << "\r\n"
-        << "Sec-WebSocket-Version: 13\r\n"
-        << "\r\n";
-
-    std::string req_str = req.str();
-    if (!raw_write(req_str.data(), req_str.size())) {
-        if (on_error_) on_error_("Failed to send WebSocket upgrade request");
-        return false;
-    }
-
-    // Read HTTP response (up to 4KB)
-    std::string response;
-    char buf[1];
-    while (response.size() < 4096) {
-        if (!raw_read(buf, 1)) {
-            if (on_error_) on_error_("Failed to read WebSocket upgrade response");
-            return false;
-        }
-        response.push_back(buf[0]);
-        if (response.size() >= 4 &&
-            response.substr(response.size() - 4) == "\r\n\r\n") {
-            break;
-        }
-    }
-
-    // Verify 101 Switching Protocols
-    if (response.find("HTTP/1.1 101") == std::string::npos) {
-        if (on_error_) on_error_("WebSocket upgrade failed: " + response.substr(0, 80));
-        return false;
-    }
-
-    return true;
-}
-
-std::vector<uint8_t> WebSocketClient::encode_frame(const std::string& payload) {
-    std::vector<uint8_t> frame;
-    // FIN bit + text opcode (0x1)
-    frame.push_back(0x81);
-
-    // Payload length with mask bit set (client must mask)
-    uint64_t len = payload.size();
-    if (len <= 125) {
-        frame.push_back(0x80 | static_cast<uint8_t>(len));
-    } else if (len <= 65535) {
-        frame.push_back(0x80 | 126);
-        frame.push_back(static_cast<uint8_t>((len >> 8) & 0xFF));
-        frame.push_back(static_cast<uint8_t>(len & 0xFF));
-    } else {
-        frame.push_back(0x80 | 127);
-        for (int i = 7; i >= 0; i--) {
-            frame.push_back(static_cast<uint8_t>((len >> (8 * i)) & 0xFF));
-        }
-    }
-
-    // Masking key (4 random bytes)
-    std::random_device rd;
-    uint8_t mask[4];
-    for (int i = 0; i < 4; i++) mask[i] = static_cast<uint8_t>(rd());
-    frame.insert(frame.end(), mask, mask + 4);
-
-    // Masked payload
-    for (size_t i = 0; i < payload.size(); i++) {
-        frame.push_back(static_cast<uint8_t>(payload[i]) ^ mask[i % 4]);
-    }
-
-    return frame;
-}
-
-bool WebSocketClient::read_frame(std::string& out_payload, uint8_t& out_opcode) {
-    uint8_t header[2];
-    if (!raw_read(header, 2)) return false;
-
-    out_opcode = header[0] & 0x0F;
-    bool masked = (header[1] & 0x80) != 0;
-    uint64_t payload_len = header[1] & 0x7F;
-
-    if (payload_len == 126) {
-        uint8_t ext[2];
-        if (!raw_read(ext, 2)) return false;
-        payload_len = (static_cast<uint64_t>(ext[0]) << 8) | ext[1];
-    } else if (payload_len == 127) {
-        uint8_t ext[8];
-        if (!raw_read(ext, 8)) return false;
-        payload_len = 0;
-        for (int i = 0; i < 8; i++) {
-            payload_len = (payload_len << 8) | ext[i];
-        }
-    }
-
-    uint8_t mask_key[4] = {0};
-    if (masked) {
-        if (!raw_read(mask_key, 4)) return false;
-    }
-
-    out_payload.resize(static_cast<size_t>(payload_len));
-    if (payload_len > 0) {
-        if (!raw_read(&out_payload[0], static_cast<size_t>(payload_len))) return false;
-        if (masked) {
-            for (size_t i = 0; i < out_payload.size(); i++) {
-                out_payload[i] ^= static_cast<char>(mask_key[i % 4]);
-            }
-        }
-    }
-
-    return true;
-}
-
-void WebSocketClient::read_loop() {
-    while (connected_.load()) {
-        std::string payload;
-        uint8_t opcode;
-
-        if (!read_frame(payload, opcode)) {
-            if (connected_.load() && !closing_.load()) {
-                connected_.store(false);
-                if (on_close_) on_close_(1006, "Connection lost");
-            }
-            break;
-        }
-
-        switch (opcode) {
-            case 0x1: // Text frame
-                if (on_message_) on_message_(payload);
-                break;
-            case 0x8: { // Close frame
-                int code = 1000;
-                std::string reason;
-                if (payload.size() >= 2) {
-                    code = (static_cast<unsigned char>(payload[0]) << 8) |
-                            static_cast<unsigned char>(payload[1]);
-                    if (payload.size() > 2) reason = payload.substr(2);
-                }
-                connected_.store(false);
-                if (on_close_) on_close_(code, reason);
-                return;
-            }
-            case 0x9: { // Ping - respond with pong
-                std::vector<uint8_t> pong;
-                pong.push_back(0x8A); // FIN + pong opcode
-                uint8_t mask_bit = 0x80;
-                if (payload.size() <= 125) {
-                    pong.push_back(mask_bit | static_cast<uint8_t>(payload.size()));
-                } else {
-                    pong.push_back(mask_bit | 126);
-                    pong.push_back(static_cast<uint8_t>((payload.size() >> 8) & 0xFF));
-                    pong.push_back(static_cast<uint8_t>(payload.size() & 0xFF));
-                }
-                std::random_device rd;
-                uint8_t mask[4];
-                for (int i = 0; i < 4; i++) mask[i] = static_cast<uint8_t>(rd());
-                pong.insert(pong.end(), mask, mask + 4);
-                for (size_t i = 0; i < payload.size(); i++) {
-                    pong.push_back(static_cast<uint8_t>(payload[i]) ^ mask[i % 4]);
-                }
-                std::lock_guard<std::mutex> lock(write_mutex_);
-                raw_write(pong.data(), pong.size());
-                break;
-            }
-            case 0xA: // Pong - ignore
-                break;
-            default:
-                break;
-        }
-    }
-}
-
-bool WebSocketClient::raw_read(void* buf, size_t len) {
-    size_t total = 0;
-    auto* p = static_cast<char*>(buf);
-    while (total < len) {
-        ssize_t n;
-        if (plain_) {
-            n = ::recv(sock_fd_, p + total, len - total, 0);
-        } else {
-            n = SSL_read(static_cast<SSL*>(ssl_), p + total, static_cast<int>(len - total));
-        }
-        if (n <= 0) return false;
-        total += static_cast<size_t>(n);
-    }
-    return true;
-}
-
-bool WebSocketClient::raw_write(const void* buf, size_t len) {
-    size_t total = 0;
-    auto* p = static_cast<const char*>(buf);
-    while (total < len) {
-        ssize_t n;
-        if (plain_) {
-            n = ::send(sock_fd_, p + total, len - total, 0);
-        } else {
-            n = SSL_write(static_cast<SSL*>(ssl_), p + total, static_cast<int>(len - total));
-        }
-        if (n <= 0) return false;
-        total += static_cast<size_t>(n);
-    }
-    return true;
-}
-
-void WebSocketClient::cleanup() {
-    if (ssl_) {
-        SSL_shutdown(static_cast<SSL*>(ssl_));
-        SSL_free(static_cast<SSL*>(ssl_));
-        ssl_ = nullptr;
-    }
-    if (ssl_ctx_) {
-        SSL_CTX_free(static_cast<SSL_CTX*>(ssl_ctx_));
-        ssl_ctx_ = nullptr;
-    }
-    if (sock_fd_ >= 0) {
-        ::close(sock_fd_);
-        sock_fd_ = -1;
-    }
+    if (!connected_.load() || !ws_) return false;
+    auto info = ws_->sendText(message);
+    return info.success;
 }
 
 } // namespace relay
 } // namespace signalwire
-
-#endif // _WIN32

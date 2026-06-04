@@ -13,14 +13,39 @@ find_package(OpenSSL REQUIRED)
 # Threads
 find_package(Threads REQUIRED)
 
+# IXWebSocket — cross-platform RFC 6455 WebSocket client with OpenSSL-backed
+# TLS, used by the RELAY transport (src/relay/websocket.cpp). Fetched at
+# configure time (the build env has network); pinned to a known-good tag.
+# USE_TLS + USE_OPEN_SSL select the OpenSSL backend so wss:// verifies the
+# server cert against the system store / SSL_CERT_FILE. Requires OpenSSL 3.0+,
+# same toolchain bar as cpp-httplib's TLS above.
+include(FetchContent)
+set(USE_TLS ON CACHE BOOL "" FORCE)
+set(USE_OPEN_SSL ON CACHE BOOL "" FORCE)
+set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    ixwebsocket
+    GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
+    GIT_TAG        v11.4.6
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(ixwebsocket)
+
 # All sources
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 add_library(signalwire STATIC ${SOURCES})
-# Note: CPPHTTPLIB_OPENSSL_SUPPORT disabled - httplib requires OpenSSL 3.0+
-# SSL connections handled externally; HMAC/crypto uses OpenSSL directly
-target_link_libraries(signalwire OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+# cpp-httplib TLS enabled — requires OpenSSL 3.0+ (build with a 3.0+ toolchain;
+# OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
+# httplib::SSLServer for the webhook server (in-process TLS termination).
+target_compile_definitions(signalwire PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
+target_link_libraries(signalwire OpenSSL::SSL OpenSSL::Crypto Threads::Threads ixwebsocket)
 target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/deps)
+# src/ is PRIVATE: internal-only headers (e.g. server/tls_server.hpp, which
+# pulls in httplib.h for SSLServer) live under src/ so they stay out of the
+# public surface AND out of the signature enumerator (which scans include/
+# only). Consumers never see them.
+target_include_directories(signalwire PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 # Tests
 enable_testing()
@@ -28,6 +53,7 @@ add_executable(run_tests
     tests/test_main.cpp
     tests/mocktest.cpp
     tests/relay_mocktest.cpp
+    tests/tls_mocktest.cpp
 )
 target_link_libraries(run_tests signalwire)
 target_compile_definitions(run_tests PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")

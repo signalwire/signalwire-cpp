@@ -4,6 +4,7 @@
 #include "signalwire/agent/agent_base.hpp"
 #include "signalwire/logging.hpp"
 #include "signalwire/common.hpp"
+#include "server/tls_server.hpp"
 #include "httplib.h"
 
 namespace signalwire {
@@ -154,12 +155,23 @@ void AgentServer::setup_routes(httplib::Server& server) {
 }
 
 void AgentServer::run() {
-    server_ = std::make_unique<httplib::Server>();
+    // TLS termination in-process when SWML_SSL_ENABLED + cert/key paths are
+    // set (mirrors Python's SecurityConfig). make_http_server returns an
+    // httplib::SSLServer upcast to Server* in that case; otherwise plain HTTP.
+    auto tls = server::resolve_tls_config_from_env();
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+        get_logger().error("SSL enabled but cert/key failed to load (cert=" +
+                           tls.cert_path + " key=" + tls.key_path + ")");
+        return;
+    }
     server_->set_payload_max_length(1024 * 1024); // 1MB limit
 
     setup_routes(*server_);
 
-    get_logger().info("Starting AgentServer on " + host_ + ":" + std::to_string(port_));
+    get_logger().info("Starting AgentServer on " +
+                      std::string(tls.usable() ? "https://" : "http://") +
+                      host_ + ":" + std::to_string(port_));
     get_logger().info("Registered " + std::to_string(agents_.size()) + " agent(s)");
 
     if (!server_->listen(host_, port_)) {

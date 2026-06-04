@@ -3,18 +3,35 @@
 #pragma once
 
 #include <string>
-#include <vector>
 #include <functional>
+#include <memory>
 #include <mutex>
-#include <thread>
 #include <atomic>
 #include <condition_variable>
+
+// Forward-declare the IXWebSocket type so this header carries no dependency
+// on the vendored library's headers (which live under the build tree). The
+// implementation (.cpp) owns the concrete ix::WebSocket.
+namespace ix { class WebSocket; }
 
 namespace signalwire {
 namespace relay {
 
-/// Minimal WebSocket client using raw TCP sockets + OpenSSL TLS.
-/// Implements RFC 6455 text frame encoding/decoding for JSON-RPC transport.
+/// WebSocket client for the RELAY JSON-RPC transport.
+///
+/// Wraps IXWebSocket (cross-platform, OpenSSL-backed TLS) while preserving a
+/// minimal synchronous interface: connect() blocks until the handshake
+/// completes (or fails/times out), send() pushes a text frame, and the
+/// on_message / on_close / on_error callbacks are invoked from IXWebSocket's
+/// background event thread. RFC 6455 framing, ping/pong, and TLS are handled
+/// by IXWebSocket — this class only adapts its async event model to the
+/// synchronous connect() contract relay::RelayClient depends on.
+///
+/// TLS certificate verification is ALWAYS on for the connect() (wss://) path.
+/// To trust a private/self-signed CA (e.g. the porting-sdk test CA), set the
+/// SSL_CERT_FILE environment variable to the CA bundle — the same cross-port
+/// idiom the other ports honor; it is wired into ix::SocketTLSOptions::caFile.
+/// When unset, the system trust store is used (production / public CAs).
 class WebSocketClient {
 public:
     using MessageCallback = std::function<void(const std::string&)>;
@@ -27,7 +44,9 @@ public:
     WebSocketClient(const WebSocketClient&) = delete;
     WebSocketClient& operator=(const WebSocketClient&) = delete;
 
-    /// Connect to wss://host:port/ with TLS
+    /// Connect to wss://host:port/ with TLS. Blocks until the WebSocket is
+    /// open or the attempt fails/times out. Verifies the server certificate
+    /// against the system store (or SSL_CERT_FILE when set).
     bool connect(const std::string& host, int port = 443);
 
     /// Connect to ws://host:port/ without TLS (plain TCP). Used by audit
@@ -54,24 +73,19 @@ public:
     void on_error(ErrorCallback cb) { on_error_ = std::move(cb); }
 
 private:
-    void read_loop();
-    bool do_tls_handshake(const std::string& host);
-    bool do_ws_upgrade(const std::string& host);
-    std::vector<uint8_t> encode_frame(const std::string& payload);
-    bool read_frame(std::string& out_payload, uint8_t& out_opcode);
-    bool raw_read(void* buf, size_t len);
-    bool raw_write(const void* buf, size_t len);
-    void cleanup();
+    // Shared connect path for both TLS (wss) and plain (ws) transports.
+    bool connect_impl(const std::string& host, int port, bool tls);
 
-    int sock_fd_ = -1;
-    void* ssl_ctx_ = nullptr;
-    void* ssl_ = nullptr;
-    bool plain_ = false;  // true when connect_plain() is used (no TLS)
+    std::unique_ptr<ix::WebSocket> ws_;
     std::atomic<bool> connected_{false};
     std::atomic<bool> closing_{false};
 
-    std::thread read_thread_;
-    std::mutex write_mutex_;
+    // Synchronization for the synchronous connect() handshake: the IXWebSocket
+    // event thread signals open/error/close through these.
+    std::mutex connect_mutex_;
+    std::condition_variable connect_cv_;
+    bool connect_done_ = false;
+    bool connect_ok_ = false;
 
     MessageCallback on_message_;
     CloseCallback on_close_;

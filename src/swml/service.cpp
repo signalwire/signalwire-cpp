@@ -1,5 +1,6 @@
 #include "signalwire/swml/service.hpp"
 #include "signalwire/common.hpp"
+#include "server/tls_server.hpp"
 #include "httplib.h"
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
@@ -507,10 +508,21 @@ void Service::serve() {
         try { port_ = std::stoi(env_port); } catch (...) {}
     }
 
-    server_ = std::make_unique<httplib::Server>();
+    // TLS termination in-process when SWML_SSL_ENABLED + cert/key are set
+    // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
+    // unique_ptr<Server>; setup_routes() is unchanged.
+    auto tls = server::resolve_tls_config_from_env();
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+        get_logger().error("SSL enabled but cert/key failed to load (cert=" +
+                           tls.cert_path + " key=" + tls.key_path + ")");
+        return;
+    }
     server_->set_payload_max_length(1024 * 1024); // 1MB limit
     setup_routes(*server_);
-    get_logger().info("Starting SWML service on " + host_ + ":" + std::to_string(port_) + route_);
+    get_logger().info("Starting SWML service on " +
+                      std::string(tls.usable() ? "https://" : "http://") +
+                      host_ + ":" + std::to_string(port_) + route_);
     if (!server_->listen(host_, port_)) {
         get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                            " -- is the port already in use?");

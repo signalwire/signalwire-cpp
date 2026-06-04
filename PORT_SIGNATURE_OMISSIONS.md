@@ -96,10 +96,14 @@ diverge from Python's.
   error path goes through structured logging instead of an inline
   string. Same load-vs-fail contract.
 - `cpp_wait_returns_bool`: Python's `Message.wait` /
-  `Call.wait_for_ended` return the terminal `RelayEvent`; C++ returns
-  `bool` indicating whether the timeout was reached without producing
-  a terminal event. Callers who need the event reach for it via the
-  Call/Message accessors after `wait` returns.
+  `Call.wait_for_ended` / `Call.wait_for_{answered,ringing,ending}`
+  return the terminal/state `RelayEvent`; C++ returns `bool` indicating
+  whether the wait reached the target before the timeout. Callers who
+  need the event reach for it via the Call/Message accessors (e.g.
+  `Call::state()`) after `wait` returns. The state-wait helpers share
+  `wait_for_ended`'s `int timeout_ms` idiom (`<=0` waits indefinitely)
+  and the same created<ringing<answered<ending<ended short-circuit as
+  Python's `_wait_for_state`.
 - `cpp_handler_register_void`: Python's `RelayClient.on_call` /
   `on_message` return the registered handler so the registration site
   can chain decoration. C++ returns `void` and exposes the registered
@@ -217,6 +221,9 @@ signalwire.relay.call.Call.answer: cpp_unified_action
 signalwire.relay.call.Call.collect: cpp_unified_action
 signalwire.relay.call.Call.connect: cpp_unified_action
 signalwire.relay.call.Call.detect: cpp_unified_action
+signalwire.relay.call.Call.detect_answering_machine: cpp_unified_action
+signalwire.relay.call.Call.detect_digit: cpp_unified_action
+signalwire.relay.call.Call.detect_fax: cpp_unified_action
 signalwire.relay.call.Call.disconnect: cpp_unified_action
 signalwire.relay.call.Call.hangup: cpp_unified_action
 signalwire.relay.call.Call.hold: cpp_unified_action
@@ -227,6 +234,12 @@ signalwire.relay.call.Call.live_translate: cpp_unified_action
 signalwire.relay.call.Call.pay: cpp_unified_action
 signalwire.relay.call.Call.play: cpp_unified_action
 signalwire.relay.call.Call.play_and_collect: cpp_unified_action
+signalwire.relay.call.Call.play_audio: cpp_unified_action
+signalwire.relay.call.Call.play_ringtone: cpp_unified_action
+signalwire.relay.call.Call.play_silence: cpp_unified_action
+signalwire.relay.call.Call.play_tts: cpp_unified_action
+signalwire.relay.call.Call.prompt_audio: cpp_unified_action
+signalwire.relay.call.Call.prompt_tts: cpp_unified_action
 signalwire.relay.call.Call.receive_fax: cpp_unified_action
 signalwire.relay.call.Call.record: cpp_unified_action
 signalwire.relay.call.Call.send_digits: cpp_unified_action
@@ -239,7 +252,10 @@ signalwire.relay.call.Call.unhold: cpp_unified_action
 
 ### Wait / connect / handler-register return-type idiom
 
+signalwire.relay.call.Call.wait_for_answered: cpp_wait_returns_bool
 signalwire.relay.call.Call.wait_for_ended: cpp_wait_returns_bool
+signalwire.relay.call.Call.wait_for_ending: cpp_wait_returns_bool
+signalwire.relay.call.Call.wait_for_ringing: cpp_wait_returns_bool
 signalwire.relay.message.Message.wait: cpp_wait_returns_bool
 signalwire.relay.client.RelayClient.connect: cpp_connect_returns_bool
 signalwire.relay.client.RelayClient.on_call: cpp_handler_register_void

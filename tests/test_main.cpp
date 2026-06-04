@@ -173,6 +173,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_relay_mock_inbound_call.cpp"
 #include "test_relay_mock_messaging.cpp"
 #include "test_relay_mock_actions.cpp"
+#include "test_relay_mock_convenience.cpp"
 #include "test_relay_mock_event_dispatch.cpp"
 #include "test_relay_mock_outbound_call.cpp"
 

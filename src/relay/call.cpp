@@ -219,6 +219,42 @@ Action Call::play(const json& media, double volume, const std::string& control_i
     return execute_action("play", p);
 }
 
+// Typed play convenience wrappers. Each assembles the RELAY play-media array
+// — [{"type": <kind>, "params": {...}}] — and delegates to play(). Optional
+// fields are emitted only when the caller supplies a non-sentinel value, so
+// the on-wire params object stays minimal (matching Python's only-provided
+// keys). See RELAY_IMPLEMENTATION_GUIDE.md for the media shapes.
+Action Call::play_tts(const std::string& text, const std::string& language,
+                      const std::string& gender, const std::string& voice,
+                      double volume) {
+    json tts;
+    tts["text"] = text;
+    if (!language.empty()) tts["language"] = language;
+    if (!gender.empty()) tts["gender"] = gender;
+    if (!voice.empty()) tts["voice"] = voice;
+    json media = json::array({ {{"type", "tts"}, {"params", tts}} });
+    return play(media, volume);
+}
+
+Action Call::play_audio(const std::string& url, double volume) {
+    json media = json::array({ {{"type", "audio"}, {"params", {{"url", url}}}} });
+    return play(media, volume);
+}
+
+Action Call::play_silence(double duration) {
+    json media = json::array({ {{"type", "silence"}, {"params", {{"duration", duration}}}} });
+    return play(media);
+}
+
+Action Call::play_ringtone(const std::string& name, double duration,
+                           double volume) {
+    json rt;
+    rt["name"] = name;
+    if (duration >= 0.0) rt["duration"] = duration;
+    json media = json::array({ {{"type", "ringtone"}, {"params", rt}} });
+    return play(media, volume);
+}
+
 Action Call::record(const json& params, const std::string& control_id) {
     json p;
     if (!params.empty()) p["record"] = params;
@@ -253,6 +289,46 @@ Action Call::play_and_collect(const json& play_media, const json& collect_params
     return a;
 }
 
+// Typed prompt convenience wrappers. Build the RELAY play-media array and
+// delegate to play_and_collect() with the caller's collect descriptor. The
+// returned Action inherits play_and_collect's collect-only resolution
+// semantics (a play(finished) does not resolve it).
+// Build one play_and_collect frame from the supplied media + collect with an
+// optional top-level volume, issue it, and apply the collect-only resolution
+// semantics. Shared by prompt_tts/prompt_audio so the wire frame carries
+// volume in a SINGLE journaled calling.play_and_collect (not a second one).
+Action Call::prompt_with_media(const json& media, const json& collect,
+                               double volume) {
+    json p;
+    p["play"] = media;
+    p["collect"] = collect;
+    if (volume != 0.0) p["volume"] = volume;
+    Action a = execute_action("play_and_collect", p);
+    // Same gotcha as play_and_collect(): resolve on the collect event only,
+    // and on the result payload (not a play(finished)).
+    a.set_event_type_filter({"calling.call.collect"});
+    a.set_resolve_on_result(true);
+    return a;
+}
+
+Action Call::prompt_tts(const std::string& text, const json& collect,
+                        const std::string& language, const std::string& gender,
+                        const std::string& voice, double volume) {
+    json tts;
+    tts["text"] = text;
+    if (!language.empty()) tts["language"] = language;
+    if (!gender.empty()) tts["gender"] = gender;
+    if (!voice.empty()) tts["voice"] = voice;
+    json media = json::array({ {{"type", "tts"}, {"params", tts}} });
+    return prompt_with_media(media, collect, volume);
+}
+
+Action Call::prompt_audio(const std::string& url, const json& collect,
+                          double volume) {
+    json media = json::array({ {{"type", "audio"}, {"params", {{"url", url}}}} });
+    return prompt_with_media(media, collect, volume);
+}
+
 Action Call::collect(const json& params, const std::string& control_id) {
     json p = params.is_object() ? params : json::object();
     if (!control_id.empty()) p["control_id"] = control_id;
@@ -271,6 +347,39 @@ Action Call::detect(const json& params, const std::string& control_id) {
     // action. See Python DetectAction.
     a.set_resolve_on_detect(true);
     return a;
+}
+
+// Typed detect convenience wrappers. Each assembles the RELAY detect
+// descriptor {"type": <kind>, "params": {...only-provided...}} and an optional
+// top-level timeout, then delegates to detect(). The returned Action inherits
+// detect()'s "resolve on first detect payload" semantics.
+Action Call::detect_digit(const std::string& digits, double timeout) {
+    json params = json::object();
+    if (!digits.empty()) params["digits"] = digits;
+    json p;
+    p["detect"] = {{"type", "digit"}, {"params", params}};
+    if (timeout >= 0.0) p["timeout"] = timeout;
+    return detect(p);
+}
+
+Action Call::detect_answering_machine(const json& amd_params, double timeout) {
+    // amd_params carries any of initial_timeout, end_silence_timeout,
+    // machine_voice_threshold, machine_words_threshold, detect_interruptions,
+    // detect_message_end — only the keys the caller supplied ride the wire.
+    json params = amd_params.is_object() ? amd_params : json::object();
+    json p;
+    p["detect"] = {{"type", "machine"}, {"params", params}};
+    if (timeout >= 0.0) p["timeout"] = timeout;
+    return detect(p);
+}
+
+Action Call::detect_fax(const std::string& tone, double timeout) {
+    json params = json::object();
+    if (!tone.empty()) params["tone"] = tone;
+    json p;
+    p["detect"] = {{"type", "fax"}, {"params", params}};
+    if (timeout >= 0.0) p["timeout"] = timeout;
+    return detect(p);
 }
 
 Action Call::tap_audio(const json& params, const std::string& control_id) {
@@ -356,11 +465,57 @@ bool Call::wait_for_ended(int timeout_ms) {
     return true;
 }
 
+namespace {
+// Lifecycle rank for the call state machine
+// (created < ringing < answered < ending < ended). Unknown states rank -1
+// so they never satisfy a wait. Mirrors Python's _wait_for_state ordering.
+int call_state_rank(const std::string& s) {
+    if (s == CALL_STATE_CREATED)  return 0;
+    if (s == CALL_STATE_RINGING)  return 1;
+    if (s == CALL_STATE_ANSWERED) return 2;
+    if (s == CALL_STATE_ENDING)   return 3;
+    if (s == CALL_STATE_ENDED)    return 4;
+    return -1;
+}
+} // namespace
+
+bool Call::wait_for_state(const std::string& target, int timeout_ms) {
+    const int target_rank = call_state_rank(target);
+    std::unique_lock<std::mutex> lock(s_->ended_mutex);
+    // Already at or past the target -> return immediately (matches Python's
+    // _wait_for_state short-circuit when rank(state) >= rank(target)).
+    auto reached = [this, target_rank] {
+        return call_state_rank(s_->state) >= target_rank;
+    };
+    if (reached()) return true;
+    if (timeout_ms > 0) {
+        return s_->state_cv.wait_for(
+            lock, std::chrono::milliseconds(timeout_ms), reached);
+    }
+    s_->state_cv.wait(lock, reached);
+    return true;
+}
+
+bool Call::wait_for_answered(int timeout_ms) {
+    return wait_for_state(CALL_STATE_ANSWERED, timeout_ms);
+}
+
+bool Call::wait_for_ringing(int timeout_ms) {
+    return wait_for_state(CALL_STATE_RINGING, timeout_ms);
+}
+
+bool Call::wait_for_ending(int timeout_ms) {
+    return wait_for_state(CALL_STATE_ENDING, timeout_ms);
+}
+
 void Call::update_state(const std::string& new_state) {
     {
         std::lock_guard<std::mutex> lock(s_->ended_mutex);
         s_->state = new_state;
     }
+    // Wake every state-waiter on each transition so wait_for_answered/
+    // ringing/ending can observe intermediate states, not just "ended".
+    s_->state_cv.notify_all();
     if (new_state == CALL_STATE_ENDED) {
         s_->ended_cv.notify_all();
         resolve_all_actions("finished");

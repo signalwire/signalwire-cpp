@@ -7137,6 +7137,69 @@
               ],
               "returns": "class:signalwire.relay.action.Action"
             },
+            "detect_answering_machine": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "amd_params",
+                  "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "detect_digit": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "digits",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "detect_fax": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "tone",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
             "direction": {
               "params": [
                 {
@@ -7406,6 +7469,104 @@
               ],
               "returns": "class:signalwire.relay.action.Action"
             },
+            "play_audio": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "volume",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "play_ringtone": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "duration",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "volume",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "play_silence": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "duration",
+                  "type": "float",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "play_tts": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "text",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "language",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "gender",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "voice",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "volume",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
             "prompt": {
               "params": [
                 {
@@ -7425,6 +7586,74 @@
                 {
                   "name": "control_id",
                   "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "prompt_audio": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "collect",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "volume",
+                  "type": "float",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.relay.action.Action"
+            },
+            "prompt_tts": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "text",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "collect",
+                  "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "language",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "gender",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "voice",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "volume",
+                  "type": "float",
                   "required": false,
                   "default": null
                 }
@@ -7819,7 +8048,52 @@
               ],
               "returns": "void"
             },
+            "wait_for_answered": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "timeout_ms",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "bool"
+            },
             "wait_for_ended": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "timeout_ms",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "bool"
+            },
+            "wait_for_ending": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "timeout_ms",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "bool"
+            },
+            "wait_for_ringing": {
               "params": [
                 {
                   "name": "self",

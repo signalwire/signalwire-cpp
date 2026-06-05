@@ -31,7 +31,10 @@ enum class ConferenceTrim { TrimSilence, DoNotTrim };
 /// `status_callback_method` / `recording_status_callback_method` — HTTP verb.
 enum class CallbackMethod { Get, Post };
 
-inline std::string conference_beep_value(ConferenceBeep v) {
+// The closed-set value mappers below are pure functions whose only effect is
+// the returned wire string — [[nodiscard]] so a stray `conference_beep_value(x);`
+// (forgetting to use the result) is flagged.
+[[nodiscard]] inline std::string conference_beep_value(ConferenceBeep v) {
     switch (v) {
         case ConferenceBeep::True:    return "true";
         case ConferenceBeep::False:   return "false";
@@ -40,21 +43,21 @@ inline std::string conference_beep_value(ConferenceBeep v) {
     }
     return "";
 }
-inline std::string conference_record_value(ConferenceRecord v) {
+[[nodiscard]] inline std::string conference_record_value(ConferenceRecord v) {
     switch (v) {
         case ConferenceRecord::DoNotRecord:     return "do-not-record";
         case ConferenceRecord::RecordFromStart: return "record-from-start";
     }
     return "";
 }
-inline std::string conference_trim_value(ConferenceTrim v) {
+[[nodiscard]] inline std::string conference_trim_value(ConferenceTrim v) {
     switch (v) {
         case ConferenceTrim::TrimSilence: return "trim-silence";
         case ConferenceTrim::DoNotTrim:   return "do-not-trim";
     }
     return "";
 }
-inline std::string callback_method_value(CallbackMethod v) {
+[[nodiscard]] inline std::string callback_method_value(CallbackMethod v) {
     switch (v) {
         case CallbackMethod::Get:  return "GET";
         case CallbackMethod::Post: return "POST";
@@ -101,7 +104,7 @@ enum class TapDirection { Speak, Hear, Both };
 /// strings are upper-case. Distinct from the wider RELAY codec set — do not unify.
 enum class Codec { Pcmu, Pcma };
 
-inline std::string record_format_value(RecordFormat v) {
+[[nodiscard]] inline std::string record_format_value(RecordFormat v) {
     switch (v) {
         case RecordFormat::Wav: return "wav";
         case RecordFormat::Mp3: return "mp3";
@@ -109,7 +112,7 @@ inline std::string record_format_value(RecordFormat v) {
     }
     return "";
 }
-inline std::string record_direction_value(RecordDirection v) {
+[[nodiscard]] inline std::string record_direction_value(RecordDirection v) {
     switch (v) {
         case RecordDirection::Speak:  return "speak";
         case RecordDirection::Listen: return "listen";
@@ -117,7 +120,7 @@ inline std::string record_direction_value(RecordDirection v) {
     }
     return "";
 }
-inline std::string tap_direction_value(TapDirection v) {
+[[nodiscard]] inline std::string tap_direction_value(TapDirection v) {
     switch (v) {
         case TapDirection::Speak: return "speak";
         case TapDirection::Hear:  return "hear";
@@ -125,7 +128,7 @@ inline std::string tap_direction_value(TapDirection v) {
     }
     return "";
 }
-inline std::string codec_value(Codec v) {
+[[nodiscard]] inline std::string codec_value(Codec v) {
     switch (v) {
         case Codec::Pcmu: return "PCMU";
         case Codec::Pcma: return "PCMA";
@@ -135,10 +138,10 @@ inline std::string codec_value(Codec v) {
 
 /// ADL `to_string` overloads so these enums stringify the same way the
 /// `*_value()` mappers do (the single wire-string normalization point).
-inline std::string to_string(RecordFormat v)    { return record_format_value(v); }
-inline std::string to_string(RecordDirection v) { return record_direction_value(v); }
-inline std::string to_string(TapDirection v)    { return tap_direction_value(v); }
-inline std::string to_string(Codec v)           { return codec_value(v); }
+[[nodiscard]] inline std::string to_string(RecordFormat v)    { return record_format_value(v); }
+[[nodiscard]] inline std::string to_string(RecordDirection v) { return record_direction_value(v); }
+[[nodiscard]] inline std::string to_string(TapDirection v)    { return tap_direction_value(v); }
+[[nodiscard]] inline std::string to_string(Codec v)           { return codec_value(v); }
 
 /// A closed-set field that accepts EITHER the typed enum OR a bare string.
 ///
@@ -154,7 +157,7 @@ struct EnumOrString {
     EnumOrString(E e) : value(Map(e)) {}                 // NOLINT(google-explicit-constructor)
     EnumOrString(const std::string& s) : value(s) {}     // NOLINT
     EnumOrString(const char* s) : value(s) {}            // NOLINT
-    const std::string& str() const { return value; }
+    [[nodiscard]] const std::string& str() const { return value; }
 };
 
 using BeepField   = EnumOrString<ConferenceBeep, &conference_beep_value>;
@@ -393,21 +396,27 @@ public:
     // Static Payment Helpers
     // ========================================================================
 
-    static json create_payment_prompt(const std::string& for_situation,
+    // [[nodiscard]] on the static payment factories: each builds and returns
+    // a JSON fragment — calling one and dropping the result does nothing.
+    [[nodiscard]] static json create_payment_prompt(const std::string& for_situation,
                                        const std::vector<json>& actions,
                                        const std::string& card_type = "",
                                        const std::string& error_type = "");
-    static json create_payment_action(const std::string& action_type,
+    [[nodiscard]] static json create_payment_action(const std::string& action_type,
                                        const std::string& phrase);
-    static json create_payment_parameter(const std::string& name,
+    [[nodiscard]] static json create_payment_parameter(const std::string& name,
                                           const std::string& value);
 
     // ========================================================================
     // Serialization
     // ========================================================================
 
-    json to_json() const;
-    std::string to_string(int indent = -1) const;
+    // [[nodiscard]]: these produce the serialized result the builder exists to
+    // create; discarding the rendered action/SWML is a bug. (The fluent
+    // FunctionResult& action builders above are intentionally NOT nodiscard —
+    // the terminal call in a build chain is routinely discarded.)
+    [[nodiscard]] json to_json() const;
+    [[nodiscard]] std::string to_string(int indent = -1) const;
 
 private:
     std::string response_;

@@ -610,6 +610,26 @@ def strip_strings(line: str) -> str:
     return "".join(result)
 
 
+ATTRIBUTE_RE = re.compile(r"\[\[[^\]]*\]\]")
+
+
+def strip_attributes(line: str) -> str:
+    """Remove C++ standard attributes (``[[nodiscard]]``, ``[[maybe_unused]]``,
+    ``[[deprecated]]`` …) so they don't break the method/class regexes.
+
+    These attributes can legitimately prefix a declaration's return type, e.g.
+    ``[[nodiscard]] json get(...) const;``. The method/class matchers anchor on
+    a leading ``[A-Za-z_]`` type/name token, so a leading ``[[…]]`` would make
+    the declaration invisible (it is dropped from the surface). Only the
+    DOUBLE-bracket attribute form is matched — single-bracket array subscripts
+    (``std::array<const char*, 9>``) are left untouched. Replaced with a single
+    space so the surrounding tokens stay separated.
+    """
+    if "[[" not in line:
+        return line
+    return ATTRIBUTE_RE.sub(" ", line)
+
+
 class Scope:
     """A nested scope (namespace or class) stacked during parsing."""
 
@@ -643,7 +663,7 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
     lines = text.split("\n")
     for raw_line in lines:
         line = strip_line_comments(raw_line)
-        code_line = strip_strings(line)
+        code_line = strip_attributes(strip_strings(line))
 
         # --- Namespace opener
         m = NAMESPACE_RE.match(code_line)

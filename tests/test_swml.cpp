@@ -98,7 +98,7 @@ TEST(schema_load_embedded) {
 
 TEST(schema_find_verb) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto* vd = schema.find_verb("answer");
     ASSERT_TRUE(vd != nullptr);
     ASSERT_EQ(vd->verb_name, "answer");
@@ -108,7 +108,7 @@ TEST(schema_find_verb) {
 
 TEST(schema_find_sip_refer) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto* vd = schema.find_verb("sip_refer");
     ASSERT_TRUE(vd != nullptr);
     ASSERT_EQ(vd->schema_name, "SIPRefer");
@@ -117,14 +117,14 @@ TEST(schema_find_sip_refer) {
 
 TEST(schema_find_nonexistent) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     ASSERT_TRUE(schema.find_verb("nonexistent_verb") == nullptr);
     return true;
 }
 
 TEST(schema_verb_names_contain_all_38) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto names = schema.verb_names();
 
     // Check some specific important verbs

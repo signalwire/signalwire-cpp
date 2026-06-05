@@ -84,7 +84,7 @@ TEST(tls_rest_client_https_get) {
         ::unsetenv("SSL_CERT_FILE");
         HttpClient http(base, "test_proj", "test_tok");
         http.set_ca_cert_path("/dev/null");          // empty/invalid trust store
-        ASSERT_THROWS(http.get("/api/relay/rest/addresses"));
+        ASSERT_THROWS((void)http.get("/api/relay/rest/addresses"));
         tt::trust_test_ca();                          // restore trust
     }
     return true;

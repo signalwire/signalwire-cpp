@@ -245,7 +245,7 @@ TEST(phone_binding_regression_swml_single_put) {
     HttpClient http(srv.base_url(), "proj", "tok");
     RestClient::PhoneNumbersNamespace pn(http);
 
-    pn.set_swml_webhook("pn-1", "https://example.com/swml");
+    (void)pn.set_swml_webhook("pn-1", "https://example.com/swml");
 
     auto reqs = srv.captured();
     // Exactly one HTTP request — NOT two (no fabric resource pre-creation)
@@ -271,7 +271,7 @@ TEST(phone_binding_regression_wire_level_form) {
     HttpClient http(srv.base_url(), "proj", "tok");
     RestClient::PhoneNumbersNamespace pn(http);
 
-    pn.update("pn-1", {
+    (void)pn.update("pn-1", {
         {"call_handler", "relay_script"},
         {"call_relay_script_url", "https://example.com/swml"},
     });

@@ -69,16 +69,16 @@ public:
     /// Validate provided basic-auth credentials against the configured ones
     /// using a constant-time comparison.
     /// Python parity: ``AuthMixin.validate_basic_auth(username, password)``.
-    bool validate_basic_auth(const std::string& username, const std::string& password) const;
+    [[nodiscard]] bool validate_basic_auth(const std::string& username, const std::string& password) const;
 
     /// Get (user, password) — Python-canonical name.
     /// Python parity: ``AuthMixin.get_basic_auth_credentials``.
-    std::pair<std::string, std::string> get_basic_auth_credentials() const;
+    [[nodiscard]] std::pair<std::string, std::string> get_basic_auth_credentials() const;
 
     /// Get (user, password, source) where source is one of "provided",
     /// "environment", or "generated". Python parity:
     /// ``AuthMixin.get_basic_auth_credentials(include_source=True)``.
-    std::tuple<std::string, std::string, std::string>
+    [[nodiscard]] std::tuple<std::string, std::string, std::string>
         get_basic_auth_credentials_with_source() const;
 
     // ========================================================================
@@ -146,7 +146,7 @@ public:
     const signalwire::utils::SchemaUtils& schema_utils() const;
 
     /// Render the SWML document to JSON
-    json render_swml() const;
+    [[nodiscard]] json render_swml() const;
 
     // ========================================================================
     // SWAIG tool registry (lifted from AgentBase)
@@ -164,12 +164,12 @@ public:
     /// Dispatch a function call to the registered handler.
     /// Returns a FunctionResult; if the function isn't registered, returns
     /// a FunctionResult with a "Function not found" response.
-    virtual swaig::FunctionResult on_function_call(const std::string& name,
+    [[nodiscard]] virtual swaig::FunctionResult on_function_call(const std::string& name,
                                                     const json& args,
                                                     const json& raw_data);
 
-    bool has_tool(const std::string& name) const;
-    std::vector<std::string> list_tool_names() const;
+    [[nodiscard]] bool has_tool(const std::string& name) const;
+    [[nodiscard]] std::vector<std::string> list_tool_names() const;
 
     // ========================================================================
     // ToolRegistry parity (Python: signalwire.core.agent.tools.registry)
@@ -177,22 +177,22 @@ public:
 
     /// Whether a SWAIG function with the given name is registered.
     /// Python parity: ``ToolRegistry.has_function``.
-    bool has_function(const std::string& name) const;
+    [[nodiscard]] bool has_function(const std::string& name) const;
 
     /// Get a registered SWAIG function definition by name.
     /// Returns nullptr when no such function is registered.
     /// Python parity: ``ToolRegistry.get_function``.
-    const swaig::ToolDefinition* get_function(const std::string& name) const;
+    [[nodiscard]] const swaig::ToolDefinition* get_function(const std::string& name) const;
 
     /// Snapshot of all registered SWAIG functions keyed by name.
     /// Returned by value so subsequent registrations don't mutate the
     /// snapshot. Python parity: ``ToolRegistry.get_all_functions``.
-    std::map<std::string, swaig::ToolDefinition> get_all_functions() const;
+    [[nodiscard]] std::map<std::string, swaig::ToolDefinition> get_all_functions() const;
 
     /// Remove a registered SWAIG function. Returns true when the
     /// function was found and removed; false when it wasn't registered.
     /// Python parity: ``ToolRegistry.remove_function``.
-    bool remove_function(const std::string& name);
+    [[nodiscard]] bool remove_function(const std::string& name);
 
     /// Build the introspect payload for the registered tools as a JSON string
     /// shaped like `{"tools":[<each tool's SWAIG definition>]}`. Iterates
@@ -201,12 +201,12 @@ public:
     /// `swaig-test --example` CLI can parse output uniformly. Used by the
     /// SWAIG_LIST_TOOLS env-var path; pulled out as a separate helper so
     /// tests can assert content without invoking exit().
-    std::string build_tool_registry_json() const;
+    [[nodiscard]] std::string build_tool_registry_json() const;
     /// Pure-string extractor: slice the JSON payload between
     /// `__SWAIG_TOOLS_BEGIN__` and `__SWAIG_TOOLS_END__` sentinels in a
     /// captured stdout. Returns empty string if either marker is missing or
     /// the order is wrong. Static so the swaig-test CLI / tests can reuse it.
-    static std::string extract_introspect_payload(const std::string& stdout_capture);
+    [[nodiscard]] static std::string extract_introspect_payload(const std::string& stdout_capture);
 
     // ========================================================================
     // HTTP Server
@@ -222,10 +222,10 @@ public:
     int port() const { return port_; }
 
     /// Timing-safe string comparison using CRYPTO_memcmp
-    static bool timing_safe_compare(const std::string& a, const std::string& b);
+    [[nodiscard]] static bool timing_safe_compare(const std::string& a, const std::string& b);
 
     /// Generate a random hex string of given byte length
-    static std::string generate_random_hex(size_t bytes);
+    [[nodiscard]] static std::string generate_random_hex(size_t bytes);
 
     /// Customization hook called when SWML is requested. Default
     /// delegates to on_swml_request and returns its result. Subclasses

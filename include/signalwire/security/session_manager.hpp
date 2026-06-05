@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <optional>
 #include <vector>
 #include <cstdint>
@@ -33,9 +34,14 @@ public:
     /// @param function_name  Expected function name
     /// @param call_id        Expected call ID
     /// @return true if token is valid and not expired
-    bool validate_token(const std::string& token,
-                        const std::string& function_name,
-                        const std::string& call_id) const;
+    ///
+    /// All three params are consumed read-only (parsed/compared, never
+    /// stored), so they take std::string_view — consistent with the
+    /// webhook_validator entry points in this module. [[nodiscard]]: the
+    /// validity result is the reason to call it.
+    [[nodiscard]] bool validate_token(std::string_view token,
+                        std::string_view function_name,
+                        std::string_view call_id) const;
 
     /// Timing-safe comparison of two byte sequences
     static bool timing_safe_compare(const std::string& a, const std::string& b);

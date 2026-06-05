@@ -34,24 +34,28 @@ public:
                const std::string& username,
                const std::string& password);
 
+    // [[nodiscard]] on every verb: the returned JSON IS the API response.
+    // Dropping it discards the call's result (and the only place errors that
+    // aren't thrown would surface), which is always a bug.
+
     /// GET request
-    json get(const std::string& path,
+    [[nodiscard]] json get(const std::string& path,
              const std::map<std::string, std::string>& params = {}) const;
 
     /// POST request
-    json post(const std::string& path,
+    [[nodiscard]] json post(const std::string& path,
               const json& body = json::object()) const;
 
     /// PUT request
-    json put(const std::string& path,
+    [[nodiscard]] json put(const std::string& path,
              const json& body = json::object()) const;
 
     /// PATCH request
-    json patch(const std::string& path,
+    [[nodiscard]] json patch(const std::string& path,
                const json& body = json::object()) const;
 
     /// DELETE request
-    json del(const std::string& path) const;
+    [[nodiscard]] json del(const std::string& path) const;
 
     /// Set additional default headers
     void set_header(const std::string& key, const std::string& value);
@@ -86,11 +90,13 @@ class CrudResource {
 public:
     CrudResource(const HttpClient& client, const std::string& base_path);
 
-    json list(const std::map<std::string, std::string>& params = {}) const;
-    json create(const json& data) const;
-    json get(const std::string& id) const;
-    json update(const std::string& id, const json& data) const;
-    json del(const std::string& id) const;
+    // [[nodiscard]]: each CRUD verb returns the REST response body; ignoring
+    // it drops the result of the call.
+    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const;
+    [[nodiscard]] json create(const json& data) const;
+    [[nodiscard]] json get(const std::string& id) const;
+    [[nodiscard]] json update(const std::string& id, const json& data) const;
+    [[nodiscard]] json del(const std::string& id) const;
 
 protected:
     const HttpClient& client_;
@@ -117,11 +123,15 @@ public:
 
     /// Returns true if another item can be fetched. Performs HTTP if
     /// the in-memory buffer is exhausted but more pages remain.
-    bool has_next();
+    /// [[nodiscard]]: this is the loop condition — discarding it loses the
+    /// "more items?" answer (and the side-effecting page fetch is not why
+    /// you'd call it).
+    [[nodiscard]] bool has_next();
 
     /// Returns the next item; throws std::out_of_range when the iterator
     /// is exhausted (mirrors Python's StopIteration).
-    json next();
+    /// [[nodiscard]]: dropping the returned item silently consumes it.
+    [[nodiscard]] json next();
 
     // -- Read-only state accessors used by tests ------------------------
     const HttpClient& http() const { return http_; }

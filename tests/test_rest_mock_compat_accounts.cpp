@@ -29,7 +29,7 @@ TEST(rest_mock_compat_accounts_create_returns_account_resource) {
 
 TEST(rest_mock_compat_accounts_create_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().accounts.create({{"FriendlyName", "Sub-B"}});
+    (void)client.compat().accounts.create({{"FriendlyName", "Sub-B"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path, kAccountsRoot);
@@ -55,7 +55,7 @@ TEST(rest_mock_compat_accounts_get_returns_account_for_sid) {
 
 TEST(rest_mock_compat_accounts_get_journal_records_get_with_sid) {
     auto client = mocktest::make_client();
-    client.compat().accounts.get("AC_SAMPLE_SID");
+    (void)client.compat().accounts.get("AC_SAMPLE_SID");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kAccountsRoot + "/AC_SAMPLE_SID");
@@ -77,7 +77,7 @@ TEST(rest_mock_compat_accounts_update_returns_updated_account) {
 
 TEST(rest_mock_compat_accounts_update_journal_records_post_to_account_path) {
     auto client = mocktest::make_client();
-    client.compat().accounts.update("AC_X", {{"FriendlyName", "NewName"}});
+    (void)client.compat().accounts.update("AC_X", {{"FriendlyName", "NewName"}});
     auto j = mocktest::journal_last();
     // Twilio-compat update uses POST (not PATCH/PUT).
     ASSERT_EQ(j.method, std::string("POST"));

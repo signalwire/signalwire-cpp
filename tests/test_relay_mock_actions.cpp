@@ -170,7 +170,7 @@ TEST(relay_mock_play_on_completed_callback_fires) {
     action.on_completed([&](const Action& a) {
         if (a.state() == "finished") fired.store(true);
     });
-    action.wait(5000);
+    (void)action.wait(5000);
     spin([&] { return fired.load(); }, 2000);
     ASSERT_TRUE(fired.load());
     client->disconnect();

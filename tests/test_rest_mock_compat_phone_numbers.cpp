@@ -29,7 +29,7 @@ TEST(rest_mock_compat_phone_numbers_list_returns_paginated_list) {
 
 TEST(rest_mock_compat_phone_numbers_list_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.list();
+    (void)client.compat().phone_numbers.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -51,7 +51,7 @@ TEST(rest_mock_compat_phone_numbers_get_returns_phone_number_resource) {
 
 TEST(rest_mock_compat_phone_numbers_get_journal_records_get_with_sid) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.get("PN_GET");
+    (void)client.compat().phone_numbers.get("PN_GET");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -73,7 +73,7 @@ TEST(rest_mock_compat_phone_numbers_update_returns_phone_number_resource) {
 
 TEST(rest_mock_compat_phone_numbers_update_journal_records_post_with_friendly_name) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.update(
+    (void)client.compat().phone_numbers.update(
         "PN_UU",
         {{"FriendlyName", "updated"}, {"VoiceUrl", "https://a.b/v"}});
     auto j = mocktest::journal_last();
@@ -99,7 +99,7 @@ TEST(rest_mock_compat_phone_numbers_delete_no_exception) {
 
 TEST(rest_mock_compat_phone_numbers_delete_journal_records_delete_at_phone_number_path) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.delete_("PN_DEL");
+    (void)client.compat().phone_numbers.delete_("PN_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,
@@ -121,7 +121,7 @@ TEST(rest_mock_compat_phone_numbers_purchase_returns_purchased_number) {
 
 TEST(rest_mock_compat_phone_numbers_purchase_journal_records_post_with_phone_number) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.purchase(
+    (void)client.compat().phone_numbers.purchase(
         {{"PhoneNumber", "+15555550100"}, {"FriendlyName", "Main"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -148,7 +148,7 @@ TEST(rest_mock_compat_phone_numbers_import_number_returns_imported_number) {
 
 TEST(rest_mock_compat_phone_numbers_import_number_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.import_number(
+    (void)client.compat().phone_numbers.import_number(
         {{"PhoneNumber", "+15555550111"}, {"VoiceUrl", "https://a.b/v"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -174,7 +174,7 @@ TEST(rest_mock_compat_phone_numbers_list_available_countries_returns_collection)
 
 TEST(rest_mock_compat_phone_numbers_list_available_countries_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.list_available_countries();
+    (void)client.compat().phone_numbers.list_available_countries();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -197,7 +197,7 @@ TEST(rest_mock_compat_phone_numbers_search_toll_free_returns_available_numbers) 
 
 TEST(rest_mock_compat_phone_numbers_search_toll_free_journal_records_get_with_area_code) {
     auto client = mocktest::make_client();
-    client.compat().phone_numbers.search_toll_free("US", {{"AreaCode", "888"}});
+    (void)client.compat().phone_numbers.search_toll_free("US", {{"AreaCode", "888"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,

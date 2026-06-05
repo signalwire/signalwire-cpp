@@ -24,17 +24,17 @@ public:
     SkillManager() = default;
 
     /// Load a skill by name with params and register it with the agent
-    bool load_skill(const std::string& skill_name, const json& params,
+    [[nodiscard]] bool load_skill(const std::string& skill_name, const json& params,
                     agent::AgentBase& agent);
 
     /// Unload a skill
     void unload_skill(const std::string& skill_name);
 
     /// Check if a skill is loaded
-    bool is_loaded(const std::string& skill_name) const;
+    [[nodiscard]] bool is_loaded(const std::string& skill_name) const;
 
     /// List loaded skills
-    std::vector<std::string> list_loaded() const;
+    [[nodiscard]] std::vector<std::string> list_loaded() const;
 
     /// Cleanup all skills
     void cleanup_all();

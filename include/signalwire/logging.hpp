@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <iostream>
 #include <cstdlib>
 #include <mutex>
@@ -28,7 +29,7 @@ public:
         level_ = level;
     }
 
-    LogLevel level() const {
+    [[nodiscard]] LogLevel level() const {
         return level_;
     }
 
@@ -42,11 +43,14 @@ public:
         suppressed_ = false;
     }
 
-    bool is_suppressed() const {
+    [[nodiscard]] bool is_suppressed() const {
         return suppressed_;
     }
 
-    void log(LogLevel level, const std::string& message) {
+    // `message` is read-only here (streamed to cout/cerr, never stored), so
+    // it takes a std::string_view; the convenience debug/info/warn/error
+    // wrappers below forward their view through unchanged.
+    void log(LogLevel level, std::string_view message) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (suppressed_ || level < level_) return;
 
@@ -66,10 +70,10 @@ public:
         }
     }
 
-    void debug(const std::string& msg) { log(LogLevel::Debug, msg); }
-    void info(const std::string& msg)  { log(LogLevel::Info, msg); }
-    void warn(const std::string& msg)  { log(LogLevel::Warn, msg); }
-    void error(const std::string& msg) { log(LogLevel::Error, msg); }
+    void debug(std::string_view msg) { log(LogLevel::Debug, msg); }
+    void info(std::string_view msg)  { log(LogLevel::Info, msg); }
+    void warn(std::string_view msg)  { log(LogLevel::Warn, msg); }
+    void error(std::string_view msg) { log(LogLevel::Error, msg); }
 
 private:
     Logger() {

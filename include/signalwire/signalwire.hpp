@@ -46,7 +46,7 @@ namespace signalwire {
 ///         from either ``args``, ``kwargs``, or the standard
 ///         environment variables (``SIGNALWIRE_PROJECT_ID``,
 ///         ``SIGNALWIRE_API_TOKEN``, ``SIGNALWIRE_SPACE``).
-rest::RestClient RestClient(
+[[nodiscard]] rest::RestClient RestClient(
     const std::vector<std::string>& args = {},
     const std::map<std::string, std::string>& kwargs = {});
 
@@ -79,7 +79,7 @@ void add_skill_directory(const std::string& path);
 /// in v1, so each entry contains the skill name and an empty parameter
 /// map; built-in skills that expose ``parameter_schema()`` via
 /// ``SkillBase`` get richer detail merged in.
-std::map<std::string, std::map<std::string, std::string>>
+[[nodiscard]] std::map<std::string, std::map<std::string, std::string>>
 list_skills_with_params();
 
 } // namespace signalwire

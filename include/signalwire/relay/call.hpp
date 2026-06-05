@@ -151,7 +151,10 @@ public:
 
     // Event handling
     void on_event(CallEventHandler handler);
-    bool wait_for_ended(int timeout_ms = 0);
+    // [[nodiscard]]: the return value is the whole point of a wait — it tells
+    // you whether the call actually reached the terminal state vs. timed out.
+    // Silently dropping it (then acting as if the call ended) is a bug.
+    [[nodiscard]] bool wait_for_ended(int timeout_ms = 0);
 
     // Typed state-wait convenience (mirror Python's wait_for_answered/
     // wait_for_ringing/wait_for_ending). Block until the call reaches the
@@ -161,9 +164,11 @@ public:
     // waits indefinitely. (Python returns the state RelayEvent; the C++
     // idiom returns bool to match wait_for_ended — see
     // PORT_SIGNATURE_OMISSIONS.md cpp_wait_returns_bool.)
-    bool wait_for_answered(int timeout_ms = 0);
-    bool wait_for_ringing(int timeout_ms = 0);
-    bool wait_for_ending(int timeout_ms = 0);
+    // [[nodiscard]] for the same reason as wait_for_ended: ignoring the
+    // reached-vs-timed-out result is always a bug.
+    [[nodiscard]] bool wait_for_answered(int timeout_ms = 0);
+    [[nodiscard]] bool wait_for_ringing(int timeout_ms = 0);
+    [[nodiscard]] bool wait_for_ending(int timeout_ms = 0);
 
     // State updates (called internally by the client)
     void update_state(const std::string& new_state);

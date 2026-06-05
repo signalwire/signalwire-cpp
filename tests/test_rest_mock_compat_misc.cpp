@@ -31,7 +31,7 @@ TEST(rest_mock_compat_applications_update_returns_application_resource) {
 
 TEST(rest_mock_compat_applications_update_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().applications.update(
+    (void)client.compat().applications.update(
         "AP_UU",
         {{"FriendlyName", "renamed"}, {"VoiceUrl", "https://a.b/v"}});
     auto j = mocktest::journal_last();
@@ -61,7 +61,7 @@ TEST(rest_mock_compat_laml_bins_update_returns_bin_resource) {
 
 TEST(rest_mock_compat_laml_bins_update_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().laml_bins.update(
+    (void)client.compat().laml_bins.update(
         "LB_UU",
         {{"FriendlyName", "renamed"}, {"Contents", "<Response/>"}});
     auto j = mocktest::journal_last();

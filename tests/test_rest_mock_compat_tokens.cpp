@@ -29,7 +29,7 @@ TEST(rest_mock_compat_tokens_create_returns_token_resource) {
 
 TEST(rest_mock_compat_tokens_create_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().tokens.create(
+    (void)client.compat().tokens.create(
         {{"Ttl", 3600}, {"Name", "api-key"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -54,7 +54,7 @@ TEST(rest_mock_compat_tokens_update_returns_token_resource) {
 
 TEST(rest_mock_compat_tokens_update_journal_records_patch) {
     auto client = mocktest::make_client();
-    client.compat().tokens.update("TK_UU", {{"Ttl", 7200}});
+    (void)client.compat().tokens.update("TK_UU", {{"Ttl", 7200}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PATCH"));
     ASSERT_EQ(j.path, kTokensBase + "/TK_UU");
@@ -76,7 +76,7 @@ TEST(rest_mock_compat_tokens_delete_returns_dict) {
 
 TEST(rest_mock_compat_tokens_delete_journal_records_delete) {
     auto client = mocktest::make_client();
-    client.compat().tokens.delete_("TK_DEL");
+    (void)client.compat().tokens.delete_("TK_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path, kTokensBase + "/TK_DEL");

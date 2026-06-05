@@ -393,14 +393,14 @@ TEST(pom_from_json_rejects_subsection_without_title) {
     // std::invalid_argument.
     std::string bad =
         "[{\"title\": \"P\", \"subsections\": [{\"body\": \"missing-title\"}]}]";
-    ASSERT_THROWS(pom_ns::PromptObjectModel::from_json(bad));
+    ASSERT_THROWS((void)pom_ns::PromptObjectModel::from_json(bad));
     return true;
 }
 
 TEST(pom_from_json_rejects_section_without_content) {
     // Python rule: every section needs either body, bullets, or subsections.
     std::string bad = "[{\"title\": \"empty\"}]";
-    ASSERT_THROWS(pom_ns::PromptObjectModel::from_json(bad));
+    ASSERT_THROWS((void)pom_ns::PromptObjectModel::from_json(bad));
     return true;
 }
 

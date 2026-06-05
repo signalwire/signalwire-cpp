@@ -3,6 +3,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <iostream>
 #include <cstdlib>
 
@@ -11,7 +12,7 @@ namespace logging {
 
 enum class LogLevel { DEBUG, INFO, WARN, ERROR, OFF };
 
-inline LogLevel get_log_level() {
+[[nodiscard]] inline LogLevel get_log_level() {
     std::string level = "";
     const char* env = std::getenv("SIGNALWIRE_LOG_LEVEL");
     if (env) level = env;
@@ -27,19 +28,23 @@ class Logger {
 public:
     explicit Logger(const std::string& name) : name_(name) {}
 
-    void debug(const std::string& msg) const {
+    // `msg` is consumed read-only (streamed to cerr, never stored), so it
+    // takes a std::string_view — callers can pass a std::string, a literal,
+    // or a substring view with no allocation. (The constructor's `name`
+    // stays std::string: it is retained in name_.)
+    void debug(std::string_view msg) const {
         if (get_log_level() <= LogLevel::DEBUG)
             std::cerr << "[DEBUG][" << name_ << "] " << msg << std::endl;
     }
-    void info(const std::string& msg) const {
+    void info(std::string_view msg) const {
         if (get_log_level() <= LogLevel::INFO)
             std::cerr << "[INFO][" << name_ << "] " << msg << std::endl;
     }
-    void warn(const std::string& msg) const {
+    void warn(std::string_view msg) const {
         if (get_log_level() <= LogLevel::WARN)
             std::cerr << "[WARN][" << name_ << "] " << msg << std::endl;
     }
-    void error(const std::string& msg) const {
+    void error(std::string_view msg) const {
         if (get_log_level() <= LogLevel::ERROR)
             std::cerr << "[ERROR][" << name_ << "] " << msg << std::endl;
     }
@@ -48,7 +53,7 @@ private:
     std::string name_;
 };
 
-inline Logger get_logger(const std::string& name) {
+[[nodiscard]] inline Logger get_logger(const std::string& name) {
     return Logger(name);
 }
 

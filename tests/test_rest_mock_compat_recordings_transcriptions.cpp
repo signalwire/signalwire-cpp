@@ -30,7 +30,7 @@ TEST(rest_mock_compat_recordings_list_returns_paginated) {
 
 TEST(rest_mock_compat_recordings_list_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().recordings.list();
+    (void)client.compat().recordings.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kRecBase);
@@ -47,7 +47,7 @@ TEST(rest_mock_compat_recordings_get_returns_recording_resource) {
 
 TEST(rest_mock_compat_recordings_get_journal_records_get_with_sid) {
     auto client = mocktest::make_client();
-    client.compat().recordings.get("RE_GET");
+    (void)client.compat().recordings.get("RE_GET");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kRecBase + "/RE_GET");
@@ -63,7 +63,7 @@ TEST(rest_mock_compat_recordings_delete_returns_dict) {
 
 TEST(rest_mock_compat_recordings_delete_journal_records_delete) {
     auto client = mocktest::make_client();
-    client.compat().recordings.delete_("RE_DEL");
+    (void)client.compat().recordings.delete_("RE_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path, kRecBase + "/RE_DEL");
@@ -85,7 +85,7 @@ TEST(rest_mock_compat_transcriptions_list_returns_paginated) {
 
 TEST(rest_mock_compat_transcriptions_list_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().transcriptions.list();
+    (void)client.compat().transcriptions.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kTransBase);
@@ -102,7 +102,7 @@ TEST(rest_mock_compat_transcriptions_get_returns_transcription_resource) {
 
 TEST(rest_mock_compat_transcriptions_get_journal_records_get_with_sid) {
     auto client = mocktest::make_client();
-    client.compat().transcriptions.get("TR_GET");
+    (void)client.compat().transcriptions.get("TR_GET");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kTransBase + "/TR_GET");
@@ -118,7 +118,7 @@ TEST(rest_mock_compat_transcriptions_delete_returns_dict) {
 
 TEST(rest_mock_compat_transcriptions_delete_journal_records_delete) {
     auto client = mocktest::make_client();
-    client.compat().transcriptions.delete_("TR_DEL");
+    (void)client.compat().transcriptions.delete_("TR_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path, kTransBase + "/TR_DEL");

@@ -22,14 +22,14 @@ public:
                      const std::string& token);
 
     /// Initialize from environment variables
-    static RestClient from_env();
+    [[nodiscard]] static RestClient from_env();
 
     /// Construct with an explicit pre-built base URL (`http://...` or
     /// `https://...`) instead of synthesizing one from the SignalWire
     /// space hostname. Used by audit harnesses pointing the client at
     /// loopback fixtures. The space-based constructor remains the
     /// production path.
-    static RestClient with_base_url(const std::string& base_url,
+    [[nodiscard]] static RestClient with_base_url(const std::string& base_url,
                                      const std::string& project_id,
                                      const std::string& token);
 
@@ -57,7 +57,7 @@ public:
         FabricResource(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
         // Python parity: list_addresses sub-collection.
-        json list_addresses(const std::string& resource_id,
+        [[nodiscard]] json list_addresses(const std::string& resource_id,
                             const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + resource_id + "/addresses", params);
         }
@@ -67,7 +67,7 @@ public:
         FabricResourcePUT(const HttpClient& c, const std::string& base)
             : FabricResource(c, base) {}
         // Python: _update_method = "PUT".
-        json update(const std::string& resource_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& resource_id, const json& data) const {
             return client_.put(base_path_ + "/" + resource_id, data);
         }
     };
@@ -81,15 +81,15 @@ public:
         std::string singular_base() const {
             return "/api/fabric/resources/call_flow";
         }
-        json list_addresses(const std::string& flow_id,
+        [[nodiscard]] json list_addresses(const std::string& flow_id,
                             const std::map<std::string, std::string>& params = {}) const {
             return client_.get(singular_base() + "/" + flow_id + "/addresses", params);
         }
-        json list_versions(const std::string& flow_id,
+        [[nodiscard]] json list_versions(const std::string& flow_id,
                            const std::map<std::string, std::string>& params = {}) const {
             return client_.get(singular_base() + "/" + flow_id + "/versions", params);
         }
-        json deploy_version(const std::string& flow_id, const json& data) const {
+        [[nodiscard]] json deploy_version(const std::string& flow_id, const json& data) const {
             return client_.post(singular_base() + "/" + flow_id + "/versions", data);
         }
     };
@@ -102,7 +102,7 @@ public:
         std::string singular_base() const {
             return "/api/fabric/resources/conference_room";
         }
-        json list_addresses(const std::string& room_id,
+        [[nodiscard]] json list_addresses(const std::string& room_id,
                             const std::map<std::string, std::string>& params = {}) const {
             return client_.get(singular_base() + "/" + room_id + "/addresses", params);
         }
@@ -112,24 +112,24 @@ public:
         FabricSubscribers(const HttpClient& c)
             : FabricResourcePUT(c, "/api/fabric/resources/subscribers") {}
 
-        json list_sip_endpoints(const std::string& subscriber_id,
+        [[nodiscard]] json list_sip_endpoints(const std::string& subscriber_id,
                                 const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + subscriber_id + "/sip_endpoints", params);
         }
-        json create_sip_endpoint(const std::string& subscriber_id, const json& data) const {
+        [[nodiscard]] json create_sip_endpoint(const std::string& subscriber_id, const json& data) const {
             return client_.post(base_path_ + "/" + subscriber_id + "/sip_endpoints", data);
         }
-        json get_sip_endpoint(const std::string& subscriber_id,
+        [[nodiscard]] json get_sip_endpoint(const std::string& subscriber_id,
                               const std::string& endpoint_id) const {
             return client_.get(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id);
         }
         // Python parity: PATCH for sub-resource update.
-        json update_sip_endpoint(const std::string& subscriber_id,
+        [[nodiscard]] json update_sip_endpoint(const std::string& subscriber_id,
                                  const std::string& endpoint_id,
                                  const json& data) const {
             return client_.patch(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id, data);
         }
-        json delete_sip_endpoint(const std::string& subscriber_id,
+        [[nodiscard]] json delete_sip_endpoint(const std::string& subscriber_id,
                                  const std::string& endpoint_id) const {
             return client_.del(base_path_ + "/" + subscriber_id + "/sip_endpoints/" + endpoint_id);
         }
@@ -139,7 +139,7 @@ public:
         FabricCxmlApplications(const HttpClient& c)
             : FabricResourcePUT(c, "/api/fabric/resources/cxml_applications") {}
         // Python parity: deliberately refuses create.
-        json create(const json& /*data*/) const {
+        [[nodiscard]] json create(const json& /*data*/) const {
             throw std::runtime_error(
                 "cXML applications cannot be created via this API");
         }
@@ -149,10 +149,10 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/fabric/addresses";
         FabricAddresses(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& address_id) const {
+        [[nodiscard]] json get(const std::string& address_id) const {
             return client.get(base_path + "/" + address_id);
         }
     };
@@ -161,25 +161,25 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/fabric/resources";
         FabricGenericResources(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& resource_id) const {
+        [[nodiscard]] json get(const std::string& resource_id) const {
             return client.get(base_path + "/" + resource_id);
         }
-        json delete_(const std::string& resource_id) const {
+        [[nodiscard]] json delete_(const std::string& resource_id) const {
             return client.del(base_path + "/" + resource_id);
         }
-        json list_addresses(const std::string& resource_id,
+        [[nodiscard]] json list_addresses(const std::string& resource_id,
                             const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + resource_id + "/addresses", params);
         }
-        json assign_domain_application(const std::string& resource_id,
+        [[nodiscard]] json assign_domain_application(const std::string& resource_id,
                                        const json& data) const {
             return client.post(base_path + "/" + resource_id + "/domain_applications", data);
         }
         // Deprecated for the common binding cases; see Python parity.
-        json assign_phone_route(const std::string& resource_id, const json& data) const {
+        [[nodiscard]] json assign_phone_route(const std::string& resource_id, const json& data) const {
             return client.post(base_path + "/" + resource_id + "/phone_routes", data);
         }
     };
@@ -189,19 +189,19 @@ public:
         std::string base_path = "/api/fabric";
         FabricTokens(const HttpClient& c) : client(c) {}
 
-        json create_subscriber_token(const json& data) const {
+        [[nodiscard]] json create_subscriber_token(const json& data) const {
             return client.post(base_path + "/subscribers/tokens", data);
         }
-        json refresh_subscriber_token(const json& data) const {
+        [[nodiscard]] json refresh_subscriber_token(const json& data) const {
             return client.post(base_path + "/subscribers/tokens/refresh", data);
         }
-        json create_invite_token(const json& data) const {
+        [[nodiscard]] json create_invite_token(const json& data) const {
             return client.post(base_path + "/subscriber/invites", data);
         }
-        json create_guest_token(const json& data) const {
+        [[nodiscard]] json create_guest_token(const json& data) const {
             return client.post(base_path + "/guests/tokens", data);
         }
-        json create_embed_token(const json& data) const {
+        [[nodiscard]] json create_embed_token(const json& data) const {
             return client.post(base_path + "/embeds/tokens", data);
         }
     };
@@ -282,7 +282,7 @@ public:
         // ``id`` is omitted for calls that target no specific call (e.g.
         // ``dial`` and ``update``).
         // ----------------------------------------------------------------
-        json execute(const std::string& command,
+        [[nodiscard]] json execute(const std::string& command,
                      const json& params,
                      const std::optional<std::string>& call_id = std::nullopt) const {
             json body = {{"command", command}, {"params", params}};
@@ -291,144 +291,144 @@ public:
         }
 
         // Lifecycle
-        json dial(const json& params) const { return execute("dial", params); }
-        json update(const json& params) const { return execute("update", params); }
-        json end(const std::string& call_id, const json& params = json::object()) const {
+        [[nodiscard]] json dial(const json& params) const { return execute("dial", params); }
+        [[nodiscard]] json update(const json& params) const { return execute("update", params); }
+        [[nodiscard]] json end(const std::string& call_id, const json& params = json::object()) const {
             return execute("calling.end", params, call_id);
         }
-        json transfer(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json transfer(const std::string& call_id, const json& params) const {
             return execute("calling.transfer", params, call_id);
         }
-        json disconnect(const std::string& call_id, const json& params = json::object()) const {
+        [[nodiscard]] json disconnect(const std::string& call_id, const json& params = json::object()) const {
             return execute("calling.disconnect", params, call_id);
         }
 
         // Play
-        json play(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json play(const std::string& call_id, const json& params) const {
             return execute("calling.play", params, call_id);
         }
-        json play_pause(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json play_pause(const std::string& call_id, const json& params) const {
             return execute("calling.play.pause", params, call_id);
         }
-        json play_resume(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json play_resume(const std::string& call_id, const json& params) const {
             return execute("calling.play.resume", params, call_id);
         }
-        json play_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json play_stop(const std::string& call_id, const json& params) const {
             return execute("calling.play.stop", params, call_id);
         }
-        json play_volume(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json play_volume(const std::string& call_id, const json& params) const {
             return execute("calling.play.volume", params, call_id);
         }
 
         // Record
-        json record(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json record(const std::string& call_id, const json& params) const {
             return execute("calling.record", params, call_id);
         }
-        json record_pause(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json record_pause(const std::string& call_id, const json& params) const {
             return execute("calling.record.pause", params, call_id);
         }
-        json record_resume(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json record_resume(const std::string& call_id, const json& params) const {
             return execute("calling.record.resume", params, call_id);
         }
-        json record_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json record_stop(const std::string& call_id, const json& params) const {
             return execute("calling.record.stop", params, call_id);
         }
 
         // Collect
-        json collect(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json collect(const std::string& call_id, const json& params) const {
             return execute("calling.collect", params, call_id);
         }
-        json collect_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json collect_stop(const std::string& call_id, const json& params) const {
             return execute("calling.collect.stop", params, call_id);
         }
-        json collect_start_input_timers(const std::string& call_id,
+        [[nodiscard]] json collect_start_input_timers(const std::string& call_id,
                                         const json& params) const {
             return execute("calling.collect.start_input_timers", params, call_id);
         }
 
         // Detect
-        json detect(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json detect(const std::string& call_id, const json& params) const {
             return execute("calling.detect", params, call_id);
         }
-        json detect_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json detect_stop(const std::string& call_id, const json& params) const {
             return execute("calling.detect.stop", params, call_id);
         }
 
         // Tap
-        json tap(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json tap(const std::string& call_id, const json& params) const {
             return execute("calling.tap", params, call_id);
         }
-        json tap_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json tap_stop(const std::string& call_id, const json& params) const {
             return execute("calling.tap.stop", params, call_id);
         }
 
         // Stream
-        json stream(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json stream(const std::string& call_id, const json& params) const {
             return execute("calling.stream", params, call_id);
         }
-        json stream_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json stream_stop(const std::string& call_id, const json& params) const {
             return execute("calling.stream.stop", params, call_id);
         }
 
         // Denoise
-        json denoise(const std::string& call_id,
+        [[nodiscard]] json denoise(const std::string& call_id,
                      const json& params = json::object()) const {
             return execute("calling.denoise", params, call_id);
         }
-        json denoise_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json denoise_stop(const std::string& call_id, const json& params) const {
             return execute("calling.denoise.stop", params, call_id);
         }
 
         // Transcribe
-        json transcribe(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json transcribe(const std::string& call_id, const json& params) const {
             return execute("calling.transcribe", params, call_id);
         }
-        json transcribe_stop(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json transcribe_stop(const std::string& call_id, const json& params) const {
             return execute("calling.transcribe.stop", params, call_id);
         }
 
         // AI
-        json ai_message(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json ai_message(const std::string& call_id, const json& params) const {
             return execute("calling.ai_message", params, call_id);
         }
-        json ai_hold(const std::string& call_id,
+        [[nodiscard]] json ai_hold(const std::string& call_id,
                      const json& params = json::object()) const {
             return execute("calling.ai_hold", params, call_id);
         }
-        json ai_unhold(const std::string& call_id,
+        [[nodiscard]] json ai_unhold(const std::string& call_id,
                        const json& params = json::object()) const {
             return execute("calling.ai_unhold", params, call_id);
         }
-        json ai_stop(const std::string& call_id,
+        [[nodiscard]] json ai_stop(const std::string& call_id,
                      const json& params = json::object()) const {
             return execute("calling.ai.stop", params, call_id);
         }
 
         // Live transcribe / translate
-        json live_transcribe(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json live_transcribe(const std::string& call_id, const json& params) const {
             return execute("calling.live_transcribe", params, call_id);
         }
-        json live_translate(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json live_translate(const std::string& call_id, const json& params) const {
             return execute("calling.live_translate", params, call_id);
         }
 
         // Fax
-        json send_fax_stop(const std::string& call_id,
+        [[nodiscard]] json send_fax_stop(const std::string& call_id,
                            const json& params = json::object()) const {
             return execute("calling.send_fax.stop", params, call_id);
         }
-        json receive_fax_stop(const std::string& call_id,
+        [[nodiscard]] json receive_fax_stop(const std::string& call_id,
                               const json& params = json::object()) const {
             return execute("calling.receive_fax.stop", params, call_id);
         }
 
         // SIP refer
-        json refer(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json refer(const std::string& call_id, const json& params) const {
             return execute("calling.refer", params, call_id);
         }
 
         // Custom user event
-        json user_event(const std::string& call_id, const json& params) const {
+        [[nodiscard]] json user_event(const std::string& call_id, const json& params) const {
             return execute("calling.user_event", params, call_id);
         }
 
@@ -437,23 +437,23 @@ public:
         // These use direct REST paths rather than the command-dispatch
         // wire format and are retained so existing tests keep linking.
         // ----------------------------------------------------------------
-        json list_calls(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/calling/calls", p); }
-        json get_call(const std::string& id) const { return client.get("/api/calling/calls/" + id); }
-        json update_call(const std::string& id, const json& data) const { return client.put("/api/calling/calls/" + id, data); }
-        json end_call(const std::string& id) const { return client.del("/api/calling/calls/" + id); }
-        json connect(const std::string& id, const json& data) const { return client.post("/api/calling/calls/" + id + "/connect", data); }
-        json send_digits(const std::string& id, const json& data) const { return client.post("/api/calling/calls/" + id + "/send_digits", data); }
-        json answer(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/answer"); }
-        json hangup(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/hangup"); }
-        json hold(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/hold"); }
-        json unhold(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/unhold"); }
+        [[nodiscard]] json list_calls(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/calling/calls", p); }
+        [[nodiscard]] json get_call(const std::string& id) const { return client.get("/api/calling/calls/" + id); }
+        [[nodiscard]] json update_call(const std::string& id, const json& data) const { return client.put("/api/calling/calls/" + id, data); }
+        [[nodiscard]] json end_call(const std::string& id) const { return client.del("/api/calling/calls/" + id); }
+        [[nodiscard]] json connect(const std::string& id, const json& data) const { return client.post("/api/calling/calls/" + id + "/connect", data); }
+        [[nodiscard]] json send_digits(const std::string& id, const json& data) const { return client.post("/api/calling/calls/" + id + "/send_digits", data); }
+        [[nodiscard]] json answer(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/answer"); }
+        [[nodiscard]] json hangup(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/hangup"); }
+        [[nodiscard]] json hold(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/hold"); }
+        [[nodiscard]] json unhold(const std::string& id) const { return client.post("/api/calling/calls/" + id + "/unhold"); }
     };
 
     struct PhoneNumbersNamespace : public CrudResource {
         PhoneNumbersNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/phone_numbers") {}
-        json search(const std::map<std::string, std::string>& p) const { return client_.get(base_path_ + "/search", p); }
-        json buy(const json& data) const { return client_.post(base_path_ + "/buy", data); }
-        json release(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
+        [[nodiscard]] json search(const std::map<std::string, std::string>& p) const { return client_.get(base_path_ + "/search", p); }
+        [[nodiscard]] json buy(const json& data) const { return client_.post(base_path_ + "/buy", data); }
+        [[nodiscard]] json release(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
 
         // ====================================================================
         // Typed binding helpers
@@ -489,14 +489,14 @@ public:
 
         // -- Body builders (pure, no side effects — useful for tests) --------
 
-        static json make_swml_webhook_body(const std::string& url) {
+        [[nodiscard]] static json make_swml_webhook_body(const std::string& url) {
             return {
                 {"call_handler", to_wire_string(PhoneCallHandler::RelayScript)},
                 {"call_relay_script_url", url},
             };
         }
 
-        static json make_cxml_webhook_body(const std::string& url,
+        [[nodiscard]] static json make_cxml_webhook_body(const std::string& url,
                                            const CxmlWebhookOptions& opts = {}) {
             json body = {
                 {"call_handler", to_wire_string(PhoneCallHandler::LamlWebhooks)},
@@ -507,21 +507,21 @@ public:
             return body;
         }
 
-        static json make_cxml_application_body(const std::string& application_id) {
+        [[nodiscard]] static json make_cxml_application_body(const std::string& application_id) {
             return {
                 {"call_handler", to_wire_string(PhoneCallHandler::LamlApplication)},
                 {"call_laml_application_id", application_id},
             };
         }
 
-        static json make_ai_agent_body(const std::string& agent_id) {
+        [[nodiscard]] static json make_ai_agent_body(const std::string& agent_id) {
             return {
                 {"call_handler", to_wire_string(PhoneCallHandler::AiAgent)},
                 {"call_ai_agent_id", agent_id},
             };
         }
 
-        static json make_call_flow_body(const std::string& flow_id,
+        [[nodiscard]] static json make_call_flow_body(const std::string& flow_id,
                                         const CallFlowOptions& opts = {}) {
             json body = {
                 {"call_handler", to_wire_string(PhoneCallHandler::CallFlow)},
@@ -531,14 +531,14 @@ public:
             return body;
         }
 
-        static json make_relay_application_body(const std::string& name) {
+        [[nodiscard]] static json make_relay_application_body(const std::string& name) {
             return {
                 {"call_handler", to_wire_string(PhoneCallHandler::RelayApplication)},
                 {"call_relay_application", name},
             };
         }
 
-        static json make_relay_topic_body(const std::string& topic,
+        [[nodiscard]] static json make_relay_topic_body(const std::string& topic,
                                           const RelayTopicOptions& opts = {}) {
             json body = {
                 {"call_handler", to_wire_string(PhoneCallHandler::RelayTopic)},
@@ -553,7 +553,7 @@ public:
         /// Route inbound calls to an SWML webhook URL.
         /// Server auto-creates a ``swml_webhook`` Fabric resource keyed off
         /// this URL.
-        json set_swml_webhook(const std::string& resource_id, const std::string& url) const {
+        [[nodiscard]] json set_swml_webhook(const std::string& resource_id, const std::string& url) const {
             return update(resource_id, make_swml_webhook_body(url));
         }
 
@@ -561,40 +561,40 @@ public:
         /// Despite the wire value ``laml_webhooks`` being plural, this creates
         /// a single ``cxml_webhook`` Fabric resource. Extra options populate
         /// fallback and status-callback fields.
-        json set_cxml_webhook(const std::string& resource_id,
+        [[nodiscard]] json set_cxml_webhook(const std::string& resource_id,
                               const std::string& url,
                               const CxmlWebhookOptions& opts = {}) const {
             return update(resource_id, make_cxml_webhook_body(url, opts));
         }
 
         /// Route inbound calls to an existing cXML application by ID.
-        json set_cxml_application(const std::string& resource_id,
+        [[nodiscard]] json set_cxml_application(const std::string& resource_id,
                                   const std::string& application_id) const {
             return update(resource_id, make_cxml_application_body(application_id));
         }
 
         /// Route inbound calls to an AI Agent Fabric resource by ID.
-        json set_ai_agent(const std::string& resource_id,
+        [[nodiscard]] json set_ai_agent(const std::string& resource_id,
                           const std::string& agent_id) const {
             return update(resource_id, make_ai_agent_body(agent_id));
         }
 
         /// Route inbound calls to a Call Flow by ID.
         /// ``opts.version`` accepts ``"working_copy"`` or ``"current_deployed"``.
-        json set_call_flow(const std::string& resource_id,
+        [[nodiscard]] json set_call_flow(const std::string& resource_id,
                            const std::string& flow_id,
                            const CallFlowOptions& opts = {}) const {
             return update(resource_id, make_call_flow_body(flow_id, opts));
         }
 
         /// Route inbound calls to a named RELAY application.
-        json set_relay_application(const std::string& resource_id,
+        [[nodiscard]] json set_relay_application(const std::string& resource_id,
                                    const std::string& name) const {
             return update(resource_id, make_relay_application_body(name));
         }
 
         /// Route inbound calls to a RELAY topic (client subscription).
-        json set_relay_topic(const std::string& resource_id,
+        [[nodiscard]] json set_relay_topic(const std::string& resource_id,
                              const std::string& topic,
                              const RelayTopicOptions& opts = {}) const {
             return update(resource_id, make_relay_topic_body(topic, opts));
@@ -611,18 +611,18 @@ public:
     struct DatasphereDocuments : public CrudResource {
         DatasphereDocuments(const HttpClient& c)
             : CrudResource(c, "/api/datasphere/documents") {}
-        json search(const json& data) const {
+        [[nodiscard]] json search(const json& data) const {
             return client_.post(base_path_ + "/search", data);
         }
-        json list_chunks(const std::string& document_id,
+        [[nodiscard]] json list_chunks(const std::string& document_id,
                          const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + document_id + "/chunks", params);
         }
-        json get_chunk(const std::string& document_id,
+        [[nodiscard]] json get_chunk(const std::string& document_id,
                        const std::string& chunk_id) const {
             return client_.get(base_path_ + "/" + document_id + "/chunks/" + chunk_id);
         }
-        json delete_chunk(const std::string& document_id,
+        [[nodiscard]] json delete_chunk(const std::string& document_id,
                           const std::string& chunk_id) const {
             return client_.del(base_path_ + "/" + document_id + "/chunks/" + chunk_id);
         }
@@ -638,7 +638,7 @@ public:
         // Legacy alias retained -- callers can still invoke
         // ``client.datasphere().search({...})`` instead of going through
         // ``documents.search``.
-        json search(const json& data) const {
+        [[nodiscard]] json search(const json& data) const {
             return client.post("/api/datasphere/documents/search", data);
         }
     };
@@ -658,14 +658,14 @@ public:
     struct VideoRooms : public CrudResource {
         VideoRooms(const HttpClient& c) : CrudResource(c, "/api/video/rooms") {}
         // Python parity: PUT (CrudResource default is PATCH).
-        json update(const std::string& room_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& room_id, const json& data) const {
             return client_.put(base_path_ + "/" + room_id, data);
         }
-        json list_streams(const std::string& room_id,
+        [[nodiscard]] json list_streams(const std::string& room_id,
                           const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + room_id + "/streams", params);
         }
-        json create_stream(const std::string& room_id, const json& data) const {
+        [[nodiscard]] json create_stream(const std::string& room_id, const json& data) const {
             return client_.post(base_path_ + "/" + room_id + "/streams", data);
         }
     };
@@ -674,28 +674,28 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/video/room_tokens";
         VideoRoomTokens(const HttpClient& c) : client(c) {}
-        json create(const json& data) const { return client.post(base_path, data); }
+        [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
     };
 
     struct VideoRoomSessions {
         const HttpClient& client;
         std::string base_path = "/api/video/room_sessions";
         VideoRoomSessions(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& session_id) const {
+        [[nodiscard]] json get(const std::string& session_id) const {
             return client.get(base_path + "/" + session_id);
         }
-        json list_events(const std::string& session_id,
+        [[nodiscard]] json list_events(const std::string& session_id,
                          const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + session_id + "/events", params);
         }
-        json list_members(const std::string& session_id,
+        [[nodiscard]] json list_members(const std::string& session_id,
                           const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + session_id + "/members", params);
         }
-        json list_recordings(const std::string& session_id,
+        [[nodiscard]] json list_recordings(const std::string& session_id,
                              const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + session_id + "/recordings", params);
         }
@@ -705,16 +705,16 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/video/room_recordings";
         VideoRoomRecordings(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& recording_id) const {
+        [[nodiscard]] json get(const std::string& recording_id) const {
             return client.get(base_path + "/" + recording_id);
         }
-        json delete_(const std::string& recording_id) const {
+        [[nodiscard]] json delete_(const std::string& recording_id) const {
             return client.del(base_path + "/" + recording_id);
         }
-        json list_events(const std::string& recording_id,
+        [[nodiscard]] json list_events(const std::string& recording_id,
                          const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + recording_id + "/events", params);
         }
@@ -724,18 +724,18 @@ public:
         VideoConferences(const HttpClient& c)
             : CrudResource(c, "/api/video/conferences") {}
         // Python parity: PUT.
-        json update(const std::string& conf_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& conf_id, const json& data) const {
             return client_.put(base_path_ + "/" + conf_id, data);
         }
-        json list_conference_tokens(const std::string& conf_id,
+        [[nodiscard]] json list_conference_tokens(const std::string& conf_id,
                                     const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + conf_id + "/conference_tokens", params);
         }
-        json list_streams(const std::string& conf_id,
+        [[nodiscard]] json list_streams(const std::string& conf_id,
                           const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + conf_id + "/streams", params);
         }
-        json create_stream(const std::string& conf_id, const json& data) const {
+        [[nodiscard]] json create_stream(const std::string& conf_id, const json& data) const {
             return client_.post(base_path_ + "/" + conf_id + "/streams", data);
         }
     };
@@ -744,10 +744,10 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/video/conference_tokens";
         VideoConferenceTokens(const HttpClient& c) : client(c) {}
-        json get(const std::string& token_id) const {
+        [[nodiscard]] json get(const std::string& token_id) const {
             return client.get(base_path + "/" + token_id);
         }
-        json reset(const std::string& token_id) const {
+        [[nodiscard]] json reset(const std::string& token_id) const {
             return client.post(base_path + "/" + token_id + "/reset");
         }
     };
@@ -756,14 +756,14 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/video/streams";
         VideoStreams(const HttpClient& c) : client(c) {}
-        json get(const std::string& stream_id) const {
+        [[nodiscard]] json get(const std::string& stream_id) const {
             return client.get(base_path + "/" + stream_id);
         }
         // Python parity: PUT.
-        json update(const std::string& stream_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& stream_id, const json& data) const {
             return client.put(base_path + "/" + stream_id, data);
         }
-        json delete_(const std::string& stream_id) const {
+        [[nodiscard]] json delete_(const std::string& stream_id) const {
             return client.del(base_path + "/" + stream_id);
         }
     };
@@ -804,25 +804,25 @@ public:
             : CrudResource(c, base) {}
 
         // Override update -- compat uses POST not PUT for resource updates.
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
 
         // Recording sub-resources.
-        json start_recording(const std::string& call_sid, const json& data) const {
+        [[nodiscard]] json start_recording(const std::string& call_sid, const json& data) const {
             return client_.post(base_path_ + "/" + call_sid + "/Recordings", data);
         }
-        json update_recording(const std::string& call_sid,
+        [[nodiscard]] json update_recording(const std::string& call_sid,
                               const std::string& recording_sid,
                               const json& data) const {
             return client_.post(base_path_ + "/" + call_sid + "/Recordings/" + recording_sid, data);
         }
 
         // Stream sub-resources.
-        json start_stream(const std::string& call_sid, const json& data) const {
+        [[nodiscard]] json start_stream(const std::string& call_sid, const json& data) const {
             return client_.post(base_path_ + "/" + call_sid + "/Streams", data);
         }
-        json stop_stream(const std::string& call_sid,
+        [[nodiscard]] json stop_stream(const std::string& call_sid,
                          const std::string& stream_sid,
                          const json& data) const {
             return client_.post(base_path_ + "/" + call_sid + "/Streams/" + stream_sid, data);
@@ -833,19 +833,19 @@ public:
         CompatMessages(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
 
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
 
-        json list_media(const std::string& message_sid,
+        [[nodiscard]] json list_media(const std::string& message_sid,
                         const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + message_sid + "/Media", params);
         }
-        json get_media(const std::string& message_sid,
+        [[nodiscard]] json get_media(const std::string& message_sid,
                        const std::string& media_sid) const {
             return client_.get(base_path_ + "/" + message_sid + "/Media/" + media_sid);
         }
-        json delete_media(const std::string& message_sid,
+        [[nodiscard]] json delete_media(const std::string& message_sid,
                           const std::string& media_sid) const {
             return client_.del(base_path_ + "/" + message_sid + "/Media/" + media_sid);
         }
@@ -855,19 +855,19 @@ public:
         CompatFaxes(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
 
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
 
-        json list_media(const std::string& fax_sid,
+        [[nodiscard]] json list_media(const std::string& fax_sid,
                         const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + fax_sid + "/Media", params);
         }
-        json get_media(const std::string& fax_sid,
+        [[nodiscard]] json get_media(const std::string& fax_sid,
                        const std::string& media_sid) const {
             return client_.get(base_path_ + "/" + fax_sid + "/Media/" + media_sid);
         }
-        json delete_media(const std::string& fax_sid,
+        [[nodiscard]] json delete_media(const std::string& fax_sid,
                           const std::string& media_sid) const {
             return client_.del(base_path_ + "/" + fax_sid + "/Media/" + media_sid);
         }
@@ -885,32 +885,32 @@ public:
               available_base(account_base + "/AvailablePhoneNumbers"),
               imported_base(account_base + "/ImportedPhoneNumbers") {}
 
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& sid) const {
+        [[nodiscard]] json get(const std::string& sid) const {
             return client.get(base_path + "/" + sid);
         }
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client.post(base_path + "/" + sid, data);
         }
-        json delete_(const std::string& sid) const {
+        [[nodiscard]] json delete_(const std::string& sid) const {
             return client.del(base_path + "/" + sid);
         }
-        json purchase(const json& data) const {
+        [[nodiscard]] json purchase(const json& data) const {
             return client.post(base_path, data);
         }
-        json import_number(const json& data) const {
+        [[nodiscard]] json import_number(const json& data) const {
             return client.post(imported_base, data);
         }
-        json list_available_countries(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list_available_countries(const std::map<std::string, std::string>& params = {}) const {
             return client.get(available_base, params);
         }
-        json search_local(const std::string& country,
+        [[nodiscard]] json search_local(const std::string& country,
                           const std::map<std::string, std::string>& params = {}) const {
             return client.get(available_base + "/" + country + "/Local", params);
         }
-        json search_toll_free(const std::string& country,
+        [[nodiscard]] json search_toll_free(const std::string& country,
                               const std::map<std::string, std::string>& params = {}) const {
             return client.get(available_base + "/" + country + "/TollFree", params);
         }
@@ -928,15 +928,15 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/laml/2010-04-01/Accounts";
         CompatAccounts(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json create(const json& data) const { return client.post(base_path, data); }
-        json get(const std::string& sid) const {
+        [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
+        [[nodiscard]] json get(const std::string& sid) const {
             return client.get(base_path + "/" + sid);
         }
         // Python: POST (Twilio-compat).
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client.post(base_path + "/" + sid, data);
         }
     };
@@ -944,7 +944,7 @@ public:
     struct CompatApplications : public CrudResource {
         CompatApplications(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
     };
@@ -952,7 +952,7 @@ public:
     struct CompatLamlBins : public CrudResource {
         CompatLamlBins(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
     };
@@ -963,59 +963,59 @@ public:
         CompatConferences(const HttpClient& c, const std::string& base)
             : client(c), base_path(base) {}
 
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& sid) const {
+        [[nodiscard]] json get(const std::string& sid) const {
             return client.get(base_path + "/" + sid);
         }
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client.post(base_path + "/" + sid, data);
         }
 
         // Participants
-        json list_participants(const std::string& conference_sid,
+        [[nodiscard]] json list_participants(const std::string& conference_sid,
                                const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + conference_sid + "/Participants", params);
         }
-        json get_participant(const std::string& conference_sid,
+        [[nodiscard]] json get_participant(const std::string& conference_sid,
                              const std::string& call_sid) const {
             return client.get(base_path + "/" + conference_sid + "/Participants/" + call_sid);
         }
-        json update_participant(const std::string& conference_sid,
+        [[nodiscard]] json update_participant(const std::string& conference_sid,
                                 const std::string& call_sid,
                                 const json& data) const {
             return client.post(base_path + "/" + conference_sid + "/Participants/" + call_sid, data);
         }
-        json remove_participant(const std::string& conference_sid,
+        [[nodiscard]] json remove_participant(const std::string& conference_sid,
                                 const std::string& call_sid) const {
             return client.del(base_path + "/" + conference_sid + "/Participants/" + call_sid);
         }
 
         // Conference recordings
-        json list_recordings(const std::string& conference_sid,
+        [[nodiscard]] json list_recordings(const std::string& conference_sid,
                              const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + conference_sid + "/Recordings", params);
         }
-        json get_recording(const std::string& conference_sid,
+        [[nodiscard]] json get_recording(const std::string& conference_sid,
                            const std::string& recording_sid) const {
             return client.get(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
         }
-        json update_recording(const std::string& conference_sid,
+        [[nodiscard]] json update_recording(const std::string& conference_sid,
                               const std::string& recording_sid,
                               const json& data) const {
             return client.post(base_path + "/" + conference_sid + "/Recordings/" + recording_sid, data);
         }
-        json delete_recording(const std::string& conference_sid,
+        [[nodiscard]] json delete_recording(const std::string& conference_sid,
                               const std::string& recording_sid) const {
             return client.del(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
         }
 
         // Conference streams
-        json start_stream(const std::string& conference_sid, const json& data) const {
+        [[nodiscard]] json start_stream(const std::string& conference_sid, const json& data) const {
             return client.post(base_path + "/" + conference_sid + "/Streams", data);
         }
-        json stop_stream(const std::string& conference_sid,
+        [[nodiscard]] json stop_stream(const std::string& conference_sid,
                          const std::string& stream_sid,
                          const json& data) const {
             return client.post(base_path + "/" + conference_sid + "/Streams/" + stream_sid, data);
@@ -1025,18 +1025,18 @@ public:
     struct CompatQueues : public CrudResource {
         CompatQueues(const HttpClient& c, const std::string& base)
             : CrudResource(c, base) {}
-        json update(const std::string& sid, const json& data) const {
+        [[nodiscard]] json update(const std::string& sid, const json& data) const {
             return client_.post(base_path_ + "/" + sid, data);
         }
-        json list_members(const std::string& queue_sid,
+        [[nodiscard]] json list_members(const std::string& queue_sid,
                           const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + queue_sid + "/Members", params);
         }
-        json get_member(const std::string& queue_sid,
+        [[nodiscard]] json get_member(const std::string& queue_sid,
                         const std::string& call_sid) const {
             return client_.get(base_path_ + "/" + queue_sid + "/Members/" + call_sid);
         }
-        json dequeue_member(const std::string& queue_sid,
+        [[nodiscard]] json dequeue_member(const std::string& queue_sid,
                             const std::string& call_sid,
                             const json& data) const {
             return client_.post(base_path_ + "/" + queue_sid + "/Members/" + call_sid, data);
@@ -1048,13 +1048,13 @@ public:
         std::string base_path;
         CompatRecordings(const HttpClient& c, const std::string& base)
             : client(c), base_path(base) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& sid) const {
+        [[nodiscard]] json get(const std::string& sid) const {
             return client.get(base_path + "/" + sid);
         }
-        json delete_(const std::string& sid) const {
+        [[nodiscard]] json delete_(const std::string& sid) const {
             return client.del(base_path + "/" + sid);
         }
     };
@@ -1064,13 +1064,13 @@ public:
         std::string base_path;
         CompatTranscriptions(const HttpClient& c, const std::string& base)
             : client(c), base_path(base) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& sid) const {
+        [[nodiscard]] json get(const std::string& sid) const {
             return client.get(base_path + "/" + sid);
         }
-        json delete_(const std::string& sid) const {
+        [[nodiscard]] json delete_(const std::string& sid) const {
             return client.del(base_path + "/" + sid);
         }
     };
@@ -1080,12 +1080,12 @@ public:
         std::string base_path;
         CompatTokens(const HttpClient& c, const std::string& base)
             : client(c), base_path(base) {}
-        json create(const json& data) const { return client.post(base_path, data); }
+        [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
         // Python parity: PATCH for update (BaseResource default).
-        json update(const std::string& token_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& token_id, const json& data) const {
             return client.patch(base_path + "/" + token_id, data);
         }
-        json delete_(const std::string& token_id) const {
+        [[nodiscard]] json delete_(const std::string& token_id) const {
             return client.del(base_path + "/" + token_id);
         }
     };
@@ -1128,10 +1128,10 @@ public:
         // (the existing rest_compat_laml.cpp example references these).
         // The paths are intentionally not project-scoped to avoid changing
         // the wire contract any callers may rely on.
-        json create_call(const json& data) const { return client.post("/api/laml/2010-04-01/Accounts/calls", data); }
-        json send_message(const json& data) const { return client.post("/api/laml/2010-04-01/Accounts/messages", data); }
-        json list_calls(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/laml/2010-04-01/Accounts/calls", p); }
-        json list_messages(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/laml/2010-04-01/Accounts/messages", p); }
+        [[nodiscard]] json create_call(const json& data) const { return client.post("/api/laml/2010-04-01/Accounts/calls", data); }
+        [[nodiscard]] json send_message(const json& data) const { return client.post("/api/laml/2010-04-01/Accounts/messages", data); }
+        [[nodiscard]] json list_calls(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/laml/2010-04-01/Accounts/calls", p); }
+        [[nodiscard]] json list_messages(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/laml/2010-04-01/Accounts/messages", p); }
     };
 
     // ---------------------------------------------------------------------
@@ -1145,23 +1145,23 @@ public:
     struct AddressesNamespace : public CrudResource {
         AddressesNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/addresses") {}
         // Python-parity ``delete`` alias (CrudResource exposes ``del``).
-        json delete_(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
+        [[nodiscard]] json delete_(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
     };
 
     struct QueuesNamespace : public CrudResource {
         QueuesNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/queues") {}
         // Override update -- Python uses PUT, not PATCH (the CrudResource default).
-        json update(const std::string& id, const json& data) const {
+        [[nodiscard]] json update(const std::string& id, const json& data) const {
             return client_.put(base_path_ + "/" + id, data);
         }
-        json list_members(const std::string& queue_id,
+        [[nodiscard]] json list_members(const std::string& queue_id,
                           const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + queue_id + "/members", params);
         }
-        json get_next_member(const std::string& queue_id) const {
+        [[nodiscard]] json get_next_member(const std::string& queue_id) const {
             return client_.get(base_path_ + "/" + queue_id + "/members/next");
         }
-        json get_member(const std::string& queue_id, const std::string& member_id) const {
+        [[nodiscard]] json get_member(const std::string& queue_id, const std::string& member_id) const {
             return client_.get(base_path_ + "/" + queue_id + "/members/" + member_id);
         }
     };
@@ -1169,27 +1169,27 @@ public:
     struct RecordingsNamespace : public CrudResource {
         RecordingsNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/recordings") {}
         // Python ``delete`` alias.
-        json delete_(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
+        [[nodiscard]] json delete_(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
     };
 
     struct NumberGroupsNamespace : public CrudResource {
         NumberGroupsNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/number_groups") {}
         // Python NumberGroups uses PUT for update (overrides default PATCH).
-        json update(const std::string& id, const json& data) const {
+        [[nodiscard]] json update(const std::string& id, const json& data) const {
             return client_.put(base_path_ + "/" + id, data);
         }
         // Membership operations.
-        json list_memberships(const std::string& group_id,
+        [[nodiscard]] json list_memberships(const std::string& group_id,
                               const std::map<std::string, std::string>& params = {}) const {
             return client_.get(base_path_ + "/" + group_id + "/number_group_memberships", params);
         }
-        json add_membership(const std::string& group_id, const json& data) const {
+        [[nodiscard]] json add_membership(const std::string& group_id, const json& data) const {
             return client_.post(base_path_ + "/" + group_id + "/number_group_memberships", data);
         }
-        json get_membership(const std::string& membership_id) const {
+        [[nodiscard]] json get_membership(const std::string& membership_id) const {
             return client_.get("/api/relay/rest/number_group_memberships/" + membership_id);
         }
-        json delete_membership(const std::string& membership_id) const {
+        [[nodiscard]] json delete_membership(const std::string& membership_id) const {
             return client_.del("/api/relay/rest/number_group_memberships/" + membership_id);
         }
     };
@@ -1202,20 +1202,20 @@ public:
     // ``update`` directly on the namespace (PUT for update -- Python parity).
     struct SipProfileNamespace : public CrudResource {
         SipProfileNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/sip_profile") {}
-        json get() const { return client_.get(base_path_); }
-        json update(const json& data) const { return client_.put(base_path_, data); }
+        [[nodiscard]] json get() const { return client_.get(base_path_); }
+        [[nodiscard]] json update(const json& data) const { return client_.put(base_path_, data); }
     };
 
     struct LookupNamespace {
         const HttpClient& client;
         LookupNamespace(const HttpClient& c) : client(c) {}
-        json lookup(const std::string& number) const { return client.get("/api/relay/rest/lookup/" + number); }
+        [[nodiscard]] json lookup(const std::string& number) const { return client.get("/api/relay/rest/lookup/" + number); }
     };
 
     struct ShortCodesNamespace : public CrudResource {
         ShortCodesNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/short_codes") {}
         // Python ShortCodes.update uses PUT explicitly.
-        json update(const std::string& id, const json& data) const {
+        [[nodiscard]] json update(const std::string& id, const json& data) const {
             return client_.put(base_path_ + "/" + id, data);
         }
     };
@@ -1228,7 +1228,7 @@ public:
     struct ImportedNumbersNamespace : public CrudResource {
         ImportedNumbersNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/imported_numbers") {}
         // Python parity: POST /api/relay/rest/imported_phone_numbers.
-        json create(const json& data) const {
+        [[nodiscard]] json create(const json& data) const {
             return client_.post("/api/relay/rest/imported_phone_numbers", data);
         }
     };
@@ -1237,14 +1237,14 @@ public:
         const HttpClient& client;
         MFANamespace(const HttpClient& c) : client(c) {}
         // Python parity:
-        json sms(const json& data) const { return client.post("/api/relay/rest/mfa/sms", data); }
-        json call(const json& data) const { return client.post("/api/relay/rest/mfa/call", data); }
-        json verify(const std::string& request_id, const json& data) const {
+        [[nodiscard]] json sms(const json& data) const { return client.post("/api/relay/rest/mfa/sms", data); }
+        [[nodiscard]] json call(const json& data) const { return client.post("/api/relay/rest/mfa/call", data); }
+        [[nodiscard]] json verify(const std::string& request_id, const json& data) const {
             return client.post("/api/relay/rest/mfa/" + request_id + "/verify", data);
         }
         // Legacy convenience accessors.
-        json request_code(const json& data) const { return client.post("/api/mfa/request", data); }
-        json verify_code(const json& data) const { return client.post("/api/mfa/verify", data); }
+        [[nodiscard]] json request_code(const json& data) const { return client.post("/api/mfa/request", data); }
+        [[nodiscard]] json verify_code(const json& data) const { return client.post("/api/mfa/verify", data); }
     };
 
     // ---------------------------------------------------------------------
@@ -1255,18 +1255,18 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/relay/rest/registry/beta/brands";
         RegistryBrands(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json create(const json& data) const { return client.post(base_path, data); }
-        json get(const std::string& brand_id) const {
+        [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
+        [[nodiscard]] json get(const std::string& brand_id) const {
             return client.get(base_path + "/" + brand_id);
         }
-        json list_campaigns(const std::string& brand_id,
+        [[nodiscard]] json list_campaigns(const std::string& brand_id,
                             const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + brand_id + "/campaigns", params);
         }
-        json create_campaign(const std::string& brand_id, const json& data) const {
+        [[nodiscard]] json create_campaign(const std::string& brand_id, const json& data) const {
             return client.post(base_path + "/" + brand_id + "/campaigns", data);
         }
     };
@@ -1275,22 +1275,22 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/relay/rest/registry/beta/campaigns";
         RegistryCampaigns(const HttpClient& c) : client(c) {}
-        json get(const std::string& campaign_id) const {
+        [[nodiscard]] json get(const std::string& campaign_id) const {
             return client.get(base_path + "/" + campaign_id);
         }
         // Python parity: PUT (CrudResource default would be PATCH).
-        json update(const std::string& campaign_id, const json& data) const {
+        [[nodiscard]] json update(const std::string& campaign_id, const json& data) const {
             return client.put(base_path + "/" + campaign_id, data);
         }
-        json list_numbers(const std::string& campaign_id,
+        [[nodiscard]] json list_numbers(const std::string& campaign_id,
                           const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + campaign_id + "/numbers", params);
         }
-        json list_orders(const std::string& campaign_id,
+        [[nodiscard]] json list_orders(const std::string& campaign_id,
                          const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + campaign_id + "/orders", params);
         }
-        json create_order(const std::string& campaign_id, const json& data) const {
+        [[nodiscard]] json create_order(const std::string& campaign_id, const json& data) const {
             return client.post(base_path + "/" + campaign_id + "/orders", data);
         }
     };
@@ -1299,7 +1299,7 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/relay/rest/registry/beta/orders";
         RegistryOrders(const HttpClient& c) : client(c) {}
-        json get(const std::string& order_id) const {
+        [[nodiscard]] json get(const std::string& order_id) const {
             return client.get(base_path + "/" + order_id);
         }
     };
@@ -1308,7 +1308,7 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/relay/rest/registry/beta/numbers";
         RegistryNumbers(const HttpClient& c) : client(c) {}
-        json delete_(const std::string& number_id) const {
+        [[nodiscard]] json delete_(const std::string& number_id) const {
             return client.del(base_path + "/" + number_id);
         }
     };
@@ -1334,10 +1334,10 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/messaging/logs";
         LogsMessages(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& log_id) const {
+        [[nodiscard]] json get(const std::string& log_id) const {
             return client.get(base_path + "/" + log_id);
         }
     };
@@ -1346,13 +1346,13 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/voice/logs";
         LogsVoice(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& log_id) const {
+        [[nodiscard]] json get(const std::string& log_id) const {
             return client.get(base_path + "/" + log_id);
         }
-        json list_events(const std::string& log_id,
+        [[nodiscard]] json list_events(const std::string& log_id,
                          const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path + "/" + log_id + "/events", params);
         }
@@ -1362,10 +1362,10 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/fax/logs";
         LogsFax(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
-        json get(const std::string& log_id) const {
+        [[nodiscard]] json get(const std::string& log_id) const {
             return client.get(base_path + "/" + log_id);
         }
     };
@@ -1374,7 +1374,7 @@ public:
         const HttpClient& client;
         std::string base_path = "/api/logs/conferences";
         LogsConferences(const HttpClient& c) : client(c) {}
-        json list(const std::map<std::string, std::string>& params = {}) const {
+        [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
             return client.get(base_path, params);
         }
     };
@@ -1393,11 +1393,11 @@ public:
         const HttpClient& client;
         const std::string base_path = "/api/project/tokens";
         ProjectTokens(const HttpClient& c) : client(c) {}
-        json create(const json& data) const { return client.post(base_path, data); }
-        json update(const std::string& token_id, const json& data) const {
+        [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
+        [[nodiscard]] json update(const std::string& token_id, const json& data) const {
             return client.patch(base_path + "/" + token_id, data);
         }
-        json delete_(const std::string& token_id) const {
+        [[nodiscard]] json delete_(const std::string& token_id) const {
             return client.del(base_path + "/" + token_id);
         }
     };
@@ -1408,21 +1408,21 @@ public:
         ProjectNamespace(const HttpClient& c) : client(c), tokens(c) {}
         // Legacy direct accessors -- these don't have Python equivalents
         // and remain for backwards compatibility with existing tests.
-        json get_project() const { return client.get("/api/relay/rest/project"); }
-        json update_project(const json& data) const { return client.put("/api/relay/rest/project", data); }
+        [[nodiscard]] json get_project() const { return client.get("/api/relay/rest/project"); }
+        [[nodiscard]] json update_project(const json& data) const { return client.put("/api/relay/rest/project", data); }
     };
 
     struct PubSubNamespace {
         const HttpClient& client;
         PubSubNamespace(const HttpClient& c) : client(c) {}
-        json publish(const json& data) const { return client.post("/api/pubsub/publish", data); }
+        [[nodiscard]] json publish(const json& data) const { return client.post("/api/pubsub/publish", data); }
     };
 
     struct ChatNamespace {
         const HttpClient& client;
         ChatNamespace(const HttpClient& c) : client(c) {}
-        json send_message(const json& data) const { return client.post("/api/chat/messages", data); }
-        json list_messages(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/chat/messages", p); }
+        [[nodiscard]] json send_message(const json& data) const { return client.post("/api/chat/messages", data); }
+        [[nodiscard]] json list_messages(const std::map<std::string, std::string>& p = {}) const { return client.get("/api/chat/messages", p); }
     };
 
     // ========================================================================

@@ -121,7 +121,7 @@ TEST(rest_from_env_missing_vars) {
     // Should throw when env vars are missing
     bool threw = false;
     try {
-        RestClient::from_env();
+        (void)RestClient::from_env();
     } catch (const std::runtime_error&) {
         threw = true;
     }

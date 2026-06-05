@@ -17,7 +17,7 @@ namespace utils {
  *
  * @return `true` unless the detected mode is `"server"`.
  */
-bool is_serverless_mode();
+[[nodiscard]] bool is_serverless_mode();
 
 }  // namespace utils
 }  // namespace signalwire

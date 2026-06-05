@@ -30,7 +30,7 @@ struct Message {
     ~Message() = default;
 
     /// Parse from a RELAY event params object
-    static Message from_params(const json& params);
+    [[nodiscard]] static Message from_params(const json& params);
 
     // Identity / outbound metadata. These are write-once-by-construction so
     // sharing across copies isn't required for these fields.
@@ -50,12 +50,12 @@ struct Message {
     void set_state(const std::string& s);
     void set_reason(const std::string& r);
 
-    bool is_delivered() const { return state() == "delivered"; }
-    bool is_failed() const {
+    [[nodiscard]] bool is_delivered() const { return state() == "delivered"; }
+    [[nodiscard]] bool is_failed() const {
         const std::string& s = state();
         return s == "failed" || s == "undelivered";
     }
-    bool is_terminal() const { return is_delivered() || is_failed(); }
+    [[nodiscard]] bool is_terminal() const { return is_delivered() || is_failed(); }
 
     /// Update state from a messaging.state event. Notifies waiters /
     /// callbacks when the state is terminal.
@@ -63,7 +63,9 @@ struct Message {
 
     /// Block until message reaches a terminal state. Returns true if
     /// terminal, false on timeout.
-    bool wait(int timeout_ms = 0);
+    /// [[nodiscard]]: the delivered-vs-timed-out result is the reason you
+    /// called wait() — dropping it is a bug.
+    [[nodiscard]] bool wait(int timeout_ms = 0);
 
     /// Set callback for when message reaches terminal state. If the
     /// message is already terminal the callback fires immediately.

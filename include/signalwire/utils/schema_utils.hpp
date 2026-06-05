@@ -38,8 +38,8 @@ public:
           verb_name_(std::move(verb_name)),
           errors_(std::move(errors)) {}
 
-    const std::string& verb_name() const { return verb_name_; }
-    const std::vector<std::string>& errors() const { return errors_; }
+    [[nodiscard]] const std::string& verb_name() const { return verb_name_; }
+    [[nodiscard]] const std::vector<std::string>& errors() const { return errors_; }
 
 private:
     static std::string build_message(const std::string& vn,
@@ -66,47 +66,47 @@ public:
 
     /// Whether full JSON Schema validation is wired up.
     /// Mirrors Python's full_validation_available property.
-    bool full_validation_available() const;
+    [[nodiscard]] bool full_validation_available() const;
 
     /// Read and parse the JSON Schema. Mirrors Python's load_schema().
-    json load_schema();
+    [[nodiscard]] json load_schema();
 
     /// Sorted list of all known verb names.
     /// Mirrors Python's get_all_verb_names().
-    std::vector<std::string> get_all_verb_names() const;
+    [[nodiscard]] std::vector<std::string> get_all_verb_names() const;
 
     /// The properties[verb_name] block for a verb, or empty when
     /// unknown. Mirrors Python's get_verb_properties(verb_name).
-    json get_verb_properties(const std::string& verb_name) const;
+    [[nodiscard]] json get_verb_properties(const std::string& verb_name) const;
 
     /// The required list for a verb, or empty when unknown / not
     /// specified. Mirrors Python's get_verb_required_properties(verb_name).
-    std::vector<std::string> get_verb_required_properties(const std::string& verb_name) const;
+    [[nodiscard]] std::vector<std::string> get_verb_required_properties(const std::string& verb_name) const;
 
     /// Parameter-definition block used by code-gen tooling.
     /// Mirrors Python's get_verb_parameters(verb_name).
-    json get_verb_parameters(const std::string& verb_name) const;
+    [[nodiscard]] json get_verb_parameters(const std::string& verb_name) const;
 
     /// Validate a verb config against the schema.
     /// Mirrors Python's validate_verb(verb_name, verb_config).
     /// Returns (valid, errors) — Python's Tuple[bool, List[str]].
-    std::pair<bool, std::vector<std::string>>
+    [[nodiscard]] std::pair<bool, std::vector<std::string>>
     validate_verb(const std::string& verb_name, const json& verb_config) const;
 
     /// Validate a complete SWML document.
     /// Mirrors Python's validate_document(document). Returns
     /// (false, ["Schema validator not initialized"]) when no full
     /// validator is wired in.
-    std::pair<bool, std::vector<std::string>>
+    [[nodiscard]] std::pair<bool, std::vector<std::string>>
     validate_document(const json& document) const;
 
     /// Generate a Python-style method signature string for a verb.
     /// Mirrors Python's generate_method_signature(verb_name).
-    std::string generate_method_signature(const std::string& verb_name) const;
+    [[nodiscard]] std::string generate_method_signature(const std::string& verb_name) const;
 
     /// Generate a Python-style method body string for a verb.
     /// Mirrors Python's generate_method_body(verb_name).
-    std::string generate_method_body(const std::string& verb_name) const;
+    [[nodiscard]] std::string generate_method_body(const std::string& verb_name) const;
 
 private:
     void extract_verbs();

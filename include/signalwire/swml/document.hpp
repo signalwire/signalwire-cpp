@@ -19,7 +19,7 @@ struct Verb {
     Verb() = default;
     Verb(std::string n, json p) : name(std::move(n)), params(std::move(p)) {}
 
-    json to_json() const {
+    [[nodiscard]] json to_json() const {
         return json::object({{name, params}});
     }
 };
@@ -40,7 +40,7 @@ struct Section {
         verbs.emplace_back(verb_name, params);
     }
 
-    json to_json() const {
+    [[nodiscard]] json to_json() const {
         json arr = json::array();
         for (const auto& v : verbs) {
             arr.push_back(v.to_json());
@@ -92,12 +92,12 @@ public:
     }
 
     /// Check if a section exists
-    bool has_section(const std::string& name) const {
+    [[nodiscard]] bool has_section(const std::string& name) const {
         return sections_.find(name) != sections_.end();
     }
 
     /// Render to JSON
-    json to_json() const {
+    [[nodiscard]] json to_json() const {
         json doc;
         doc["version"] = version_;
 
@@ -121,7 +121,7 @@ public:
     }
 
     /// Render to JSON string
-    std::string to_string(int indent = -1) const {
+    [[nodiscard]] std::string to_string(int indent = -1) const {
         return to_json().dump(indent);
     }
 

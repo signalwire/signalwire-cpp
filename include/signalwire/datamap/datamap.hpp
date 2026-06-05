@@ -99,7 +99,10 @@ public:
     DataMap& global_error_keys(const std::vector<std::string>& keys);
 
     /// Convert to a SWAIG function definition JSON
-    json to_swaig_function() const;
+    /// [[nodiscard]]: the built tool definition is the output of the builder;
+    /// dropping it discards the whole DataMap. (The fluent DataMap& setters
+    /// above are intentionally NOT nodiscard.)
+    [[nodiscard]] json to_swaig_function() const;
 
 private:
     std::string function_name_;

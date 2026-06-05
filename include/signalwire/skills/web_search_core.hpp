@@ -70,7 +70,7 @@ struct LatencyParams {
 
 /// Parse a Google CSE `{ "items": [ {title, link, snippet}, ... ] }` body into
 /// candidate hits. Unknown / missing fields default to empty strings.
-inline std::vector<Candidate> parse_cse_items(const json& parsed) {
+[[nodiscard]] inline std::vector<Candidate> parse_cse_items(const json& parsed) {
     std::vector<Candidate> out;
     if (parsed.contains("items") && parsed["items"].is_array()) {
         for (const auto& it : parsed["items"]) {
@@ -88,7 +88,7 @@ inline std::vector<Candidate> parse_cse_items(const json& parsed) {
 /// the `snippets_only` fast path AND as the graceful fallback when scraping is
 /// abandoned by the overall_deadline. Always non-empty when there is at least
 /// one candidate. Mirrors Python's `_format_snippet_results`.
-inline std::string format_snippet_results(const std::string& query,
+[[nodiscard]] inline std::string format_snippet_results(const std::string& query,
                                           const std::vector<Candidate>& cands,
                                           int num_results) {
     std::size_t top = static_cast<std::size_t>(num_results < 1 ? 1 : num_results);
@@ -119,7 +119,7 @@ inline std::string format_snippet_results(const std::string& query,
 /// fetched within budget. Keeps the historical "Web search results for '<q>'"
 /// header shape so existing parse-assertions still see it, but enriches each
 /// entry with the fetched page content (truncated to `per_result_limit`).
-inline std::string format_scraped_results(const std::string& query,
+[[nodiscard]] inline std::string format_scraped_results(const std::string& query,
                                            const std::vector<Candidate>& scraped,
                                            std::size_t total_candidates,
                                            std::size_t per_result_limit) {
@@ -150,7 +150,7 @@ inline std::string format_scraped_results(const std::string& query,
 /// with a non-empty body is a usable scrape; everything else (transport error,
 /// non-2xx, empty body) yields an unscraped candidate. The per_page_timeout is
 /// converted to milliseconds so a sub-second budget is honored exactly.
-inline Candidate scrape_one(const Candidate& in, double per_page_timeout) {
+[[nodiscard]] inline Candidate scrape_one(const Candidate& in, double per_page_timeout) {
     Candidate c = in;
     if (c.link.empty()) return c;
     long timeout_ms = static_cast<long>(per_page_timeout * 1000.0);
@@ -183,7 +183,7 @@ inline Candidate scrape_one(const Candidate& in, double per_page_timeout) {
 ///
 /// Sequential mode: scrape one link at a time, breaking out the instant the
 /// deadline has passed.
-inline std::vector<Candidate> scrape_candidates(const std::vector<Candidate>& cands,
+[[nodiscard]] inline std::vector<Candidate> scrape_candidates(const std::vector<Candidate>& cands,
                                                 const LatencyParams& lp,
                                                 steady_clock::time_point deadline_at) {
     std::vector<Candidate> scraped;
@@ -251,7 +251,7 @@ inline std::vector<Candidate> scrape_candidates(const std::vector<Candidate>& ca
 ///   2. scrape under deadline.
 ///   3. no scraped survivors -> snippet fallback (non-empty).
 ///   4. else                 -> format scraped results.
-inline std::string run(const std::string& query,
+[[nodiscard]] inline std::string run(const std::string& query,
                        std::vector<Candidate> candidates,
                        const LatencyParams& lp,
                        int num_results,
@@ -299,7 +299,7 @@ inline std::string run(const std::string& query,
 /// Build the parameter-schema fragment advertising the 6 latency / response
 /// params. Merged into each skill's get_parameter_schema(). Mirrors Python's
 /// get_parameter_schema entries (295745b) and the Go reference port.
-inline json schema_fragment() {
+[[nodiscard]] inline json schema_fragment() {
     return json::object({
         {"response_prefix", json::object({
             {"type", "string"},

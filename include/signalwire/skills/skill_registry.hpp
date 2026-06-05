@@ -17,7 +17,7 @@ namespace skills {
 /// Global registry of skill factories
 class SkillRegistry {
 public:
-    static SkillRegistry& instance() {
+    [[nodiscard]] static SkillRegistry& instance() {
         static SkillRegistry registry;
         return registry;
     }
@@ -29,7 +29,7 @@ public:
     }
 
     /// Create a skill instance by name
-    std::unique_ptr<SkillBase> create(const std::string& name) const {
+    [[nodiscard]] std::unique_ptr<SkillBase> create(const std::string& name) const {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = factories_.find(name);
         if (it != factories_.end()) {
@@ -39,13 +39,13 @@ public:
     }
 
     /// Check if a skill is registered
-    bool has_skill(const std::string& name) const {
+    [[nodiscard]] bool has_skill(const std::string& name) const {
         std::lock_guard<std::mutex> lock(mutex_);
         return factories_.find(name) != factories_.end();
     }
 
     /// List all registered skill names
-    std::vector<std::string> list_skills() const {
+    [[nodiscard]] std::vector<std::string> list_skills() const {
         std::lock_guard<std::mutex> lock(mutex_);
         std::vector<std::string> names;
         for (const auto& [k, v] : factories_) {
@@ -81,7 +81,7 @@ public:
     /// Mirrors Python's ``SkillRegistry._external_paths`` (private list,
     /// exposed here as a public accessor for parity-test inspection — C++
     /// has no convention for protected attributes that tests can poke).
-    std::vector<std::string> external_paths() const {
+    [[nodiscard]] std::vector<std::string> external_paths() const {
         std::lock_guard<std::mutex> lock(mutex_);
         return external_paths_;
     }

@@ -20,7 +20,8 @@ struct ToolDefinition {
     bool secure = false;
 
     /// Render to the SWAIG function JSON format (for inclusion in SWML)
-    json to_swaig_json(const std::string& web_hook_url = "") const {
+    /// [[nodiscard]]: the rendered JSON is the output; discarding it is a bug.
+    [[nodiscard]] json to_swaig_json(const std::string& web_hook_url = "") const {
         json func;
         func["function"] = name;
         func["description"] = description;

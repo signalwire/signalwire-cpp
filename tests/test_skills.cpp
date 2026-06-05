@@ -251,8 +251,8 @@ TEST(skill_manager_load) {
 TEST(skill_manager_list_loaded) {
     sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    mgr.load_skill("datetime", json::object(), agent);
-    mgr.load_skill("math", json::object(), agent);
+    (void)mgr.load_skill("datetime", json::object(), agent);
+    (void)mgr.load_skill("math", json::object(), agent);
     auto loaded = mgr.list_loaded();
     ASSERT_EQ(loaded.size(), 2u);
     return true;
@@ -261,7 +261,7 @@ TEST(skill_manager_list_loaded) {
 TEST(skill_manager_unload) {
     sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    mgr.load_skill("datetime", json::object(), agent);
+    (void)mgr.load_skill("datetime", json::object(), agent);
     mgr.unload_skill("datetime");
     ASSERT_FALSE(mgr.is_loaded("datetime"));
     return true;
@@ -278,7 +278,7 @@ TEST(skill_manager_unknown_skill) {
 TEST(skill_manager_no_duplicate_single_instance) {
     sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    mgr.load_skill("datetime", json::object(), agent);
+    (void)mgr.load_skill("datetime", json::object(), agent);
     bool second = mgr.load_skill("datetime", json::object(), agent);
     ASSERT_FALSE(second);
     return true;

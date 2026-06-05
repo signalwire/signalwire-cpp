@@ -25,7 +25,7 @@ struct RelayEvent {
 
     /// Parse from a signalwire.event params JSON.
     /// The outer params contains event_type and the inner params with event-specific data.
-    static RelayEvent from_json(const json& j) {
+    [[nodiscard]] static RelayEvent from_json(const json& j) {
         RelayEvent ev;
         ev.event_type = j.value("event_type", "");
         ev.params = j.value("params", json::object());
@@ -42,7 +42,7 @@ struct CallEvent : public RelayEvent {
     std::optional<std::string> peer_call_id;
     std::string tag;
 
-    static CallEvent from_relay_event(const RelayEvent& ev) {
+    [[nodiscard]] static CallEvent from_relay_event(const RelayEvent& ev) {
         CallEvent ce;
         ce.event_type = ev.event_type;
         ce.params = ev.params;
@@ -68,7 +68,7 @@ struct ComponentEvent : public RelayEvent {
     std::string control_id;
     std::string state;
 
-    static ComponentEvent from_relay_event(const RelayEvent& ev) {
+    [[nodiscard]] static ComponentEvent from_relay_event(const RelayEvent& ev) {
         ComponentEvent ce;
         ce.event_type = ev.event_type;
         ce.params = ev.params;
@@ -89,7 +89,7 @@ struct MessageEvent : public RelayEvent {
     std::string to;
     std::string body;
 
-    static MessageEvent from_relay_event(const RelayEvent& ev) {
+    [[nodiscard]] static MessageEvent from_relay_event(const RelayEvent& ev) {
         MessageEvent me;
         me.event_type = ev.event_type;
         me.params = ev.params;
@@ -110,7 +110,7 @@ struct DialEvent : public RelayEvent {
     std::string dial_state;
     json call_info;
 
-    static DialEvent from_relay_event(const RelayEvent& ev) {
+    [[nodiscard]] static DialEvent from_relay_event(const RelayEvent& ev) {
         DialEvent de;
         de.event_type = ev.event_type;
         de.params = ev.params;

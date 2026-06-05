@@ -54,7 +54,7 @@ struct LanguageConfig {
     /// object.
     json params;
 
-    json to_json() const {
+    [[nodiscard]] json to_json() const {
         json j;
         j["name"] = name;
         j["code"] = code;
@@ -77,7 +77,7 @@ struct Pronunciation {
     std::string with_val;
     bool ignore_case = false;
 
-    json to_json() const {
+    [[nodiscard]] json to_json() const {
         json j;
         j["replace"] = replace_val;
         j["with"] = with_val;
@@ -150,8 +150,8 @@ public:
     AgentBase& prompt_add_to_section(const std::string& title,
                                       const std::string& body = "",
                                       const std::vector<std::string>& bullets = {});
-    bool prompt_has_section(const std::string& title) const;
-    std::string get_prompt() const;
+    [[nodiscard]] bool prompt_has_section(const std::string& title) const;
+    [[nodiscard]] std::string get_prompt() const;
     AgentBase& set_use_pom(bool use_pom);
 
     /// Read-only snapshot of the agent's POM as a ``PromptObjectModel``.
@@ -162,7 +162,7 @@ public:
     /// freshly built ``signalwire::pom::PromptObjectModel`` whose
     /// sections are deep-copied from the agent's internal section/
     /// subsection structures so callers cannot mutate them in-place.
-    std::optional<signalwire::pom::PromptObjectModel> pom() const;
+    [[nodiscard]] std::optional<signalwire::pom::PromptObjectModel> pom() const;
 
     /// Returns the post-prompt text whatever ``set_post_prompt`` stored, or
     /// ``std::nullopt`` when no post-prompt has been set.
@@ -170,7 +170,7 @@ public:
     /// Mirrors Python's ``PromptManager.get_post_prompt`` /
     /// ``PromptMixin.get_post_prompt`` — used by SWML rendering when a
     /// post-prompt is configured.
-    std::optional<std::string> get_post_prompt() const;
+    [[nodiscard]] std::optional<std::string> get_post_prompt() const;
 
     /// Returns the raw prompt text whatever ``set_prompt_text`` stored, or
     /// ``std::nullopt`` when no raw prompt has been set. Distinct from
@@ -178,7 +178,7 @@ public:
     /// true.
     ///
     /// Mirrors Python's ``PromptManager.get_raw_prompt``.
-    std::optional<std::string> get_raw_prompt() const;
+    [[nodiscard]] std::optional<std::string> get_raw_prompt() const;
 
     /// Sets the prompt as a list of POM section JSON objects. Each
     /// section supports keys "title", "body", "bullets", "numbered",
@@ -193,7 +193,7 @@ public:
     ///
     /// Mirrors Python's ``PromptManager.get_contexts`` which returns the
     /// contexts dict or ``None``.
-    std::optional<json> get_contexts() const;
+    [[nodiscard]] std::optional<json> get_contexts() const;
 
     // ========================================================================
     // Tool Methods
@@ -260,10 +260,10 @@ public:
                             const json& parameters, swaig::ToolHandler handler,
                             bool secure = false);
     AgentBase& register_swaig_function(const json& func_def);
-    swaig::FunctionResult on_function_call(const std::string& name,
+    [[nodiscard]] swaig::FunctionResult on_function_call(const std::string& name,
                                             const json& args,
                                             const json& raw_data) override;
-    std::vector<std::string> list_tools() const;
+    [[nodiscard]] std::vector<std::string> list_tools() const;
 
     /// Mint a per-call SWAIG-function token via the agent's SessionManager.
     ///
@@ -271,7 +271,7 @@ public:
     /// delegates to ``SessionManager::create_token`` and returns an empty
     /// string on any thrown exception (Python catches all exceptions and
     /// returns "" on error).
-    std::string create_tool_token(const std::string& tool_name,
+    [[nodiscard]] std::string create_tool_token(const std::string& tool_name,
                                    const std::string& call_id) const;
 
     /// Validate a per-call SWAIG-function token. Returns ``false`` when
@@ -280,7 +280,7 @@ public:
     ///
     /// Python parity: ``state_mixin.StateMixin.validate_tool_token`` —
     /// rejects unknown function names up-front and swallows exceptions.
-    bool validate_tool_token(const std::string& function_name,
+    [[nodiscard]] bool validate_tool_token(const std::string& function_name,
                               const std::string& token,
                               const std::string& call_id) const;
 
@@ -310,7 +310,7 @@ public:
     /// path, mirroring Python's ``None`` return.
     ///
     /// Python parity: ``AIConfigMixin.get_language_params`` (029ca6f).
-    std::optional<json> get_language_params(const std::string& code) const;
+    [[nodiscard]] std::optional<json> get_language_params(const std::string& code) const;
     AgentBase& add_pronunciation(const std::string& replace_val,
                                   const std::string& with_val,
                                   bool ignore_case = false);
@@ -328,7 +328,7 @@ public:
     ///
     /// Notable absences: change_step, gather_submit, and arbitrary
     /// user-defined SWAIG function names are NOT supported.
-    static const std::set<std::string>& supported_internal_filler_names();
+    [[nodiscard]] static const std::set<std::string>& supported_internal_filler_names();
 
     /// Set internal fillers for native SWAIG functions.
     ///
@@ -390,7 +390,7 @@ public:
 
     contexts::ContextBuilder& define_contexts();
     contexts::Context& add_context(const std::string& name);
-    bool has_contexts() const;
+    [[nodiscard]] bool has_contexts() const;
 
     /// Remove all contexts, returning the agent to a no-contexts state.
     /// Convenience wrapper around define_contexts().reset().
@@ -402,8 +402,8 @@ public:
 
     AgentBase& add_skill(const std::string& skill_name, const json& params = json::object());
     AgentBase& remove_skill(const std::string& skill_name);
-    bool has_skill(const std::string& skill_name) const;
-    std::vector<std::string> list_skills() const;
+    [[nodiscard]] bool has_skill(const std::string& skill_name) const;
+    [[nodiscard]] std::vector<std::string> list_skills() const;
 
     // Typed-enum overloads for the built-in skill closed set. They delegate
     // to the string overloads above via skills::skill_name_value(), so the
@@ -413,7 +413,7 @@ public:
     // are an idiomatic C++ addition (see PORT_ADDITIONS.md).
     AgentBase& add_skill(skills::SkillName skill_name, const json& params = json::object());
     AgentBase& remove_skill(skills::SkillName skill_name);
-    bool has_skill(skills::SkillName skill_name) const;
+    [[nodiscard]] bool has_skill(skills::SkillName skill_name) const;
 
     // ========================================================================
     // MCP Integration
@@ -424,10 +424,10 @@ public:
                                bool resources = false,
                                const std::map<std::string, std::string>& resource_vars = {});
     AgentBase& enable_mcp_server(bool enable = true);
-    bool is_mcp_server_enabled() const { return mcp_server_enabled_; }
-    const std::vector<json>& mcp_servers() const { return mcp_servers_; }
-    std::vector<json> build_mcp_tool_list() const;
-    json handle_mcp_request(const json& body);
+    [[nodiscard]] bool is_mcp_server_enabled() const { return mcp_server_enabled_; }
+    [[nodiscard]] const std::vector<json>& mcp_servers() const { return mcp_servers_; }
+    [[nodiscard]] std::vector<json> build_mcp_tool_list() const;
+    [[nodiscard]] json handle_mcp_request(const json& body);
 
     // ========================================================================
     // Web / Config Methods
@@ -478,7 +478,7 @@ public:
     /// Read the resolved signing key (constructor / set_signing_key /
     /// SIGNALWIRE_SIGNING_KEY env), or std::nullopt when unset.
     /// The returned value is the secret — never log it.
-    std::optional<std::string> signing_key() const;
+    [[nodiscard]] std::optional<std::string> signing_key() const;
 
     /// If true, ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` are honored
     /// by the webhook middleware when reconstructing the URL. Default
@@ -497,8 +497,8 @@ public:
     // SWML Rendering
     // ========================================================================
 
-    json render_swml() const;
-    json render_swml_for_request(const std::map<std::string, std::string>& query_params,
+    [[nodiscard]] json render_swml() const;
+    [[nodiscard]] json render_swml_for_request(const std::map<std::string, std::string>& query_params,
                                   const json& body_params,
                                   const std::map<std::string, std::string>& headers) const;
 
@@ -515,22 +515,22 @@ public:
 
 protected:
     // Clone for dynamic config
-    std::unique_ptr<AgentBase> clone() const;
+    [[nodiscard]] std::unique_ptr<AgentBase> clone() const;
 
     // Build the webhook URL for SWAIG functions
-    std::string build_webhook_url(const std::string& base_url) const;
+    [[nodiscard]] std::string build_webhook_url(const std::string& base_url) const;
 
     // Detect proxy URL from request
-    std::string detect_proxy_url(const std::map<std::string, std::string>& headers) const;
+    [[nodiscard]] std::string detect_proxy_url(const std::map<std::string, std::string>& headers) const;
 
     // Build the AI verb JSON
-    json build_ai_verb(const std::string& webhook_url) const;
+    [[nodiscard]] json build_ai_verb(const std::string& webhook_url) const;
 
     // Build SWAIG functions array
-    json build_swaig_functions(const std::string& webhook_url) const;
+    [[nodiscard]] json build_swaig_functions(const std::string& webhook_url) const;
 
     // Build the prompt
-    json build_prompt() const;
+    [[nodiscard]] json build_prompt() const;
 
     // Initialize auth
     void init_auth();
@@ -554,7 +554,7 @@ protected:
     static void add_security_headers(httplib::Response& res);
 
     // Internal SWML rendering (used by render_swml_for_request)
-    json render_swml_internal(const std::map<std::string, std::string>& headers) const;
+    [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers) const;
 
     // ========================================================================
     // State

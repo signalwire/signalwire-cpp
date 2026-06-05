@@ -12,14 +12,14 @@ TEST(schema_utils_load_embedded_ok) {
 
 TEST(schema_utils_38_verbs) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     ASSERT_EQ(schema.verb_names().size(), 38u);
     return true;
 }
 
 TEST(schema_utils_find_answer) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto* vd = schema.find_verb("answer");
     ASSERT_TRUE(vd != nullptr);
     ASSERT_EQ(vd->verb_name, "answer");
@@ -28,7 +28,7 @@ TEST(schema_utils_find_answer) {
 
 TEST(schema_utils_find_ai) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto* vd = schema.find_verb("ai");
     ASSERT_TRUE(vd != nullptr);
     ASSERT_EQ(vd->verb_name, "ai");
@@ -37,14 +37,14 @@ TEST(schema_utils_find_ai) {
 
 TEST(schema_utils_find_nonexistent) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     ASSERT_TRUE(schema.find_verb("xyz_nonexistent") == nullptr);
     return true;
 }
 
 TEST(schema_utils_verb_has_description) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     auto* vd = schema.find_verb("answer");
     ASSERT_TRUE(vd != nullptr);
     // Schema name should be CamelCase
@@ -54,7 +54,7 @@ TEST(schema_utils_verb_has_description) {
 
 TEST(schema_utils_raw_accessible) {
     Schema schema;
-    schema.load_embedded();
+    (void)schema.load_embedded();
     // raw() may be null if the implementation doesn't store the full schema
     // Just verify it's accessible without crashing
     auto& raw = schema.raw();

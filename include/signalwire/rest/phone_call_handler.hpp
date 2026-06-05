@@ -51,7 +51,7 @@ enum class PhoneCallHandler {
 };
 
 /// Serialize a ``PhoneCallHandler`` to its wire string.
-inline std::string to_wire_string(PhoneCallHandler h) {
+[[nodiscard]] inline std::string to_wire_string(PhoneCallHandler h) {
     switch (h) {
         case PhoneCallHandler::RelayScript:      return "relay_script";
         case PhoneCallHandler::LamlWebhooks:     return "laml_webhooks";

@@ -27,7 +27,7 @@ TEST(rest_mock_compat_messages_update_returns_message_resource) {
 
 TEST(rest_mock_compat_messages_update_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().messages.update("MM_U1", {{"Body", "x"}, {"Status", "canceled"}});
+    (void)client.compat().messages.update("MM_U1", {{"Body", "x"}, {"Status", "canceled"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
@@ -48,7 +48,7 @@ TEST(rest_mock_compat_messages_get_media_returns_media_resource) {
 
 TEST(rest_mock_compat_messages_get_media_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().messages.get_media("MM_X", "ME_X");
+    (void)client.compat().messages.get_media("MM_X", "ME_X");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -65,7 +65,7 @@ TEST(rest_mock_compat_messages_delete_media_no_exception) {
 
 TEST(rest_mock_compat_messages_delete_media_journal_records_delete) {
     auto client = mocktest::make_client();
-    client.compat().messages.delete_media("MM_D", "ME_D");
+    (void)client.compat().messages.delete_media("MM_D", "ME_D");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,
@@ -87,7 +87,7 @@ TEST(rest_mock_compat_faxes_update_returns_fax_resource) {
 
 TEST(rest_mock_compat_faxes_update_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().faxes.update("FX_U2", {{"Status", "canceled"}});
+    (void)client.compat().faxes.update("FX_U2", {{"Status", "canceled"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path, std::string("/api/laml/2010-04-01/Accounts/test_proj/Faxes/FX_U2"));
@@ -106,7 +106,7 @@ TEST(rest_mock_compat_faxes_list_media_returns_paginated_list) {
 
 TEST(rest_mock_compat_faxes_list_media_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().faxes.list_media("FX_LM_X");
+    (void)client.compat().faxes.list_media("FX_LM_X");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -124,7 +124,7 @@ TEST(rest_mock_compat_faxes_get_media_returns_fax_media_resource) {
 
 TEST(rest_mock_compat_faxes_get_media_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().faxes.get_media("FX_G", "ME_G");
+    (void)client.compat().faxes.get_media("FX_G", "ME_G");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
@@ -141,7 +141,7 @@ TEST(rest_mock_compat_faxes_delete_media_no_exception) {
 
 TEST(rest_mock_compat_faxes_delete_media_journal_records_delete) {
     auto client = mocktest::make_client();
-    client.compat().faxes.delete_media("FX_D", "ME_D");
+    (void)client.compat().faxes.delete_media("FX_D", "ME_D");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,

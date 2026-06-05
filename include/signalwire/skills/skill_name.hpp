@@ -48,7 +48,7 @@ enum class SkillName {
 /// skill reports from `skill_name()`). This is the single normalization
 /// point shared by the typed `add_skill`/`remove_skill`/`has_skill`
 /// overloads, so their behavior is identical to passing the bare string.
-inline std::string skill_name_value(SkillName name) {
+[[nodiscard]] inline std::string skill_name_value(SkillName name) {
     switch (name) {
         case SkillName::ApiNinjasTrivia:      return "api_ninjas_trivia";
         case SkillName::ClaudeSkills:         return "claude_skills";
@@ -74,7 +74,7 @@ inline std::string skill_name_value(SkillName name) {
 
 /// `to_string` overload so `SkillName` interoperates with ADL-based
 /// stringification the same way `skill_name_value()` does.
-inline std::string to_string(SkillName name) {
+[[nodiscard]] inline std::string to_string(SkillName name) {
     return skill_name_value(name);
 }
 

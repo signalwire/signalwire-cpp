@@ -29,7 +29,7 @@ TEST(rest_mock_compat_queues_update_returns_queue_resource) {
 
 TEST(rest_mock_compat_queues_update_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().queues.update(
+    (void)client.compat().queues.update(
         "QU_UU",
         {{"FriendlyName", "renamed"}, {"MaxSize", 200}});
     auto j = mocktest::journal_last();
@@ -56,7 +56,7 @@ TEST(rest_mock_compat_queues_list_members_returns_paginated) {
 
 TEST(rest_mock_compat_queues_list_members_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().queues.list_members("QU_LMX");
+    (void)client.compat().queues.list_members("QU_LMX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kQueueBase + "/QU_LMX/Members");
@@ -77,7 +77,7 @@ TEST(rest_mock_compat_queues_get_member_returns_member_resource) {
 
 TEST(rest_mock_compat_queues_get_member_journal_records_get) {
     auto client = mocktest::make_client();
-    client.compat().queues.get_member("QU_GMX", "CA_GMX");
+    (void)client.compat().queues.get_member("QU_GMX", "CA_GMX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path, kQueueBase + "/QU_GMX/Members/CA_GMX");
@@ -99,7 +99,7 @@ TEST(rest_mock_compat_queues_dequeue_member_returns_member_resource) {
 
 TEST(rest_mock_compat_queues_dequeue_member_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().queues.dequeue_member(
+    (void)client.compat().queues.dequeue_member(
         "QU_DMX", "CA_DMX",
         {{"Url", "https://a.b/url"}, {"Method", "POST"}});
     auto j = mocktest::journal_last();

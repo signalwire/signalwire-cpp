@@ -30,7 +30,7 @@ TEST(rest_mock_compat_calls_start_stream_returns_stream_resource) {
 
 TEST(rest_mock_compat_calls_start_stream_journal_records_post) {
     auto client = mocktest::make_client();
-    client.compat().calls.start_stream(
+    (void)client.compat().calls.start_stream(
         "CA_JX1",
         {{"Url", "wss://a.b/s"}, {"Name", "strm-x"}});
     auto j = mocktest::journal_last();
@@ -58,7 +58,7 @@ TEST(rest_mock_compat_calls_stop_stream_returns_stream_resource_with_status) {
 
 TEST(rest_mock_compat_calls_stop_stream_journal_records_post_to_specific_stream) {
     auto client = mocktest::make_client();
-    client.compat().calls.stop_stream("CA_S1", "ST_S1", {{"Status", "stopped"}});
+    (void)client.compat().calls.stop_stream("CA_S1", "ST_S1", {{"Status", "stopped"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
@@ -83,7 +83,7 @@ TEST(rest_mock_compat_calls_update_recording_returns_recording_resource) {
 
 TEST(rest_mock_compat_calls_update_recording_journal_records_post_to_specific_recording) {
     auto client = mocktest::make_client();
-    client.compat().calls.update_recording("CA_R1", "RE_R1", {{"Status", "paused"}});
+    (void)client.compat().calls.update_recording("CA_R1", "RE_R1", {{"Status", "paused"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,

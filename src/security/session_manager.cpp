@@ -117,14 +117,17 @@ std::string SessionManager::create_token(const std::string& function_name,
     return encoded_payload + "." + hex_sig;
 }
 
-bool SessionManager::validate_token(const std::string& token,
-                                     const std::string& function_name,
-                                     const std::string& call_id) const {
+bool SessionManager::validate_token(std::string_view token,
+                                     std::string_view function_name,
+                                     std::string_view call_id) const {
     auto dot_pos = token.find('.');
-    if (dot_pos == std::string::npos) return false;
+    if (dot_pos == std::string_view::npos) return false;
 
-    std::string encoded_payload = token.substr(0, dot_pos);
-    std::string provided_sig = token.substr(dot_pos + 1);
+    // token.substr now yields a string_view; materialise the slices we hand
+    // to the std::string-taking helpers (hmac_sha256 / timing_safe_compare /
+    // base64_decode) into owning strings.
+    std::string encoded_payload(token.substr(0, dot_pos));
+    std::string provided_sig(token.substr(dot_pos + 1));
 
     // Recompute signature
     std::string expected_sig_raw = hmac_sha256(encoded_payload);

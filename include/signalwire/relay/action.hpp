@@ -31,7 +31,7 @@ public:
 
     const std::string& control_id() const { return state_->control_id; }
     const std::string& state() const;
-    bool completed() const;
+    [[nodiscard]] bool completed() const;
     const json& result() const;
     const std::string& call_id() const { return state_->call_id; }
     const std::string& node_id() const { return state_->node_id; }
@@ -82,7 +82,10 @@ public:
     bool resolve_on_result() const { return state_->resolve_on_result; }
 
     /// Block until the action completes or times out.
-    bool wait(int timeout_ms = 0);
+    /// [[nodiscard]]: the bool tells you whether the action actually
+    /// completed vs. timed out — dropping it (then treating the action as
+    /// done) is a bug.
+    [[nodiscard]] bool wait(int timeout_ms = 0);
 
     /// Request the server to stop this action. Routes to
     /// `<method_prefix>.stop` so an Action returned by `record()` sends

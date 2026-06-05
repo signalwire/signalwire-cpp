@@ -3,6 +3,7 @@
 #include "signalwire/security/session_manager.hpp"
 #include <thread>
 #include <chrono>
+#include <string_view>
 
 using namespace signalwire::security;
 
@@ -122,5 +123,56 @@ TEST(session_manager_token_format) {
 TEST(session_manager_constructor_rejects_short_secret) {
     std::vector<uint8_t> short_secret(8, 0x01);
     ASSERT_THROWS(SessionManager sm(short_secret));
+    return true;
+}
+
+// --- std::string_view-param coverage --------------------------------------
+//
+// validate_token() takes its three params by std::string_view. These tests
+// pin that the read-only-view contract is honoured: the function PARSES and
+// HMAC-verifies the token within the call and retains nothing, so passing
+// views over buffers whose lifetime is bounded by the call (a temporary, an
+// owned std::string that is mutated/destroyed afterwards) must still produce
+// the correct accept/reject decision. A dangling-view regression (e.g. if the
+// impl ever stashed a view past the call) would corrupt these comparisons.
+// They drive the real create/validate code path — no mocks.
+
+TEST(session_manager_validate_token_string_view_args) {
+    SessionManager sm;
+    std::string token = sm.create_token("get_weather", "call-123", 3600);
+
+    // Build explicit string_views over distinct owning buffers, then validate.
+    std::string fn_buf = "get_weather";
+    std::string cid_buf = "call-123";
+    std::string_view tok_v{token};
+    std::string_view fn_v{fn_buf};
+    std::string_view cid_v{cid_buf};
+
+    ASSERT_TRUE(sm.validate_token(tok_v, fn_v, cid_v));
+    // Wrong-value views still reject (the comparison reads through the view).
+    ASSERT_FALSE(sm.validate_token(tok_v, std::string_view{"wrong_fn"}, cid_v));
+    ASSERT_FALSE(sm.validate_token(tok_v, fn_v, std::string_view{"wrong-call"}));
+    return true;
+}
+
+TEST(session_manager_validate_token_temporary_string_args) {
+    SessionManager sm;
+    std::string token = sm.create_token("func-x", "call-77", 3600);
+
+    // Pass freshly-constructed temporaries (string_view binds to each
+    // temporary for the duration of the full call expression — the impl must
+    // finish reading before the temporary dies, which it does).
+    ASSERT_TRUE(sm.validate_token(token,
+                                  std::string("func-x"),
+                                  std::string("call-77")));
+
+    // A sub-view of a larger buffer (no NUL terminator at the view's end):
+    // proves validate_token relies on the view's length, not C-string scanning.
+    std::string fn_haystack = "func-x__padding__";
+    std::string_view fn_exact = std::string_view{fn_haystack}.substr(0, 6); // "func-x"
+    ASSERT_TRUE(sm.validate_token(token, fn_exact, std::string_view{"call-77"}));
+    // Over-long view (includes the padding) must NOT match.
+    ASSERT_FALSE(sm.validate_token(token, std::string_view{fn_haystack},
+                                   std::string_view{"call-77"}));
     return true;
 }

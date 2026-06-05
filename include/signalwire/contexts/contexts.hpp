@@ -26,7 +26,7 @@ constexpr int MAX_STEPS_PER_CONTEXT = 100;
 ///     answers.
 /// ContextBuilder::validate() rejects any agent that registers a user tool
 /// sharing one of these names.
-const std::set<std::string>& reserved_native_tool_names();
+[[nodiscard]] const std::set<std::string>& reserved_native_tool_names();
 
 // ============================================================================
 // GatherQuestion
@@ -39,9 +39,9 @@ public:
                    const std::string& prompt = "",
                    const std::vector<std::string>& functions = {});
 
-    json to_json() const;
+    [[nodiscard]] json to_json() const;
 
-    const std::string& key() const { return key_; }
+    [[nodiscard]] const std::string& key() const { return key_; }
 
 private:
     std::string key_;
@@ -67,11 +67,11 @@ public:
                               const std::string& prompt = "",
                               const std::vector<std::string>& functions = {});
 
-    json to_json() const;
+    [[nodiscard]] json to_json() const;
 
-    bool has_questions() const { return !questions_.empty(); }
-    const std::vector<GatherQuestion>& questions() const { return questions_; }
-    const std::string& completion_action() const { return completion_action_; }
+    [[nodiscard]] bool has_questions() const { return !questions_.empty(); }
+    [[nodiscard]] const std::vector<GatherQuestion>& questions() const { return questions_; }
+    [[nodiscard]] const std::string& completion_action() const { return completion_action_; }
 
 private:
     std::vector<GatherQuestion> questions_;
@@ -198,12 +198,12 @@ public:
     Step& set_reset_full_reset(bool fr);
 
     /// Serialize to JSON
-    json to_json() const;
+    [[nodiscard]] json to_json() const;
 
     const std::string& name() const { return name_; }
-    const std::optional<std::vector<std::string>>& valid_steps() const { return valid_steps_; }
-    const std::optional<std::vector<std::string>>& valid_contexts() const { return valid_contexts_; }
-    const std::optional<GatherInfo>& gather_info() const { return gather_info_; }
+    [[nodiscard]] const std::optional<std::vector<std::string>>& valid_steps() const { return valid_steps_; }
+    [[nodiscard]] const std::optional<std::vector<std::string>>& valid_contexts() const { return valid_contexts_; }
+    [[nodiscard]] const std::optional<GatherInfo>& gather_info() const { return gather_info_; }
 
 private:
     std::string render_text() const;
@@ -245,7 +245,7 @@ public:
                    const std::vector<std::string>& valid_steps = {});
 
     /// Get an existing step by name
-    Step* get_step(const std::string& name);
+    [[nodiscard]] Step* get_step(const std::string& name);
 
     /// Remove a step
     Context& remove_step(const std::string& name);
@@ -328,14 +328,14 @@ public:
     Context& add_exit_filler(const std::string& lang, const std::vector<std::string>& fillers);
 
     /// Serialize to JSON
-    json to_json() const;
+    [[nodiscard]] json to_json() const;
 
     const std::string& name() const { return name_; }
-    bool has_steps() const { return !steps_.empty(); }
-    const std::map<std::string, Step>& steps() const { return steps_; }
-    const std::vector<std::string>& step_order() const { return step_order_; }
-    const std::optional<std::string>& initial_step() const { return initial_step_; }
-    const std::optional<std::vector<std::string>>& valid_contexts() const { return valid_contexts_; }
+    [[nodiscard]] bool has_steps() const { return !steps_.empty(); }
+    [[nodiscard]] const std::map<std::string, Step>& steps() const { return steps_; }
+    [[nodiscard]] const std::vector<std::string>& step_order() const { return step_order_; }
+    [[nodiscard]] const std::optional<std::string>& initial_step() const { return initial_step_; }
+    [[nodiscard]] const std::optional<std::vector<std::string>>& valid_contexts() const { return valid_contexts_; }
 
 private:
     std::optional<std::string> render_prompt() const;
@@ -405,7 +405,7 @@ public:
     Context& add_context(const std::string& name);
 
     /// Get an existing context
-    Context* get_context(const std::string& name);
+    [[nodiscard]] Context* get_context(const std::string& name);
 
     /// Attach a tool-name supplier so validate() can check
     /// user-defined SWAIG tool names against
@@ -424,9 +424,9 @@ public:
     void validate() const;
 
     /// Serialize all contexts to JSON
-    json to_json() const;
+    [[nodiscard]] json to_json() const;
 
-    bool has_contexts() const { return !contexts_.empty(); }
+    [[nodiscard]] bool has_contexts() const { return !contexts_.empty(); }
 
 private:
     std::map<std::string, Context> contexts_;

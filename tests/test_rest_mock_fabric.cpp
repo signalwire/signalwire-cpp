@@ -54,7 +54,7 @@ TEST(rest_mock_fabric_cxml_applications_create_raises_not_implemented) {
     bool threw = false;
     std::string what;
     try {
-        client.fabric().cxml_applications.create({{"name", "never_built"}});
+        (void)client.fabric().cxml_applications.create({{"name", "never_built"}});
     } catch (const std::exception& e) {
         threw = true;
         what = e.what();

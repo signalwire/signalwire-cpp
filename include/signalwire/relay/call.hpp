@@ -15,6 +15,7 @@
 #include "signalwire/relay/relay_event.hpp"
 #include "signalwire/relay/constants.hpp"
 #include "signalwire/relay/tts_gender.hpp"
+#include "signalwire/relay/states.hpp"
 
 namespace signalwire {
 namespace relay {
@@ -39,6 +40,14 @@ public:
     const std::string& call_id() const { return s_->call_id; }
     const std::string& node_id() const { return s_->node_id; }
     const std::string& state() const { return s_->state; }
+    // Typed lifecycle-state accessor (Tier-3 idiom) ALONGSIDE the bare-string
+    // state() above. Returns the CallState enum parsed from the same backing
+    // string; std::nullopt if the server emitted a value outside the known set
+    // (the set can grow — see states.hpp), so callers never crash on a new
+    // state. [[nodiscard]]: the whole point is the returned enum.
+    [[nodiscard]] std::optional<CallState> call_state() const {
+        return call_state_from_string(s_->state);
+    }
     const std::string& direction() const { return s_->direction; }
     const std::string& from() const { return s_->from; }
     const std::string& to() const { return s_->to; }

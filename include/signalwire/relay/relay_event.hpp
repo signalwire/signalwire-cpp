@@ -6,6 +6,7 @@
 #include <optional>
 #include <chrono>
 #include <nlohmann/json.hpp>
+#include "signalwire/relay/states.hpp"
 
 namespace signalwire {
 namespace relay {
@@ -109,6 +110,15 @@ struct DialEvent : public RelayEvent {
     std::string tag;
     std::string dial_state;
     json call_info;
+
+    // Typed dial-outcome accessor (Tier-3 idiom) ALONGSIDE the bare-string
+    // `dial_state` field above. Parses it into a DialState enum; std::nullopt
+    // if the server emitted a value outside {dialing,answered,failed} (the set
+    // can grow — see states.hpp), so callers never crash on a new outcome.
+    // [[nodiscard]]: the returned enum is the point.
+    [[nodiscard]] std::optional<DialState> dial_state_enum() const {
+        return dial_state_from_string(dial_state);
+    }
 
     [[nodiscard]] static DialEvent from_relay_event(const RelayEvent& ev) {
         DialEvent de;

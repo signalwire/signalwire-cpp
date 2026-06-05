@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include "signalwire/relay/states.hpp"
 
 namespace signalwire {
 namespace relay {
@@ -46,6 +47,13 @@ struct Message {
     // Mutable fields — accessor pattern so returned-by-value Message
     // copies see updates the registry-owned instance applies.
     const std::string& state() const;
+    // Typed delivery-state accessor (Tier-3 idiom) ALONGSIDE the bare-string
+    // state() above. Parses the same backing string into a MessageState enum;
+    // std::nullopt if the server emitted an unknown value (the set can grow —
+    // see states.hpp). [[nodiscard]]: the returned enum is the point.
+    [[nodiscard]] std::optional<MessageState> message_state() const {
+        return message_state_from_string(state());
+    }
     const std::string& reason() const;
     void set_state(const std::string& s);
     void set_reason(const std::string& r);

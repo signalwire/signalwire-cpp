@@ -7173,6 +7173,15 @@
               ],
               "returns": "string"
             },
+            "call_state": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<class:signalwire.call_state.CallState>"
+            },
             "collect": {
               "params": [
                 {
@@ -8572,6 +8581,32 @@
         }
       }
     },
+    "signalwire.relay.device": {
+      "classes": {
+        "Device": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "to_json": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            }
+          }
+        }
+      }
+    },
     "signalwire.relay.dial_event": {
       "classes": {
         "DialEvent": {
@@ -8584,6 +8619,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "dial_state_enum": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<class:signalwire.dial_state.DialState>"
             },
             "from_relay_event": {
               "params": [
@@ -8648,6 +8692,15 @@
                 }
               ],
               "returns": "bool"
+            },
+            "message_state": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<class:signalwire.message_state.MessageState>"
             },
             "on_completed": {
               "params": [

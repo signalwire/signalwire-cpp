@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 51b38f3f4c23b40884382f84ed644b4806c20e87",
+  "generated_from": "signalwire-cpp @ 041c25e36d752ad0703f74e25a407fcade04f40c",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -717,6 +717,7 @@
           "ai",
           "answer",
           "call_id",
+          "call_state",
           "collect",
           "connect",
           "detect",
@@ -825,9 +826,19 @@
       },
       "functions": []
     },
+    "signalwire.relay.device": {
+      "classes": {
+        "Device": [
+          "__init__",
+          "to_json"
+        ]
+      },
+      "functions": []
+    },
     "signalwire.relay.dial_event": {
       "classes": {
         "DialEvent": [
+          "dial_state_enum",
           "from_relay_event"
         ]
       },
@@ -841,6 +852,7 @@
           "is_delivered",
           "is_failed",
           "is_terminal",
+          "message_state",
           "on_completed",
           "reason",
           "set_reason",

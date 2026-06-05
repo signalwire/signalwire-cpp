@@ -128,6 +128,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_relay_event.cpp"
 #include "test_relay_message.cpp"
 #include "test_tts_gender_enum.cpp"
+#include "test_relay_states.cpp"
 
 // REST split test files
 #include "test_rest_calling.cpp"
@@ -190,6 +191,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_relay_mock_convenience.cpp"
 #include "test_relay_mock_event_dispatch.cpp"
 #include "test_relay_mock_outbound_call.cpp"
+#include "test_relay_states_mock.cpp"
 
 int main(int argc, char** argv) {
     // Suppress logging during tests

@@ -45,6 +45,19 @@ constexpr const char* COMPONENT_STATE_RECORDING = "recording";
 constexpr const char* COMPONENT_STATE_NO_INPUT  = "no_input";
 
 // ========================================================================
+// Message states (mirror Python relay/constants.py MESSAGE_STATE_* /
+// MESSAGE_TERMINAL_STATES — the messaging.state `message_state` vocabulary)
+// ========================================================================
+
+constexpr const char* MESSAGE_STATE_QUEUED      = "queued";
+constexpr const char* MESSAGE_STATE_INITIATED   = "initiated";
+constexpr const char* MESSAGE_STATE_SENT        = "sent";
+constexpr const char* MESSAGE_STATE_DELIVERED   = "delivered";
+constexpr const char* MESSAGE_STATE_UNDELIVERED = "undelivered";
+constexpr const char* MESSAGE_STATE_FAILED      = "failed";
+constexpr const char* MESSAGE_STATE_RECEIVED    = "received";
+
+// ========================================================================
 // Event types
 // ========================================================================
 

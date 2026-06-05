@@ -186,6 +186,15 @@ FunctionResult& FunctionResult::record_call(const std::string& control_id,
                                               std::optional<double> end_silence_timeout,
                                               std::optional<double> max_length,
                                               const std::string& status_url) {
+    // Validate format (SWML record_call verb schema: {wav, mp3, mp4}) and
+    // direction ({speak, listen, both}) — byte-exact Python ValueError messages.
+    if (format != "wav" && format != "mp3" && format != "mp4") {
+        throw std::invalid_argument("format must be 'wav', 'mp3', or 'mp4'");
+    }
+    if (direction != "speak" && direction != "listen" && direction != "both") {
+        throw std::invalid_argument("direction must be 'speak', 'listen', or 'both'");
+    }
+
     json record_params;
     record_params["stereo"] = stereo;
     record_params["format"] = format;
@@ -444,6 +453,23 @@ FunctionResult& FunctionResult::tap(const std::string& uri,
                                      const std::string& codec,
                                      int rtp_ptime,
                                      const std::string& status_url) {
+    // Validate direction {speak, hear, both}, codec {PCMU, PCMA}, and
+    // rtp_ptime > 0 — byte-exact Python ValueError messages. Python renders the
+    // first two with f"... must be one of {list}" (single-quoted list-repr).
+    static const std::vector<std::string> valid_directions = {"speak", "hear", "both"};
+    if (!contains(valid_directions, direction)) {
+        throw std::invalid_argument(
+            "direction must be one of " + render_choices(valid_directions));
+    }
+    static const std::vector<std::string> valid_codecs = {"PCMU", "PCMA"};
+    if (!contains(valid_codecs, codec)) {
+        throw std::invalid_argument(
+            "codec must be one of " + render_choices(valid_codecs));
+    }
+    if (rtp_ptime <= 0) {
+        throw std::invalid_argument("rtp_ptime must be a positive integer");
+    }
+
     json tap_params;
     tap_params["uri"] = uri;
     if (!control_id.empty()) tap_params["control_id"] = control_id;
@@ -552,13 +578,17 @@ FunctionResult& FunctionResult::pay(const std::string& payment_connector_url,
 FunctionResult& FunctionResult::execute_rpc(const std::string& method, const json& params,
                                              const std::string& call_id,
                                              const std::string& node_id) {
-    json rpc_params = params;
-    if (!call_id.empty()) rpc_params["call_id"] = call_id;
-    if (!node_id.empty()) rpc_params["node_id"] = node_id;
-
-    json rpc_cmd;
+    // Mirror Python core/function_result.py: the rpc command is
+    //   {method, call_id?, node_id?, params?}
+    // where call_id / node_id are TOP-LEVEL siblings of params (NOT nested
+    // inside it), and params is OMITTED entirely when empty (Python `if params:`).
+    json rpc_cmd = json::object();
     rpc_cmd["method"] = method;
-    rpc_cmd["params"] = rpc_params;
+    if (!call_id.empty()) rpc_cmd["call_id"] = call_id;
+    if (!node_id.empty()) rpc_cmd["node_id"] = node_id;
+    // Python's `if params:` is falsey for None AND for an empty dict — so an
+    // empty object suppresses the key just like a null does.
+    if (!params.is_null() && !params.empty()) rpc_cmd["params"] = params;
 
     json swml_doc = {
         {"version", "1.0.0"},

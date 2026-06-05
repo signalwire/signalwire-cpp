@@ -708,6 +708,67 @@ TEST(function_result_tap) {
     return true;
 }
 
+// --- tap validation — byte-exact Python ValueError messages ----------------
+// Python uses f"... must be one of {list}", repr-rendered with single quotes.
+
+TEST(function_result_tap_invalid_direction) {
+    FunctionResult r("test");
+    ASSERT_THROWS(r.tap("wss://x", "", "sideways"));
+    bool checked = false;
+    try {
+        r.tap("wss://x", "", "sideways");
+    } catch (const std::invalid_argument& e) {
+        ASSERT_EQ(std::string(e.what()),
+                  "direction must be one of ['speak', 'hear', 'both']");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_tap_invalid_codec) {
+    FunctionResult r("test");
+    ASSERT_THROWS(r.tap("wss://x", "", "both", "OPUS"));
+    bool checked = false;
+    try {
+        r.tap("wss://x", "", "both", "OPUS");
+    } catch (const std::invalid_argument& e) {
+        ASSERT_EQ(std::string(e.what()),
+                  "codec must be one of ['PCMU', 'PCMA']");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_tap_invalid_rtp_ptime) {
+    FunctionResult r("test");
+    ASSERT_THROWS(r.tap("wss://x", "", "both", "PCMU", 0));
+    bool checked = false;
+    try {
+        r.tap("wss://x", "", "both", "PCMU", -5);
+    } catch (const std::invalid_argument& e) {
+        ASSERT_EQ(std::string(e.what()), "rtp_ptime must be a positive integer");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_tap_valid_hear_codec_pcma) {
+    // The in-set non-default values must NOT throw and must round-trip.
+    FunctionResult r("test");
+    r.tap("rtp://1.2.3.4:5000", "tap-1", "hear", "PCMA", 30, "https://cb/x");
+    auto verb = r.to_json()["action"][0]["SWML"]["sections"]["main"][0]["tap"];
+    ASSERT_EQ(verb["uri"].get<std::string>(), "rtp://1.2.3.4:5000");
+    ASSERT_EQ(verb["control_id"].get<std::string>(), "tap-1");
+    ASSERT_EQ(verb["direction"].get<std::string>(), "hear");
+    ASSERT_EQ(verb["codec"].get<std::string>(), "PCMA");
+    ASSERT_EQ(verb["rtp_ptime"].get<int>(), 30);
+    ASSERT_EQ(verb["status_url"].get<std::string>(), "https://cb/x");
+    return true;
+}
+
 TEST(function_result_stop_tap) {
     FunctionResult r("test");
     r.stop_tap("ctrl-123");
@@ -746,6 +807,50 @@ TEST(function_result_record_call) {
     return true;
 }
 
+// --- record_call validation — byte-exact Python ValueError messages --------
+// Python: "format must be 'wav', 'mp3', or 'mp4'" and
+//         "direction must be 'speak', 'listen', or 'both'" (hand-written, NOT
+// the list-repr form).
+
+TEST(function_result_record_call_invalid_format) {
+    FunctionResult r("Recording");
+    ASSERT_THROWS(r.record_call("", false, "flac"));
+    bool checked = false;
+    try {
+        r.record_call("", false, "flac");
+    } catch (const std::invalid_argument& e) {
+        ASSERT_EQ(std::string(e.what()), "format must be 'wav', 'mp3', or 'mp4'");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_record_call_invalid_direction) {
+    FunctionResult r("Recording");
+    ASSERT_THROWS(r.record_call("", false, "wav", "sideways"));
+    bool checked = false;
+    try {
+        r.record_call("", false, "wav", "sideways");
+    } catch (const std::invalid_argument& e) {
+        ASSERT_EQ(std::string(e.what()),
+                  "direction must be 'speak', 'listen', or 'both'");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_record_call_mp4_accepted) {
+    // mp4 is in the {wav,mp3,mp4} set — must NOT throw.
+    FunctionResult r("Recording");
+    r.record_call("ctrl-9", false, "mp4", "listen");
+    auto verb = r.to_json()["action"][0]["SWML"]["sections"]["main"][0]["record_call"];
+    ASSERT_EQ(verb["format"].get<std::string>(), "mp4");
+    ASSERT_EQ(verb["direction"].get<std::string>(), "listen");
+    return true;
+}
+
 TEST(function_result_stop_record_call) {
     FunctionResult r("Stopped");
     r.stop_record_call("ctrl-1");
@@ -758,11 +863,71 @@ TEST(function_result_stop_record_call) {
 // RPC
 // ========================================================================
 
+// ------------------------------------------------------------------------
+// execute_rpc — byte-exact parity with Python core/function_result.py.
+// Python builds the rpc command as {method, call_id?, node_id?, params?}
+// where call_id/node_id are SIBLINGS of params (top-level rpc fields), and
+// params is OMITTED entirely when empty. The verb lives at:
+//   action[0]["SWML"]["sections"]["main"][0]["execute_rpc"]
+// ------------------------------------------------------------------------
+
+// Reach into the execute_rpc command payload of a just-built result.
+static json rpc_cmd(const FunctionResult& r) {
+    return r.to_json()["action"][0]["SWML"]["sections"]["main"][0]["execute_rpc"];
+}
+
 TEST(function_result_execute_rpc) {
     FunctionResult r("RPC");
     r.execute_rpc("dial", json::object({{"to", "+1555"}}));
     auto j = r.to_json();
     ASSERT_TRUE(j["action"][0].contains("SWML"));
+    return true;
+}
+
+TEST(function_result_execute_rpc_shape) {
+    // method present; caller params nested UNDER "params" (not spread at top
+    // level); no call_id/node_id when not supplied.
+    FunctionResult r("RPC");
+    r.execute_rpc("dial", json::object({{"to", "+1555"}}));
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "dial");
+    ASSERT_TRUE(cmd.contains("params"));
+    ASSERT_EQ(cmd["params"]["to"].get<std::string>(), "+1555");
+    // Caller param must NOT have leaked to the top level.
+    ASSERT_FALSE(cmd.contains("to"));
+    ASSERT_FALSE(cmd.contains("call_id"));
+    ASSERT_FALSE(cmd.contains("node_id"));
+    return true;
+}
+
+TEST(function_result_execute_rpc_call_id_sibling_of_params) {
+    // call_id/node_id are TOP-LEVEL rpc fields, SIBLINGS of params — they must
+    // NOT be buried inside the params object.
+    FunctionResult r("RPC");
+    r.execute_rpc("ai_message",
+                  json::object({{"role", "system"}, {"message_text", "hi"}}),
+                  "call-xyz", "node-7");
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "ai_message");
+    ASSERT_EQ(cmd["call_id"].get<std::string>(), "call-xyz");
+    ASSERT_EQ(cmd["node_id"].get<std::string>(), "node-7");
+    ASSERT_TRUE(cmd.contains("params"));
+    ASSERT_EQ(cmd["params"]["role"].get<std::string>(), "system");
+    ASSERT_EQ(cmd["params"]["message_text"].get<std::string>(), "hi");
+    // call_id/node_id must NOT be inside params.
+    ASSERT_FALSE(cmd["params"].contains("call_id"));
+    ASSERT_FALSE(cmd["params"].contains("node_id"));
+    return true;
+}
+
+TEST(function_result_execute_rpc_empty_params_omitted) {
+    // Empty params -> the "params" key is OMITTED entirely (Python `if params:`).
+    FunctionResult r("RPC");
+    r.execute_rpc("ai_unhold", json::object(), "call-abc");
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "ai_unhold");
+    ASSERT_EQ(cmd["call_id"].get<std::string>(), "call-abc");
+    ASSERT_FALSE(cmd.contains("params"));
     return true;
 }
 
@@ -774,6 +939,22 @@ TEST(function_result_rpc_dial) {
     return true;
 }
 
+TEST(function_result_rpc_dial_shape) {
+    // rpc_dial uses method "dial" (NOT "calling.dial"); the device + dest_swml
+    // ride inside params; no call_id (none supplied).
+    FunctionResult r("Dialing");
+    r.rpc_dial("+15551234567", "+15559876543", "https://example.com/swml");
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "dial");
+    ASSERT_FALSE(cmd.contains("call_id"));
+    ASSERT_TRUE(cmd.contains("params"));
+    ASSERT_EQ(cmd["params"]["devices"]["type"].get<std::string>(), "phone");
+    ASSERT_EQ(cmd["params"]["devices"]["params"]["to_number"].get<std::string>(), "+15551234567");
+    ASSERT_EQ(cmd["params"]["devices"]["params"]["from_number"].get<std::string>(), "+15559876543");
+    ASSERT_EQ(cmd["params"]["dest_swml"].get<std::string>(), "https://example.com/swml");
+    return true;
+}
+
 TEST(function_result_rpc_ai_message) {
     FunctionResult r("Message sent");
     r.rpc_ai_message("call-123", "Hello from other call");
@@ -782,11 +963,37 @@ TEST(function_result_rpc_ai_message) {
     return true;
 }
 
+TEST(function_result_rpc_ai_message_shape) {
+    // call_id is a top-level rpc field (sibling of params); role/message_text
+    // ride inside params.
+    FunctionResult r("Message sent");
+    r.rpc_ai_message("call-123", "Hello from other call");
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "ai_message");
+    ASSERT_EQ(cmd["call_id"].get<std::string>(), "call-123");
+    ASSERT_TRUE(cmd.contains("params"));
+    ASSERT_EQ(cmd["params"]["role"].get<std::string>(), "system");
+    ASSERT_EQ(cmd["params"]["message_text"].get<std::string>(), "Hello from other call");
+    ASSERT_FALSE(cmd["params"].contains("call_id"));
+    return true;
+}
+
 TEST(function_result_rpc_ai_unhold) {
     FunctionResult r("Unholding");
     r.rpc_ai_unhold("call-123");
     auto j = r.to_json();
     ASSERT_EQ(j["action"].size(), 1u);
+    return true;
+}
+
+TEST(function_result_rpc_ai_unhold_shape) {
+    // ai_unhold passes empty params -> NO "params" key; call_id at top level.
+    FunctionResult r("Unholding");
+    r.rpc_ai_unhold("call-123");
+    auto cmd = rpc_cmd(r);
+    ASSERT_EQ(cmd["method"].get<std::string>(), "ai_unhold");
+    ASSERT_EQ(cmd["call_id"].get<std::string>(), "call-123");
+    ASSERT_FALSE(cmd.contains("params"));
     return true;
 }
 

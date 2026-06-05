@@ -2660,6 +2660,96 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "start_on_enter",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "end_on_exit",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "wait_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "max_participants",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "region",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "trim",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "coach",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_callback_event",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_callback",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_callback_method",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "recording_status_callback",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "recording_status_callback_method",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "recording_status_callback_event",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "result",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"

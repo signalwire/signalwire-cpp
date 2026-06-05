@@ -273,27 +273,153 @@ FunctionResult& FunctionResult::execute_swml(const json& swml_content, bool tran
     return add_action("SWML", action);
 }
 
-FunctionResult& FunctionResult::join_conference(const std::string& name, bool muted,
-                                                 const std::string& beep) {
-    json join_params;
-    if (!muted && beep == "true") {
-        // Simple form
-        json swml_doc = {
-            {"version", "1.0.0"},
-            {"sections", {{"main", json::array({json::object({{"join_conference", json(name)}})})}}}
-        };
-        return execute_swml(swml_doc);
+namespace {
+
+// Render Python's list-literal of valid values, e.g.
+//   ["true", "false", "onEnter", "onExit"]
+// so the thrown message matches the reference's f"... must be one of {list}".
+std::string render_choices(const std::vector<std::string>& choices) {
+    std::string out = "[";
+    for (size_t i = 0; i < choices.size(); ++i) {
+        if (i) out += ", ";
+        out += "'" + choices[i] + "'";
+    }
+    out += "]";
+    return out;
+}
+
+bool contains(const std::vector<std::string>& choices, const std::string& v) {
+    for (const auto& c : choices) if (c == v) return true;
+    return false;
+}
+
+std::string strip(const std::string& s) {
+    const char* ws = " \t\n\r\f\v";
+    auto b = s.find_first_not_of(ws);
+    if (b == std::string::npos) return "";
+    auto e = s.find_last_not_of(ws);
+    return s.substr(b, e - b + 1);
+}
+
+} // namespace
+
+FunctionResult& FunctionResult::join_conference(
+        const std::string& name, bool muted, const std::string& beep,
+        bool start_on_enter, bool end_on_exit,
+        std::optional<std::string> wait_url, int max_participants,
+        const std::string& record, std::optional<std::string> region,
+        const std::string& trim, std::optional<std::string> coach,
+        std::optional<std::string> status_callback_event,
+        std::optional<std::string> status_callback,
+        const std::string& status_callback_method,
+        std::optional<std::string> recording_status_callback,
+        const std::string& recording_status_callback_method,
+        const std::string& recording_status_callback_event,
+        std::optional<json> result) {
+    // --- Validations (match Python's ValueError messages exactly) ---------
+    static const std::vector<std::string> valid_beep =
+        {"true", "false", "onEnter", "onExit"};
+    if (!contains(valid_beep, beep)) {
+        throw std::invalid_argument("beep must be one of " + render_choices(valid_beep));
+    }
+    if (max_participants <= 0 || max_participants > 250) {
+        throw std::invalid_argument("max_participants must be a positive integer <= 250");
+    }
+    static const std::vector<std::string> valid_record =
+        {"do-not-record", "record-from-start"};
+    if (!contains(valid_record, record)) {
+        throw std::invalid_argument("record must be one of " + render_choices(valid_record));
+    }
+    static const std::vector<std::string> valid_trim =
+        {"trim-silence", "do-not-trim"};
+    if (!contains(valid_trim, trim)) {
+        throw std::invalid_argument("trim must be one of " + render_choices(valid_trim));
+    }
+    static const std::vector<std::string> valid_methods = {"GET", "POST"};
+    if (!contains(valid_methods, status_callback_method)) {
+        throw std::invalid_argument(
+            "status_callback_method must be one of " + render_choices(valid_methods));
+    }
+    if (!contains(valid_methods, recording_status_callback_method)) {
+        throw std::invalid_argument(
+            "recording_status_callback_method must be one of " + render_choices(valid_methods));
+    }
+    if (strip(name).empty()) {
+        throw std::invalid_argument("name cannot be empty");
     }
 
-    join_params["name"] = name;
-    if (muted) join_params["muted"] = true;
-    if (beep != "true") join_params["beep"] = beep;
+    // --- Emission: simple bare-name string when all params are at default --
+    bool all_default =
+        !muted && beep == "true" && start_on_enter && !end_on_exit &&
+        !wait_url.has_value() && max_participants == 250 &&
+        record == "do-not-record" && !region.has_value() &&
+        trim == "trim-silence" && !coach.has_value() &&
+        !status_callback_event.has_value() && !status_callback.has_value() &&
+        status_callback_method == "POST" && !recording_status_callback.has_value() &&
+        recording_status_callback_method == "POST" &&
+        recording_status_callback_event == "completed" && !result.has_value();
+
+    json join_params;
+    if (all_default) {
+        join_params = name;  // simple form — just the conference name
+    } else {
+        json obj = json::object();
+        obj["name"] = name;
+        // Each non-default param under its snake_case wire key.
+        if (muted) obj["muted"] = muted;
+        if (beep != "true") obj["beep"] = beep;
+        if (!start_on_enter) obj["start_on_enter"] = start_on_enter;
+        if (end_on_exit) obj["end_on_exit"] = end_on_exit;
+        if (wait_url.has_value()) obj["wait_url"] = *wait_url;
+        if (max_participants != 250) obj["max_participants"] = max_participants;
+        if (record != "do-not-record") obj["record"] = record;
+        if (region.has_value()) obj["region"] = *region;
+        if (trim != "trim-silence") obj["trim"] = trim;
+        if (coach.has_value()) obj["coach"] = *coach;
+        if (status_callback_event.has_value()) obj["status_callback_event"] = *status_callback_event;
+        if (status_callback.has_value()) obj["status_callback"] = *status_callback;
+        if (status_callback_method != "POST") obj["status_callback_method"] = status_callback_method;
+        if (recording_status_callback.has_value())
+            obj["recording_status_callback"] = *recording_status_callback;
+        if (recording_status_callback_method != "POST")
+            obj["recording_status_callback_method"] = recording_status_callback_method;
+        if (recording_status_callback_event != "completed")
+            obj["recording_status_callback_event"] = recording_status_callback_event;
+        if (result.has_value()) obj["result"] = *result;
+        join_params = std::move(obj);
+    }
 
     json swml_doc = {
         {"version", "1.0.0"},
         {"sections", {{"main", json::array({json::object({{"join_conference", join_params}})})}}}
     };
     return execute_swml(swml_doc);
+}
+
+FunctionResult& FunctionResult::join_conference(const std::string& name,
+                                                const JoinConferenceOptions& o) {
+    // Unwrap each optional to its default, then delegate to the flat overload
+    // so validation + emission live in exactly one place.
+    return join_conference(
+        name,
+        o.muted.value_or(false),
+        o.beep ? o.beep->str() : std::string("true"),
+        o.start_on_enter.value_or(true),
+        o.end_on_exit.value_or(false),
+        o.wait_url,
+        o.max_participants.value_or(250),
+        o.record ? o.record->str() : std::string("do-not-record"),
+        o.region,
+        o.trim ? o.trim->str() : std::string("trim-silence"),
+        o.coach,
+        o.status_callback_event,
+        o.status_callback,
+        o.status_callback_method ? o.status_callback_method->str() : std::string("POST"),
+        o.recording_status_callback,
+        o.recording_status_callback_method ? o.recording_status_callback_method->str()
+                                           : std::string("POST"),
+        o.recording_status_callback_event.value_or("completed"),
+        o.result);
 }
 
 FunctionResult& FunctionResult::join_room(const std::string& name) {

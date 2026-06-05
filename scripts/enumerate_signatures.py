@@ -100,6 +100,23 @@ from enumerate_surface import (  # type: ignore
     camel_to_snake, module_for_class, native_ns_to_module,
 )
 
+# Methods whose canonical name should resolve to the OVERLOAD WITH THE MOST
+# PARAMETERS, overriding the default fewest-param dedup.
+#
+# Default policy is "prefer the smallest-arity overload" — it keeps the audit
+# honest when a C++ class adds extra convenience overloads with more knobs than
+# Python exposes (we don't want a port to look like it has more API than the
+# reference). But some C++ methods deliberately ship BOTH a flat positional
+# overload that mirrors Python's full signature 1:1 AND an idiomatic
+# options-struct convenience overload that DELEGATES to it. For those, the flat
+# (max-arity) overload is the one that lines up with the reference; the
+# convenience wrapper is a strict subset (fewer adapter-visible params). Picking
+# the wrapper would falsely report a param-count gap even though the full
+# capability is present. Keyed by the canonical ``module.Class.method`` path.
+PREFER_FULL_OVERLOAD = {
+    "signalwire.core.function_result.FunctionResult.join_conference",
+}
+
 
 class TypeTranslationError(RuntimeError):
     pass
@@ -504,10 +521,17 @@ def collect(
                 failures.append(str(e))
                 continue
             if method_canonical in methods_out:
-                # Prefer fewer-param overload
                 existing = methods_out[method_canonical]
-                if len(sig["params"]) >= len(existing["params"]):
-                    continue
+                if ctx in PREFER_FULL_OVERLOAD:
+                    # Keep the LARGER-arity overload (the flat form that
+                    # mirrors Python's full signature); drop the convenience
+                    # options-struct wrapper.
+                    if len(sig["params"]) <= len(existing["params"]):
+                        continue
+                else:
+                    # Default: prefer the fewer-param overload.
+                    if len(sig["params"]) >= len(existing["params"]):
+                        continue
             methods_out[method_canonical] = sig
 
         if not methods_out:

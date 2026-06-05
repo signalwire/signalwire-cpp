@@ -10,6 +10,107 @@ namespace swaig {
 
 using json = nlohmann::json;
 
+// ===========================================================================
+// join_conference closed-set enums
+//
+// Mirrors the Gender / SkillName affordance pattern: each closed set the
+// Python reference documents as a bare string gets a typed `enum class` so a
+// typo fails at the call site instead of on the server. The string form still
+// works (Python uses bare `str`/`Optional[str]`), so engine-/CXML-specific
+// values that aren't one of the canonical members remain expressible. The
+// `*_value()` helpers are the single normalization point — enum and string
+// emit the identical wire string.
+// ===========================================================================
+
+/// `beep` — when the conference plays an enter/leave tone.
+enum class ConferenceBeep { True, False, OnEnter, OnExit };
+/// `record` — conference recording mode.
+enum class ConferenceRecord { DoNotRecord, RecordFromStart };
+/// `trim` — leading/trailing silence handling on recordings.
+enum class ConferenceTrim { TrimSilence, DoNotTrim };
+/// `status_callback_method` / `recording_status_callback_method` — HTTP verb.
+enum class CallbackMethod { Get, Post };
+
+inline std::string conference_beep_value(ConferenceBeep v) {
+    switch (v) {
+        case ConferenceBeep::True:    return "true";
+        case ConferenceBeep::False:   return "false";
+        case ConferenceBeep::OnEnter: return "onEnter";
+        case ConferenceBeep::OnExit:  return "onExit";
+    }
+    return "";
+}
+inline std::string conference_record_value(ConferenceRecord v) {
+    switch (v) {
+        case ConferenceRecord::DoNotRecord:     return "do-not-record";
+        case ConferenceRecord::RecordFromStart: return "record-from-start";
+    }
+    return "";
+}
+inline std::string conference_trim_value(ConferenceTrim v) {
+    switch (v) {
+        case ConferenceTrim::TrimSilence: return "trim-silence";
+        case ConferenceTrim::DoNotTrim:   return "do-not-trim";
+    }
+    return "";
+}
+inline std::string callback_method_value(CallbackMethod v) {
+    switch (v) {
+        case CallbackMethod::Get:  return "GET";
+        case CallbackMethod::Post: return "POST";
+    }
+    return "";
+}
+
+/// A closed-set field that accepts EITHER the typed enum OR a bare string.
+///
+/// `JoinConferenceOptions::beep = ConferenceBeep::OnEnter;` and
+/// `... = "onEnter";` both compile and resolve to the same wire string; the
+/// open-string path keeps parity with Python's bare `str` (the validation in
+/// `join_conference` then rejects out-of-set strings exactly as Python does).
+/// Templated on the enum type plus its `*_value()` mapper so one definition
+/// covers all four sets.
+template <typename E, std::string (*Map)(E)>
+struct EnumOrString {
+    std::string value;
+    EnumOrString(E e) : value(Map(e)) {}                 // NOLINT(google-explicit-constructor)
+    EnumOrString(const std::string& s) : value(s) {}     // NOLINT
+    EnumOrString(const char* s) : value(s) {}            // NOLINT
+    const std::string& str() const { return value; }
+};
+
+using BeepField   = EnumOrString<ConferenceBeep, &conference_beep_value>;
+using RecordField = EnumOrString<ConferenceRecord, &conference_record_value>;
+using TrimField   = EnumOrString<ConferenceTrim, &conference_trim_value>;
+using MethodField = EnumOrString<CallbackMethod, &callback_method_value>;
+
+/// Options bag for `FunctionResult::join_conference`.
+///
+/// Every field is `std::optional` and unset means "Python default" — so a
+/// default-constructed `JoinConferenceOptions` collapses to the bare
+/// conference-name string form, matching the reference's simple case. Closed
+/// sets use the enum-or-string wrapper above; open fields are plain
+/// `std::optional`. `result` is a free-form `json` (Python's `Optional[Any]`).
+struct JoinConferenceOptions {
+    std::optional<bool>        muted;
+    std::optional<BeepField>   beep;
+    std::optional<bool>        start_on_enter;
+    std::optional<bool>        end_on_exit;
+    std::optional<std::string> wait_url;
+    std::optional<int>         max_participants;
+    std::optional<RecordField> record;
+    std::optional<std::string> region;
+    std::optional<TrimField>   trim;
+    std::optional<std::string> coach;
+    std::optional<std::string> status_callback_event;
+    std::optional<std::string> status_callback;
+    std::optional<MethodField> status_callback_method;
+    std::optional<std::string> recording_status_callback;
+    std::optional<MethodField> recording_status_callback_method;
+    std::optional<std::string> recording_status_callback_event;
+    std::optional<json>        result;
+};
+
 /// Builder for SWAIG function results with 40+ action methods.
 /// Every method returns *this for chaining.
 class FunctionResult {
@@ -96,8 +197,40 @@ public:
     // ========================================================================
 
     FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
-    FunctionResult& join_conference(const std::string& name, bool muted = false,
-                                     const std::string& beep = "true");
+
+    /// Join an ad-hoc audio conference (SWML `join_conference`). Full parity
+    /// with Python `core/function_result.py`: 18 optional params past `name`,
+    /// 7 validations, and simple (bare-name) vs full-object emission.
+    ///
+    /// Flat positional overload — mirrors the Python signature 1:1 so the
+    /// cross-language audit lines up on parameter count/types. The closed-set
+    /// params are bare `std::string` (Python uses bare `str`); the
+    /// options-struct overload below adds the typed `enum class` affordance.
+    FunctionResult& join_conference(
+        const std::string& name,
+        bool muted = false,
+        const std::string& beep = "true",
+        bool start_on_enter = true,
+        bool end_on_exit = false,
+        std::optional<std::string> wait_url = std::nullopt,
+        int max_participants = 250,
+        const std::string& record = "do-not-record",
+        std::optional<std::string> region = std::nullopt,
+        const std::string& trim = "trim-silence",
+        std::optional<std::string> coach = std::nullopt,
+        std::optional<std::string> status_callback_event = std::nullopt,
+        std::optional<std::string> status_callback = std::nullopt,
+        const std::string& status_callback_method = "POST",
+        std::optional<std::string> recording_status_callback = std::nullopt,
+        const std::string& recording_status_callback_method = "POST",
+        const std::string& recording_status_callback_event = "completed",
+        std::optional<json> result = std::nullopt);
+
+    /// Options-bag overload — the C++-idiomatic way to pass the 18 optional
+    /// params (named `std::optional` fields + closed-set enums). Delegates to
+    /// the flat overload, so behavior + validation + emission are identical.
+    FunctionResult& join_conference(const std::string& name,
+                                    const JoinConferenceOptions& opts);
     FunctionResult& join_room(const std::string& name);
     FunctionResult& sip_refer(const std::string& to_uri);
     FunctionResult& tap(const std::string& uri, const std::string& control_id = "",

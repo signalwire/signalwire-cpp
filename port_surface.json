@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 522ad5579268fb53409059ae0e47eb2ac8b03152",
+  "generated_from": "signalwire-cpp @ c32507dd066c0fd57e5f2dc2881f0d0739bcb8cf",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -1527,6 +1527,15 @@
           "instance",
           "list_skills",
           "register_skill"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.swaig.enum_or_string": {
+      "classes": {
+        "EnumOrString": [
+          "__init__",
+          "str"
         ]
       },
       "functions": []

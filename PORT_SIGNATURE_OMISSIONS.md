@@ -272,7 +272,6 @@ signalwire.core.agent.tools.registry.ToolRegistry.define_tool: cpp_typed_overloa
 signalwire.core.agent_base.AgentBase.add_answer_verb: cpp_typed_overload_split
 signalwire.core.agent_base.AgentBase.enable_sip_routing: cpp_typed_overload_subset
 signalwire.core.agent_base.AgentBase.on_summary: cpp_typed_overload_subset
-signalwire.core.function_result.FunctionResult.join_conference: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_function_include: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_internal_filler: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_language: cpp_typed_overload_subset

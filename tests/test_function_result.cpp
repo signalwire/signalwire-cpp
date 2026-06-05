@@ -1,5 +1,6 @@
 // SwaigFunctionResult tests
 
+#include <stdexcept>
 #include "signalwire/swaig/function_result.hpp"
 #include "signalwire/swaig/tool_definition.hpp"
 
@@ -423,11 +424,263 @@ TEST(function_result_execute_swml_transfer) {
     return true;
 }
 
+// ------------------------------------------------------------------------
+// join_conference — full parity with Python core/function_result.py
+// (19 params: name + 18 optional; 7 validations; simple/full emission).
+// Parity ref: signalwire/signalwire/core/function_result.py join_conference.
+// The verb lives under the SWML action wrapper that execute_swml builds:
+//   action[0]["SWML"]["sections"]["main"][0]["join_conference"]
+// ------------------------------------------------------------------------
+
+// Reach into the join_conference verb payload of a just-built result.
+static json jc_verb(const FunctionResult& r) {
+    return r.to_json()["action"][0]["SWML"]["sections"]["main"][0]["join_conference"];
+}
+
 TEST(function_result_join_conference_simple) {
+    // All-defaults collapses to the bare conference-name string form.
     FunctionResult r("test");
     r.join_conference("my_conf");
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_string());
+    ASSERT_EQ(verb.get<std::string>(), "my_conf");
+    return true;
+}
+
+TEST(function_result_join_conference_simple_explicit_defaults) {
+    // Passing the documented defaults explicitly must ALSO collapse to the
+    // bare-name form (every param == its default).
+    FunctionResult r("test");
+    JoinConferenceOptions opts;  // all std::optional fields unset == defaults
+    r.join_conference("conf-default", opts);
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_string());
+    ASSERT_EQ(verb.get<std::string>(), "conf-default");
+    return true;
+}
+
+TEST(function_result_join_conference_full_object) {
+    // A non-default param forces the full object form; assert EVERY
+    // non-default wire key (snake_case) appears with the right value, and
+    // that default-valued params are omitted.
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.muted = true;
+    opts.beep = "onEnter";
+    opts.start_on_enter = false;
+    opts.end_on_exit = true;
+    opts.wait_url = "https://hold.example.com/swml";
+    opts.max_participants = 10;
+    opts.record = "record-from-start";
+    opts.region = "us-east";
+    opts.trim = "do-not-trim";
+    opts.coach = "call-abc";
+    opts.status_callback_event = "start end join leave";
+    opts.status_callback = "https://cb.example.com/status";
+    opts.status_callback_method = "GET";
+    opts.recording_status_callback = "https://cb.example.com/rec";
+    opts.recording_status_callback_method = "GET";
+    opts.recording_status_callback_event = "in-progress";
+    opts.result = json::object({{"switch", "x"}});
+    r.join_conference("big-conf", opts);
+
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_object());
+    ASSERT_EQ(verb["name"].get<std::string>(), "big-conf");
+    ASSERT_EQ(verb["muted"].get<bool>(), true);
+    ASSERT_EQ(verb["beep"].get<std::string>(), "onEnter");
+    ASSERT_EQ(verb["start_on_enter"].get<bool>(), false);
+    ASSERT_EQ(verb["end_on_exit"].get<bool>(), true);
+    ASSERT_EQ(verb["wait_url"].get<std::string>(), "https://hold.example.com/swml");
+    ASSERT_EQ(verb["max_participants"].get<int>(), 10);
+    ASSERT_EQ(verb["record"].get<std::string>(), "record-from-start");
+    ASSERT_EQ(verb["region"].get<std::string>(), "us-east");
+    ASSERT_EQ(verb["trim"].get<std::string>(), "do-not-trim");
+    ASSERT_EQ(verb["coach"].get<std::string>(), "call-abc");
+    ASSERT_EQ(verb["status_callback_event"].get<std::string>(), "start end join leave");
+    ASSERT_EQ(verb["status_callback"].get<std::string>(), "https://cb.example.com/status");
+    ASSERT_EQ(verb["status_callback_method"].get<std::string>(), "GET");
+    ASSERT_EQ(verb["recording_status_callback"].get<std::string>(), "https://cb.example.com/rec");
+    ASSERT_EQ(verb["recording_status_callback_method"].get<std::string>(), "GET");
+    ASSERT_EQ(verb["recording_status_callback_event"].get<std::string>(), "in-progress");
+    ASSERT_EQ(verb["result"]["switch"].get<std::string>(), "x");
+    // No holdAudio key — Python uses wait_url.
+    ASSERT_FALSE(verb.contains("holdAudio"));
+    return true;
+}
+
+TEST(function_result_join_conference_full_omits_defaults) {
+    // Full form is triggered by ONE non-default (muted); every other param
+    // is left at its default and must NOT appear in the emitted object.
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.muted = true;
+    r.join_conference("conf", opts);
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_object());
+    ASSERT_EQ(verb["name"].get<std::string>(), "conf");
+    ASSERT_EQ(verb["muted"].get<bool>(), true);
+    // Defaults omitted:
+    ASSERT_FALSE(verb.contains("beep"));
+    ASSERT_FALSE(verb.contains("start_on_enter"));
+    ASSERT_FALSE(verb.contains("end_on_exit"));
+    ASSERT_FALSE(verb.contains("wait_url"));
+    ASSERT_FALSE(verb.contains("max_participants"));
+    ASSERT_FALSE(verb.contains("record"));
+    ASSERT_FALSE(verb.contains("region"));
+    ASSERT_FALSE(verb.contains("trim"));
+    ASSERT_FALSE(verb.contains("coach"));
+    ASSERT_FALSE(verb.contains("status_callback_event"));
+    ASSERT_FALSE(verb.contains("status_callback"));
+    ASSERT_FALSE(verb.contains("status_callback_method"));
+    ASSERT_FALSE(verb.contains("recording_status_callback"));
+    ASSERT_FALSE(verb.contains("recording_status_callback_method"));
+    ASSERT_FALSE(verb.contains("recording_status_callback_event"));
+    ASSERT_FALSE(verb.contains("result"));
+    return true;
+}
+
+TEST(function_result_join_conference_flat_overload) {
+    // The flat positional overload (mirrors Python's signature exactly) must
+    // emit identically to the options-struct form.
+    FunctionResult r("test");
+    r.join_conference("flat-conf", /*muted=*/true, /*beep=*/"onExit");
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_object());
+    ASSERT_EQ(verb["name"].get<std::string>(), "flat-conf");
+    ASSERT_EQ(verb["muted"].get<bool>(), true);
+    ASSERT_EQ(verb["beep"].get<std::string>(), "onExit");
+    return true;
+}
+
+TEST(function_result_join_conference_invalid_beep) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.beep = "sometimes";
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    // Message mirrors Python's f"beep must be one of {list}" with the list
+    // rendered the way Python's repr does (single-quoted members).
+    bool checked = false;
+    try {
+        r.join_conference("conf", opts);
+    } catch (const std::invalid_argument& e) {
+        std::string msg = e.what();
+        ASSERT_EQ(msg, "beep must be one of ['true', 'false', 'onEnter', 'onExit']");
+        checked = true;
+    }
+    ASSERT_TRUE(checked);
+    return true;
+}
+
+TEST(function_result_join_conference_max_participants_over) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.max_participants = 251;
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_max_participants_zero) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.max_participants = 0;
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_max_participants_negative) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.max_participants = -5;
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_max_participants_boundary) {
+    // 250 is the inclusive upper bound — must NOT throw (and equals default,
+    // so it collapses to the simple name form).
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.max_participants = 250;
+    r.join_conference("edge", opts);
+    auto verb = jc_verb(r);
+    ASSERT_TRUE(verb.is_string());
+    ASSERT_EQ(verb.get<std::string>(), "edge");
+    return true;
+}
+
+TEST(function_result_join_conference_invalid_record) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.record = "always";
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_invalid_trim) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.trim = "maybe";
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_invalid_status_callback_method) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.status_callback_method = "PUT";
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_invalid_recording_status_callback_method) {
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.recording_status_callback_method = "DELETE";
+    ASSERT_THROWS(r.join_conference("conf", opts));
+    return true;
+}
+
+TEST(function_result_join_conference_empty_name) {
+    FunctionResult r("test");
+    ASSERT_THROWS(r.join_conference(""));
+    return true;
+}
+
+TEST(function_result_join_conference_whitespace_name) {
+    // Python trims then checks emptiness: "   " is empty after strip().
+    FunctionResult r("test");
+    ASSERT_THROWS(r.join_conference("   "));
+    return true;
+}
+
+TEST(function_result_join_conference_chaining) {
+    // Returns *this for fluent chaining; the chained say() lands as a 2nd
+    // action after the join_conference SWML action.
+    FunctionResult r("test");
+    r.join_conference("chain-conf").say("joined");
     auto j = r.to_json();
+    ASSERT_EQ(j["action"].size(), 2u);
     ASSERT_TRUE(j["action"][0].contains("SWML"));
+    ASSERT_EQ(j["action"][1]["say"].get<std::string>(), "joined");
+    return true;
+}
+
+TEST(function_result_join_conference_enum_typed_sets) {
+    // The closed-set enums emit the identical wire strings as the bare
+    // strings (Gender/SkillName affordance pattern).
+    FunctionResult r("test");
+    JoinConferenceOptions opts;
+    opts.beep = ConferenceBeep::OnEnter;
+    opts.record = ConferenceRecord::RecordFromStart;
+    opts.trim = ConferenceTrim::DoNotTrim;
+    opts.status_callback_method = CallbackMethod::Get;
+    r.join_conference("typed-conf", opts);
+    auto verb = jc_verb(r);
+    ASSERT_EQ(verb["beep"].get<std::string>(), "onEnter");
+    ASSERT_EQ(verb["record"].get<std::string>(), "record-from-start");
+    ASSERT_EQ(verb["trim"].get<std::string>(), "do-not-trim");
+    ASSERT_EQ(verb["status_callback_method"].get<std::string>(), "GET");
     return true;
 }
 

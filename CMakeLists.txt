@@ -39,6 +39,16 @@ add_library(signalwire STATIC ${SOURCES})
 # OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
 # httplib::SSLServer for the webhook server (in-process TLS termination).
 target_compile_definitions(signalwire PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
+# PROJECT_SOURCE_DIR must be visible to src/utils/schema_utils.cpp, which lives
+# in THIS library (not just run_tests) — its default_schema_candidates() ladder
+# uses ``#ifdef PROJECT_SOURCE_DIR`` as the first (absolute) candidate for
+# src/swml/schema.json. Without it the library only carries the cwd-relative
+# fallbacks (./schema.json, ./src/swml/schema.json, ../src/swml/schema.json),
+# which don't resolve when run_tests runs from an out-of-source build dir (e.g.
+# the CI's /tmp/run-ci-build), leaving SchemaUtils with zero verbs. Defining it
+# on the library (PRIVATE — it's an implementation detail of the .cpp) makes the
+# absolute candidate available wherever the library is linked.
+target_compile_definitions(signalwire PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(signalwire OpenSSL::SSL OpenSSL::Crypto Threads::Threads ixwebsocket)
 target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/deps)
 # src/ is PRIVATE: internal-only headers (e.g. server/tls_server.hpp, which

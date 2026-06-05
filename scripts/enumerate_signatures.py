@@ -117,6 +117,45 @@ PREFER_FULL_OVERLOAD = {
     "signalwire.core.function_result.FunctionResult.join_conference",
 }
 
+# Methods whose canonical name should resolve to the TYPED (enum-class)
+# overload, overriding the default arity-based dedup when two overloads are
+# the SAME arity but differ only in whether a closed-set parameter is a bare
+# ``std::string`` or a typed ``enum class``.
+#
+# Wave-1 closed-set contract (2026-06-05): the reference oracle now emits
+# ``enum<...>`` for the four strongly-grounded closed sets
+# (``record_call(format, direction)`` + ``tap(direction, codec)``), and
+# diff_port_signatures.py REQUIRES a typed port form (``class:``/``enum``/
+# ``union``) for them, not a bare ``string``. These methods each ship TWO
+# equal-arity overloads: the flat ``std::string`` form (Python-parity, the
+# forward-compat wire path) AND a typed form whose closed-set params are the
+# ``RecordFormat``/``RecordDirection``/``TapDirection``/``Codec`` enum classes
+# (which translate to ``class:...`` refs). Default dedup breaks an arity tie by
+# insertion order, which keeps the string overload (declared first) canonical
+# and so surfaces a bare ``string`` -> drift. For these, prefer the overload
+# that types MORE of its params (the enum form) so the closed-set params surface
+# as ``class:...`` and satisfy the oracle's ``enum<...>``; the string overload
+# becomes a port-only convenience addition (documented in PORT_ADDITIONS.md).
+# Keyed by the canonical ``module.Class.method`` path.
+PREFER_TYPED_OVERLOAD = {
+    "signalwire.core.function_result.FunctionResult.record_call",
+    "signalwire.core.function_result.FunctionResult.tap",
+}
+
+
+def _typed_param_count(sig: dict) -> int:
+    """Count params whose canonical type is a *typed* closed-set form — a
+    ``class:`` ref (port enum/typed-const), a port ``enum<...>``, or a
+    ``union<...>``. Used to break an equal-arity overload tie toward the
+    overload that renders its closed-set params with a real type rather than a
+    bare ``string`` (the wave-1 closed-set contract)."""
+    n = 0
+    for p in sig.get("params", []):
+        t = p.get("type") or ""
+        if t.startswith("class:") or t.startswith("enum<") or t.startswith("union<"):
+            n += 1
+    return n
+
 
 class TypeTranslationError(RuntimeError):
     pass
@@ -522,7 +561,22 @@ def collect(
                 continue
             if method_canonical in methods_out:
                 existing = methods_out[method_canonical]
-                if ctx in PREFER_FULL_OVERLOAD:
+                if ctx in PREFER_TYPED_OVERLOAD:
+                    # Equal-arity string-vs-enum overloads: keep the one that
+                    # TYPES more params (the enum-class form), so its closed-set
+                    # params surface as ``class:...`` and satisfy the oracle's
+                    # ``enum<...>``. Fall back to the default fewer-param rule
+                    # only when the typed-param count ties (e.g. genuinely
+                    # different arities sneak in). The bare-string overload is a
+                    # port-only convenience addition (PORT_ADDITIONS.md).
+                    new_typed = _typed_param_count(sig)
+                    old_typed = _typed_param_count(existing)
+                    if new_typed < old_typed:
+                        continue
+                    if new_typed == old_typed and \
+                            len(sig["params"]) >= len(existing["params"]):
+                        continue
+                elif ctx in PREFER_FULL_OVERLOAD:
                     # Keep the LARGER-arity overload (the flat form that
                     # mirrors Python's full signature); drop the convenience
                     # options-struct wrapper.

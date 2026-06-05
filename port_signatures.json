@@ -2919,26 +2919,22 @@
                 {
                   "name": "control_id",
                   "type": "string",
-                  "required": false,
-                  "default": null
+                  "required": true
                 },
                 {
                   "name": "stereo",
                   "type": "bool",
-                  "required": false,
-                  "default": null
+                  "required": true
                 },
                 {
                   "name": "format",
-                  "type": "string",
-                  "required": false,
-                  "default": null
+                  "type": "class:signalwire.swaig.record_format.RecordFormat",
+                  "required": true
                 },
                 {
                   "name": "direction",
-                  "type": "string",
-                  "required": false,
-                  "default": null
+                  "type": "class:signalwire.swaig.record_direction.RecordDirection",
+                  "required": true
                 },
                 {
                   "name": "terminators",
@@ -3413,20 +3409,17 @@
                 {
                   "name": "control_id",
                   "type": "string",
-                  "required": false,
-                  "default": null
+                  "required": true
                 },
                 {
                   "name": "direction",
-                  "type": "string",
-                  "required": false,
-                  "default": null
+                  "type": "class:signalwire.swaig.tap_direction.TapDirection",
+                  "required": true
                 },
                 {
                   "name": "codec",
-                  "type": "string",
-                  "required": false,
-                  "default": null
+                  "type": "class:signalwire.swaig.codec.Codec",
+                  "required": true
                 },
                 {
                   "name": "rtp_ptime",

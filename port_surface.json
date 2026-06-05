@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ c32507dd066c0fd57e5f2dc2881f0d0739bcb8cf",
+  "generated_from": "signalwire-cpp @ 51b38f3f4c23b40884382f84ed644b4806c20e87",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -1536,6 +1536,28 @@
         "EnumOrString": [
           "__init__",
           "str"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.swaig.parameter_schema": {
+      "classes": {
+        "ParameterSchema": [
+          "__init__",
+          "array_of",
+          "boolean",
+          "empty",
+          "enum_of",
+          "integer",
+          "json",
+          "number",
+          "object_of",
+          "property",
+          "require",
+          "required",
+          "size",
+          "string",
+          "to_json"
         ]
       },
       "functions": []

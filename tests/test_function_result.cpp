@@ -424,6 +424,64 @@ TEST(function_result_execute_swml_transfer) {
     return true;
 }
 
+// --- execute_swml with a raw-JSON STRING — byte-exact Python parity ---------
+// Python core/function_result.py::execute_swml treats a string as raw SWML JSON
+// text and PARSES it with json.loads, emitting the parsed OBJECT under "SWML"
+// (NOT a quoted string). On a parse error it falls back to {"raw_swml": text}.
+// (Drift-0 emission bug found by porting-sdk diff_port_emission.py: cpp used to
+// store the unparsed string. Go mirrors this detect-and-parse branch.)
+
+TEST(function_result_execute_swml_string_parses_to_object) {
+    FunctionResult r("test");
+    r.execute_swml(json("{\"version\": \"1.0.0\", \"sections\": {\"main\": [{\"hangup\": {}}]}}"));
+    auto swml = r.to_json()["action"][0]["SWML"];
+    // The SWML value must be a parsed object, not a string.
+    ASSERT_TRUE(swml.is_object());
+    ASSERT_EQ(swml["version"].get<std::string>(), "1.0.0");
+    ASSERT_TRUE(swml["sections"]["main"][0].contains("hangup"));
+    // It must NOT be the raw-string form.
+    ASSERT_FALSE(swml.is_string());
+    ASSERT_FALSE(swml.contains("raw_swml"));
+    return true;
+}
+
+TEST(function_result_execute_swml_string_with_transfer) {
+    // String content + transfer=true: parse, then add transfer:"true" as a
+    // SIBLING key on the parsed object.
+    FunctionResult r("test");
+    r.execute_swml(json("{\"version\": \"1.0.0\", \"sections\": {\"main\": []}}"), true);
+    auto swml = r.to_json()["action"][0]["SWML"];
+    ASSERT_TRUE(swml.is_object());
+    ASSERT_EQ(swml["version"].get<std::string>(), "1.0.0");
+    ASSERT_EQ(swml["transfer"].get<std::string>(), "true");
+    return true;
+}
+
+TEST(function_result_execute_swml_invalid_json_string_raw_fallback) {
+    // A string that is NOT valid JSON falls back to {"raw_swml": <original>}
+    // (Python's except (JSONDecodeError, ValueError) branch).
+    FunctionResult r("test");
+    r.execute_swml(json("this is not json {"));
+    auto swml = r.to_json()["action"][0]["SWML"];
+    ASSERT_TRUE(swml.is_object());
+    ASSERT_TRUE(swml.contains("raw_swml"));
+    ASSERT_EQ(swml["raw_swml"].get<std::string>(), "this is not json {");
+    return true;
+}
+
+TEST(function_result_execute_swml_dict_still_emits_object) {
+    // Regression guard for the non-string path: a json OBJECT must continue to
+    // emit as-is (the fix must not disturb the dict branch).
+    FunctionResult r("test");
+    json swml = {{"version", "1.0.0"}, {"sections", {{"main", json::array()}}}};
+    r.execute_swml(swml);
+    auto out = r.to_json()["action"][0]["SWML"];
+    ASSERT_TRUE(out.is_object());
+    ASSERT_EQ(out["version"].get<std::string>(), "1.0.0");
+    ASSERT_FALSE(out.contains("raw_swml"));
+    return true;
+}
+
 // ------------------------------------------------------------------------
 // join_conference — full parity with Python core/function_result.py
 // (19 params: name + 18 optional; 7 validations; simple/full emission).

@@ -69,6 +69,15 @@ target_link_libraries(run_tests signalwire)
 target_compile_definitions(run_tests PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME all_tests COMMAND run_tests)
 
+# emit_corpus — the EMISSION-DUMP program for the cross-port emission differ
+# (porting-sdk/scripts/diff_port_emission.py). Builds the shared 81-entry
+# FunctionResult corpus natively and prints {id -> to_json()} as one canonical
+# JSON object on stdout. The differ (run via the EMISSION gate in
+# scripts/run-ci.sh) byte-compares it against Python's to_dict() oracle. Mirrors
+# the Go reference dump (signalwire-go/cmd/emit-corpus).
+add_executable(emit_corpus tools/emit_corpus.cpp)
+target_link_libraries(emit_corpus signalwire)
+
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that
 # every method referenced in docs and examples resolves to a real symbol; the

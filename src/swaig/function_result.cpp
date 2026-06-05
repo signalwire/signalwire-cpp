@@ -294,7 +294,24 @@ FunctionResult& FunctionResult::simulate_user_input(const std::string& text) {
 // ========================================================================
 
 FunctionResult& FunctionResult::execute_swml(const json& swml_content, bool transfer) {
-    json action = swml_content;
+    // Match Python core/function_result.py::execute_swml: a STRING is raw SWML
+    // JSON text and must be PARSED into a structure (so it emits as the SWML
+    // object, not a quoted string). On a JSON parse error Python falls back to
+    // {"raw_swml": <original text>}. A non-string json value (dict/array/etc.)
+    // is used as-is (Python copies the dict). The Go port mirrors this same
+    // detect-and-parse branch (pkg/swaig/function_result.go::ExecuteSwml).
+    json action;
+    if (swml_content.is_string()) {
+        const std::string& text = swml_content.get_ref<const std::string&>();
+        json parsed = json::parse(text, /*cb=*/nullptr, /*allow_exceptions=*/false);
+        if (parsed.is_discarded()) {
+            action = json::object({{"raw_swml", text}});
+        } else {
+            action = std::move(parsed);
+        }
+    } else {
+        action = swml_content;
+    }
     if (transfer) {
         action["transfer"] = "true";
     }

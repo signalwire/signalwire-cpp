@@ -5,11 +5,17 @@
 # GitHub Actions workflow. No drift between local and CI behavior.
 #
 # Gates (in order, fail-fast):
-#   1. cmake --build build --target run_tests + ./build/run_tests
+#   1. cmake --build build --target run_tests emit_corpus + ./build/run_tests
 #                                         — language test runner
 #   2. signature regen                    — python adapter via libclang
 #   3. drift gate                         — porting-sdk diff_port_signatures.py
 #   4. no-cheat gate                      — porting-sdk audit_no_cheat_tests.py
+#   5. emission gate                      — porting-sdk diff_port_emission.py
+#                                           (byte-compare FunctionResult
+#                                           serialisation vs Python to_dict()
+#                                           over the shared 81-entry corpus;
+#                                           reuses the emit_corpus binary built
+#                                           in gate 1)
 #
 # OpenSSL 3.0+ requirement
 # ------------------------
@@ -129,8 +135,11 @@ echo "==> TEST build mode: $BUILD_MODE"
 SWCPP_CONTAINER_REPO="${SWCPP_CONTAINER_REPO:-/src/$PORT_NAME}"
 SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"
 
-# Build run_tests + execute it, honoring BUILD_MODE. Each branch produces the
-# same observable result: a built run_tests and its exit code.
+# Build run_tests + emit_corpus + execute run_tests, honoring BUILD_MODE. Each
+# branch produces the same observable result: a built run_tests (+ emit_corpus,
+# which the EMISSION gate reuses) and run_tests' exit code. emit_corpus is built
+# here too so the EMISSION gate doesn't reconfigure the tree (and so the host /
+# exec modes leave a ready-to-run binary).
 test_gate() {
     case "$BUILD_MODE" in
         host)
@@ -138,13 +147,13 @@ test_gate() {
                 echo "[BOOTSTRAP] cmake -S . -B build (initial configure)"
                 cmake -S . -B build || return 1
             fi
-            cmake --build build --target run_tests -j && ./build/run_tests
+            cmake --build build --target run_tests emit_corpus -j && ./build/run_tests
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -153,12 +162,45 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
             echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
     esac
+}
+
+# EMISSION gate: byte-compare the C++ FunctionResult serialisation against
+# Python's to_dict() over the shared 81-entry corpus
+# (porting-sdk/scripts/diff_port_emission.py + tools/emit_corpus.cpp). Pure
+# serialisation — no mocks, no network. The differ runs the dump program and
+# reads its stdout; we hand it a --dump-cmd that emits the binary built in the
+# TEST gate, resolved per BUILD_MODE. For host/exec the binary persists
+# (`./build/emit_corpus` / a docker-exec into the running container); for the
+# throwaway run: mode the container vanishes after test_gate, so the dump-cmd is
+# a self-contained docker run that (re)builds emit_corpus with logs on stderr and
+# execs it so ONLY the JSON object reaches stdout.
+emission_gate() {
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)
+            dump_cmd="$PORT_ROOT/build/emit_corpus"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/emit_corpus"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                 && cmake --build $SWCPP_CONTAINER_BUILD --target emit_corpus -j\$(nproc) 1>&2 \
+                 && exec $SWCPP_CONTAINER_BUILD/emit_corpus'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_emission.py" --dump-cmd "$dump_cmd"
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
@@ -180,6 +222,10 @@ run_gate "DRIFT" "diff_port_signatures vs python reference" \
 # Gate 4: no-cheat
 run_gate "NO-CHEAT" "audit_no_cheat_tests" \
     python3 "$PORTING_SDK_DIR/scripts/audit_no_cheat_tests.py" --root "$PORT_ROOT"
+
+# Gate 5: emission — byte-compare FunctionResult serialisation vs Python oracle
+run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
+    emission_gate
 
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"

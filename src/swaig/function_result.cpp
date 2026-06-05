@@ -216,6 +216,25 @@ FunctionResult& FunctionResult::record_call(const std::string& control_id,
     return execute_swml(swml_doc);
 }
 
+// Typed overload: normalize the RecordFormat/RecordDirection enums to their
+// canonical wire strings and delegate to the std::string record_call above —
+// single source of truth, so the emitted SWML is byte-identical to passing the
+// equivalent bare strings.
+FunctionResult& FunctionResult::record_call(const std::string& control_id,
+                                              bool stereo, RecordFormat format,
+                                              RecordDirection direction,
+                                              const std::string& terminators,
+                                              bool beep, double input_sensitivity,
+                                              std::optional<double> initial_timeout,
+                                              std::optional<double> end_silence_timeout,
+                                              std::optional<double> max_length,
+                                              const std::string& status_url) {
+    return record_call(control_id, stereo, record_format_value(format),
+                       record_direction_value(direction), terminators, beep,
+                       input_sensitivity, initial_timeout, end_silence_timeout,
+                       max_length, status_url);
+}
+
 FunctionResult& FunctionResult::stop_record_call(const std::string& control_id) {
     json stop_params = json::object();
     if (!control_id.empty()) {
@@ -483,6 +502,20 @@ FunctionResult& FunctionResult::tap(const std::string& uri,
         {"sections", {{"main", json::array({json::object({{"tap", tap_params}})})}}}
     };
     return execute_swml(swml_doc);
+}
+
+// Typed overload: normalize the TapDirection/Codec enums to their canonical
+// wire strings and delegate to the std::string tap above — single source of
+// truth, so the emitted SWML is byte-identical to passing the equivalent bare
+// strings. (tap direction is {speak,hear,both}; codec is {PCMU,PCMA}.)
+FunctionResult& FunctionResult::tap(const std::string& uri,
+                                     const std::string& control_id,
+                                     TapDirection direction,
+                                     Codec codec,
+                                     int rtp_ptime,
+                                     const std::string& status_url) {
+    return tap(uri, control_id, tap_direction_value(direction),
+               codec_value(codec), rtp_ptime, status_url);
 }
 
 FunctionResult& FunctionResult::stop_tap(const std::string& control_id) {

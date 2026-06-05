@@ -62,6 +62,84 @@ inline std::string callback_method_value(CallbackMethod v) {
     return "";
 }
 
+// ===========================================================================
+// record_call / tap media closed-set enums
+//
+// Same SkillName / Gender / join_conference affordance: the Python reference
+// validates each of these against a fixed set in `core/function_result.py`
+// (`raise ValueError` on a miss), so a typo only fails at runtime on the
+// server. The typed `enum class` makes the typo fail at the call site with
+// editor autocompletion, while the bare-`std::string` overloads stay canonical
+// (parity with Python's bare `str`). The `*_value()` helpers are the single
+// normalization point — the enum overload routes its wire string into the
+// EXACT string method, so the emitted SWML is byte-identical.
+//
+// ★ Three direction vocabularies + two codec vocabularies that must NEVER be
+// unified (they are bug generators): record_call's direction is
+// {speak,listen,both}, tap's direction is {speak,hear,both} (`hear`, not
+// `listen`), and tap's codec is the 2-value SWAIG set {PCMU,PCMA} — NOT the
+// wider RELAY connect/stream codec superset. Each set gets its OWN enum,
+// faithfully mirroring the reference's separate validation lists.
+// ===========================================================================
+
+/// Recording container format for `FunctionResult::record_call`.
+/// Mirrors the reference's `format in {"wav","mp3","mp4"}` validation.
+enum class RecordFormat { Wav, Mp3, Mp4 };
+
+/// Audio direction for `FunctionResult::record_call`.
+/// Mirrors the reference's `direction in {"speak","listen","both"}` validation.
+/// NOTE: differs from `TapDirection` — record_call uses `listen`, tap uses `hear`.
+enum class RecordDirection { Speak, Listen, Both };
+
+/// Audio direction for `FunctionResult::tap`.
+/// Mirrors the reference's `direction in {"speak","hear","both"}` validation.
+/// NOTE: differs from `RecordDirection` — tap uses `hear`, record_call uses `listen`.
+enum class TapDirection { Speak, Hear, Both };
+
+/// Media codec for `FunctionResult::tap` (SWAIG tap only).
+/// Mirrors the reference's `codec in {"PCMU","PCMA"}` validation. The wire
+/// strings are upper-case. Distinct from the wider RELAY codec set — do not unify.
+enum class Codec { Pcmu, Pcma };
+
+inline std::string record_format_value(RecordFormat v) {
+    switch (v) {
+        case RecordFormat::Wav: return "wav";
+        case RecordFormat::Mp3: return "mp3";
+        case RecordFormat::Mp4: return "mp4";
+    }
+    return "";
+}
+inline std::string record_direction_value(RecordDirection v) {
+    switch (v) {
+        case RecordDirection::Speak:  return "speak";
+        case RecordDirection::Listen: return "listen";
+        case RecordDirection::Both:   return "both";
+    }
+    return "";
+}
+inline std::string tap_direction_value(TapDirection v) {
+    switch (v) {
+        case TapDirection::Speak: return "speak";
+        case TapDirection::Hear:  return "hear";
+        case TapDirection::Both:  return "both";
+    }
+    return "";
+}
+inline std::string codec_value(Codec v) {
+    switch (v) {
+        case Codec::Pcmu: return "PCMU";
+        case Codec::Pcma: return "PCMA";
+    }
+    return "";
+}
+
+/// ADL `to_string` overloads so these enums stringify the same way the
+/// `*_value()` mappers do (the single wire-string normalization point).
+inline std::string to_string(RecordFormat v)    { return record_format_value(v); }
+inline std::string to_string(RecordDirection v) { return record_direction_value(v); }
+inline std::string to_string(TapDirection v)    { return tap_direction_value(v); }
+inline std::string to_string(Codec v)           { return codec_value(v); }
+
 /// A closed-set field that accepts EITHER the typed enum OR a bare string.
 ///
 /// `JoinConferenceOptions::beep = ConferenceBeep::OnEnter;` and
@@ -176,6 +254,24 @@ public:
                                  std::optional<double> end_silence_timeout = std::nullopt,
                                  std::optional<double> max_length = std::nullopt,
                                  const std::string& status_url = "");
+
+    /// Typed overload — `format`/`direction` as the `RecordFormat` /
+    /// `RecordDirection` closed-set enums for call-site typo checking. Declared
+    /// after the std::string overload (equal arity) so the enumerator's dedup
+    /// keeps the string signature canonical; normalizes the enums to their wire
+    /// strings via `record_format_value`/`record_direction_value` and delegates
+    /// to the std::string `record_call`, so the emitted SWML is byte-identical.
+    FunctionResult& record_call(const std::string& control_id,
+                                 bool stereo,
+                                 RecordFormat format,
+                                 RecordDirection direction,
+                                 const std::string& terminators = "",
+                                 bool beep = false,
+                                 double input_sensitivity = 44.0,
+                                 std::optional<double> initial_timeout = std::nullopt,
+                                 std::optional<double> end_silence_timeout = std::nullopt,
+                                 std::optional<double> max_length = std::nullopt,
+                                 const std::string& status_url = "");
     FunctionResult& stop_record_call(const std::string& control_id = "");
 
     // ========================================================================
@@ -236,6 +332,20 @@ public:
     FunctionResult& tap(const std::string& uri, const std::string& control_id = "",
                         const std::string& direction = "both",
                         const std::string& codec = "PCMU",
+                        int rtp_ptime = 20,
+                        const std::string& status_url = "");
+
+    /// Typed overload — `direction`/`codec` as the `TapDirection` / `Codec`
+    /// closed-set enums for call-site typo checking. Declared after the
+    /// std::string overload (equal arity) so the enumerator's dedup keeps the
+    /// string signature canonical; normalizes the enums via
+    /// `tap_direction_value`/`codec_value` and delegates to the std::string
+    /// `tap`, so the emitted SWML is byte-identical. NOTE the tap direction set
+    /// is {speak,hear,both} (`hear`, not record_call's `listen`).
+    FunctionResult& tap(const std::string& uri,
+                        const std::string& control_id,
+                        TapDirection direction,
+                        Codec codec,
                         int rtp_ptime = 20,
                         const std::string& status_url = "");
     FunctionResult& stop_tap(const std::string& control_id = "");

@@ -9,8 +9,16 @@
 #                                         — language test runner
 #   2. signature regen                    — python adapter via libclang
 #   3. drift gate                         — porting-sdk diff_port_signatures.py
-#   4. no-cheat gate                      — porting-sdk audit_no_cheat_tests.py
-#   5. emission gate                      — porting-sdk diff_port_emission.py
+#   4. surface-fresh gate                 — porting-sdk check_surface_freshness.py
+#                                           (regenerate port_surface.json in place
+#                                           via the SAME host-side regex enumerator
+#                                           the SIGNATURES gate uses, then compare
+#                                           the committed copy against the regen
+#                                           MODULO the generated_from git-sha;
+#                                           closes the Layer-B-not-gated hole where
+#                                           port_surface.json silently rots)
+#   5. no-cheat gate                      — porting-sdk audit_no_cheat_tests.py
+#   6. emission gate                      — porting-sdk diff_port_emission.py
 #                                           (byte-compare FunctionResult
 #                                           serialisation vs Python to_dict()
 #                                           over the shared 81-entry corpus;
@@ -203,6 +211,35 @@ emission_gate() {
     python3 "$PORTING_SDK_DIR/scripts/diff_port_emission.py" --dump-cmd "$dump_cmd"
 }
 
+# SURFACE-FRESH gate: prove the committed port_surface.json (Layer B) still
+# matches a fresh regeneration. run-ci otherwise gates only Layer A
+# (diff_port_signatures.py over port_signatures.json), so the surface can rot
+# unnoticed when a symbol lands in headers but the surface isn't regenerated.
+#
+# cpp's enumerate_surface.py is a HOST-side regex header walker (no compiler,
+# no libclang, no mock servers) — exactly like the SIGNATURES gate's
+# enumerate_signatures.py — so it runs on the host regardless of BUILD_MODE and
+# needs no container routing. It writes port_surface.json in place (default
+# output) and includes the strip_attributes [[nodiscard]] fix, so a clean tree
+# regenerates byte-for-byte modulo the generated_from git-sha. We snapshot the
+# committed copy, regenerate in place, diff modulo provenance via
+# check_surface_freshness.py, then restore the working copy.
+surface_fresh_gate() {
+    # 1. snapshot the committed surface (fallback cp if not tracked at HEAD).
+    if ! git show HEAD:port_surface.json > /tmp/committed_surface.json 2>/dev/null; then
+        cp port_surface.json /tmp/committed_surface.json || return 1
+    fi
+    # 2. regenerate in place via the same host enumerator the SIGNATURES gate uses.
+    python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    # 3. compare committed vs fresh, ignoring the volatile generated_from sha.
+    python3 "$PORTING_SDK_DIR/scripts/check_surface_freshness.py" \
+        --committed /tmp/committed_surface.json --fresh port_surface.json
+    local rc=$?
+    # 4. always restore the working copy (regen rewrote the git-sha provenance).
+    git checkout -- port_surface.json 2>/dev/null
+    return $rc
+}
+
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
 run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
 
@@ -219,11 +256,15 @@ run_gate "DRIFT" "diff_port_signatures vs python reference" \
         --surface-additions "$PORT_ROOT/PORT_ADDITIONS.md" \
         --omissions "$PORT_ROOT/PORT_SIGNATURE_OMISSIONS.md"
 
-# Gate 4: no-cheat
+# Gate 4: surface-fresh — committed port_surface.json must match a fresh regen
+run_gate "SURFACE-FRESH" "check_surface_freshness vs regenerated port_surface.json" \
+    surface_fresh_gate
+
+# Gate 5: no-cheat
 run_gate "NO-CHEAT" "audit_no_cheat_tests" \
     python3 "$PORTING_SDK_DIR/scripts/audit_no_cheat_tests.py" --root "$PORT_ROOT"
 
-# Gate 5: emission — byte-compare FunctionResult serialisation vs Python oracle
+# Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
     emission_gate
 

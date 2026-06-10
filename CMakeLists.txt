@@ -26,7 +26,7 @@ set(IXWEBSOCKET_INSTALL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     ixwebsocket
     GIT_REPOSITORY https://github.com/machinezone/IXWebSocket.git
-    GIT_TAG        v11.4.6
+    GIT_TAG        v12.0.0
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(ixwebsocket)

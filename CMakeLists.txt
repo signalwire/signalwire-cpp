@@ -50,6 +50,14 @@ target_compile_definitions(signalwire PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
 # absolute candidate available wherever the library is linked.
 target_compile_definitions(signalwire PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(signalwire OpenSSL::SSL OpenSSL::Crypto Threads::Threads ixwebsocket)
+# cpp-httplib >= 0.16 loads the OS trust store natively on Apple platforms
+# (httplib::tls::load_system_certs via SecTrustSettingsCopyCertificates), which
+# needs the CoreFoundation + Security frameworks. PUBLIC so the link propagates
+# to anything that links signalwire (e.g. run_tests / emit_corpus). Harmless on
+# non-Apple hosts (guarded by APPLE).
+if(APPLE)
+    target_link_libraries(signalwire "-framework CoreFoundation" "-framework Security")
+endif()
 target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/deps)
 # src/ is PRIVATE: internal-only headers (e.g. server/tls_server.hpp, which
 # pulls in httplib.h for SSLServer) live under src/ so they stay out of the

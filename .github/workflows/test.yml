@@ -60,10 +60,30 @@ jobs:
           sudo apt-get install -y cmake g++ libssl-dev
 
       # The SIGNATURES gate enumerates the C++ surface with libclang via Python.
-      # The `clang` package gives `clang.cindex`; `libclang` bundles a matching
-      # libclang.so that scripts/enumerate_signatures.py's _find_libclang() locates.
+      # The `clang` package provides the `clang.cindex` bindings; the `libclang`
+      # package bundles the native libclang.so. These MUST be version-matched:
+      # the `clang` package's OWN bundled .so is too old and lacks
+      # clang_getOffsetOfBase (LibclangError at Index.create()), so we pin both
+      # to a matching 18.x and point _find_libclang() at the `libclang`
+      # package's .so explicitly via SW_LIBCLANG_PATH (its priority-0 override).
+      # clang==18.1.8 provides the cindex bindings; libclang's newest is 18.1.1
+      # and its native .so HAS clang_getOffsetOfBase (the symbol the `clang`
+      # package's own older bundled .so is missing). Same 18.1.x line → compatible.
       - name: Install libclang Python bindings (SIGNATURES gate)
-        run: pip install clang libclang
+        run: pip install "clang==18.1.8" "libclang==18.1.1"
+
+      # Point _find_libclang() at the resolved native libclang via its priority-0
+      # SW_LIBCLANG_PATH override. The `libclang` pip package installs its native
+      # lib into the `clang/native/` dir (it does NOT create a separate
+      # `libclang/native/`), so resolve the path off the importable `clang`
+      # package — with libclang==18.1.1 pinned, that .so HAS clang_getOffsetOfBase
+      # (the symbol the unpinned/older `clang`-package .so was missing in CI).
+      - name: Resolve the matching libclang native lib (SW_LIBCLANG_PATH)
+        run: |
+          SO="$(python -c 'import os, glob, clang; d=os.path.join(os.path.dirname(clang.__file__), "native"); hits=[h for pat in ("libclang.so","libclang.dylib") for h in glob.glob(os.path.join(d, pat))]; print(hits[0] if hits else "")')"
+          echo "Resolved libclang native lib: $SO"
+          test -f "$SO"
+          echo "SW_LIBCLANG_PATH=$SO" >> "$GITHUB_ENV"
 
       - name: Install Python test harnesses (mock_relay + mock_signalwire)
         run: |

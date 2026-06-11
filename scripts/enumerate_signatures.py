@@ -77,12 +77,30 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
             args += ["-isysroot", sdk]
     except (OSError, subprocess.CalledProcessError) as e:
         print(f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr)
-    if libclang_path:
-        prefix = Path(libclang_path).parent.parent  # <prefix>/lib/libclang.dylib
+    # Find a libc++ + builtin (resource) header pair. Prefer the prefix that
+    # provided libclang.dylib (a self-consistent toolchain); but the pip
+    # `libclang` package's dylib lives in clang/native/ with NO headers — in
+    # that case fall back to any Homebrew LLVM keg that has both, so the audit
+    # doesn't silently degrade types to `int`.
+    def _libcxx_and_builtins(prefix: Path):
         libcxx = prefix / "include" / "c++" / "v1"
         builtins = sorted(_glob.glob(str(prefix / "lib" / "clang" / "*" / "include")), reverse=True)
-        if libcxx.is_dir() and builtins:
-            args += ["-nostdinc++", "-isystem", str(libcxx), "-isystem", builtins[0]]
+        return (str(libcxx), builtins[0]) if libcxx.is_dir() and builtins else None
+    found = None
+    if libclang_path:
+        found = _libcxx_and_builtins(Path(libclang_path).parent.parent)  # <prefix>/lib/libclang.dylib
+    if not found:
+        for prefix in _macos_llvm_prefixes():
+            found = _libcxx_and_builtins(Path(prefix))
+            if found:
+                break
+    if found:
+        libcxx, builtins = found
+        args += ["-nostdinc++", "-isystem", libcxx, "-isystem", builtins]
+    else:
+        print("enumerate_signatures: no matched libc++/builtin headers found on "
+              "macOS (install a Homebrew `llvm` keg); C++ types may degrade to int",
+              file=sys.stderr)
     return args
 
 

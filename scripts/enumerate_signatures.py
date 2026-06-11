@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,6 +37,55 @@ import importlib.util as _ilu
 import os as _os
 import sysconfig as _sc
 
+def _macos_llvm_prefixes() -> list[str]:
+    """Candidate Homebrew LLVM install prefixes on macOS, newest-pinned first.
+
+    A versioned `llvm@NN` keg has a libclang.dylib whose builtin + libc++
+    headers exactly match its version — the matched set we want. `xcrun -f`
+    is NOT used here because Apple's bundled clang doesn't expose libclang.dylib.
+    """
+    prefixes: list[str] = []
+    # `brew --prefix llvm` / versioned kegs, without requiring brew on PATH:
+    # probe the standard Apple-silicon and Intel Cellar/opt layouts.
+    import glob as _glob
+    for base in ("/opt/homebrew/opt", "/usr/local/opt"):
+        # Prefer an explicitly versioned keg (llvm@18, llvm@19, …) then plain llvm.
+        prefixes += sorted(_glob.glob(f"{base}/llvm@*"), reverse=True)
+        prefixes.append(f"{base}/llvm")
+    return prefixes
+
+
+def _macos_clang_args(libclang_path: str | None) -> list[str]:
+    """Extra libclang parse args so C++ stdlib + builtin headers resolve on macOS.
+
+    Without these, `<cstddef>`/`<bit>`/etc. don't resolve and every type that
+    touches them degrades to `int`. The working combination (verified):
+      -isysroot <SDK>            base C library (stdint.h, …)
+      -nostdinc++                ignore the SDK's libc++ (avoids version skew)
+      -isystem <llvm libc++>     use the matched libc++ that ships with libclang
+      -isystem <llvm builtins>   the resource-dir builtins (stdarg.h, __builtin_*)
+    Derived from the same LLVM prefix that provided libclang.dylib so the dylib
+    and headers are one self-consistent toolchain.
+    """
+    import glob as _glob
+    args: list[str] = []
+    try:
+        sdk = subprocess.run(
+            ["xcrun", "--show-sdk-path"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        if sdk and Path(sdk).is_dir():
+            args += ["-isysroot", sdk]
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr)
+    if libclang_path:
+        prefix = Path(libclang_path).parent.parent  # <prefix>/lib/libclang.dylib
+        libcxx = prefix / "include" / "c++" / "v1"
+        builtins = sorted(_glob.glob(str(prefix / "lib" / "clang" / "*" / "include")), reverse=True)
+        if libcxx.is_dir() and builtins:
+            args += ["-nostdinc++", "-isystem", str(libcxx), "-isystem", builtins[0]]
+    return args
+
+
 def _find_libclang() -> str | None:
     """Find a usable libclang.so across local-dev / pip / system layouts."""
     # 0. Explicit override via env var — wins over everything. CI sets this
@@ -44,6 +94,17 @@ def _find_libclang() -> str | None:
     env_path = _os.environ.get("SW_LIBCLANG_PATH")
     if env_path and Path(env_path).is_file():
         return env_path
+    # 0b. macOS: prefer a Homebrew LLVM whose libclang.dylib ships ALONGSIDE its
+    #     own libc++ + builtin (resource) headers. Pairing the dylib with a
+    #     *matching* header set is essential — mixing pip's older libclang
+    #     dylib with the newer macOS SDK libc++ makes types silently degrade to
+    #     `int` (missing builtins like __builtin_clzg). _macos_clang_args()
+    #     below derives -isysroot / -nostdinc++ / -isystem from this same prefix.
+    if sys.platform == "darwin":
+        for prefix in _macos_llvm_prefixes():
+            cand = Path(prefix) / "lib" / "libclang.dylib"
+            if cand.is_file():
+                return str(cand)
     # 1. pip's `libclang` package — bundles libclang.so at
     #    <site-packages>/libclang/native/libclang.so. Newer than pip's
     #    `clang` package's bundled .so so always prefer it. Look it up
@@ -1002,17 +1063,26 @@ def main() -> int:
     deps_dir = PORT_ROOT / "deps"
     if deps_dir.is_dir():
         parse_args.append(f"-I{deps_dir}")
-    # libclang ships without the host stdlib headers; pull them in from
-    # the system gcc install if present so <cstddef> et al. resolve and
-    # nlohmann::json doesn't degrade to ``int``.
-    for gcc_inc in (
-        "/usr/lib/gcc/x86_64-linux-gnu/10/include",
-        "/usr/lib/gcc/x86_64-linux-gnu/12/include",
-        "/usr/lib/gcc/x86_64-linux-gnu/13/include",
-    ):
-        if Path(gcc_inc).is_dir():
-            parse_args.append(f"-I{gcc_inc}")
-            break
+    # libclang ships without the host stdlib headers; pull them in so
+    # <cstddef> et al. resolve and nlohmann::json doesn't degrade to ``int``
+    # (which silently corrupts every type that touches the missing headers).
+    # Platform-specific, so the audit can be run + validated locally on macOS
+    # as well as in Linux CI:
+    #   * macOS: point libclang at the active SDK via -isysroot (same
+    #     mechanism the compiler uses), discovered with `xcrun --show-sdk-path`.
+    #     The SDK carries the libc++ headers under usr/include/c++/v1.
+    #   * Linux: -I the system gcc include dir if present.
+    if sys.platform == "darwin":
+        parse_args += _macos_clang_args(_LIBCLANG)
+    else:
+        for gcc_inc in (
+            "/usr/lib/gcc/x86_64-linux-gnu/10/include",
+            "/usr/lib/gcc/x86_64-linux-gnu/12/include",
+            "/usr/lib/gcc/x86_64-linux-gnu/13/include",
+        ):
+            if Path(gcc_inc).is_dir():
+                parse_args.append(f"-I{gcc_inc}")
+                break
     for header in headers:
         try:
             tu = index.parse(str(header), args=parse_args, options=TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)

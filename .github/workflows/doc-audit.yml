@@ -42,10 +42,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout signalwire-cpp
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Checkout porting-sdk (audit tool)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk

@@ -46,7 +46,7 @@ jobs:
           VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.ref.outputs.ref }}
 
@@ -110,7 +110,7 @@ jobs:
           VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ steps.ref.outputs.ref }}
 

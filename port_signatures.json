@@ -8501,6 +8501,15 @@
               ],
               "returns": "any"
             },
+            "session_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "subscribe": {
               "params": [
                 {

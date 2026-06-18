@@ -55,7 +55,42 @@ int resolve_ws_port();
 // back to ws_port + 1000.
 int resolve_http_port();
 
-// Reset the mock server's journal + scenario queues.
+// ── Session isolation ────────────────────────────────────────────────────
+//
+// The mock's journal AND scenario store are session-scoped on the server by
+// the RELAY handshake `sessionid` (the server returns it in the connect
+// result; RelayClient::session_id() captures it). To make the shared mock
+// safe under parallel test execution, every control-plane call below
+// (journal read, journal/scenario reset, push, inbound_call, scenario_play,
+// arm_method, arm_dial) threads `?session_id=<active>` so a test only ever
+// sees/targets its own frames.
+//
+// The "active session" is a THREAD-LOCAL set automatically by make_client()
+// to the new client's session_id(). Because the parallel test runner gives
+// each test case its own thread, a test's harness calls are implicitly scoped
+// to the client it built — no signature change at the ~130 call sites. Tests
+// that build a RelayClient by hand call set_active_session(client.session_id())
+// themselves. An empty active session means "global" (legacy single-threaded /
+// broadcast), preserving the old behavior for any unscoped caller.
+
+// Force the plain-WS scheme (SIGNALWIRE_RELAY_SCHEME=ws) exactly once. Tests
+// that build a RelayClient by hand call this instead of setenv() directly, so
+// the process-global env isn't mutated concurrently by parallel workers.
+void force_ws_scheme();
+
+// Set the thread-local active session id. Subsequent harness calls on this
+// thread scope to it. Pass "" to clear (global/broadcast).
+void set_active_session(const std::string& session_id);
+
+// Read the thread-local active session id ("" if none).
+std::string active_session();
+
+// Clear the thread-local active session id (== set_active_session("")).
+void clear_active_session();
+
+// Reset the mock server's journal + scenario queues. Scoped to the active
+// session when one is set (clears only this session's entries — safe under
+// parallel load); otherwise clears everything (legacy global reset).
 void reset();
 
 // Read every journal entry in arrival order. Filtered helpers below are

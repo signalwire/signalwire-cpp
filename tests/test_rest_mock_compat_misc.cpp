@@ -12,7 +12,10 @@
 namespace {
 using namespace signalwire::rest;
 using nlohmann::json;
-const std::string kAccountBase = "/api/laml/2010-04-01/Accounts/test_proj";
+// Per-test random project => read the AccountSid from the active scope.
+std::string account_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project();
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -36,7 +39,7 @@ TEST(rest_mock_compat_applications_update_journal_records_post) {
         {{"FriendlyName", "renamed"}, {"VoiceUrl", "https://a.b/v"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kAccountBase + "/Applications/AP_UU");
+    ASSERT_EQ(j.path, account_base() + "/Applications/AP_UU");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("FriendlyName", std::string()), std::string("renamed"));
     ASSERT_EQ(j.body.value("VoiceUrl", std::string()), std::string("https://a.b/v"));
@@ -66,7 +69,7 @@ TEST(rest_mock_compat_laml_bins_update_journal_records_post) {
         {{"FriendlyName", "renamed"}, {"Contents", "<Response/>"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kAccountBase + "/LamlBins/LB_UU");
+    ASSERT_EQ(j.path, account_base() + "/LamlBins/LB_UU");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("FriendlyName", std::string()), std::string("renamed"));
     ASSERT_EQ(j.body.value("Contents", std::string()), std::string("<Response/>"));

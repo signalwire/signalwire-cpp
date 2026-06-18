@@ -11,8 +11,13 @@
 namespace {
 using namespace signalwire::rest;
 using nlohmann::json;
-const std::string kRecBase   = "/api/laml/2010-04-01/Accounts/test_proj/Recordings";
-const std::string kTransBase = "/api/laml/2010-04-01/Accounts/test_proj/Transcriptions";
+// Per-test random project => read the AccountSid from the active scope.
+std::string rec_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Recordings";
+}
+std::string trans_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Transcriptions";
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -33,7 +38,7 @@ TEST(rest_mock_compat_recordings_list_journal_records_get) {
     (void)client.compat().recordings.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kRecBase);
+    ASSERT_EQ(j.path, rec_base());
     return true;
 }
 
@@ -50,7 +55,7 @@ TEST(rest_mock_compat_recordings_get_journal_records_get_with_sid) {
     (void)client.compat().recordings.get("RE_GET");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kRecBase + "/RE_GET");
+    ASSERT_EQ(j.path, rec_base() + "/RE_GET");
     return true;
 }
 
@@ -66,7 +71,7 @@ TEST(rest_mock_compat_recordings_delete_journal_records_delete) {
     (void)client.compat().recordings.delete_("RE_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
-    ASSERT_EQ(j.path, kRecBase + "/RE_DEL");
+    ASSERT_EQ(j.path, rec_base() + "/RE_DEL");
     return true;
 }
 
@@ -88,7 +93,7 @@ TEST(rest_mock_compat_transcriptions_list_journal_records_get) {
     (void)client.compat().transcriptions.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kTransBase);
+    ASSERT_EQ(j.path, trans_base());
     return true;
 }
 
@@ -105,7 +110,7 @@ TEST(rest_mock_compat_transcriptions_get_journal_records_get_with_sid) {
     (void)client.compat().transcriptions.get("TR_GET");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kTransBase + "/TR_GET");
+    ASSERT_EQ(j.path, trans_base() + "/TR_GET");
     return true;
 }
 
@@ -121,6 +126,6 @@ TEST(rest_mock_compat_transcriptions_delete_journal_records_delete) {
     (void)client.compat().transcriptions.delete_("TR_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
-    ASSERT_EQ(j.path, kTransBase + "/TR_DEL");
+    ASSERT_EQ(j.path, trans_base() + "/TR_DEL");
     return true;
 }

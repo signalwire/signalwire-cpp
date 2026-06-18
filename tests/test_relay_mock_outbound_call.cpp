@@ -116,7 +116,15 @@ TEST(relay_mock_dial_with_max_duration_in_frame) {
 TEST(relay_mock_dial_auto_generates_uuid_tag_when_omitted) {
     auto client = mt::make_client();
     // Drive the answer push from a worker thread once the dial frame lands.
-    std::thread pusher([&]() {
+    // The active-session scope is a THREAD-LOCAL set on the test thread by
+    // make_client(); a freshly spawned std::thread does NOT inherit it, so we
+    // must re-establish it here. Without this the worker's journal reads see
+    // the global journal and — fatally under parallel load — its mt::push()
+    // BROADCASTS to every connected session, leaking this test's dial event
+    // into a concurrent test's client.
+    const std::string sid = client->session_id();
+    std::thread pusher([&, sid]() {
+        mt::set_active_session(sid);
         for (int i = 0; i < 200; ++i) {
             auto entries = mt::journal_recv("calling.dial");
             if (!entries.empty()) {
@@ -160,7 +168,13 @@ TEST(relay_mock_dial_auto_generates_uuid_tag_when_omitted) {
 
 TEST(relay_mock_dial_failed_returns_empty_call) {
     auto client = mt::make_client();
-    std::thread pusher([&]() {
+    // Re-establish the thread-local active-session scope inside the worker (a
+    // spawned std::thread doesn't inherit it). Otherwise mt::push() broadcasts
+    // to all sessions and mt::journal_recv() reads the global journal — both
+    // unsafe under the parallel runner.
+    const std::string sid = client->session_id();
+    std::thread pusher([&, sid]() {
+        mt::set_active_session(sid);
         for (int i = 0; i < 200; ++i) {
             if (!mt::journal_recv("calling.dial").empty()) {
                 json frame;

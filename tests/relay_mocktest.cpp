@@ -7,6 +7,7 @@
 // Python conftest fixtures and the REST mocktest.cpp implementation.
 #include "relay_mocktest.hpp"
 
+#include <cctype>
 #include <chrono>
 #include <cstdlib>
 #include <mutex>
@@ -43,6 +44,36 @@ bool& server_started() {
 std::string& http_url_cache() {
     static std::string url;
     return url;
+}
+
+// Thread-local active session id. make_client() sets it; the parallel runner
+// gives each test its own thread, so harness calls scope to the test's client.
+std::string& active_session_ref() {
+    thread_local std::string sid;
+    return sid;
+}
+
+// URL-encode a query value (session ids are hex, but be correct anyway).
+std::string url_encode(const std::string& s) {
+    static const char* hexd = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(s.size());
+    for (unsigned char c : s) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out.push_back(static_cast<char>(c));
+        } else {
+            out.push_back('%');
+            out.push_back(hexd[c >> 4]);
+            out.push_back(hexd[c & 0xF]);
+        }
+    }
+    return out;
+}
+
+// "?session_id=<active>" when scoped, else "".
+std::string session_query() {
+    const std::string& sid = active_session_ref();
+    return sid.empty() ? std::string() : ("?session_id=" + url_encode(sid));
 }
 
 std::pair<std::string, int> split_url(const std::string& base) {
@@ -275,15 +306,33 @@ std::string ensure_server() {
         + "MOCK_RELAY_HTTP_PORT to a pre-running instance)");
 }
 
+void force_ws_scheme() {
+    static std::once_flag scheme_once;
+    std::call_once(scheme_once, [] { ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1); });
+}
+
+void set_active_session(const std::string& session_id) {
+    active_session_ref() = session_id;
+}
+
+std::string active_session() {
+    return active_session_ref();
+}
+
+void clear_active_session() {
+    active_session_ref().clear();
+}
+
 void reset() {
     std::string url = ensure_server();
-    post_no_body(url, "/__mock__/journal/reset");
-    post_no_body(url, "/__mock__/scenarios/reset");
+    std::string q = session_query();
+    post_no_body(url, "/__mock__/journal/reset" + q);
+    post_no_body(url, "/__mock__/scenarios/reset" + q);
 }
 
 std::vector<JournalEntry> journal() {
     std::string url = ensure_server();
-    json arr = get_json(url, "/__mock__/journal");
+    json arr = get_json(url, "/__mock__/journal" + session_query());
     std::vector<JournalEntry> out;
     if (arr.is_array()) {
         out.reserve(arr.size());
@@ -344,24 +393,50 @@ JournalEntry journal_last_recv(const std::string& method) {
 
 void arm_method(const std::string& method, const json& events) {
     std::string url = ensure_server();
-    post_json(url, "/__mock__/scenarios/" + method, events);
+    // Scope the scenario to this session so a parallel test can't consume it.
+    post_json(url, "/__mock__/scenarios/" + method + session_query(), events);
 }
 
 void arm_dial(const json& body) {
     std::string url = ensure_server();
-    post_json(url, "/__mock__/scenarios/dial", body);
+    post_json(url, "/__mock__/scenarios/dial" + session_query(), body);
 }
 
 json push(const json& frame, const std::string& session_id) {
     std::string url = ensure_server();
+    // Explicit arg wins; otherwise target this thread's active session so the
+    // frame reaches only this test's client (empty => broadcast, legacy).
+    std::string target = session_id.empty() ? active_session_ref() : session_id;
     std::string path = "/__mock__/push";
-    if (!session_id.empty()) path += "?session_id=" + session_id;
+    if (!target.empty()) path += "?session_id=" + url_encode(target);
     return post_json(url, path, {{"frame", frame}});
+}
+
+// Stamp each push/expect_recv op of a scenario_play timeline with the active
+// session id (unless it already carries one), so the timeline targets only
+// this test's client and expect_recv matches only this session's frames.
+static json scope_ops(const json& ops) {
+    const std::string& sid = active_session_ref();
+    if (sid.empty() || !ops.is_array()) return ops;
+    json out = json::array();
+    for (const auto& op : ops) {
+        json o = op;
+        if (o.is_object()) {
+            for (const char* key : {"push", "expect_recv"}) {
+                if (o.contains(key) && o[key].is_object()
+                    && !o[key].contains("session_id")) {
+                    o[key]["session_id"] = sid;
+                }
+            }
+        }
+        out.push_back(std::move(o));
+    }
+    return out;
 }
 
 json scenario_play(const json& ops) {
     std::string url = ensure_server();
-    return post_json(url, "/__mock__/scenario_play", ops);
+    return post_json(url, "/__mock__/scenario_play", scope_ops(ops));
 }
 
 json inbound_call(const InboundCallOpts& opts) {
@@ -377,7 +452,11 @@ json inbound_call(const InboundCallOpts& opts) {
         body["auto_states"] = json::array({"created"});
     }
     if (!opts.call_id.empty()) body["call_id"] = opts.call_id;
-    if (!opts.session_id.empty()) body["session_id"] = opts.session_id;
+    // Explicit opts.session_id wins; otherwise target this thread's active
+    // session so the inbound-call sequence reaches only this test's client.
+    std::string target = opts.session_id.empty() ? active_session_ref()
+                                                  : opts.session_id;
+    if (!target.empty()) body["session_id"] = target;
     return post_json(url, "/__mock__/inbound_call", body);
 }
 
@@ -407,12 +486,15 @@ std::unique_ptr<RelayClient> make_client(const std::string& project,
                                           const std::string& token,
                                           const std::vector<std::string>& contexts) {
     ensure_server();
-    reset();
+    // Drop any prior thread-local scope before connecting so we don't, e.g.,
+    // accidentally inherit a previous test's session on a reused worker thread.
+    clear_active_session();
     // Force plain WS scheme in the global env so RelayClient::connect()
     // takes the connect_plain() path. This applies to every test in the
     // process; the production code path is still exercised by the regular
-    // `connect()` overload.
-    ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);
+    // `connect()` overload. Set exactly once (process-global env mutated from
+    // multiple worker threads under the parallel runner).
+    force_ws_scheme();
     RelayConfig cfg = make_config(project, token);
     cfg.contexts = contexts;
     auto client = std::make_unique<RelayClient>(cfg);
@@ -421,6 +503,11 @@ std::unique_ptr<RelayClient> make_client(const std::string& project,
             "relay_mocktest: client connect() failed (mock URL "
             + http_url_cache() + ")");
     }
+    // Scope this thread's subsequent harness calls to THIS client's session.
+    // No reset is needed: a brand-new session starts with an empty (scoped)
+    // journal/scenario view, so the test sees a clean slate and never disturbs
+    // a concurrent test's session.
+    set_active_session(client->session_id());
     return client;
 }
 

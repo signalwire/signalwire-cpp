@@ -12,7 +12,10 @@
 namespace {
 using namespace signalwire::rest;
 using nlohmann::json;
-const std::string kConfBase = "/api/laml/2010-04-01/Accounts/test_proj/Conferences";
+// Per-test random project => read the AccountSid from the active scope.
+std::string conf_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Conferences";
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -35,7 +38,7 @@ TEST(rest_mock_compat_conferences_list_journal_records_get) {
     (void)client.compat().conferences.list();
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kConfBase);
+    ASSERT_EQ(j.path, conf_base());
     ASSERT_TRUE(j.matched_route.has_value());
     return true;
 }
@@ -53,7 +56,7 @@ TEST(rest_mock_compat_conferences_get_journal_records_get_with_sid) {
     (void)client.compat().conferences.get("CF_GETSID");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_GETSID");
+    ASSERT_EQ(j.path, conf_base() + "/CF_GETSID");
     return true;
 }
 
@@ -73,7 +76,7 @@ TEST(rest_mock_compat_conferences_update_journal_records_post_with_status) {
         {{"Status", "completed"}, {"AnnounceUrl", "https://a.b"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_UPD");
+    ASSERT_EQ(j.path, conf_base() + "/CF_UPD");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("completed"));
     ASSERT_EQ(j.body.value("AnnounceUrl", std::string()), std::string("https://a.b"));
@@ -97,7 +100,7 @@ TEST(rest_mock_compat_conferences_get_participant_journal_records_get) {
     (void)client.compat().conferences.get_participant("CF_GP", "CA_GP");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_GP/Participants/CA_GP");
+    ASSERT_EQ(j.path, conf_base() + "/CF_GP/Participants/CA_GP");
     return true;
 }
 
@@ -117,7 +120,7 @@ TEST(rest_mock_compat_conferences_update_participant_journal_records_post) {
         {{"Muted", true}, {"Hold", false}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_M/Participants/CA_M");
+    ASSERT_EQ(j.path, conf_base() + "/CF_M/Participants/CA_M");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Muted", false), true);
     ASSERT_EQ(j.body.value("Hold", true), false);
@@ -137,7 +140,7 @@ TEST(rest_mock_compat_conferences_remove_participant_journal_records_delete) {
     (void)client.compat().conferences.remove_participant("CF_RM", "CA_RM");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_RM/Participants/CA_RM");
+    ASSERT_EQ(j.path, conf_base() + "/CF_RM/Participants/CA_RM");
     return true;
 }
 
@@ -159,7 +162,7 @@ TEST(rest_mock_compat_conferences_list_recordings_journal_records_get) {
     (void)client.compat().conferences.list_recordings("CF_LRX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_LRX/Recordings");
+    ASSERT_EQ(j.path, conf_base() + "/CF_LRX/Recordings");
     return true;
 }
 
@@ -176,7 +179,7 @@ TEST(rest_mock_compat_conferences_get_recording_journal_records_get) {
     (void)client.compat().conferences.get_recording("CF_GRX", "RE_GRX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_GRX/Recordings/RE_GRX");
+    ASSERT_EQ(j.path, conf_base() + "/CF_GRX/Recordings/RE_GRX");
     return true;
 }
 
@@ -195,7 +198,7 @@ TEST(rest_mock_compat_conferences_update_recording_journal_records_post) {
         "CF_UR", "RE_UR", {{"Status", "paused"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_UR/Recordings/RE_UR");
+    ASSERT_EQ(j.path, conf_base() + "/CF_UR/Recordings/RE_UR");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("paused"));
     return true;
@@ -213,7 +216,7 @@ TEST(rest_mock_compat_conferences_delete_recording_journal_records_delete) {
     (void)client.compat().conferences.delete_recording("CF_DRX", "RE_DRX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_DRX/Recordings/RE_DRX");
+    ASSERT_EQ(j.path, conf_base() + "/CF_DRX/Recordings/RE_DRX");
     return true;
 }
 
@@ -236,7 +239,7 @@ TEST(rest_mock_compat_conferences_start_stream_journal_records_post) {
         "CF_SSX", {{"Url", "wss://a.b/s"}, {"Name", "strm"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_SSX/Streams");
+    ASSERT_EQ(j.path, conf_base() + "/CF_SSX/Streams");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Url", std::string()), std::string("wss://a.b/s"));
     return true;
@@ -257,7 +260,7 @@ TEST(rest_mock_compat_conferences_stop_stream_journal_records_post) {
         "CF_TSX", "ST_TSX", {{"Status", "stopped"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kConfBase + "/CF_TSX/Streams/ST_TSX");
+    ASSERT_EQ(j.path, conf_base() + "/CF_TSX/Streams/ST_TSX");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("stopped"));
     return true;

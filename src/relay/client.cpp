@@ -212,6 +212,12 @@ bool RelayClient::authenticate() {
         if (result.contains("authorization_state")) {
             authorization_state_ = result["authorization_state"].get<std::string>();
         }
+        // Capture the server-assigned session id so the test harness can scope
+        // the mock's journal/scenarios/pushes to this client (production code
+        // ignores it). The real RELAY connect result carries `sessionid`.
+        if (result.contains("sessionid") && result["sessionid"].is_string()) {
+            session_id_ = result["sessionid"].get<std::string>();
+        }
         return true;
     } catch (const std::exception& e) {
         get_logger().error(std::string("Authentication failed: ") + e.what());

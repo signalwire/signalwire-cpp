@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 041c25e36d752ad0703f74e25a407fcade04f40c",
+  "generated_from": "signalwire-cpp @ a457ae727852f2edc2b1cae2491f1d07bad37fae",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -811,6 +811,7 @@
           "run",
           "send_message",
           "send_raw_request",
+          "session_id",
           "subscribe",
           "unregister_call",
           "unsubscribe"

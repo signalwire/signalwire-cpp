@@ -33,7 +33,7 @@ TEST(rest_mock_compat_phone_numbers_list_journal_records_get) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/IncomingPhoneNumbers"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/IncomingPhoneNumbers"));
     return true;
 }
 
@@ -55,7 +55,7 @@ TEST(rest_mock_compat_phone_numbers_get_journal_records_get_with_sid) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/IncomingPhoneNumbers/PN_GET"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/IncomingPhoneNumbers/PN_GET"));
     return true;
 }
 
@@ -79,7 +79,7 @@ TEST(rest_mock_compat_phone_numbers_update_journal_records_post_with_friendly_na
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/IncomingPhoneNumbers/PN_UU"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/IncomingPhoneNumbers/PN_UU"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("FriendlyName", std::string()), std::string("updated"));
     ASSERT_EQ(j.body.value("VoiceUrl", std::string()), std::string("https://a.b/v"));
@@ -103,7 +103,7 @@ TEST(rest_mock_compat_phone_numbers_delete_journal_records_delete_at_phone_numbe
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/IncomingPhoneNumbers/PN_DEL"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/IncomingPhoneNumbers/PN_DEL"));
     return true;
 }
 
@@ -126,7 +126,7 @@ TEST(rest_mock_compat_phone_numbers_purchase_journal_records_post_with_phone_num
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/IncomingPhoneNumbers"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/IncomingPhoneNumbers"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("PhoneNumber", std::string()), std::string("+15555550100"));
     ASSERT_EQ(j.body.value("FriendlyName", std::string()), std::string("Main"));
@@ -153,7 +153,7 @@ TEST(rest_mock_compat_phone_numbers_import_number_journal_records_post) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/ImportedPhoneNumbers"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/ImportedPhoneNumbers"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("PhoneNumber", std::string()), std::string("+15555550111"));
     return true;
@@ -178,7 +178,7 @@ TEST(rest_mock_compat_phone_numbers_list_available_countries_journal_records_get
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/AvailablePhoneNumbers"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/AvailablePhoneNumbers"));
     return true;
 }
 
@@ -201,7 +201,7 @@ TEST(rest_mock_compat_phone_numbers_search_toll_free_journal_records_get_with_ar
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/AvailablePhoneNumbers/US/TollFree"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/AvailablePhoneNumbers/US/TollFree"));
     auto it = j.query_params.find("AreaCode");
     ASSERT_TRUE(it != j.query_params.end());
     ASSERT_TRUE(!it->second.empty());

@@ -7,9 +7,12 @@
 // pilot pkg/rest/internal/mocktest.
 #include "mocktest.hpp"
 
+#include <cctype>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -20,6 +23,7 @@
 #include <fcntl.h>
 
 #include "httplib.h"
+#include "signalwire/common.hpp"
 
 namespace signalwire {
 namespace rest {
@@ -45,6 +49,36 @@ bool& server_started() {
 std::string& server_url_cache() {
     static std::string url;
     return url;
+}
+
+// Thread-local active scope: the per-test random project + its Basic-auth
+// header. make_client() sets it; the parallel runner gives each test its own
+// thread, so harness calls scope to the test's client.
+std::string& active_project_ref() {
+    thread_local std::string p;
+    return p;
+}
+std::string& active_auth_ref() {
+    thread_local std::string a;
+    return a;
+}
+
+// URL-encode a query value (the auth header used as a scenario session key
+// contains '+' '/' '=' from base64, so encoding is mandatory).
+std::string mt_url_encode(const std::string& s) {
+    static const char* hexd = "0123456789ABCDEF";
+    std::string out;
+    out.reserve(s.size());
+    for (unsigned char c : s) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            out.push_back(static_cast<char>(c));
+        } else {
+            out.push_back('%');
+            out.push_back(hexd[c >> 4]);
+            out.push_back(hexd[c & 0xF]);
+        }
+    }
+    return out;
 }
 
 // Parse a base URL like http://127.0.0.1:8772 into (host, port).
@@ -228,7 +262,29 @@ std::string ensure_server() {
         + "mock_signalwire package, or set MOCK_SIGNALWIRE_PORT to a pre-running instance)");
 }
 
+void set_active_scope(const std::string& project, const std::string& auth_header) {
+    active_project_ref() = project;
+    active_auth_ref() = auth_header;
+}
+
+std::string active_project() {
+    return active_project_ref();
+}
+
+std::string active_auth_header() {
+    return active_auth_ref();
+}
+
+void clear_active_scope() {
+    active_project_ref().clear();
+    active_auth_ref().clear();
+}
+
 void journal_reset() {
+    // No-op when scoped: the auth-filtered view starts empty for a fresh
+    // client, and a global wipe would race a concurrent test. Unscoped
+    // callers keep the legacy global reset.
+    if (!active_auth_ref().empty()) return;
     std::string url = ensure_server();
     post_no_body(url, "/__mock__/journal/reset");
     post_no_body(url, "/__mock__/scenarios/reset");
@@ -249,9 +305,24 @@ std::vector<JournalEntry> journal() {
                                  + std::to_string(res->status));
     }
     json arr = json::parse(res->body);
+    // Client-side filter to THIS test's requests (identified by auth header)
+    // when scoped, so a parallel test never sees another test's entries.
+    const std::string& my_auth = active_auth_ref();
     std::vector<JournalEntry> out;
     out.reserve(arr.size());
     for (const auto& e : arr) {
+        if (!my_auth.empty()) {
+            // The mock records header keys lowercase (Starlette), matching the
+            // TS harness's `e.headers.authorization` filter.
+            std::string h;
+            if (e.contains("headers") && e["headers"].is_object()) {
+                auto it = e["headers"].find("authorization");
+                if (it != e["headers"].end() && it->is_string()) {
+                    h = it->get<std::string>();
+                }
+            }
+            if (h != my_auth) continue;
+        }
         JournalEntry je;
         if (e.contains("timestamp") && e["timestamp"].is_number()) {
             je.timestamp = e["timestamp"].get<double>();
@@ -309,8 +380,13 @@ void scenario_set(const std::string& endpoint_id, int status, const json& body) 
     cli.set_connection_timeout(5, 0);
     cli.set_read_timeout(5, 0);
     json payload = {{"status", status}, {"response", body}};
-    auto res = cli.Post("/__mock__/scenarios/" + endpoint_id,
-                        payload.dump(), "application/json");
+    // Scope the override to THIS client's auth header (the mock keys REST
+    // scenarios by `?session_id=<auth header>`) so a concurrent test can't
+    // consume it. Unscoped => shared (legacy).
+    std::string path = "/__mock__/scenarios/" + endpoint_id;
+    const std::string& my_auth = active_auth_ref();
+    if (!my_auth.empty()) path += "?session_id=" + mt_url_encode(my_auth);
+    auto res = cli.Post(path, payload.dump(), "application/json");
     if (!res) {
         throw std::runtime_error("mocktest: POST /__mock__/scenarios failed");
     }
@@ -323,8 +399,29 @@ void scenario_set(const std::string& endpoint_id, int status, const json& body) 
 
 RestClient make_client() {
     std::string url = ensure_server();
-    journal_reset();
-    return RestClient::with_base_url(url, "test_proj", "test_tok");
+    // Unique per-test random project => unique Basic-Auth header => journal
+    // filterable per client. Random (not a counter) so concurrent test threads
+    // can't collide on the same project name. No global reset: the scoped
+    // (auth-filtered) journal view starts empty for this brand-new project.
+    static std::random_device rd;
+    static std::mt19937_64 gen(rd());
+    static std::mutex gen_mutex;
+    uint64_t a, b;
+    {
+        std::lock_guard<std::mutex> lk(gen_mutex);
+        a = gen();
+        b = gen();
+    }
+    char hex[13];
+    std::snprintf(hex, sizeof(hex), "%06x%06x",
+                  static_cast<unsigned>(a & 0xFFFFFF),
+                  static_cast<unsigned>(b & 0xFFFFFF));
+    std::string project = std::string("test_proj_") + hex;
+    const std::string token = "test_tok";
+    std::string auth_header =
+        "Basic " + signalwire::base64_encode(project + ":" + token);
+    set_active_scope(project, auth_header);
+    return RestClient::with_base_url(url, project, token);
 }
 
 } // namespace mocktest

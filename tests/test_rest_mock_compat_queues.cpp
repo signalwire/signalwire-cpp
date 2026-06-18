@@ -11,7 +11,12 @@
 namespace {
 using namespace signalwire::rest;
 using nlohmann::json;
-const std::string kQueueBase = "/api/laml/2010-04-01/Accounts/test_proj/Queues";
+// Each test authenticates with a unique random project, so the LAML
+// AccountSid in the path is per-test. Read it from the active scope at
+// assertion time rather than hard-coding "test_proj".
+std::string queue_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Queues";
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -34,7 +39,7 @@ TEST(rest_mock_compat_queues_update_journal_records_post) {
         {{"FriendlyName", "renamed"}, {"MaxSize", 200}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kQueueBase + "/QU_UU");
+    ASSERT_EQ(j.path, queue_base() + "/QU_UU");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("FriendlyName", std::string()), std::string("renamed"));
     ASSERT_EQ(j.body.value("MaxSize", 0), 200);
@@ -59,7 +64,7 @@ TEST(rest_mock_compat_queues_list_members_journal_records_get) {
     (void)client.compat().queues.list_members("QU_LMX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kQueueBase + "/QU_LMX/Members");
+    ASSERT_EQ(j.path, queue_base() + "/QU_LMX/Members");
     return true;
 }
 
@@ -80,7 +85,7 @@ TEST(rest_mock_compat_queues_get_member_journal_records_get) {
     (void)client.compat().queues.get_member("QU_GMX", "CA_GMX");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_EQ(j.path, kQueueBase + "/QU_GMX/Members/CA_GMX");
+    ASSERT_EQ(j.path, queue_base() + "/QU_GMX/Members/CA_GMX");
     return true;
 }
 
@@ -104,7 +109,7 @@ TEST(rest_mock_compat_queues_dequeue_member_journal_records_post) {
         {{"Url", "https://a.b/url"}, {"Method", "POST"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kQueueBase + "/QU_DMX/Members/CA_DMX");
+    ASSERT_EQ(j.path, queue_base() + "/QU_DMX/Members/CA_DMX");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Url", std::string()), std::string("https://a.b/url"));
     ASSERT_EQ(j.body.value("Method", std::string()), std::string("POST"));

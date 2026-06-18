@@ -132,6 +132,16 @@ public:
     const RelayConfig& config() const { return config_; }
     const std::string& relay_protocol() const { return protocol_; }
 
+    /// Server-assigned session id captured from the `signalwire.connect`
+    /// handshake result (`result.sessionid`). Empty until a successful
+    /// connect. Production code never needs this — it exists so the test
+    /// harness can scope the mock's journal/scenarios/pushes to this client's
+    /// session and run safely under parallel execution. Python's RelayClient
+    /// keeps the equivalent internal too; exposing a read-only accessor here
+    /// (rather than a bare public field) keeps it off the mutable surface.
+    /// Documented in PORT_ADDITIONS.md as cpp_relay_session_id_accessor.
+    const std::string& session_id() const { return session_id_; }
+
     // JSON-RPC execution (used by Call and Action objects)
     json execute(const std::string& method, const json& params);
 
@@ -189,6 +199,9 @@ private:
     std::atomic<bool> running_{false};
     std::string protocol_;
     std::string authorization_state_;
+    // Server-assigned session id from the connect handshake result. Test-only
+    // (exposed via session_id()); see the accessor's doc comment.
+    std::string session_id_;
 
     // WebSocket transport
     std::unique_ptr<WebSocketClient> ws_;

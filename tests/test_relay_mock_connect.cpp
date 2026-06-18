@@ -91,9 +91,15 @@ TEST(relay_mock_connect_journal_event_acks_true) {
 TEST(relay_mock_connect_with_empty_creds_fails) {
     // The mock returns AUTH_REQUIRED for empty creds; SDK's connect()
     // must surface failure (returns false) and stay disconnected.
+    //
+    // A failed connect never yields a sessionid, so this hand-built client
+    // can't scope the harness by session. Instead we read the GLOBAL journal
+    // and pick out THIS attempt by its distinctive empty-creds connect frame —
+    // deterministic under parallel load because no other test connects with an
+    // empty project (every other client uses a non-empty random/fixed project).
     mt::ensure_server();
-    mt::reset();
-    ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);
+    mt::clear_active_session();  // global (unscoped) harness view
+    mt::force_ws_scheme();
 
     RelayConfig cfg;
     cfg.project = "";
@@ -108,12 +114,19 @@ TEST(relay_mock_connect_with_empty_creds_fails) {
     ASSERT_FALSE(client.is_connected());
 
     // The journal should still record the connect attempt with empty creds,
-    // proving the request hit the mock and the mock rejected it.
-    auto recvs = mt::journal_recv("signalwire.connect");
-    ASSERT_FALSE(recvs.empty());
-    json auth = recvs.back().frame["params"]["authentication"];
-    ASSERT_EQ(auth.value("project", "x"), "");
-    ASSERT_EQ(auth.value("token", "x"), "");
+    // proving the request hit the mock and the mock rejected it. Find OUR
+    // attempt (empty project+token) among the global connect frames.
+    bool found = false;
+    for (const auto& e : mt::journal_recv("signalwire.connect")) {
+        if (!e.frame.contains("params")) continue;
+        json auth = e.frame["params"].value("authentication", json::object());
+        if (auth.value("project", "x").empty()
+            && auth.value("token", "x").empty()) {
+            found = true;
+            break;
+        }
+    }
+    ASSERT_TRUE(found);
     return true;
 }
 
@@ -122,10 +135,12 @@ TEST(relay_mock_connect_with_empty_creds_fails) {
 // ---------------------------------------------------------------------------
 
 TEST(relay_mock_reconnect_with_protocol_sends_protocol_in_frame) {
-    // First connect: capture the protocol.
+    // First connect: capture the protocol. No global reset — this test only
+    // reads the clients' own protocol fields (never the journal), and a global
+    // reset would race concurrent tests sharing the mock.
     mt::ensure_server();
-    mt::reset();
-    ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);
+    mt::clear_active_session();
+    mt::force_ws_scheme();
 
     RelayConfig cfg;
     cfg.project = "p";

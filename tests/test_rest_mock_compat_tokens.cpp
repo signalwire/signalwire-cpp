@@ -12,7 +12,10 @@
 namespace {
 using namespace signalwire::rest;
 using nlohmann::json;
-const std::string kTokensBase = "/api/laml/2010-04-01/Accounts/test_proj/tokens";
+// Per-test random project => read the AccountSid from the active scope.
+std::string tokens_base() {
+    return "/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/tokens";
+}
 }
 
 // ---------------------------------------------------------------------------
@@ -33,7 +36,7 @@ TEST(rest_mock_compat_tokens_create_journal_records_post) {
         {{"Ttl", 3600}, {"Name", "api-key"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, kTokensBase);
+    ASSERT_EQ(j.path, tokens_base());
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Ttl", 0), 3600);
     ASSERT_EQ(j.body.value("Name", std::string()), std::string("api-key"));
@@ -57,7 +60,7 @@ TEST(rest_mock_compat_tokens_update_journal_records_patch) {
     (void)client.compat().tokens.update("TK_UU", {{"Ttl", 7200}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PATCH"));
-    ASSERT_EQ(j.path, kTokensBase + "/TK_UU");
+    ASSERT_EQ(j.path, tokens_base() + "/TK_UU");
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Ttl", 0), 7200);
     return true;
@@ -79,6 +82,6 @@ TEST(rest_mock_compat_tokens_delete_journal_records_delete) {
     (void)client.compat().tokens.delete_("TK_DEL");
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
-    ASSERT_EQ(j.path, kTokensBase + "/TK_DEL");
+    ASSERT_EQ(j.path, tokens_base() + "/TK_DEL");
     return true;
 }

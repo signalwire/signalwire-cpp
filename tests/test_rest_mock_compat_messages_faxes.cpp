@@ -31,7 +31,7 @@ TEST(rest_mock_compat_messages_update_journal_records_post) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Messages/MM_U1"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Messages/MM_U1"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Body", std::string()), std::string("x"));
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("canceled"));
@@ -52,7 +52,7 @@ TEST(rest_mock_compat_messages_get_media_journal_records_get) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Messages/MM_X/Media/ME_X"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Messages/MM_X/Media/ME_X"));
     return true;
 }
 
@@ -69,7 +69,7 @@ TEST(rest_mock_compat_messages_delete_media_journal_records_delete) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Messages/MM_D/Media/ME_D"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Messages/MM_D/Media/ME_D"));
     return true;
 }
 
@@ -90,7 +90,7 @@ TEST(rest_mock_compat_faxes_update_journal_records_post) {
     (void)client.compat().faxes.update("FX_U2", {{"Status", "canceled"}});
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_EQ(j.path, std::string("/api/laml/2010-04-01/Accounts/test_proj/Faxes/FX_U2"));
+    ASSERT_EQ(j.path, std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Faxes/FX_U2"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("canceled"));
     return true;
@@ -110,7 +110,7 @@ TEST(rest_mock_compat_faxes_list_media_journal_records_get) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Faxes/FX_LM_X/Media"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Faxes/FX_LM_X/Media"));
     return true;
 }
 
@@ -128,7 +128,7 @@ TEST(rest_mock_compat_faxes_get_media_journal_records_get) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Faxes/FX_G/Media/ME_G"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Faxes/FX_G/Media/ME_G"));
     return true;
 }
 
@@ -145,6 +145,6 @@ TEST(rest_mock_compat_faxes_delete_media_journal_records_delete) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Faxes/FX_D/Media/ME_D"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Faxes/FX_D/Media/ME_D"));
     return true;
 }

@@ -36,7 +36,7 @@ TEST(rest_mock_compat_calls_start_stream_journal_records_post) {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Calls/CA_JX1/Streams"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Calls/CA_JX1/Streams"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Url", std::string()), std::string("wss://a.b/s"));
     ASSERT_EQ(j.body.value("Name", std::string()), std::string("strm-x"));
@@ -62,7 +62,7 @@ TEST(rest_mock_compat_calls_stop_stream_journal_records_post_to_specific_stream)
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Calls/CA_S1/Streams/ST_S1"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Calls/CA_S1/Streams/ST_S1"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("stopped"));
     return true;
@@ -87,7 +87,7 @@ TEST(rest_mock_compat_calls_update_recording_journal_records_post_to_specific_re
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path,
-              std::string("/api/laml/2010-04-01/Accounts/test_proj/Calls/CA_R1/Recordings/RE_R1"));
+              std::string("/api/laml/2010-04-01/Accounts/" + mocktest::active_project() + "/Calls/CA_R1/Recordings/RE_R1"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("Status", std::string()), std::string("paused"));
     return true;

@@ -44,7 +44,13 @@ SurveyAgent& SurveyAgent::set_questions(const std::vector<json>& questions) {
   for (size_t i = 0; i < questions.size(); ++i) {
     std::string type = questions[i].value("type", "open_ended");
     std::string text = questions[i].value("question", "");
-    bullets.push_back("Q" + std::to_string(i + 1) + " (" + type + "): " + text);
+    std::string bullet = "Q";
+    bullet += std::to_string(i + 1);
+    bullet += " (";
+    bullet += type;
+    bullet += "): ";
+    bullet += text;
+    bullets.push_back(bullet);
   }
   prompt_add_section("Survey Questions", "", bullets);
   return *this;

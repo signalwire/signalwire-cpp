@@ -112,7 +112,7 @@ class WebSearchSkill : public SkillBase {
           std::string no_items = "Web search results for '" + query + "':\n(no results)";
           // run() handles snippets_only / deadline-bounded scraping /
           // snippet fallback (Python 51101da). Returns UNWRAPPED body.
-          std::string response = web_search_core::run(query, std::move(cands), lp_, num_results_,
+          std::string response = web_search_core::run(query, cands, lp_, num_results_,
                                                       max_content_length_, no_items);
           // Wrap the success / snippet / scraped response with the
           // configured prefix/postfix. Error / transport-error / no-API-key

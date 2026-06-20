@@ -13,9 +13,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <regex>
 #include <sstream>
 #include <utility>
@@ -128,7 +130,18 @@ bool cidr_contains(const std::string& cidr, const std::string& ip) {
   if (slash == std::string::npos) { return false;
 }
   std::string net_str = cidr.substr(0, slash);
-  int prefix = std::atoi(cidr.substr(slash + 1).c_str());
+  std::string prefix_str = cidr.substr(slash + 1);
+  int prefix = 0;
+  {
+    errno = 0;
+    char* end = nullptr;
+    long parsed = std::strtol(prefix_str.c_str(), &end, 10);
+    if (errno == 0 && end != prefix_str.c_str() && *end == '\0' &&
+        parsed >= std::numeric_limits<int>::min() && parsed <= std::numeric_limits<int>::max()) {
+      prefix = static_cast<int>(parsed);
+    }
+    // On any parse failure, preserve the prior std::atoi behaviour of yielding 0.
+  }
 
   auto ip_bytes = ip_to_bytes(ip);
   auto net_bytes = ip_to_bytes(net_str);

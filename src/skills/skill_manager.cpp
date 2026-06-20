@@ -34,7 +34,11 @@ bool SkillManager::load_skill(const std::string& skill_name, const json& params,
   // Validate env vars
   for (const auto& env : skill->required_env_vars()) {
     if (!std::getenv(env.c_str())) {
-      get_logger().error("Missing required env var for skill " + skill_name + ": " + env);
+      std::string msg = "Missing required env var for skill ";
+      msg += skill_name;
+      msg += ": ";
+      msg += env;
+      get_logger().error(msg);
       return false;
     }
   }
@@ -106,6 +110,7 @@ bool SkillManager::is_loaded(const std::string& skill_name) const {
 
 std::vector<std::string> SkillManager::list_loaded() const {
   std::vector<std::string> names;
+  names.reserve(loaded_skills_.size());
   for (const auto& ls : loaded_skills_) {
     names.push_back(ls.name);
   }

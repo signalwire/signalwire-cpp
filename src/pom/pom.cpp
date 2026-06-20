@@ -705,8 +705,10 @@ json parse_scalar(const std::string& raw) {
   if (is_int) {
     try {
       return std::stoll(s);
-    } catch (...) {
-      // fall through to plain string
+    } catch (const std::exception& e) {
+      // Not representable as a long long (e.g. out of range); intentionally
+      // ignore and fall through to return the value as a plain string.
+      static_cast<void>(e);
     }
   }
 
@@ -1024,11 +1026,7 @@ void emit_mapping(std::string& out, const J& obj, int indent_level, bool inline_
       } else {
         out += "\n";
         int next_indent = v.is_array() ? indent_level : (indent_level + 1);
-        if (v.is_array()) {
-          emit_value(out, v, next_indent);
-        } else {
-          emit_value(out, v, next_indent);
-        }
+        emit_value(out, v, next_indent);
       }
     } else {
       out += " ";

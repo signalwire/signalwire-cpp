@@ -168,7 +168,9 @@ struct LatencyParams {
       c.scraped = true;
     }
   } catch (...) {
-    // leave c unscraped
+    // Swallow: a failed scrape leaves the candidate unscraped and must never
+    // propagate out of the std::async task (that would terminate the process).
+    c.scraped = false;
   }
   return c;
 }
@@ -209,7 +211,22 @@ struct LatencyParams {
   futures.reserve(cands.size());
   double ppt = lp.per_page_timeout;
   for (const auto& c : cands) {
-    futures.push_back(std::async(std::launch::async, [c, ppt]() { return scrape_one(c, ppt); }));
+    // Capture the candidate behind a shared_ptr so the closure copies only a
+    // noexcept pointer. Copying a Candidate into the closure could throw
+    // (string allocation), and that copy happens as the async task is
+    // constructed — outside the body's try/catch — so it would otherwise be
+    // able to escape the task (which std::async treats as terminating).
+    auto c_ptr = std::make_shared<Candidate>(c);
+    futures.push_back(std::async(std::launch::async, [c_ptr, ppt]() {
+      try {
+        return scrape_one(*c_ptr, ppt);
+      } catch (...) {
+        // Swallow: scrape_one is already exception-safe, but guarantee no
+        // exception escapes the async task. Returning the (already-constructed)
+        // input candidate via its noexcept move keeps this path non-throwing.
+        return std::move(*c_ptr);
+      }
+    }));
   }
 
   // Anything still running at the deadline is moved here and reaped by a

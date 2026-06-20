@@ -36,7 +36,9 @@ AgentBase::AgentBase(const std::string& name, const std::string& route, const st
   if (!env_port.empty()) {
     try {
       port_ = std::stoi(env_port);
-    } catch (...) {
+    } catch (const std::exception&) {
+      // best-effort: keep the existing port_ if PORT is not a valid integer
+      get_logger().debug("Ignoring invalid PORT env value: " + env_port);
     }
   }
 
@@ -648,6 +650,7 @@ AgentBase& AgentBase::add_skill(const std::string& skill_name, const json& param
   // Add prompt sections
   for (const auto& section : skill->get_prompt_sections()) {
     std::vector<std::string> bullets;
+    bullets.reserve(section.bullets.size());
     for (const auto& b : section.bullets) { bullets.push_back(b);
 }
     prompt_add_section(section.title, section.body, bullets);
@@ -996,9 +999,7 @@ AgentBase& AgentBase::on_debug_event(DebugEventCallback cb) {
 
 json AgentBase::build_prompt() const {
   json prompt;
-  if (raw_prompt_text_ && !use_pom_) {
-    prompt["text"] = *raw_prompt_text_;
-  } else if (use_pom_ && !pom_sections_.empty()) {
+  if (use_pom_ && !pom_sections_.empty()) {
     json pom = json::array();
     for (const auto& section : pom_sections_) {
       pom.push_back(section.to_json());
@@ -1336,7 +1337,9 @@ void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Respon
   if (!req.body.empty()) {
     try {
       body_params = json::parse(req.body);
-    } catch (...) {
+    } catch (const std::exception& e) {
+      // best-effort: malformed body is non-fatal; proceed with empty params
+      (void)e;
     }
   }
 
@@ -1572,7 +1575,7 @@ void AgentBase::serve() {
                        " key=" + tls.key_path + ")");
     return;
   }
-  server_->set_payload_max_length(1024 * 1024);  // 1MB body limit
+  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB body limit
 
   setup_routes(*server_);
 

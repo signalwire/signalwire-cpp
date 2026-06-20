@@ -112,8 +112,9 @@ std::map<std::string, std::map<std::string, std::string>> list_skills_with_param
         entry["description"] = skill->skill_description();
         entry["version"] = skill->skill_version();
       }
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
       // Fall back to the minimal entry on construction failure.
+      static_cast<void>(e);
     }
     out[name] = entry;
   }

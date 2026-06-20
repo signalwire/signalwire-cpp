@@ -50,6 +50,7 @@ class SkillRegistry {
   [[nodiscard]] std::vector<std::string> list_skills() const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> names;
+    names.reserve(factories_.size());
     for (const auto& [k, v] : factories_) {
       names.push_back(k);
     }

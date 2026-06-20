@@ -145,7 +145,7 @@ void sw_free_string_array(char** arr) {
   for (char** p = arr; *p; ++p) {
     std::free(*p);
   }
-  std::free(arr);
+  std::free(static_cast<void*>(arr));
 }
 
 // ========================================================================
@@ -158,7 +158,9 @@ void sw_agent_set_param(sw_agent_t handle, const char* key, const char* value_js
   try {
     auto val = nlohmann::json::parse(value_json);
     static_cast<agent::AgentBase*>(handle)->set_param(key, val);
-  } catch (...) {
+  } catch (const std::exception& e) {
+    // best-effort: invalid JSON is silently ignored at the C boundary
+    (void)e;
   }
 }
 
@@ -168,7 +170,9 @@ void sw_agent_set_global_data(sw_agent_t handle, const char* json_str) {
   try {
     auto data = nlohmann::json::parse(json_str);
     static_cast<agent::AgentBase*>(handle)->set_global_data(data);
-  } catch (...) {
+  } catch (const std::exception& e) {
+    // best-effort: invalid JSON is silently ignored at the C boundary
+    (void)e;
   }
 }
 

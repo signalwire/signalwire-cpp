@@ -31,7 +31,12 @@ ConciergeAgent& ConciergeAgent::set_amenities(const std::vector<json>& amenities
     amenity_data.push_back(a);
     std::string name = a.value("name", "");
     std::string desc = a.value("description", "");
-    bullets.push_back(name + (desc.empty() ? "" : " - " + desc));
+    std::string bullet = name;
+    if (!desc.empty()) {
+      bullet += " - ";
+      bullet += desc;
+    }
+    bullets.push_back(bullet);
   }
 
   update_global_data(json::object({{"amenities", amenity_data}}));

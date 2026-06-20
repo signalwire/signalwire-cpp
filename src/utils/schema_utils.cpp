@@ -130,8 +130,9 @@ json SchemaUtils::load_schema() {
   if (!embedded.empty()) {
     try {
       return json::parse(embedded);
-    } catch (json::parse_error&) {
-      // fall through to file search
+    } catch (json::parse_error& e) {
+      // Embedded schema is malformed; fall through to the file search below.
+      static_cast<void>(e);
     }
   }
   for (const auto& candidate : default_schema_candidates()) {
@@ -248,7 +249,12 @@ std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_lightweight
   for (const auto& prop : get_verb_required_properties(verb_name)) {
     bool present = verb_config.is_object() && verb_config.contains(prop);
     if (!present) {
-      errors.push_back("Missing required property '" + prop + "' for verb '" + verb_name + "'");
+      std::string msg = "Missing required property '";
+      msg += prop;
+      msg += "' for verb '";
+      msg += verb_name;
+      msg += "'";
+      errors.push_back(msg);
     }
   }
   return {errors.empty(), errors};
@@ -282,9 +288,16 @@ std::string SchemaUtils::generate_method_signature(const std::string& verb_name)
   for (const auto& name : param_keys) {
     std::string t = python_type_annotation(params[name]);
     if (required.count(name)) {
-      parts.push_back(name + ": " + t);
+      std::string part = name;
+      part += ": ";
+      part += t;
+      parts.push_back(part);
     } else {
-      parts.push_back(name + ": Optional[" + t + "] = None");
+      std::string part = name;
+      part += ": Optional[";
+      part += t;
+      part += "] = None";
+      parts.push_back(part);
     }
   }
   parts.push_back("**kwargs");

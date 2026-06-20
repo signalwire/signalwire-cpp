@@ -94,7 +94,7 @@ bool RelayClient::connect() {
     try {
       port = std::stoi(port_str);
     } catch (...) {
-      // leave port as configured
+      get_logger().debug("Invalid port in host string; leaving port as configured");
     }
     host = host.substr(0, colon);
   }
@@ -593,13 +593,23 @@ void RelayClient::handle_messaging_event(const RelayEvent& ev) {
     if (handler) {
       // Dispatch on a worker thread so handler-side blocking work
       // doesn't stall the recv loop. Mirrors handle_inbound_call.
-      std::thread([handler, msg]() {
+      // Capture the handler and message behind shared_ptrs so the closure
+      // copies only noexcept pointers. Copying a Message or a std::function into
+      // the closure could throw (allocation), and that copy happens as the
+      // thread callable is constructed — outside any try/catch in the body — so
+      // it would otherwise escape the detached thread and call std::terminate.
+      auto handler_ptr = std::make_shared<InboundMessageHandler>(handler);
+      auto msg_ptr = std::make_shared<Message>(msg);
+      std::thread([handler_ptr, msg_ptr]() {
+        // Detached thread entry: an escaping exception would call
+        // std::terminate, so the handler call is fully guarded and any failure
+        // is swallowed. (Logging is deliberately omitted from the catch path so
+        // this body can never itself throw on the way out.)
         try {
-          handler(msg);
-        } catch (const std::exception& e) {
-          get_logger().error(std::string("Message handler error: ") + e.what());
+          (*handler_ptr)(*msg_ptr);
         } catch (...) {
-          get_logger().error("Message handler threw unknown exception");
+          volatile bool swallowed = true;  // drop handler exception; never rethrow
+          (void)swallowed;
         }
       }).detach();
     }
@@ -843,7 +853,9 @@ void RelayClient::reject_all_pending() {
         error_result["message"] = "Connection lost";
         pending->promise.set_value(error_result);
       } catch (...) {
-        // Promise may already be satisfied
+        // Expected when the promise was already satisfied; nothing to do and we
+        // must not throw here (this runs from the destructor via disconnect()).
+        continue;
       }
     }
     pending_requests_.clear();
@@ -856,7 +868,9 @@ void RelayClient::reject_all_pending() {
       try {
         pending->promise.set_value(nullptr);
       } catch (...) {
-        // Promise may already be satisfied
+        // Expected when the promise was already satisfied; nothing to do and we
+        // must not throw here (this runs from the destructor via disconnect()).
+        continue;
       }
     }
     pending_dials_.clear();

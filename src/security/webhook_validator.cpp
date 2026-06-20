@@ -126,7 +126,7 @@ ParsedUrl parse_url(std::string_view url) {
     p.path = std::string(url);
     return p;
   }
-  p.scheme.assign(url.data(), scheme_end);
+  p.scheme = std::string(url.substr(0, scheme_end));
 
   // Lowercase scheme — match Python's parsed.scheme
   std::transform(p.scheme.begin(), p.scheme.end(), p.scheme.begin(),
@@ -165,8 +165,8 @@ ParsedUrl parse_url(std::string_view url) {
   } else {
     auto colon = authority.rfind(':');
     if (colon != std::string_view::npos) {
-      p.host.assign(authority.data(), colon);
-      p.port.assign(authority.data() + colon + 1, authority.size() - colon - 1);
+      p.host = std::string(authority.substr(0, colon));
+      p.port = std::string(authority.substr(colon + 1));
     } else {
       p.host = std::string(authority);
     }
@@ -180,7 +180,7 @@ ParsedUrl parse_url(std::string_view url) {
     auto f = remainder.find('#');
     auto end = std::min(q == std::string_view::npos ? remainder.size() : q,
                         f == std::string_view::npos ? remainder.size() : f);
-    p.path.assign(remainder.data(), end);
+    p.path = std::string(remainder.substr(0, end));
     remainder = remainder.substr(end);
   }
   if (!remainder.empty() && remainder.front() == '?') {

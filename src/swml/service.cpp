@@ -500,7 +500,9 @@ void Service::serve() {
   if (env_port) {
     try {
       port_ = std::stoi(env_port);
-    } catch (...) {
+    } catch (const std::exception& e) {
+      // Ignore invalid PORT values and keep the existing port.
+      static_cast<void>(e);
     }
   }
 
@@ -514,7 +516,7 @@ void Service::serve() {
                        " key=" + tls.key_path + ")");
     return;
   }
-  server_->set_payload_max_length(1024 * 1024);  // 1MB limit
+  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
   setup_routes(*server_);
   get_logger().info("Starting SWML service on " +
                     std::string(tls.usable() ? "https://" : "http://") + host_ + ":" +

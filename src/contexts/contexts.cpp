@@ -400,7 +400,7 @@ Context& Context::add_exit_filler(const std::string& lang,
 }
 
 std::optional<std::string> Context::render_prompt() const {
-  if (prompt_text_) { return *prompt_text_;
+  if (prompt_text_) { return prompt_text_;
 }
   if (prompt_sections_.empty()) { return std::nullopt;
 }
@@ -420,7 +420,7 @@ std::optional<std::string> Context::render_prompt() const {
 }
 
 std::optional<std::string> Context::render_system_prompt() const {
-  if (system_prompt_) { return *system_prompt_;
+  if (system_prompt_) { return system_prompt_;
 }
   if (system_prompt_sections_.empty()) { return std::nullopt;
 }
@@ -550,8 +550,14 @@ void ContextBuilder::validate() const {
           avail_str += "'" + available[i] + "'";
         }
         avail_str += "]";
-        throw std::runtime_error("Context '" + name + "' has initial_step='" + is +
-                                 "' but that step does not exist. Available steps: " + avail_str);
+        std::string msg;
+        msg += "Context '";
+        msg += name;
+        msg += "' has initial_step='";
+        msg += is;
+        msg += "' but that step does not exist. Available steps: ";
+        msg += avail_str;
+        throw std::runtime_error(msg);
       }
     }
   }
@@ -574,22 +580,28 @@ void ContextBuilder::validate() const {
 
       if (action == "next_step") {
         if (i + 1 >= order.size()) {
-          throw std::runtime_error("Step '" + step_name + "' in context '" + ctx_name +
-                                   "' has gather_info completion_action='next_step' but "
-                                   "it is the last step in the context. Either "
-                                   "(1) add another step after '" +
-                                   step_name +
-                                   "', "
-                                   "(2) set completion_action to the name of an "
-                                   "existing step in this context to jump to it, or "
-                                   "(3) leave completion_action empty (default) to "
-                                   "stay in '" +
-                                   step_name +
-                                   "' after gathering "
-                                   "completes.");
+          std::string msg;
+          msg += "Step '";
+          msg += step_name;
+          msg += "' in context '";
+          msg += ctx_name;
+          msg += "' has gather_info completion_action='next_step' but "
+                 "it is the last step in the context. Either "
+                 "(1) add another step after '";
+          msg += step_name;
+          msg += "', "
+                 "(2) set completion_action to the name of an "
+                 "existing step in this context to jump to it, or "
+                 "(3) leave completion_action empty (default) to "
+                 "stay in '";
+          msg += step_name;
+          msg += "' after gathering "
+                 "completes.";
+          throw std::runtime_error(msg);
         }
       } else if (steps.find(action) == steps.end()) {
         std::vector<std::string> available;
+        available.reserve(steps.size());
         for (const auto& [k, _] : steps) { available.push_back(k);
 }
         std::sort(available.begin(), available.end());
@@ -600,14 +612,22 @@ void ContextBuilder::validate() const {
           avail_str += "'" + available[j] + "'";
         }
         avail_str += "]";
-        throw std::runtime_error("Step '" + step_name + "' in context '" + ctx_name +
-                                 "' has gather_info completion_action='" + action + "' but '" +
-                                 action +
-                                 "' is not a step in this context. "
-                                 "Valid options: 'next_step' (advance to the next "
-                                 "sequential step), empty string (stay in the current "
-                                 "step), or one of " +
-                                 avail_str + ".");
+        std::string msg;
+        msg += "Step '";
+        msg += step_name;
+        msg += "' in context '";
+        msg += ctx_name;
+        msg += "' has gather_info completion_action='";
+        msg += action;
+        msg += "' but '";
+        msg += action;
+        msg += "' is not a step in this context. "
+               "Valid options: 'next_step' (advance to the next "
+               "sequential step), empty string (stay in the current "
+               "step), or one of ";
+        msg += avail_str;
+        msg += ".";
+        throw std::runtime_error(msg);
       }
     }
   }

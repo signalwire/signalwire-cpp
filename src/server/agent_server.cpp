@@ -16,7 +16,9 @@ AgentServer::AgentServer(const std::string& host, int port) : host_(host), port_
   if (!env_port.empty()) {
     try {
       port_ = std::stoi(env_port);
-    } catch (...) {
+    } catch (const std::exception& e) {
+      // Ignore invalid PORT values and keep the constructor-provided port.
+      static_cast<void>(e);
     }
   }
 }
@@ -43,6 +45,7 @@ AgentServer& AgentServer::unregister_agent(const std::string& route) {
 std::vector<std::string> AgentServer::list_routes() const {
   std::lock_guard<std::mutex> lock(mutex_);
   std::vector<std::string> routes;
+  routes.reserve(agents_.size());
   for (const auto& [r, _] : agents_) {
     routes.push_back(r);
   }
@@ -167,7 +170,7 @@ void AgentServer::run() {
                        " key=" + tls.key_path + ")");
     return;
   }
-  server_->set_payload_max_length(1024 * 1024);  // 1MB limit
+  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
 
   setup_routes(*server_);
 

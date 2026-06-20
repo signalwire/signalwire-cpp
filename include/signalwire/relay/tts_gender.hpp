@@ -26,8 +26,8 @@ namespace relay {
 /// documented value). `tts_gender_value()` maps each member to that wire
 /// string, so the enum and string overloads emit the identical TTS frame.
 enum class Gender {
-    Male,
-    Female,
+  Male,
+  Female,
 };
 
 /// Map a `Gender` to its canonical wire string (the value emitted under the
@@ -35,18 +35,18 @@ enum class Gender {
 /// shared by the typed `play_tts` / `prompt_tts` overloads, so their
 /// behavior is identical to passing the bare string.
 inline std::string tts_gender_value(Gender gender) {
-    switch (gender) {
-        case Gender::Male:   return "male";
-        case Gender::Female: return "female";
-    }
-    return "";  // unreachable for a valid enumerator; keeps the compiler quiet
+  switch (gender) {
+    case Gender::Male:
+      return "male";
+    case Gender::Female:
+      return "female";
+  }
+  return "";  // unreachable for a valid enumerator; keeps the compiler quiet
 }
 
 /// `to_string` overload so `Gender` interoperates with ADL-based
 /// stringification the same way `tts_gender_value()` does.
-inline std::string to_string(Gender gender) {
-    return tts_gender_value(gender);
-}
+inline std::string to_string(Gender gender) { return tts_gender_value(gender); }
 
-} // namespace relay
-} // namespace signalwire
+}  // namespace relay
+}  // namespace signalwire

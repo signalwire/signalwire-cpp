@@ -27,11 +27,11 @@
 // tests in ``tests/test_pom.cpp`` are written from those Python outputs.
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <variant>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 namespace signalwire {
 namespace pom {
@@ -46,157 +46,148 @@ class PromptObjectModel;  // fwd
 /// match the Python attribute access pattern ``section.body``,
 /// ``section.bullets``, ``section.subsections``.
 class Section {
-public:
-    /// Section title. Optional only on the very first top-level section
-    /// (Python enforces "only the first section can have no title"); for
-    /// subsections a title is always required.
-    std::optional<std::string> title;
+ public:
+  /// Section title. Optional only on the very first top-level section
+  /// (Python enforces "only the first section can have no title"); for
+  /// subsections a title is always required.
+  std::optional<std::string> title;
 
-    /// Optional paragraph of body text.
-    std::string body;
+  /// Optional paragraph of body text.
+  std::string body;
 
-    /// Optional bullet list.
-    std::vector<std::string> bullets;
+  /// Optional bullet list.
+  std::vector<std::string> bullets;
 
-    /// Nested sections (recursively the same shape).
-    std::vector<Section> subsections;
+  /// Nested sections (recursively the same shape).
+  std::vector<Section> subsections;
 
-    /// Whether this section participates in section numbering. Three-state:
-    ///   * ``std::nullopt`` — not specified (Python ``None``); inherits.
-    ///   * ``true``         — explicitly numbered.
-    ///   * ``false``        — explicitly opted out of numbering.
-    /// Numbering is "all-or-none per sibling group": if any sibling has
-    /// ``numbered == true``, every sibling gets numbered unless it
-    /// explicitly opts out with ``false``.
-    std::optional<bool> numbered;
+  /// Whether this section participates in section numbering. Three-state:
+  ///   * ``std::nullopt`` — not specified (Python ``None``); inherits.
+  ///   * ``true``         — explicitly numbered.
+  ///   * ``false``        — explicitly opted out of numbering.
+  /// Numbering is "all-or-none per sibling group": if any sibling has
+  /// ``numbered == true``, every sibling gets numbered unless it
+  /// explicitly opts out with ``false``.
+  std::optional<bool> numbered;
 
-    /// When true, bullets are rendered as a numbered list (1. 2. 3.) in
-    /// markdown and as ``<bullet id="1">`` in XML, instead of dash bullets.
-    bool numberedBullets = false;
+  /// When true, bullets are rendered as a numbered list (1. 2. 3.) in
+  /// markdown and as ``<bullet id="1">`` in XML, instead of dash bullets.
+  bool numberedBullets = false;
 
-    Section() = default;
+  Section() = default;
 
-    /// Build a Section. ``title`` is optional; everything else has sensible
-    /// defaults so empty Sections can be created and populated incrementally
-    /// via ``add_body`` / ``add_bullets`` / ``add_subsection``.
-    explicit Section(std::optional<std::string> t,
-                     std::string b = "",
-                     std::vector<std::string> bs = {},
-                     std::optional<bool> num = std::nullopt,
-                     bool numbered_bullets = false);
+  /// Build a Section. ``title`` is optional; everything else has sensible
+  /// defaults so empty Sections can be created and populated incrementally
+  /// via ``add_body`` / ``add_bullets`` / ``add_subsection``.
+  explicit Section(std::optional<std::string> t, std::string b = "",
+                   std::vector<std::string> bs = {}, std::optional<bool> num = std::nullopt,
+                   bool numbered_bullets = false);
 
-    /// Replace (NOT append) the body text. Mirrors Python's documented
-    /// "Add OR REPLACE the body text" contract.
-    void add_body(const std::string& b);
+  /// Replace (NOT append) the body text. Mirrors Python's documented
+  /// "Add OR REPLACE the body text" contract.
+  void add_body(const std::string& b);
 
-    /// Append bullets to the existing list.
-    void add_bullets(const std::vector<std::string>& bs);
+  /// Append bullets to the existing list.
+  void add_bullets(const std::vector<std::string>& bs);
 
-    /// Add a child subsection. Returns a reference to the newly-created
-    /// subsection so callers can chain further mutations.
-    /// Throws ``std::invalid_argument`` if ``title`` is empty (Python raises
-    /// ``ValueError("Subsections must have a title")``).
-    Section& add_subsection(const std::string& title,
-                             const std::string& body = "",
-                             const std::vector<std::string>& bullets = {},
-                             std::optional<bool> numbered = std::nullopt,
-                             bool numbered_bullets = false);
-
-    /// Convert the section (and its subtree) to a JSON object. Matches the
-    /// Python key order: title, body, bullets, subsections, numbered,
-    /// numberedBullets.
-    [[nodiscard]] json to_json() const;
-
-    /// Python-compatible alias for to_json — Python exposes ``to_dict``.
-    /// Returns the same JSON object.
-    [[nodiscard]] json to_dict() const { return to_json(); }
-
-    /// Render this section + subtree as Markdown. ``level`` is the heading
-    /// level for this section (default 2 = ``## ``); ``section_number`` is
-    /// the parent path that will prefix this section's title (e.g.
-    /// ``{1, 2}`` -> ``"1.2. "``); empty means "no numbering".
-    [[nodiscard]] std::string render_markdown(int level = 2,
-                                 const std::vector<int>& section_number = {}) const;
-
-    /// Render this section + subtree as XML. ``indent`` is the number of
-    /// 2-space indents to use; ``section_number`` follows the same rule as
-    /// ``render_markdown``.
-    [[nodiscard]] std::string render_xml(int indent = 0,
-                            const std::vector<int>& section_number = {}) const;
-};
-
-
-/// Top-level container of an ordered list of sections.
-class PromptObjectModel {
-public:
-    std::vector<Section> sections;
-    bool debug = false;
-
-    PromptObjectModel() = default;
-    explicit PromptObjectModel(bool debug_flag) : debug(debug_flag) {}
-
-    /// Build a POM from a JSON string.
-    /// Throws ``nlohmann::json::parse_error`` on malformed JSON, and
-    /// ``std::invalid_argument`` on shape violations (missing required
-    /// fields, wrong types, etc.).
-    [[nodiscard]] static PromptObjectModel from_json(const std::string& json_text);
-    /// Build a POM directly from an already-parsed ``json`` value.
-    [[nodiscard]] static PromptObjectModel from_json(const json& data);
-    /// Build a POM from a YAML string (minimal POM-shaped subset only).
-    [[nodiscard]] static PromptObjectModel from_yaml(const std::string& yaml_text);
-
-    /// Append a new top-level section. ``title`` may be empty *only* for
-    /// the very first section (Python enforces "Only the first section can
-    /// have no title"); subsequent calls without a title throw
-    /// ``std::invalid_argument``.
-    Section& add_section(const std::string& title = "",
-                          const std::string& body = "",
+  /// Add a child subsection. Returns a reference to the newly-created
+  /// subsection so callers can chain further mutations.
+  /// Throws ``std::invalid_argument`` if ``title`` is empty (Python raises
+  /// ``ValueError("Subsections must have a title")``).
+  Section& add_subsection(const std::string& title, const std::string& body = "",
                           const std::vector<std::string>& bullets = {},
                           std::optional<bool> numbered = std::nullopt,
                           bool numbered_bullets = false);
 
-    /// Recursively search for a section by title. Returns a pointer to the
-    /// owned section so callers can mutate it; returns ``nullptr`` when
-    /// nothing matches. Pointer is invalidated by any subsequent mutation
-    /// of the POM that grows ``sections`` or ``subsections`` (caller's
-    /// responsibility — same contract as ``std::vector::data()``).
-    [[nodiscard]] Section* find_section(const std::string& title);
-    [[nodiscard]] const Section* find_section(const std::string& title) const;
+  /// Convert the section (and its subtree) to a JSON object. Matches the
+  /// Python key order: title, body, bullets, subsections, numbered,
+  /// numberedBullets.
+  [[nodiscard]] json to_json() const;
 
-    /// Whole-tree JSON serializer. Returns a pretty-printed (indent=2)
-    /// JSON array string, matching Python's ``json.dumps(..., indent=2)``.
-    [[nodiscard]] std::string to_json() const;
+  /// Python-compatible alias for to_json — Python exposes ``to_dict``.
+  /// Returns the same JSON object.
+  [[nodiscard]] json to_dict() const { return to_json(); }
 
-    /// Whole-tree YAML serializer. Returns a YAML document representing
-    /// the JSON-equivalent list-of-dicts structure.
-    [[nodiscard]] std::string to_yaml() const;
+  /// Render this section + subtree as Markdown. ``level`` is the heading
+  /// level for this section (default 2 = ``## ``); ``section_number`` is
+  /// the parent path that will prefix this section's title (e.g.
+  /// ``{1, 2}`` -> ``"1.2. "``); empty means "no numbering".
+  [[nodiscard]] std::string render_markdown(int level = 2,
+                                            const std::vector<int>& section_number = {}) const;
 
-    /// Whole-tree dict view (a ``json`` array). Identical content to
-    /// ``to_json``, returned as a parsed ``json`` value.
-    [[nodiscard]] json to_dict() const;
-
-    /// Render entire POM as Markdown.
-    [[nodiscard]] std::string render_markdown() const;
-
-    /// Render entire POM as XML (with ``<?xml ... ?>`` prolog and a
-    /// ``<prompt>`` root element).
-    [[nodiscard]] std::string render_xml() const;
-
-    /// Add every top-level section of ``pom_to_add`` as a subsection of
-    /// the section identified by ``target_title``. Throws
-    /// ``std::invalid_argument`` when no matching section exists.
-    void add_pom_as_subsection(const std::string& target_title,
-                                const PromptObjectModel& pom_to_add);
-
-    /// Add every top-level section of ``pom_to_add`` as a subsection of
-    /// the given ``target`` Section. Caller owns ``target``.
-    void add_pom_as_subsection(Section& target,
-                                const PromptObjectModel& pom_to_add);
-
-private:
-    static Section build_section(const json& d, bool is_subsection);
+  /// Render this section + subtree as XML. ``indent`` is the number of
+  /// 2-space indents to use; ``section_number`` follows the same rule as
+  /// ``render_markdown``.
+  [[nodiscard]] std::string render_xml(int indent = 0,
+                                       const std::vector<int>& section_number = {}) const;
 };
 
+/// Top-level container of an ordered list of sections.
+class PromptObjectModel {
+ public:
+  std::vector<Section> sections;
+  bool debug = false;
+
+  PromptObjectModel() = default;
+  explicit PromptObjectModel(bool debug_flag) : debug(debug_flag) {}
+
+  /// Build a POM from a JSON string.
+  /// Throws ``nlohmann::json::parse_error`` on malformed JSON, and
+  /// ``std::invalid_argument`` on shape violations (missing required
+  /// fields, wrong types, etc.).
+  [[nodiscard]] static PromptObjectModel from_json(const std::string& json_text);
+  /// Build a POM directly from an already-parsed ``json`` value.
+  [[nodiscard]] static PromptObjectModel from_json(const json& data);
+  /// Build a POM from a YAML string (minimal POM-shaped subset only).
+  [[nodiscard]] static PromptObjectModel from_yaml(const std::string& yaml_text);
+
+  /// Append a new top-level section. ``title`` may be empty *only* for
+  /// the very first section (Python enforces "Only the first section can
+  /// have no title"); subsequent calls without a title throw
+  /// ``std::invalid_argument``.
+  Section& add_section(const std::string& title = "", const std::string& body = "",
+                       const std::vector<std::string>& bullets = {},
+                       std::optional<bool> numbered = std::nullopt, bool numbered_bullets = false);
+
+  /// Recursively search for a section by title. Returns a pointer to the
+  /// owned section so callers can mutate it; returns ``nullptr`` when
+  /// nothing matches. Pointer is invalidated by any subsequent mutation
+  /// of the POM that grows ``sections`` or ``subsections`` (caller's
+  /// responsibility — same contract as ``std::vector::data()``).
+  [[nodiscard]] Section* find_section(const std::string& title);
+  [[nodiscard]] const Section* find_section(const std::string& title) const;
+
+  /// Whole-tree JSON serializer. Returns a pretty-printed (indent=2)
+  /// JSON array string, matching Python's ``json.dumps(..., indent=2)``.
+  [[nodiscard]] std::string to_json() const;
+
+  /// Whole-tree YAML serializer. Returns a YAML document representing
+  /// the JSON-equivalent list-of-dicts structure.
+  [[nodiscard]] std::string to_yaml() const;
+
+  /// Whole-tree dict view (a ``json`` array). Identical content to
+  /// ``to_json``, returned as a parsed ``json`` value.
+  [[nodiscard]] json to_dict() const;
+
+  /// Render entire POM as Markdown.
+  [[nodiscard]] std::string render_markdown() const;
+
+  /// Render entire POM as XML (with ``<?xml ... ?>`` prolog and a
+  /// ``<prompt>`` root element).
+  [[nodiscard]] std::string render_xml() const;
+
+  /// Add every top-level section of ``pom_to_add`` as a subsection of
+  /// the section identified by ``target_title``. Throws
+  /// ``std::invalid_argument`` when no matching section exists.
+  void add_pom_as_subsection(const std::string& target_title, const PromptObjectModel& pom_to_add);
+
+  /// Add every top-level section of ``pom_to_add`` as a subsection of
+  /// the given ``target`` Section. Caller owns ``target``.
+  void add_pom_as_subsection(Section& target, const PromptObjectModel& pom_to_add);
+
+ private:
+  static Section build_section(const json& d, bool is_subsection);
+};
 
 // ---------------------------------------------------------------------------
 // YAML support — narrow internal API. Callers should use the

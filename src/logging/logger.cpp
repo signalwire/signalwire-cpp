@@ -10,4 +10,4 @@ namespace signalwire {
 // are read early.
 static Logger& logger_init_ = Logger::instance();
 
-} // namespace signalwire
+}  // namespace signalwire

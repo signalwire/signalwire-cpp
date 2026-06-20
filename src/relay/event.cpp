@@ -13,5 +13,5 @@ namespace relay {
 // All parsing logic lives in the static from_json / from_relay_event methods
 // defined inline in the header.
 
-} // namespace relay
-} // namespace signalwire
+}  // namespace relay
+}  // namespace signalwire

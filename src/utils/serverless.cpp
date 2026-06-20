@@ -11,7 +11,7 @@ namespace signalwire {
 namespace utils {
 
 bool is_serverless_mode() {
-    return signalwire::core::logging_config::get_execution_mode() != "server";
+  return signalwire::core::logging_config::get_execution_mode() != "server";
 }
 
 }  // namespace utils

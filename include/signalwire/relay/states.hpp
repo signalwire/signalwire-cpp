@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <string>
 #include <optional>
+#include <string>
 
 namespace signalwire {
 namespace relay {
@@ -57,22 +57,27 @@ namespace relay {
 /// `relay/constants.py`. Server-emitted and may grow → `call_state_from_string`
 /// returns an optional on an unknown value.
 enum class CallState {
-    Created,
-    Ringing,
-    Answered,
-    Ending,
-    Ended,
+  Created,
+  Ringing,
+  Answered,
+  Ending,
+  Ended,
 };
 
 [[nodiscard]] inline std::string call_state_value(CallState v) {
-    switch (v) {
-        case CallState::Created:  return "created";
-        case CallState::Ringing:  return "ringing";
-        case CallState::Answered: return "answered";
-        case CallState::Ending:   return "ending";
-        case CallState::Ended:    return "ended";
-    }
-    return "";  // unreachable for a valid enumerator
+  switch (v) {
+    case CallState::Created:
+      return "created";
+    case CallState::Ringing:
+      return "ringing";
+    case CallState::Answered:
+      return "answered";
+    case CallState::Ending:
+      return "ending";
+    case CallState::Ended:
+      return "ended";
+  }
+  return "";  // unreachable for a valid enumerator
 }
 
 /// `to_string` ADL overload — same wire string as `call_state_value`.
@@ -81,12 +86,12 @@ enum class CallState {
 /// Parse a wire string into a `CallState`. Returns `std::nullopt` for any
 /// value not in the known set (server may introduce new states) — NEVER throws.
 [[nodiscard]] inline std::optional<CallState> call_state_from_string(const std::string& s) {
-    if (s == "created")  return CallState::Created;
-    if (s == "ringing")  return CallState::Ringing;
-    if (s == "answered") return CallState::Answered;
-    if (s == "ending")   return CallState::Ending;
-    if (s == "ended")    return CallState::Ended;
-    return std::nullopt;
+  if (s == "created") return CallState::Created;
+  if (s == "ringing") return CallState::Ringing;
+  if (s == "answered") return CallState::Answered;
+  if (s == "ending") return CallState::Ending;
+  if (s == "ended") return CallState::Ended;
+  return std::nullopt;
 }
 
 /// Terminal == no further transitions. For a call that is `ended`.
@@ -102,33 +107,36 @@ enum class CallState {
 /// DISTINCT from `CallState` — `failed` is dial-only; the dial RPC resolves on
 /// `answered`/`failed`. Server-emitted → `dial_state_from_string` is optional.
 enum class DialState {
-    Dialing,
-    Answered,
-    Failed,
+  Dialing,
+  Answered,
+  Failed,
 };
 
 [[nodiscard]] inline std::string dial_state_value(DialState v) {
-    switch (v) {
-        case DialState::Dialing:  return "dialing";
-        case DialState::Answered: return "answered";
-        case DialState::Failed:   return "failed";
-    }
-    return "";
+  switch (v) {
+    case DialState::Dialing:
+      return "dialing";
+    case DialState::Answered:
+      return "answered";
+    case DialState::Failed:
+      return "failed";
+  }
+  return "";
 }
 
 [[nodiscard]] inline std::string to_string(DialState v) { return dial_state_value(v); }
 
 [[nodiscard]] inline std::optional<DialState> dial_state_from_string(const std::string& s) {
-    if (s == "dialing")  return DialState::Dialing;
-    if (s == "answered") return DialState::Answered;
-    if (s == "failed")   return DialState::Failed;
-    return std::nullopt;
+  if (s == "dialing") return DialState::Dialing;
+  if (s == "answered") return DialState::Answered;
+  if (s == "failed") return DialState::Failed;
+  return std::nullopt;
 }
 
 /// Terminal == the dial RPC resolves: success (`answered`) or failure (`failed`).
 /// `dialing` is the in-progress (non-terminal) state.
 [[nodiscard]] inline bool is_terminal(DialState v) {
-    return v == DialState::Answered || v == DialState::Failed;
+  return v == DialState::Answered || v == DialState::Failed;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,47 +149,53 @@ enum class DialState {
 /// the two vocabularies are separate and must not be unified. Server-emitted →
 /// `message_state_from_string` is optional.
 enum class MessageState {
-    Queued,
-    Initiated,
-    Sent,
-    Delivered,
-    Undelivered,
-    Failed,
-    Received,
+  Queued,
+  Initiated,
+  Sent,
+  Delivered,
+  Undelivered,
+  Failed,
+  Received,
 };
 
 [[nodiscard]] inline std::string message_state_value(MessageState v) {
-    switch (v) {
-        case MessageState::Queued:      return "queued";
-        case MessageState::Initiated:   return "initiated";
-        case MessageState::Sent:        return "sent";
-        case MessageState::Delivered:   return "delivered";
-        case MessageState::Undelivered: return "undelivered";
-        case MessageState::Failed:      return "failed";
-        case MessageState::Received:    return "received";
-    }
-    return "";
+  switch (v) {
+    case MessageState::Queued:
+      return "queued";
+    case MessageState::Initiated:
+      return "initiated";
+    case MessageState::Sent:
+      return "sent";
+    case MessageState::Delivered:
+      return "delivered";
+    case MessageState::Undelivered:
+      return "undelivered";
+    case MessageState::Failed:
+      return "failed";
+    case MessageState::Received:
+      return "received";
+  }
+  return "";
 }
 
 [[nodiscard]] inline std::string to_string(MessageState v) { return message_state_value(v); }
 
 [[nodiscard]] inline std::optional<MessageState> message_state_from_string(const std::string& s) {
-    if (s == "queued")      return MessageState::Queued;
-    if (s == "initiated")   return MessageState::Initiated;
-    if (s == "sent")        return MessageState::Sent;
-    if (s == "delivered")   return MessageState::Delivered;
-    if (s == "undelivered") return MessageState::Undelivered;
-    if (s == "failed")      return MessageState::Failed;
-    if (s == "received")    return MessageState::Received;
-    return std::nullopt;
+  if (s == "queued") return MessageState::Queued;
+  if (s == "initiated") return MessageState::Initiated;
+  if (s == "sent") return MessageState::Sent;
+  if (s == "delivered") return MessageState::Delivered;
+  if (s == "undelivered") return MessageState::Undelivered;
+  if (s == "failed") return MessageState::Failed;
+  if (s == "received") return MessageState::Received;
+  return std::nullopt;
 }
 
 /// Terminal == `MESSAGE_TERMINAL_STATES`: delivered, undelivered, or failed.
 [[nodiscard]] inline bool is_terminal(MessageState v) {
-    return v == MessageState::Delivered
-        || v == MessageState::Undelivered
-        || v == MessageState::Failed;
+  return v == MessageState::Delivered || v == MessageState::Undelivered ||
+         v == MessageState::Failed;
 }
 
-} // namespace relay
-} // namespace signalwire
+}  // namespace relay
+}  // namespace signalwire

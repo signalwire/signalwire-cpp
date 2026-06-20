@@ -24,24 +24,24 @@ namespace skills {
 /// (the canonical wire strings). `skill_name_value()` maps each member to that
 /// wire string, so the enum and string overloads load the identical skill.
 enum class SkillName {
-    ApiNinjasTrivia,
-    ClaudeSkills,
-    CustomSkills,
-    Datasphere,
-    DatasphereServerless,
-    Datetime,
-    GoogleMaps,
-    InfoGatherer,
-    Joke,
-    Math,
-    McpGateway,
-    NativeVectorSearch,
-    PlayBackgroundFile,
-    Spider,
-    SwmlTransfer,
-    WeatherApi,
-    WebSearch,
-    WikipediaSearch,
+  ApiNinjasTrivia,
+  ClaudeSkills,
+  CustomSkills,
+  Datasphere,
+  DatasphereServerless,
+  Datetime,
+  GoogleMaps,
+  InfoGatherer,
+  Joke,
+  Math,
+  McpGateway,
+  NativeVectorSearch,
+  PlayBackgroundFile,
+  Spider,
+  SwmlTransfer,
+  WeatherApi,
+  WebSearch,
+  WikipediaSearch,
 };
 
 /// Map a `SkillName` to its canonical wire string (the value a built-in
@@ -49,34 +49,50 @@ enum class SkillName {
 /// point shared by the typed `add_skill`/`remove_skill`/`has_skill`
 /// overloads, so their behavior is identical to passing the bare string.
 [[nodiscard]] inline std::string skill_name_value(SkillName name) {
-    switch (name) {
-        case SkillName::ApiNinjasTrivia:      return "api_ninjas_trivia";
-        case SkillName::ClaudeSkills:         return "claude_skills";
-        case SkillName::CustomSkills:         return "custom_skills";
-        case SkillName::Datasphere:           return "datasphere";
-        case SkillName::DatasphereServerless: return "datasphere_serverless";
-        case SkillName::Datetime:             return "datetime";
-        case SkillName::GoogleMaps:           return "google_maps";
-        case SkillName::InfoGatherer:         return "info_gatherer";
-        case SkillName::Joke:                 return "joke";
-        case SkillName::Math:                 return "math";
-        case SkillName::McpGateway:           return "mcp_gateway";
-        case SkillName::NativeVectorSearch:   return "native_vector_search";
-        case SkillName::PlayBackgroundFile:   return "play_background_file";
-        case SkillName::Spider:               return "spider";
-        case SkillName::SwmlTransfer:         return "swml_transfer";
-        case SkillName::WeatherApi:           return "weather_api";
-        case SkillName::WebSearch:            return "web_search";
-        case SkillName::WikipediaSearch:      return "wikipedia_search";
-    }
-    return "";  // unreachable for a valid enumerator; keeps the compiler quiet
+  switch (name) {
+    case SkillName::ApiNinjasTrivia:
+      return "api_ninjas_trivia";
+    case SkillName::ClaudeSkills:
+      return "claude_skills";
+    case SkillName::CustomSkills:
+      return "custom_skills";
+    case SkillName::Datasphere:
+      return "datasphere";
+    case SkillName::DatasphereServerless:
+      return "datasphere_serverless";
+    case SkillName::Datetime:
+      return "datetime";
+    case SkillName::GoogleMaps:
+      return "google_maps";
+    case SkillName::InfoGatherer:
+      return "info_gatherer";
+    case SkillName::Joke:
+      return "joke";
+    case SkillName::Math:
+      return "math";
+    case SkillName::McpGateway:
+      return "mcp_gateway";
+    case SkillName::NativeVectorSearch:
+      return "native_vector_search";
+    case SkillName::PlayBackgroundFile:
+      return "play_background_file";
+    case SkillName::Spider:
+      return "spider";
+    case SkillName::SwmlTransfer:
+      return "swml_transfer";
+    case SkillName::WeatherApi:
+      return "weather_api";
+    case SkillName::WebSearch:
+      return "web_search";
+    case SkillName::WikipediaSearch:
+      return "wikipedia_search";
+  }
+  return "";  // unreachable for a valid enumerator; keeps the compiler quiet
 }
 
 /// `to_string` overload so `SkillName` interoperates with ADL-based
 /// stringification the same way `skill_name_value()` does.
-[[nodiscard]] inline std::string to_string(SkillName name) {
-    return skill_name_value(name);
-}
+[[nodiscard]] inline std::string to_string(SkillName name) { return skill_name_value(name); }
 
-} // namespace skills
-} // namespace signalwire
+}  // namespace skills
+}  // namespace signalwire

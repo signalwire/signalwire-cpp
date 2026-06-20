@@ -59,6 +59,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ libssl-dev
 
+      # The FMT (clang-format) + LINT (clang-tidy) gates in scripts/run-ci.sh
+      # require clang tooling PINNED to the same major the rollout was burned to
+      # zero against (18.1.x). ubuntu-latest ships a different clang-format major,
+      # whose formatting differs (spurious -Wclang-format-violations), and has no
+      # clang-tidy on PATH (so the gate generated build-tidy via g++, making
+      # clang-tidy mis-parse the C++17 stdlib: "no template named 'optional'",
+      # "decomposition declarations are a C++17 extension"). Install clang-18's
+      # format+tidy and make them the default `clang-format`/`clang-tidy` so the
+      # gates resolve them and run-ci.sh generates build-tidy with clang-18 — no
+      # drift between local and CI.
+      - name: Install clang-format-18 + clang-tidy-18 (FMT + LINT gates)
+        run: |
+          sudo apt-get install -y clang-format-18 clang-tidy-18
+          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-18 100
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+          clang-format --version
+          clang-tidy --version
+
       # The SIGNATURES gate enumerates the C++ surface with libclang via Python.
       # The `clang` package provides the `clang.cindex` bindings; the `libclang`
       # package bundles the native libclang.so. These MUST be version-matched:

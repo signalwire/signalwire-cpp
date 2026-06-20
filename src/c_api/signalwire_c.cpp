@@ -139,8 +139,13 @@ char** sw_agent_list_tools(sw_agent_t handle) {
     return nullptr;
   }
   for (size_t i = 0; i < tools.size(); ++i) {
-    arr[i] = static_cast<char*>(std::malloc(tools[i].size() + 1));
-    std::strcpy(arr[i], tools[i].c_str());
+    const size_t n = tools[i].size() + 1;
+    arr[i] = static_cast<char*>(std::malloc(n));
+    if (arr[i]) {
+      // Bounded copy of the exact known length (incl. NUL) — clang-tidy flags
+      // unbounded strcpy even when the buffer is provably sized.
+      std::memcpy(arr[i], tools[i].c_str(), n);
+    }
   }
   arr[tools.size()] = nullptr;
   return arr;
@@ -153,7 +158,10 @@ void sw_free_string_array(char** arr) {
   for (char** p = arr; *p; ++p) {
     std::free(*p);
   }
-  std::free(static_cast<void*>(arr));
+  // Explicit cast: free() takes void*, and clang-tidy's
+  // bugprone-multi-level-implicit-pointer-conversion wants the char**->void*
+  // conversion spelled out.
+  std::free(reinterpret_cast<void*>(arr));
 }
 
 // ========================================================================
@@ -254,9 +262,11 @@ char* sw_agent_render_swml(sw_agent_t handle) {
   }
   auto swml = static_cast<agent::AgentBase*>(handle)->render_swml();
   std::string str = swml.dump(2);
-  char* result = static_cast<char*>(std::malloc(str.size() + 1));
+  const size_t n = str.size() + 1;
+  char* result = static_cast<char*>(std::malloc(n));
   if (result) {
-    std::strcpy(result, str.c_str());
+    // Bounded copy of the exact known length (incl. NUL); see sw_agent_list_tools.
+    std::memcpy(result, str.c_str(), n);
   }
   return result;
 }
@@ -298,9 +308,11 @@ char* sw_result_to_json(sw_function_result_t handle) {
     return nullptr;
   }
   auto str = static_cast<swaig::FunctionResult*>(handle)->to_string(2);
-  char* result = static_cast<char*>(std::malloc(str.size() + 1));
+  const size_t n = str.size() + 1;
+  char* result = static_cast<char*>(std::malloc(n));
   if (result) {
-    std::strcpy(result, str.c_str());
+    // Bounded copy of the exact known length (incl. NUL); see sw_agent_list_tools.
+    std::memcpy(result, str.c_str(), n);
   }
   return result;
 }

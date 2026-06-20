@@ -41,8 +41,9 @@ const json& Action::result() const {
 
 bool Action::wait(int timeout_ms) {
   std::unique_lock<std::mutex> lock(state_->mutex);
-  if (state_->is_completed) { return true;
-}
+  if (state_->is_completed) {
+    return true;
+  }
 
   if (timeout_ms > 0) {
     return state_->cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),

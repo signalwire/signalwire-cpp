@@ -32,8 +32,9 @@ class DatasphereSkill : public SkillBase {
     space_ = get_param_or_env(params, "space_name", "SIGNALWIRE_SPACE_NAME");
     project_id_ = get_param_or_env(params, "project_id", "SIGNALWIRE_PROJECT_ID");
     token_ = get_param_or_env(params, "token", "SIGNALWIRE_TOKEN");
-    if (token_.empty()) { token_ = get_env("DATASPHERE_TOKEN");
-}
+    if (token_.empty()) {
+      token_ = get_env("DATASPHERE_TOKEN");
+    }
     doc_id_ = get_param<std::string>(params, "document_id", "");
     tool_name_ = get_param<std::string>(params, "tool_name", "search_knowledge");
     count_ = get_param<int>(params, "count", 1);
@@ -44,15 +45,16 @@ class DatasphereSkill : public SkillBase {
     return {define_tool(
         tool_name_,
         "Search the knowledge base for information on any topic and return relevant results",
-        json::object({{"type", "object"},
-                      {"properties",
-                       json::object({{"query", json::object({{"type", "string"},
-                                                             {"description", "Search query"}})}})},
-                      {"required", json::array({"query"})}}),
+        json::object(
+            {{"type", "object"},
+             {"properties",
+              json::object({{"query", json::object({{"type", "string"},
+                                                    {"description", "Search query"}})}})}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
           std::string query = args.value("query", "");
-          if (query.empty()) { return swaig::FunctionResult("No search query provided");
-}
+          if (query.empty()) {
+            return swaig::FunctionResult("No search query provided");
+          }
 
           // Build the upstream URL. Tests/audits override the base
           // via DATASPHERE_BASE_URL; production uses the per-space

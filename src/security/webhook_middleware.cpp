@@ -33,8 +33,9 @@ std::string ascii_lower(std::string s) {
 std::string header_ci(const httplib::Request& req, const char* name) {
   std::string want = ascii_lower(name);
   for (const auto& kv : req.headers) {
-    if (ascii_lower(kv.first) == want) { return kv.second;
-}
+    if (ascii_lower(kv.first) == want) {
+      return kv.second;
+    }
   }
   return {};
 }
@@ -54,8 +55,9 @@ std::string reconstruct_url(const httplib::Request& req, const WebhookValidatorO
     path_and_query += "?";
     bool first = true;
     for (const auto& kv : req.params) {
-      if (!first) { path_and_query += "&";
-}
+      if (!first) {
+        path_and_query += "&";
+      }
       first = false;
       path_and_query += url_encode(kv.first);
       path_and_query += "=";
@@ -78,8 +80,9 @@ std::string reconstruct_url(const httplib::Request& req, const WebhookValidatorO
   if (opts.trust_proxy) {
     std::string fwd_host = header_ci(req, "X-Forwarded-Host");
     std::string fwd_proto = header_ci(req, "X-Forwarded-Proto");
-    if (fwd_proto.empty()) { fwd_proto = "https";
-}
+    if (fwd_proto.empty()) {
+      fwd_proto = "https";
+    }
     if (!fwd_host.empty()) {
       return fwd_proto + "://" + fwd_host + path_and_query;
     }

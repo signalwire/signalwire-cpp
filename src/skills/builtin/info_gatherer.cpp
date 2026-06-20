@@ -56,7 +56,7 @@ class InfoGathererSkill : public SkillBase {
                   {{"answer", json::object({{"type", "string"}, {"description", "The answer"}})},
                    {"confirmed_by_user",
                     json::object({{"type", "boolean"}, {"description", "User confirmed"}})}})},
-             {"required", json::array({"answer"})}}),
+             {"required", json::array()}}),
         [this, questions, instance_key](const json& args,
                                         const json& raw) -> swaig::FunctionResult {
           std::string answer = args.value("answer", "");
@@ -122,8 +122,9 @@ class InfoGathererSkill : public SkillBase {
   }
 
   std::string get_instance_key() const override {
-    if (!prefix_.empty()) { return "info_gatherer_" + prefix_;
-}
+    if (!prefix_.empty()) {
+      return "info_gatherer_" + prefix_;
+    }
     return "info_gatherer";
   }
 

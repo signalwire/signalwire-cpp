@@ -83,8 +83,9 @@ inline std::string generate_random_password(int length = 32) {
 
 // Timing-safe string comparison
 inline bool timing_safe_compare(const std::string& a, const std::string& b) {
-  if (a.size() != b.size()) { return false;
-}
+  if (a.size() != b.size()) {
+    return false;
+  }
   volatile unsigned char result = 0;
   for (size_t i = 0; i < a.size(); ++i) {
     result |= static_cast<unsigned char>(a[i]) ^ static_cast<unsigned char>(b[i]);
@@ -105,10 +106,12 @@ inline std::string base64_encode(const std::string& input) {
       valb -= 6;
     }
   }
-  if (valb > -6) { out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
-}
-  while (out.size() % 4) { out.push_back('=');
-}
+  if (valb > -6) {
+    out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+  }
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
   return out;
 }
 
@@ -131,8 +134,9 @@ inline std::string base64_decode(const std::string& input) {
   std::string out;
   int val = 0, valb = -8;
   for (unsigned char c : input) {
-    if (table[c] == -1) { break;
-}
+    if (table[c] == -1) {
+      break;
+    }
     val = (val << 6) + table[c];
     valb += 6;
     if (valb >= 0) {

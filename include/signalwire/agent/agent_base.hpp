@@ -67,10 +67,12 @@ struct LanguageConfig {
     j["name"] = name;
     j["code"] = code;
     j["voice"] = voice;
-    if (!engine.empty()) { j["engine"] = engine;
-}
-    if (!fillers.empty()) { j["fillers"] = fillers;
-}
+    if (!engine.empty()) {
+      j["engine"] = engine;
+    }
+    if (!fillers.empty()) {
+      j["fillers"] = fillers;
+    }
     // Only emit the params key when non-empty so we don't pollute
     // SWML with empty objects (parity with Python's
     // ``if params:`` check).
@@ -91,8 +93,9 @@ struct Pronunciation {
     json j;
     j["replace"] = replace_val;
     j["with"] = with_val;
-    if (ignore_case) { j["ignore_case"] = true;
-}
+    if (ignore_case) {
+      j["ignore_case"] = true;
+    }
     return j;
   }
 };

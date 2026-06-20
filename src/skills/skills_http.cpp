@@ -39,16 +39,18 @@ ParsedUrl parse_url(const std::string& url) {
     out.host = url.substr(0, path_start);
     out.path = url.substr(path_start);
   }
-  if (out.path.empty()) { out.path = "/";
-}
+  if (out.path.empty()) {
+    out.path = "/";
+  }
   out.ok = true;
   return out;
 }
 
 httplib::Headers make_headers(const std::map<std::string, std::string>& m) {
   httplib::Headers hdrs;
-  for (const auto& [k, v] : m) { hdrs.emplace(k, v);
-}
+  for (const auto& [k, v] : m) {
+    hdrs.emplace(k, v);
+  }
   return hdrs;
 }
 
@@ -95,8 +97,9 @@ SkillHttpResponse http_get_ms(const std::string& url,
   }
   // A non-positive budget would be an unbounded fetch — clamp to a 10s
   // safety default so a misconfigured per_page_timeout can never hang.
-  if (timeout_ms <= 0) { timeout_ms = 10000;
-}
+  if (timeout_ms <= 0) {
+    timeout_ms = 10000;
+  }
   auto dur = std::chrono::milliseconds(timeout_ms);
   // See http_get: an unsupported-scheme URL (e.g. an https:// result link
   // when SSL is compiled out) throws from the Client ctor. web_search feeds

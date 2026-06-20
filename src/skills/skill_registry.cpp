@@ -75,11 +75,13 @@ class MathSkillR : public SkillBase {
   static double eval(const std::string& e) {
     std::string s;
     for (char c : e) {
-      if (!std::isspace((unsigned char)c)) { s += c;
-}
-}
-    if (s.empty()) { throw std::runtime_error("Empty");
-}
+      if (!std::isspace((unsigned char)c)) {
+        s += c;
+      }
+    }
+    if (s.empty()) {
+      throw std::runtime_error("Empty");
+    }
     struct P {
       const std::string& s;
       size_t p = 0;
@@ -95,19 +97,22 @@ class MathSkillR : public SkillBase {
       double term() {
         double r = pw();
         while (p < s.size() && (s[p] == '*' || s[p] == '/' || s[p] == '%')) {
-          if (s[p] == '*' && p + 1 < s.size() && s[p + 1] == '*') { break;
-}
+          if (s[p] == '*' && p + 1 < s.size() && s[p + 1] == '*') {
+            break;
+          }
           char o = s[p++];
           double t = pw();
           if (o == '*') {
             r *= t;
           } else if (o == '/') {
-            if (t == 0) { throw std::runtime_error("Div0");
-}
+            if (t == 0) {
+              throw std::runtime_error("Div0");
+            }
             r /= t;
           } else {
-            if (t == 0) { throw std::runtime_error("Mod0");
-}
+            if (t == 0) {
+              throw std::runtime_error("Mod0");
+            }
             r = std::fmod(r, t);
           }
         }
@@ -126,30 +131,35 @@ class MathSkillR : public SkillBase {
           p++;
           return -atom();
         }
-        if (p < s.size() && s[p] == '+') { p++;
-}
+        if (p < s.size() && s[p] == '+') {
+          p++;
+        }
         return atom();
       }
       double atom() {
         if (p < s.size() && s[p] == '(') {
           p++;
           double r = expr();
-          if (p < s.size() && s[p] == ')') { p++;
-}
+          if (p < s.size() && s[p] == ')') {
+            p++;
+          }
           return r;
         }
         size_t st = p;
-        while (p < s.size() && (std::isdigit((unsigned char)s[p]) || s[p] == '.')) { p++;
-}
-        if (st == p) { throw std::runtime_error("Expected number");
-}
+        while (p < s.size() && (std::isdigit((unsigned char)s[p]) || s[p] == '.')) {
+          p++;
+        }
+        if (st == p) {
+          throw std::runtime_error("Expected number");
+        }
         return std::stod(s.substr(st, p - st));
       }
     };
     P parser{s};
     double r = parser.expr();
-    if (parser.p != s.size()) { throw std::runtime_error("Unexpected char");
-}
+    if (parser.p != s.size()) {
+      throw std::runtime_error("Unexpected char");
+    }
     return r;
   }
 
@@ -167,12 +177,12 @@ class MathSkillR : public SkillBase {
         "calculate", "Perform a mathematical calculation",
         json::object(
             {{"type", "object"},
-             {"properties", json::object({{"expression", json::object({{"type", "string"}})}})},
-             {"required", json::array({"expression"})}}),
+             {"properties", json::object({{"expression", json::object({{"type", "string"}})}})}}),
         [](const json& a, const json&) -> swaig::FunctionResult {
           auto e = a.value("expression", "");
-          if (e.empty()) { return swaig::FunctionResult("No expression");
-}
+          if (e.empty()) {
+            return swaig::FunctionResult("No expression");
+          }
           try {
             double r = eval(e);
             std::ostringstream o;
@@ -274,11 +284,13 @@ class WebSearchSkillR : public SkillBase {
   bool setup(const json& p) override {
     params_ = p;
     ak_ = get_param_or_env(p, "api_key", "GOOGLE_SEARCH_API_KEY");
-    if (ak_.empty()) { ak_ = get_env("GOOGLE_API_KEY");
-}
+    if (ak_.empty()) {
+      ak_ = get_env("GOOGLE_API_KEY");
+    }
     sid_ = get_param_or_env(p, "search_engine_id", "GOOGLE_SEARCH_ENGINE_ID");
-    if (sid_.empty()) { sid_ = get_env("GOOGLE_CSE_ID");
-}
+    if (sid_.empty()) {
+      sid_ = get_env("GOOGLE_CSE_ID");
+    }
     tn_ = get_param<std::string>(p, "tool_name", "web_search");
     nr_ = get_param<int>(p, "num_results", 3);
     rp_ = get_param<std::string>(p, "response_prefix", "");
@@ -300,18 +312,20 @@ class WebSearchSkillR : public SkillBase {
     std::size_t mcl = mcl_;
     return {define_tool(
         tn_, "Search the web for high-quality information",
-        json::object({{"type", "object"},
-                      {"properties",
-                       json::object({{"query", json::object({{"type", "string"},
-                                                             {"description", "Search query"}})}})},
-                      {"required", json::array({"query"})}}),
+        json::object(
+            {{"type", "object"},
+             {"properties",
+              json::object({{"query", json::object({{"type", "string"},
+                                                    {"description", "Search query"}})}})}}),
         [ak, sid, nr, rp, rpf, lp, mcl](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) { return swaig::FunctionResult("No search query provided");
-}
+          if (q.empty()) {
+            return swaig::FunctionResult("No search query provided");
+          }
           std::string base = get_env("WEB_SEARCH_BASE_URL", "https://www.googleapis.com");
-          while (!base.empty() && base.back() == '/') { base.pop_back();
-}
+          while (!base.empty() && base.back() == '/') {
+            base.pop_back();
+          }
           std::ostringstream u;
           u << base << "/customsearch/v1"
             << "?key=" << url_encode(ak) << "&cx=" << url_encode(sid) << "&q=" << url_encode(q)
@@ -319,12 +333,13 @@ class WebSearchSkillR : public SkillBase {
           // The CSE fetch is the single non-cancelable step; the
           // overall_deadline budget starts after it (inside core::run).
           auto r = skills::http_get(u.str());
-          if (r.status == 0) { return swaig::FunctionResult("Web search transport error: " + r.error);
-}
+          if (r.status == 0) {
+            return swaig::FunctionResult("Web search transport error: " + r.error);
+          }
           if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("Web search HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
-}
+          }
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -339,10 +354,12 @@ class WebSearchSkillR : public SkillBase {
           // Wrap the success / snippet / scraped response (parity with
           // Python 8aad242). The no-items message stays unwrapped.
           if (response != no_items) {
-            if (!rp.empty()) { response = rp + "\n\n" + response;
-}
-            if (!rpf.empty()) { response = response + "\n\n" + rpf;
-}
+            if (!rp.empty()) {
+              response = rp + "\n\n" + response;
+            }
+            if (!rpf.empty()) {
+              response = response + "\n\n" + rpf;
+            }
           }
           return swaig::FunctionResult(response);
         })};
@@ -381,26 +398,28 @@ class WikipediaSearchSkillR : public SkillBase {
         json::object(
             {{"type", "object"},
              {"properties", json::object({{"query", json::object({{"type", "string"},
-                                                                  {"description", "Topic"}})}})},
-             {"required", json::array({"query"})}}),
+                                                                  {"description", "Topic"}})}})}}),
         [nr, nm](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) { return swaig::FunctionResult(nm);
-}
+          if (q.empty()) {
+            return swaig::FunctionResult(nm);
+          }
           std::string base = get_env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org");
-          while (!base.empty() && base.back() == '/') { base.pop_back();
-}
+          while (!base.empty() && base.back() == '/') {
+            base.pop_back();
+          }
           std::ostringstream u;
           u << base << "/w/api.php"
             << "?action=query&list=search&format=json"
             << "&srlimit=" << nr << "&srsearch=" << url_encode(q);
           auto r = skills::http_get(u.str());
-          if (r.status == 0) { return swaig::FunctionResult("Wikipedia transport error: " + r.error);
-}
+          if (r.status == 0) {
+            return swaig::FunctionResult("Wikipedia transport error: " + r.error);
+          }
           if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("Wikipedia HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
-}
+          }
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -417,8 +436,9 @@ class WikipediaSearchSkillR : public SkillBase {
               any = true;
             }
           }
-          if (!any) { return swaig::FunctionResult(nm);
-}
+          if (!any) {
+            return swaig::FunctionResult(nm);
+          }
           return swaig::FunctionResult(out.str());
         })};
   }
@@ -441,11 +461,48 @@ class GoogleMapsSkillR : public SkillBase {
     return !ak_.empty();
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
-    return {define_tool("lookup_address", "Look up address",
-                        json::object({{"type", "object"}, {"properties", json::object()}}),
-                        [](const json&, const json&) -> swaig::FunctionResult {
-                          return swaig::FunctionResult("Address lookup");
-                        })};
+    // Contract mirrors Python's google_maps register_tools (no required[] on
+    // either tool's params except as Python derives it): lookup_address takes
+    // address (string) + optional bias_lat/bias_lng (number, required:False ->
+    // none required); compute_route takes the four lat/lng numbers (Python sets
+    // no required:False, so all four are required).
+    return {
+        define_tool(
+            "lookup_address", "Validate and geocode a street address or business name",
+            json::object(
+                {{"type", "object"},
+                 {"properties",
+                  json::object(
+                      {{"address",
+                        json::object({{"type", "string"},
+                                      {"description", "The address or business name to look up"}})},
+                       {"bias_lat", json::object({{"type", "number"},
+                                                  {"description",
+                                                   "Latitude to bias results toward (optional)"}})},
+                       {"bias_lng",
+                        json::object(
+                            {{"type", "number"},
+                             {"description", "Longitude to bias results toward (optional)"}})}})}}),
+            [](const json&, const json&) -> swaig::FunctionResult {
+              return swaig::FunctionResult("Address lookup");
+            }),
+        define_tool(
+            "compute_route", "Compute a driving route between two points",
+            json::object(
+                {{"type", "object"},
+                 {"properties",
+                  json::object(
+                      {{"origin_lat",
+                        json::object({{"type", "number"}, {"description", "Origin latitude"}})},
+                       {"origin_lng",
+                        json::object({{"type", "number"}, {"description", "Origin longitude"}})},
+                       {"dest_lat", json::object({{"type", "number"},
+                                                  {"description", "Destination latitude"}})},
+                       {"dest_lng", json::object({{"type", "number"},
+                                                  {"description", "Destination longitude"}})}})}}),
+            [](const json&, const json&) -> swaig::FunctionResult {
+              return swaig::FunctionResult("Route computed");
+            })};
   }
   std::vector<std::string> get_hints() const override { return {"address", "location", "route"}; }
 };
@@ -462,17 +519,21 @@ class SpiderSkillR : public SkillBase {
     return std::regex_replace(nt, ws_re, " ");
   }
   static std::string apply_base(const std::string& url, const std::string& base) {
-    if (base.empty()) { return url;
-}
+    if (base.empty()) {
+      return url;
+    }
     auto se = url.find("://");
-    if (se == std::string::npos) { return url;
-}
+    if (se == std::string::npos) {
+      return url;
+    }
     auto ps = url.find('/', se + 3);
     std::string b = base;
-    while (!b.empty() && b.back() == '/') { b.pop_back();
-}
-    if (ps == std::string::npos) { return b;
-}
+    while (!b.empty() && b.back() == '/') {
+      b.pop_back();
+    }
+    if (ps == std::string::npos) {
+      return b;
+    }
     return b + url.substr(ps);
   }
 
@@ -485,43 +546,81 @@ class SpiderSkillR : public SkillBase {
     return true;
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
-    return {define_tool(
-        "scrape_url", "Scrape URL",
-        json::object({{"type", "object"},
-                      {"properties",
-                       json::object({{"url", json::object({{"type", "string"},
-                                                           {"description", "URL to scrape"}})}})},
-                      {"required", json::array({"url"})}}),
-        [](const json& a, const json&) -> swaig::FunctionResult {
-          std::string url = a.value("url", "");
-          if (url.empty()) { return swaig::FunctionResult("No URL provided");
-}
-          std::string base = get_env("SPIDER_BASE_URL");
-          std::string eff = apply_base(url, base);
-          auto r = skills::http_get(eff);
-          if (r.status == 0) { return swaig::FunctionResult("Spider transport error: " + r.error);
-}
-          if (r.status < 200 || r.status >= 300) {
-            return swaig::FunctionResult("Spider HTTP " + std::to_string(r.status) + " from " +
-                                         eff);
-}
-          std::string text;
-          if (!r.body.empty() && r.body.front() == '{') {
-            try {
-              json parsed = json::parse(r.body);
-              if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
-                text = strip_html(parsed["_raw_html"].get<std::string>());
+    return {
+        define_tool(
+            "scrape_url", "Scrape URL",
+            json::object(
+                {{"type", "object"},
+                 {"properties",
+                  json::object({{"url", json::object({{"type", "string"},
+                                                      {"description", "URL to scrape"}})}})},
+                 {"required", json::array({"url"})}}),
+            [](const json& a, const json&) -> swaig::FunctionResult {
+              std::string url = a.value("url", "");
+              if (url.empty()) {
+                return swaig::FunctionResult("No URL provided");
+              }
+              std::string base = get_env("SPIDER_BASE_URL");
+              std::string eff = apply_base(url, base);
+              auto r = skills::http_get(eff);
+              if (r.status == 0) {
+                return swaig::FunctionResult("Spider transport error: " + r.error);
+              }
+              if (r.status < 200 || r.status >= 300) {
+                return swaig::FunctionResult("Spider HTTP " + std::to_string(r.status) + " from " +
+                                             eff);
+              }
+              std::string text;
+              if (!r.body.empty() && r.body.front() == '{') {
+                try {
+                  json parsed = json::parse(r.body);
+                  if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
+                    text = strip_html(parsed["_raw_html"].get<std::string>());
+                  } else {
+                    text = strip_html(r.body);
+                  }
+                } catch (...) {
+                  text = strip_html(r.body);
+                }
               } else {
                 text = strip_html(r.body);
               }
-            } catch (...) {
-              text = strip_html(r.body);
-            }
-          } else {
-            text = strip_html(r.body);
-          }
-          return swaig::FunctionResult("Scraped content from " + eff + ":\n" + text);
-        })};
+              return swaig::FunctionResult("Scraped content from " + eff + ":\n" + text);
+            }),
+        // crawl_site + extract_structured_data mirror Python's spider
+        // register_tools (each one string param, required). Behavior is not
+        // part of the compared contract; the handlers return a placeholder.
+        define_tool(
+            "crawl_site", "Crawl multiple pages starting from a URL",
+            json::object(
+                {{"type", "object"},
+                 {"properties",
+                  json::object({{"start_url",
+                                 json::object({{"type", "string"},
+                                               {"description", "Starting URL for the crawl"}})}})},
+                 {"required", json::array({"start_url"})}}),
+            [](const json& a, const json&) -> swaig::FunctionResult {
+              std::string url = a.value("start_url", "");
+              if (url.empty()) {
+                return swaig::FunctionResult("No start_url provided");
+              }
+              return swaig::FunctionResult("Crawl started from " + url);
+            }),
+        define_tool(
+            "extract_structured_data", "Extract specific data from a web page using selectors",
+            json::object(
+                {{"type", "object"},
+                 {"properties",
+                  json::object({{"url", json::object({{"type", "string"},
+                                                      {"description", "The URL to scrape"}})}})},
+                 {"required", json::array({"url"})}}),
+            [](const json& a, const json&) -> swaig::FunctionResult {
+              std::string url = a.value("url", "");
+              if (url.empty()) {
+                return swaig::FunctionResult("No URL provided");
+              }
+              return swaig::FunctionResult("Structured data from " + url);
+            })};
   }
   std::vector<std::string> get_hints() const override { return {"scrape", "crawl"}; }
 };
@@ -549,8 +648,9 @@ class DatasphereSkillR : public SkillBase {
     sp_ = get_param_or_env(p, "space_name", "SIGNALWIRE_SPACE_NAME");
     pi_ = get_param_or_env(p, "project_id", "SIGNALWIRE_PROJECT_ID");
     tk_ = get_param_or_env(p, "token", "SIGNALWIRE_TOKEN");
-    if (tk_.empty()) { tk_ = get_env("DATASPHERE_TOKEN");
-}
+    if (tk_.empty()) {
+      tk_ = get_env("DATASPHERE_TOKEN");
+    }
     di_ = get_param<std::string>(p, "document_id", "");
     tn_ = get_param<std::string>(p, "tool_name", "search_knowledge");
     count_ = get_param<int>(p, "count", 1);
@@ -563,18 +663,20 @@ class DatasphereSkillR : public SkillBase {
     double dist = distance_;
     return {define_tool(
         tn_, "Search the knowledge base",
-        json::object({{"type", "object"},
-                      {"properties",
-                       json::object({{"query", json::object({{"type", "string"},
-                                                             {"description", "Search query"}})}})},
-                      {"required", json::array({"query"})}}),
+        json::object(
+            {{"type", "object"},
+             {"properties",
+              json::object({{"query", json::object({{"type", "string"},
+                                                    {"description", "Search query"}})}})}}),
         [sp, pi, tk, di, cnt, dist](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) { return swaig::FunctionResult("No search query provided");
-}
+          if (q.empty()) {
+            return swaig::FunctionResult("No search query provided");
+          }
           std::string base = get_env("DATASPHERE_BASE_URL");
-          if (base.empty()) { base = "https://" + sp + ".signalwire.com";
-}
+          if (base.empty()) {
+            base = "https://" + sp + ".signalwire.com";
+          }
           std::string url = base + "/api/datasphere/documents/search";
           json body = json::object({
               {"document_id", di},
@@ -586,12 +688,13 @@ class DatasphereSkillR : public SkillBase {
           hdrs["Authorization"] = "Basic " + base64_encode(pi + ":" + tk);
           hdrs["Accept"] = "application/json";
           auto r = skills::http_post(url, body.dump(), "application/json", hdrs);
-          if (r.status == 0) { return swaig::FunctionResult("DataSphere transport error: " + r.error);
-}
+          if (r.status == 0) {
+            return swaig::FunctionResult("DataSphere transport error: " + r.error);
+          }
           if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("DataSphere HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
-}
+          }
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -688,7 +791,18 @@ class PlayBackgroundFileSkillR : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
   std::vector<json> get_datamap_functions() const override {
     datamap::DataMap dm(tn_);
-    dm.purpose("Control playback").parameter("action", "string", "Action", true);
+    // action enum = start_<key> for each configured file, plus "stop" (mirrors
+    // Python's play_background_file register_tools); required.
+    std::vector<std::string> actions;
+    if (params_.contains("files") && params_["files"].is_array()) {
+      for (const auto& f : params_["files"]) {
+        if (f.contains("key") && f["key"].is_string()) {
+          actions.push_back("start_" + f["key"].get<std::string>());
+        }
+      }
+    }
+    actions.emplace_back("stop");
+    dm.purpose("Control playback").parameter("action", "string", "Action", true, actions);
     return {dm.to_swaig_function()};
   }
 };
@@ -708,8 +822,23 @@ class ApiNinjasTriviaSkillR : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
   std::vector<json> get_datamap_functions() const override {
     datamap::DataMap dm(tn_);
+    // category enum = the configured categories, defaulting to all 14 valid
+    // API Ninjas categories (mirrors Python's VALID_CATEGORIES keys); required.
+    std::vector<std::string> categories = {
+        "artliterature",     "entertainment", "fooddrink",     "general",  "geography",
+        "historyholidays",   "language",      "mathematics",   "music",    "peopleplaces",
+        "religionmythology", "sciencenature", "sportsleisure", "toysgames"};
+    if (params_.contains("categories") && params_["categories"].is_array() &&
+        !params_["categories"].empty()) {
+      categories.clear();
+      for (const auto& c : params_["categories"]) {
+        if (c.is_string()) {
+          categories.push_back(c.get<std::string>());
+        }
+      }
+    }
     dm.purpose("Get trivia")
-        .parameter("category", "string", "Category", true)
+        .parameter("category", "string", "Category", true, categories)
         .webhook("GET", "https://api.api-ninjas.com/v1/trivia?category=${args.category}",
                  json::object({{"X-Api-Key", ak_}}))
         .output(swaig::FunctionResult("Trivia: ${array[0].question}"));
@@ -765,9 +894,11 @@ class InfoGathererSkillR : public SkillBase {
                         }),
             define_tool(
                 an, "Submit answer",
-                json::object({{"type", "object"},
-                              {"properties",
-                               json::object({{"answer", json::object({{"type", "string"}})}})}}),
+                json::object(
+                    {{"type", "object"},
+                     {"properties",
+                      json::object({{"answer", json::object({{"type", "string"}})},
+                                    {"confirmed_by_user", json::object({{"type", "boolean"}})}})}}),
                 [](const json& a, const json&) -> swaig::FunctionResult {
                   return swaig::FunctionResult("Recorded: " + a.value("answer", ""));
                 })};
@@ -836,8 +967,9 @@ class CustomSkillsSkillR : public SkillBase {
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::vector<swaig::ToolDefinition> t;
-    if (!params_.contains("tools")) { return t;
-}
+    if (!params_.contains("tools")) {
+      return t;
+    }
     for (const auto& td : params_["tools"]) {
       auto n = td.value("name", "tool");
       auto d = td.value("description", "");

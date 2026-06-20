@@ -37,8 +37,9 @@ void HttpClient::configure_client(httplib::Client& cli) const {
   std::string ca = ca_cert_path_;
   if (ca.empty()) {
     if (const char* env = std::getenv("SSL_CERT_FILE")) {
-      if (env && *env) { ca = env;
-}
+      if (env && *env) {
+        ca = env;
+      }
     }
   }
   if (!ca.empty()) {
@@ -48,13 +49,15 @@ void HttpClient::configure_client(httplib::Client& cli) const {
 }
 
 std::string HttpClient::build_query_string(const std::map<std::string, std::string>& params) const {
-  if (params.empty()) { return "";
-}
+  if (params.empty()) {
+    return "";
+  }
   std::string qs = "?";
   bool first = true;
   for (const auto& [k, v] : params) {
-    if (!first) { qs += "&";
-}
+    if (!first) {
+      qs += "&";
+    }
     qs += signalwire::url_encode(k) + "=" + signalwire::url_encode(v);
     first = false;
   }
@@ -81,10 +84,11 @@ json HttpClient::handle_response(int status, const std::string& body) const {
       msg += ": " + err["message"].get<std::string>();
     } else if (err.contains("error")) {
       msg += ": " + err["error"].get<std::string>();
-}
+    }
   } catch (...) {
-    if (!body.empty()) { msg += ": " + body;
-}
+    if (!body.empty()) {
+      msg += ": " + body;
+    }
   }
 
   throw SignalWireRestError(status, msg, body);
@@ -99,8 +103,9 @@ static std::pair<std::string, std::string> parse_url(const std::string& base_url
     scheme = host.substr(0, pos);
     host = host.substr(pos + 3);
   }
-  if (!host.empty() && host.back() == '/') { host.pop_back();
-}
+  if (!host.empty() && host.back() == '/') {
+    host.pop_back();
+  }
   return {scheme, host};
 }
 
@@ -108,8 +113,9 @@ static httplib::Headers make_headers(const std::string& auth,
                                      const std::map<std::string, std::string>& extra) {
   httplib::Headers hdrs;
   hdrs.emplace("Authorization", auth);
-  for (const auto& [k, v] : extra) { hdrs.emplace(k, v);
-}
+  for (const auto& [k, v] : extra) {
+    hdrs.emplace(k, v);
+  }
   return hdrs;
 }
 
@@ -123,8 +129,9 @@ json HttpClient::get(const std::string& path,
   configure_client(cli);
 
   auto res = cli.Get(full_path, hdrs);
-  if (!res) { throw SignalWireRestError(0, "Connection failed to " + host);
-}
+  if (!res) {
+    throw SignalWireRestError(0, "Connection failed to " + host);
+  }
   return handle_response(res->status, res->body);
 }
 
@@ -137,8 +144,9 @@ json HttpClient::post(const std::string& path, const json& body) const {
   configure_client(cli);
 
   auto res = cli.Post(path, hdrs, body_str, "application/json");
-  if (!res) { throw SignalWireRestError(0, "Connection failed");
-}
+  if (!res) {
+    throw SignalWireRestError(0, "Connection failed");
+  }
   return handle_response(res->status, res->body);
 }
 
@@ -151,8 +159,9 @@ json HttpClient::put(const std::string& path, const json& body) const {
   configure_client(cli);
 
   auto res = cli.Put(path, hdrs, body_str, "application/json");
-  if (!res) { throw SignalWireRestError(0, "Connection failed");
-}
+  if (!res) {
+    throw SignalWireRestError(0, "Connection failed");
+  }
   return handle_response(res->status, res->body);
 }
 
@@ -165,8 +174,9 @@ json HttpClient::patch(const std::string& path, const json& body) const {
   configure_client(cli);
 
   auto res = cli.Patch(path, hdrs, body_str, "application/json");
-  if (!res) { throw SignalWireRestError(0, "Connection failed");
-}
+  if (!res) {
+    throw SignalWireRestError(0, "Connection failed");
+  }
   return handle_response(res->status, res->body);
 }
 
@@ -178,8 +188,9 @@ json HttpClient::del(const std::string& path) const {
   configure_client(cli);
 
   auto res = cli.Delete(path, hdrs);
-  if (!res) { throw SignalWireRestError(0, "Connection failed");
-}
+  if (!res) {
+    throw SignalWireRestError(0, "Connection failed");
+  }
   return handle_response(res->status, res->body);
 }
 
@@ -220,13 +231,15 @@ namespace {
 std::map<std::string, std::string> parse_query_string(const std::string& url) {
   std::map<std::string, std::string> out;
   auto qpos = url.find('?');
-  if (qpos == std::string::npos) { return out;
-}
+  if (qpos == std::string::npos) {
+    return out;
+  }
   std::string qs = url.substr(qpos + 1);
   // Strip a trailing fragment if any.
   auto frag = qs.find('#');
-  if (frag != std::string::npos) { qs = qs.substr(0, frag);
-}
+  if (frag != std::string::npos) {
+    qs = qs.substr(0, frag);
+  }
 
   auto decode_one = [](std::string s) {
     std::string out;
@@ -251,8 +264,9 @@ std::map<std::string, std::string> parse_query_string(const std::string& url) {
   size_t start = 0;
   while (start <= qs.size()) {
     size_t end = qs.find('&', start);
-    if (end == std::string::npos) { end = qs.size();
-}
+    if (end == std::string::npos) {
+      end = qs.size();
+    }
     std::string pair = qs.substr(start, end - start);
     if (!pair.empty()) {
       auto eq = pair.find('=');
@@ -262,8 +276,9 @@ std::map<std::string, std::string> parse_query_string(const std::string& url) {
         out[decode_one(pair.substr(0, eq))] = decode_one(pair.substr(eq + 1));
       }
     }
-    if (end == qs.size()) { break;
-}
+    if (end == qs.size()) {
+      break;
+    }
     start = end + 1;
   }
   return out;
@@ -278,8 +293,9 @@ PaginatedIterator::PaginatedIterator(const HttpClient& http, const std::string& 
 
 bool PaginatedIterator::has_next() {
   while (index_ >= items_.size()) {
-    if (done_) { return false;
-}
+    if (done_) {
+      return false;
+    }
     fetch_next();
   }
   return true;
@@ -295,8 +311,9 @@ json PaginatedIterator::next() {
 void PaginatedIterator::fetch_next() {
   auto resp = http_.get(path_, params_);
   if (resp.is_object() && resp.contains(data_key_) && resp[data_key_].is_array()) {
-    for (const auto& it : resp[data_key_]) { items_.push_back(it);
-}
+    for (const auto& it : resp[data_key_]) {
+      items_.push_back(it);
+    }
   }
 
   std::string next_url;

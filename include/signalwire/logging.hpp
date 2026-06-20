@@ -42,8 +42,9 @@ class Logger {
   // wrappers below forward their view through unchanged.
   void log(LogLevel level, std::string_view message) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (suppressed_ || level < level_) { return;
-}
+    if (suppressed_ || level < level_) {
+      return;
+    }
 
     const char* prefix = "";
     switch (level) {
@@ -88,7 +89,7 @@ class Logger {
         level_ = LogLevel::Warn;
       } else if (lvl == "error") {
         level_ = LogLevel::Error;
-}
+      }
     }
 
     const char* env_mode = std::getenv("SIGNALWIRE_LOG_MODE");

@@ -116,25 +116,30 @@ void Schema::extract_verbs() {
   }
 
   for (const auto& entry : defs["SWMLMethod"]["anyOf"]) {
-    if (!entry.contains("$ref")) { continue;
-}
+    if (!entry.contains("$ref")) {
+      continue;
+    }
 
     std::string ref = entry["$ref"].get<std::string>();
     auto slash = ref.rfind('/');
-    if (slash == std::string::npos) { continue;
-}
+    if (slash == std::string::npos) {
+      continue;
+    }
 
     std::string schema_name = ref.substr(slash + 1);
-    if (!defs.contains(schema_name)) { continue;
-}
+    if (!defs.contains(schema_name)) {
+      continue;
+    }
 
     auto& def = defs[schema_name];
-    if (!def.contains("properties")) { continue;
-}
+    if (!def.contains("properties")) {
+      continue;
+    }
 
     auto& props = def["properties"];
-    if (props.empty()) { continue;
-}
+    if (props.empty()) {
+      continue;
+    }
 
     // The actual verb name is the first key in properties
     std::string verb_name = props.begin().key();

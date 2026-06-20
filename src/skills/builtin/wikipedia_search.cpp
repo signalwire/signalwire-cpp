@@ -39,12 +39,12 @@ class WikipediaSearchSkill : public SkillBase {
             {{"type", "object"},
              {"properties",
               json::object({{"query", json::object({{"type", "string"},
-                                                    {"description", "Topic to search"}})}})},
-             {"required", json::array({"query"})}}),
+                                                    {"description", "Topic to search"}})}})}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
           std::string query = args.value("query", "");
-          if (query.empty()) { return swaig::FunctionResult(no_results_msg_);
-}
+          if (query.empty()) {
+            return swaig::FunctionResult(no_results_msg_);
+          }
 
           // Wikipedia API root — base host overridable via
           // WIKIPEDIA_BASE_URL (used by the audit fixture). The
@@ -52,8 +52,9 @@ class WikipediaSearchSkill : public SkillBase {
           // path-substring match succeeds even when pointed at a
           // loopback fixture.
           std::string base = get_env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org");
-          while (!base.empty() && base.back() == '/') { base.pop_back();
-}
+          while (!base.empty() && base.back() == '/') {
+            base.pop_back();
+          }
           std::ostringstream url;
           url << base << "/w/api.php"
               << "?action=query&list=search&format=json"

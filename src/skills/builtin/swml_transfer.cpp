@@ -24,8 +24,9 @@ class SwmlTransferSkill : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
 
   std::vector<json> get_datamap_functions() const override {
-    if (!params_.contains("transfers")) { return {};
-}
+    if (!params_.contains("transfers")) {
+      return {};
+    }
 
     auto& transfers = params_["transfers"];
     std::string desc =
@@ -48,7 +49,7 @@ class SwmlTransferSkill : public SkillBase {
         dest = config["url"].get<std::string>();
       } else if (config.contains("address")) {
         dest = config["address"].get<std::string>();
-}
+      }
 
       std::string message = config.value("message", "Transferring your call");
       swaig::FunctionResult output(message);
@@ -79,8 +80,9 @@ class SwmlTransferSkill : public SkillBase {
             word += c;
           }
         }
-        if (!word.empty()) { hints.push_back(word);
-}
+        if (!word.empty()) {
+          hints.push_back(word);
+        }
       }
     }
     return hints;
@@ -91,8 +93,9 @@ class SwmlTransferSkill : public SkillBase {
     if (params_.contains("transfers")) {
       for (auto& [key, config] : params_["transfers"].items()) {
         std::string desc = key;
-        if (config.contains("message")) { desc += " - " + config["message"].get<std::string>();
-}
+        if (config.contains("message")) {
+          desc += " - " + config["message"].get<std::string>();
+        }
         bullets.push_back(desc);
       }
     }

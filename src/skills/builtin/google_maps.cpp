@@ -29,9 +29,17 @@ class GoogleMapsSkill : public SkillBase {
         json::object(
             {{"type", "object"},
              {"properties",
-              json::object({{"address", json::object({{"type", "string"},
-                                                      {"description", "Address to look up"}})}})},
-             {"required", json::array({"address"})}}),
+              json::object(
+                  {{"address",
+                    json::object({{"type", "string"},
+                                  {"description", "The address or business name to look up"}})},
+                   {"bias_lat",
+                    json::object({{"type", "number"},
+                                  {"description", "Latitude to bias results toward (optional)"}})},
+                   {"bias_lng", json::object({{"type", "number"},
+                                              {"description",
+                                               "Longitude to bias results toward (optional)"}})}})},
+             {"required", json::array()}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
           std::string addr = args.value("address", "");
           return swaig::FunctionResult("Address lookup for '" + addr +
@@ -53,7 +61,7 @@ class GoogleMapsSkill : public SkillBase {
                     json::object({{"type", "number"}, {"description", "Destination latitude"}})},
                    {"dest_lng", json::object({{"type", "number"},
                                               {"description", "Destination longitude"}})}})},
-             {"required", json::array({"origin_lat", "origin_lng", "dest_lat", "dest_lng"})}}),
+             {"required", json::array()}}),
         [](const json& args, const json&) -> swaig::FunctionResult {
           return swaig::FunctionResult("Route computed: [Would use Google Routes API]");
         }));

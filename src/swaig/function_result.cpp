@@ -137,14 +137,18 @@ FunctionResult& FunctionResult::switch_context(const std::string& system_prompt,
   }
 
   json context_data;
-  if (!system_prompt.empty()) { context_data["system_prompt"] = system_prompt;
-}
-  if (!user_prompt.empty()) { context_data["user_prompt"] = user_prompt;
-}
-  if (consolidate) { context_data["consolidate"] = true;
-}
-  if (full_reset) { context_data["full_reset"] = true;
-}
+  if (!system_prompt.empty()) {
+    context_data["system_prompt"] = system_prompt;
+  }
+  if (!user_prompt.empty()) {
+    context_data["user_prompt"] = user_prompt;
+  }
+  if (consolidate) {
+    context_data["consolidate"] = true;
+  }
+  if (full_reset) {
+    context_data["full_reset"] = true;
+  }
   return add_action("context_switch", context_data);
 }
 
@@ -195,18 +199,24 @@ FunctionResult& FunctionResult::record_call(const std::string& control_id, bool 
   record_params["beep"] = beep;
   record_params["input_sensitivity"] = input_sensitivity;
 
-  if (!control_id.empty()) { record_params["control_id"] = control_id;
-}
-  if (!terminators.empty()) { record_params["terminators"] = terminators;
-}
-  if (initial_timeout.has_value()) { record_params["initial_timeout"] = *initial_timeout;
-}
-  if (end_silence_timeout.has_value()) { record_params["end_silence_timeout"] = *end_silence_timeout;
-}
-  if (max_length.has_value()) { record_params["max_length"] = *max_length;
-}
-  if (!status_url.empty()) { record_params["status_url"] = status_url;
-}
+  if (!control_id.empty()) {
+    record_params["control_id"] = control_id;
+  }
+  if (!terminators.empty()) {
+    record_params["terminators"] = terminators;
+  }
+  if (initial_timeout.has_value()) {
+    record_params["initial_timeout"] = *initial_timeout;
+  }
+  if (end_silence_timeout.has_value()) {
+    record_params["end_silence_timeout"] = *end_silence_timeout;
+  }
+  if (max_length.has_value()) {
+    record_params["max_length"] = *max_length;
+  }
+  if (!status_url.empty()) {
+    record_params["status_url"] = status_url;
+  }
 
   json swml_doc = {
       {"version", "1.0.0"},
@@ -318,8 +328,9 @@ namespace {
 std::string render_choices(const std::vector<std::string>& choices) {
   std::string out = "[";
   for (size_t i = 0; i < choices.size(); ++i) {
-    if (i) { out += ", ";
-}
+    if (i) {
+      out += ", ";
+    }
     out += "'" + choices[i] + "'";
   }
   out += "]";
@@ -328,17 +339,19 @@ std::string render_choices(const std::vector<std::string>& choices) {
 
 bool contains(const std::vector<std::string>& choices, const std::string& v) {
   for (const auto& c : choices) {
-    if (c == v) { return true;
-}
-}
+    if (c == v) {
+      return true;
+    }
+  }
   return false;
 }
 
 std::string strip(const std::string& s) {
   const char* ws = " \t\n\r\f\v";
   auto b = s.find_first_not_of(ws);
-  if (b == std::string::npos) { return "";
-}
+  if (b == std::string::npos) {
+    return "";
+  }
   auto e = s.find_last_not_of(ws);
   return s.substr(b, e - b + 1);
 }
@@ -399,43 +412,57 @@ FunctionResult& FunctionResult::join_conference(
     json obj = json::object();
     obj["name"] = name;
     // Each non-default param under its snake_case wire key.
-    if (muted) { obj["muted"] = muted;
-}
-    if (beep != "true") { obj["beep"] = beep;
-}
-    if (!start_on_enter) { obj["start_on_enter"] = start_on_enter;
-}
-    if (end_on_exit) { obj["end_on_exit"] = end_on_exit;
-}
-    if (wait_url.has_value()) { obj["wait_url"] = *wait_url;
-}
-    if (max_participants != 250) { obj["max_participants"] = max_participants;
-}
-    if (record != "do-not-record") { obj["record"] = record;
-}
-    if (region.has_value()) { obj["region"] = *region;
-}
-    if (trim != "trim-silence") { obj["trim"] = trim;
-}
-    if (coach.has_value()) { obj["coach"] = *coach;
-}
-    if (status_callback_event.has_value()) { obj["status_callback_event"] = *status_callback_event;
-}
-    if (status_callback.has_value()) { obj["status_callback"] = *status_callback;
-}
-    if (status_callback_method != "POST") { obj["status_callback_method"] = status_callback_method;
-}
+    if (muted) {
+      obj["muted"] = muted;
+    }
+    if (beep != "true") {
+      obj["beep"] = beep;
+    }
+    if (!start_on_enter) {
+      obj["start_on_enter"] = start_on_enter;
+    }
+    if (end_on_exit) {
+      obj["end_on_exit"] = end_on_exit;
+    }
+    if (wait_url.has_value()) {
+      obj["wait_url"] = *wait_url;
+    }
+    if (max_participants != 250) {
+      obj["max_participants"] = max_participants;
+    }
+    if (record != "do-not-record") {
+      obj["record"] = record;
+    }
+    if (region.has_value()) {
+      obj["region"] = *region;
+    }
+    if (trim != "trim-silence") {
+      obj["trim"] = trim;
+    }
+    if (coach.has_value()) {
+      obj["coach"] = *coach;
+    }
+    if (status_callback_event.has_value()) {
+      obj["status_callback_event"] = *status_callback_event;
+    }
+    if (status_callback.has_value()) {
+      obj["status_callback"] = *status_callback;
+    }
+    if (status_callback_method != "POST") {
+      obj["status_callback_method"] = status_callback_method;
+    }
     if (recording_status_callback.has_value()) {
       obj["recording_status_callback"] = *recording_status_callback;
-}
+    }
     if (recording_status_callback_method != "POST") {
       obj["recording_status_callback_method"] = recording_status_callback_method;
-}
+    }
     if (recording_status_callback_event != "completed") {
       obj["recording_status_callback_event"] = recording_status_callback_event;
-}
-    if (result.has_value()) { obj["result"] = *result;
-}
+    }
+    if (result.has_value()) {
+      obj["result"] = *result;
+    }
     join_params = std::move(obj);
   }
 
@@ -499,16 +526,21 @@ FunctionResult& FunctionResult::tap(const std::string& uri, const std::string& c
 
   json tap_params;
   tap_params["uri"] = uri;
-  if (!control_id.empty()) { tap_params["control_id"] = control_id;
-}
-  if (direction != "both") { tap_params["direction"] = direction;
-}
-  if (codec != "PCMU") { tap_params["codec"] = codec;
-}
-  if (rtp_ptime != 20) { tap_params["rtp_ptime"] = rtp_ptime;
-}
-  if (!status_url.empty()) { tap_params["status_url"] = status_url;
-}
+  if (!control_id.empty()) {
+    tap_params["control_id"] = control_id;
+  }
+  if (direction != "both") {
+    tap_params["direction"] = direction;
+  }
+  if (codec != "PCMU") {
+    tap_params["codec"] = codec;
+  }
+  if (rtp_ptime != 20) {
+    tap_params["rtp_ptime"] = rtp_ptime;
+  }
+  if (!status_url.empty()) {
+    tap_params["status_url"] = status_url;
+  }
 
   json swml_doc = {{"version", "1.0.0"},
                    {"sections", {{"main", json::array({json::object({{"tap", tap_params}})})}}}};
@@ -550,14 +582,18 @@ FunctionResult& FunctionResult::send_sms(const std::string& to, const std::strin
   json sms_params;
   sms_params["to_number"] = to;
   sms_params["from_number"] = from;
-  if (!body.empty()) { sms_params["body"] = body;
-}
-  if (!media.empty()) { sms_params["media"] = media;
-}
-  if (!tags.empty()) { sms_params["tags"] = tags;
-}
-  if (!region.empty()) { sms_params["region"] = region;
-}
+  if (!body.empty()) {
+    sms_params["body"] = body;
+  }
+  if (!media.empty()) {
+    sms_params["media"] = media;
+  }
+  if (!tags.empty()) {
+    sms_params["tags"] = tags;
+  }
+  if (!region.empty()) {
+    sms_params["region"] = region;
+  }
 
   json swml_doc = {
       {"version", "1.0.0"},
@@ -588,16 +624,21 @@ FunctionResult& FunctionResult::pay(
   pay_params["voice"] = voice;
   pay_params["valid_card_types"] = valid_card_types;
 
-  if (!status_url.empty()) { pay_params["status_url"] = status_url;
-}
-  if (!charge_amount.empty()) { pay_params["charge_amount"] = charge_amount;
-}
-  if (!description_text.empty()) { pay_params["description"] = description_text;
-}
-  if (!parameters.empty()) { pay_params["parameters"] = parameters;
-}
-  if (!prompts.empty()) { pay_params["prompts"] = prompts;
-}
+  if (!status_url.empty()) {
+    pay_params["status_url"] = status_url;
+  }
+  if (!charge_amount.empty()) {
+    pay_params["charge_amount"] = charge_amount;
+  }
+  if (!description_text.empty()) {
+    pay_params["description"] = description_text;
+  }
+  if (!parameters.empty()) {
+    pay_params["parameters"] = parameters;
+  }
+  if (!prompts.empty()) {
+    pay_params["prompts"] = prompts;
+  }
 
   json swml_doc = {
       {"version", "1.0.0"},
@@ -620,14 +661,17 @@ FunctionResult& FunctionResult::execute_rpc(const std::string& method, const jso
   // inside it), and params is OMITTED entirely when empty (Python `if params:`).
   json rpc_cmd = json::object();
   rpc_cmd["method"] = method;
-  if (!call_id.empty()) { rpc_cmd["call_id"] = call_id;
-}
-  if (!node_id.empty()) { rpc_cmd["node_id"] = node_id;
-}
+  if (!call_id.empty()) {
+    rpc_cmd["call_id"] = call_id;
+  }
+  if (!node_id.empty()) {
+    rpc_cmd["node_id"] = node_id;
+  }
   // Python's `if params:` is falsey for None AND for an empty dict — so an
   // empty object suppresses the key just like a null does.
-  if (!params.is_null() && !params.empty()) { rpc_cmd["params"] = params;
-}
+  if (!params.is_null() && !params.empty()) {
+    rpc_cmd["params"] = params;
+  }
 
   json swml_doc = {
       {"version", "1.0.0"},
@@ -668,10 +712,12 @@ json FunctionResult::create_payment_prompt(const std::string& for_situation,
   json prompt;
   prompt["for"] = for_situation;
   prompt["actions"] = actions;
-  if (!card_type.empty()) { prompt["card_type"] = card_type;
-}
-  if (!error_type.empty()) { prompt["error_type"] = error_type;
-}
+  if (!card_type.empty()) {
+    prompt["card_type"] = card_type;
+  }
+  if (!error_type.empty()) {
+    prompt["error_type"] = error_type;
+  }
   return prompt;
 }
 

@@ -75,8 +75,9 @@ class SkillRegistry {
       throw std::invalid_argument("Path is not a directory: " + path);
     }
     for (const auto& existing : external_paths_) {
-      if (existing == path) { return;  // already present, dedup
-}
+      if (existing == path) {
+        return;  // already present, dedup
+      }
     }
     external_paths_.push_back(path);
   }

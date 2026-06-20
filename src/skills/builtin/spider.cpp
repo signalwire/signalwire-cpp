@@ -28,11 +28,13 @@ std::string strip_html(const std::string& html) {
 /// reroutes scrape requests to a loopback fixture for the audit while
 /// keeping the per-call URL the LLM passed in.
 std::string apply_base_override(const std::string& url, const std::string& base) {
-  if (base.empty()) { return url;
-}
+  if (base.empty()) {
+    return url;
+  }
   auto scheme_end = url.find("://");
-  if (scheme_end == std::string::npos) { return url;
-}
+  if (scheme_end == std::string::npos) {
+    return url;
+  }
   auto host_start = scheme_end + 3;
   auto path_start = url.find('/', host_start);
   if (path_start == std::string::npos) {
@@ -40,8 +42,9 @@ std::string apply_base_override(const std::string& url, const std::string& base)
   }
   std::string path = url.substr(path_start);
   std::string b = base;
-  while (!b.empty() && b.back() == '/') { b.pop_back();
-}
+  while (!b.empty() && b.back() == '/') {
+    b.pop_back();
+  }
   return b + path;
 }
 
@@ -80,8 +83,9 @@ class SpiderSkill : public SkillBase {
                       {"required", json::array({"url"})}}),
         [](const json& args, const json&) -> swaig::FunctionResult {
           std::string url = args.value("url", "");
-          if (url.empty()) { return swaig::FunctionResult("No URL provided");
-}
+          if (url.empty()) {
+            return swaig::FunctionResult("No URL provided");
+          }
 
           std::string base = get_env("SPIDER_BASE_URL");
           std::string effective = apply_base_override(url, base);
@@ -132,8 +136,9 @@ class SpiderSkill : public SkillBase {
           // callers that hit this tool get real content rather than
           // canned text.
           std::string url = args.value("start_url", "");
-          if (url.empty()) { return swaig::FunctionResult("No start URL provided");
-}
+          if (url.empty()) {
+            return swaig::FunctionResult("No start URL provided");
+          }
 
           std::string base = get_env("SPIDER_BASE_URL");
           std::string effective = apply_base_override(url, base);
@@ -156,8 +161,9 @@ class SpiderSkill : public SkillBase {
              {"required", json::array({"url"})}}),
         [](const json& args, const json&) -> swaig::FunctionResult {
           std::string url = args.value("url", "");
-          if (url.empty()) { return swaig::FunctionResult("No URL provided");
-}
+          if (url.empty()) {
+            return swaig::FunctionResult("No URL provided");
+          }
           std::string base = get_env("SPIDER_BASE_URL");
           std::string effective = apply_base_override(url, base);
           auto resp = http_get(effective);

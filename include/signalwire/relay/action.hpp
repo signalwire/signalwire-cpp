@@ -53,11 +53,13 @@ class Action {
   }
   const std::vector<std::string>& event_type_filter() const { return state_->event_type_filter; }
   bool event_type_matches(const std::string& event_type) const {
-    if (state_->event_type_filter.empty()) { return true;
-}
+    if (state_->event_type_filter.empty()) {
+      return true;
+    }
     for (const auto& t : state_->event_type_filter) {
-      if (t == event_type) { return true;
-}
+      if (t == event_type) {
+        return true;
+      }
     }
     return false;
   }

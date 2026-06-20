@@ -35,8 +35,9 @@ SurveyAgent::SurveyAgent(const std::string& name, const std::string& route, cons
 
 SurveyAgent& SurveyAgent::set_questions(const std::vector<json>& questions) {
   json q_list = json::array();
-  for (const auto& q : questions) { q_list.push_back(q);
-}
+  for (const auto& q : questions) {
+    q_list.push_back(q);
+  }
   update_global_data(json::object({{"survey_questions", q_list}, {"current_index", 0}}));
 
   // Add question info to prompt

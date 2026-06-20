@@ -35,12 +35,15 @@ json GatherQuestion::to_json() const {
   j["key"] = key_;
   j["question"] = question_;
   j["type"] = type_;
-  if (confirm_) { j["confirm"] = true;
-}
-  if (!prompt_.empty()) { j["prompt"] = prompt_;
-}
-  if (!functions_.empty()) { j["functions"] = functions_;
-}
+  if (confirm_) {
+    j["confirm"] = true;
+  }
+  if (!prompt_.empty()) {
+    j["prompt"] = prompt_;
+  }
+  if (!functions_.empty()) {
+    j["functions"] = functions_;
+  }
   return j;
 }
 
@@ -62,12 +65,15 @@ GatherInfo& GatherInfo::add_question(const std::string& key, const std::string& 
 
 json GatherInfo::to_json() const {
   json j;
-  if (!output_key_.empty()) { j["output_key"] = output_key_;
-}
-  if (!completion_action_.empty()) { j["completion_action"] = completion_action_;
-}
-  if (!prompt_.empty()) { j["prompt"] = prompt_;
-}
+  if (!output_key_.empty()) {
+    j["output_key"] = output_key_;
+  }
+  if (!completion_action_.empty()) {
+    j["completion_action"] = completion_action_;
+  }
+  if (!prompt_.empty()) {
+    j["prompt"] = prompt_;
+  }
   if (!questions_.empty()) {
     j["questions"] = json::array();
     for (const auto& q : questions_) {
@@ -176,10 +182,12 @@ Step& Step::set_reset_full_reset(bool fr) {
 }
 
 std::string Step::render_text() const {
-  if (text_) { return *text_;
-}
-  if (sections_.empty()) { return "";
-}
+  if (text_) {
+    return *text_;
+  }
+  if (sections_.empty()) {
+    return "";
+  }
   // Render POM sections as text
   std::string result;
   for (const auto& s : sections_) {
@@ -204,21 +212,26 @@ json Step::to_json() const {
   j["name"] = name_;
 
   std::string text = render_text();
-  if (!text.empty()) { j["text"] = text;
-}
+  if (!text.empty()) {
+    j["text"] = text;
+  }
 
   if (!sections_.empty()) {
     j["pom"] = sections_;
   }
 
-  if (step_criteria_) { j["step_criteria"] = *step_criteria_;
-}
-  if (end_) { j["end"] = true;
-}
-  if (skip_user_turn_) { j["skip_user_turn"] = true;
-}
-  if (skip_to_next_step_) { j["skip_to_next_step"] = true;
-}
+  if (step_criteria_) {
+    j["step_criteria"] = *step_criteria_;
+  }
+  if (end_) {
+    j["end"] = true;
+  }
+  if (skip_user_turn_) {
+    j["skip_user_turn"] = true;
+  }
+  if (skip_to_next_step_) {
+    j["skip_to_next_step"] = true;
+  }
 
   if (functions_) {
     if (std::holds_alternative<std::string>(*functions_)) {
@@ -228,26 +241,33 @@ json Step::to_json() const {
     }
   }
 
-  if (valid_steps_) { j["valid_steps"] = *valid_steps_;
-}
-  if (valid_contexts_) { j["valid_contexts"] = *valid_contexts_;
-}
+  if (valid_steps_) {
+    j["valid_steps"] = *valid_steps_;
+  }
+  if (valid_contexts_) {
+    j["valid_contexts"] = *valid_contexts_;
+  }
 
   if (gather_info_ && gather_info_->has_questions()) {
     j["gather_info"] = gather_info_->to_json();
   }
 
   json reset;
-  if (reset_system_prompt_) { reset["system_prompt"] = *reset_system_prompt_;
-}
-  if (reset_user_prompt_) { reset["user_prompt"] = *reset_user_prompt_;
-}
-  if (reset_consolidate_) { reset["consolidate"] = true;
-}
-  if (reset_full_reset_) { reset["full_reset"] = true;
-}
-  if (!reset.empty()) { j["reset"] = reset;
-}
+  if (reset_system_prompt_) {
+    reset["system_prompt"] = *reset_system_prompt_;
+  }
+  if (reset_user_prompt_) {
+    reset["user_prompt"] = *reset_user_prompt_;
+  }
+  if (reset_consolidate_) {
+    reset["consolidate"] = true;
+  }
+  if (reset_full_reset_) {
+    reset["full_reset"] = true;
+  }
+  if (!reset.empty()) {
+    j["reset"] = reset;
+  }
 
   return j;
 }
@@ -268,16 +288,21 @@ Step& Context::add_step(
   }
 
   Step step(name);
-  if (!task.empty()) { step.add_section("Task", task);
-}
-  if (!bullets.empty()) { step.add_bullets("Instructions", bullets);
-}
-  if (!criteria.empty()) { step.set_step_criteria(criteria);
-}
-  if (functions) { step.set_functions(*functions);
-}
-  if (!valid_steps_val.empty()) { step.set_valid_steps(valid_steps_val);
-}
+  if (!task.empty()) {
+    step.add_section("Task", task);
+  }
+  if (!bullets.empty()) {
+    step.add_bullets("Instructions", bullets);
+  }
+  if (!criteria.empty()) {
+    step.set_step_criteria(criteria);
+  }
+  if (functions) {
+    step.set_functions(*functions);
+  }
+  if (!valid_steps_val.empty()) {
+    step.set_valid_steps(valid_steps_val);
+  }
 
   steps_[name] = std::move(step);
   step_order_.push_back(name);
@@ -385,34 +410,41 @@ Context& Context::set_exit_fillers(const json& fillers) {
 
 Context& Context::add_enter_filler(const std::string& lang,
                                    const std::vector<std::string>& fillers) {
-  if (enter_fillers_.is_null()) { enter_fillers_ = json::object();
-}
+  if (enter_fillers_.is_null()) {
+    enter_fillers_ = json::object();
+  }
   enter_fillers_[lang] = fillers;
   return *this;
 }
 
 Context& Context::add_exit_filler(const std::string& lang,
                                   const std::vector<std::string>& fillers) {
-  if (exit_fillers_.is_null()) { exit_fillers_ = json::object();
-}
+  if (exit_fillers_.is_null()) {
+    exit_fillers_ = json::object();
+  }
   exit_fillers_[lang] = fillers;
   return *this;
 }
 
 std::optional<std::string> Context::render_prompt() const {
-  if (prompt_text_) { return prompt_text_;
-}
-  if (prompt_sections_.empty()) { return std::nullopt;
-}
+  if (prompt_text_) {
+    return prompt_text_;
+  }
+  if (prompt_sections_.empty()) {
+    return std::nullopt;
+  }
   std::string result;
   for (const auto& s : prompt_sections_) {
-    if (s.contains("title")) { result += "## " + s["title"].get<std::string>() + "\n";
-}
-    if (s.contains("body")) { result += s["body"].get<std::string>() + "\n";
-}
+    if (s.contains("title")) {
+      result += "## " + s["title"].get<std::string>() + "\n";
+    }
+    if (s.contains("body")) {
+      result += s["body"].get<std::string>() + "\n";
+    }
     if (s.contains("bullets")) {
-      for (const auto& b : s["bullets"]) { result += "- " + b.get<std::string>() + "\n";
-}
+      for (const auto& b : s["bullets"]) {
+        result += "- " + b.get<std::string>() + "\n";
+      }
     }
     result += "\n";
   }
@@ -420,19 +452,24 @@ std::optional<std::string> Context::render_prompt() const {
 }
 
 std::optional<std::string> Context::render_system_prompt() const {
-  if (system_prompt_) { return system_prompt_;
-}
-  if (system_prompt_sections_.empty()) { return std::nullopt;
-}
+  if (system_prompt_) {
+    return system_prompt_;
+  }
+  if (system_prompt_sections_.empty()) {
+    return std::nullopt;
+  }
   std::string result;
   for (const auto& s : system_prompt_sections_) {
-    if (s.contains("title")) { result += "## " + s["title"].get<std::string>() + "\n";
-}
-    if (s.contains("body")) { result += s["body"].get<std::string>() + "\n";
-}
+    if (s.contains("title")) {
+      result += "## " + s["title"].get<std::string>() + "\n";
+    }
+    if (s.contains("body")) {
+      result += s["body"].get<std::string>() + "\n";
+    }
     if (s.contains("bullets")) {
-      for (const auto& b : s["bullets"]) { result += "- " + b.get<std::string>() + "\n";
-}
+      for (const auto& b : s["bullets"]) {
+        result += "- " + b.get<std::string>() + "\n";
+      }
     }
     result += "\n";
   }
@@ -443,35 +480,47 @@ json Context::to_json() const {
   json j;
 
   auto prompt = render_prompt();
-  if (prompt) { j["prompt"] = *prompt;
-}
+  if (prompt) {
+    j["prompt"] = *prompt;
+  }
 
   auto sys_prompt = render_system_prompt();
-  if (sys_prompt) { j["system_prompt"] = *sys_prompt;
-}
+  if (sys_prompt) {
+    j["system_prompt"] = *sys_prompt;
+  }
 
-  if (consolidate_) { j["consolidate"] = true;
-}
-  if (full_reset_) { j["full_reset"] = true;
-}
-  if (user_prompt_) { j["user_prompt"] = *user_prompt_;
-}
-  if (isolated_) { j["isolated"] = true;
-}
-  if (post_prompt_) { j["post_prompt"] = *post_prompt_;
-}
+  if (consolidate_) {
+    j["consolidate"] = true;
+  }
+  if (full_reset_) {
+    j["full_reset"] = true;
+  }
+  if (user_prompt_) {
+    j["user_prompt"] = *user_prompt_;
+  }
+  if (isolated_) {
+    j["isolated"] = true;
+  }
+  if (post_prompt_) {
+    j["post_prompt"] = *post_prompt_;
+  }
 
-  if (!enter_fillers_.is_null()) { j["enter_fillers"] = enter_fillers_;
-}
-  if (!exit_fillers_.is_null()) { j["exit_fillers"] = exit_fillers_;
-}
+  if (!enter_fillers_.is_null()) {
+    j["enter_fillers"] = enter_fillers_;
+  }
+  if (!exit_fillers_.is_null()) {
+    j["exit_fillers"] = exit_fillers_;
+  }
 
-  if (initial_step_) { j["initial_step"] = *initial_step_;
-}
-  if (valid_contexts_) { j["valid_contexts"] = *valid_contexts_;
-}
-  if (valid_steps_) { j["valid_steps"] = *valid_steps_;
-}
+  if (initial_step_) {
+    j["initial_step"] = *initial_step_;
+  }
+  if (valid_contexts_) {
+    j["valid_contexts"] = *valid_contexts_;
+  }
+  if (valid_steps_) {
+    j["valid_steps"] = *valid_steps_;
+  }
 
   if (!steps_.empty()) {
     j["steps"] = json::array();
@@ -540,13 +589,15 @@ void ContextBuilder::validate() const {
       const auto& is = *ctx.initial_step();
       if (ctx.steps().find(is) == ctx.steps().end()) {
         std::vector<std::string> available;
-        for (const auto& [k, _] : ctx.steps()) { available.push_back(k);
-}
+        for (const auto& [k, _] : ctx.steps()) {
+          available.push_back(k);
+        }
         std::sort(available.begin(), available.end());
         std::string avail_str = "[";
         for (std::size_t i = 0; i < available.size(); ++i) {
-          if (i > 0) { avail_str += ", ";
-}
+          if (i > 0) {
+            avail_str += ", ";
+          }
           avail_str += "'" + available[i] + "'";
         }
         avail_str += "]";
@@ -569,14 +620,17 @@ void ContextBuilder::validate() const {
     for (std::size_t i = 0; i < order.size(); ++i) {
       const auto& step_name = order[i];
       auto it = steps.find(step_name);
-      if (it == steps.end()) { continue;
-}
+      if (it == steps.end()) {
+        continue;
+      }
       const auto& gi_opt = it->second.gather_info();
-      if (!gi_opt.has_value()) { continue;
-}
+      if (!gi_opt.has_value()) {
+        continue;
+      }
       const auto& action = gi_opt->completion_action();
-      if (action.empty()) { continue;
-}
+      if (action.empty()) {
+        continue;
+      }
 
       if (action == "next_step") {
         if (i + 1 >= order.size()) {
@@ -585,30 +639,35 @@ void ContextBuilder::validate() const {
           msg += step_name;
           msg += "' in context '";
           msg += ctx_name;
-          msg += "' has gather_info completion_action='next_step' but "
-                 "it is the last step in the context. Either "
-                 "(1) add another step after '";
+          msg +=
+              "' has gather_info completion_action='next_step' but "
+              "it is the last step in the context. Either "
+              "(1) add another step after '";
           msg += step_name;
-          msg += "', "
-                 "(2) set completion_action to the name of an "
-                 "existing step in this context to jump to it, or "
-                 "(3) leave completion_action empty (default) to "
-                 "stay in '";
+          msg +=
+              "', "
+              "(2) set completion_action to the name of an "
+              "existing step in this context to jump to it, or "
+              "(3) leave completion_action empty (default) to "
+              "stay in '";
           msg += step_name;
-          msg += "' after gathering "
-                 "completes.";
+          msg +=
+              "' after gathering "
+              "completes.";
           throw std::runtime_error(msg);
         }
       } else if (steps.find(action) == steps.end()) {
         std::vector<std::string> available;
         available.reserve(steps.size());
-        for (const auto& [k, _] : steps) { available.push_back(k);
-}
+        for (const auto& [k, _] : steps) {
+          available.push_back(k);
+        }
         std::sort(available.begin(), available.end());
         std::string avail_str = "[";
         for (std::size_t j = 0; j < available.size(); ++j) {
-          if (j > 0) { avail_str += ", ";
-}
+          if (j > 0) {
+            avail_str += ", ";
+          }
           avail_str += "'" + available[j] + "'";
         }
         avail_str += "]";
@@ -621,10 +680,11 @@ void ContextBuilder::validate() const {
         msg += action;
         msg += "' but '";
         msg += action;
-        msg += "' is not a step in this context. "
-               "Valid options: 'next_step' (advance to the next "
-               "sequential step), empty string (stay in the current "
-               "step), or one of ";
+        msg +=
+            "' is not a step in this context. "
+            "Valid options: 'next_step' (advance to the next "
+            "sequential step), empty string (stay in the current "
+            "step), or one of ";
         msg += avail_str;
         msg += ".";
         throw std::runtime_error(msg);
@@ -652,8 +712,9 @@ void ContextBuilder::validate() const {
       auto format_list = [](const std::vector<std::string>& v) {
         std::string s = "[";
         for (std::size_t j = 0; j < v.size(); ++j) {
-          if (j > 0) { s += ", ";
-}
+          if (j > 0) {
+            s += ", ";
+          }
           s += "'" + v[j] + "'";
         }
         s += "]";

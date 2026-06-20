@@ -42,8 +42,9 @@ struct TlsServerConfig {
 inline TlsServerConfig resolve_tls_config_from_env() {
   TlsServerConfig cfg;
   std::string enabled = get_env("SWML_SSL_ENABLED", "");
-  for (auto& c : enabled) { c = static_cast<char>(::tolower(c));
-}
+  for (auto& c : enabled) {
+    c = static_cast<char>(::tolower(c));
+  }
   cfg.enabled = (enabled == "true" || enabled == "1" || enabled == "yes" || enabled == "on");
   cfg.cert_path = get_env("SWML_SSL_CERT_PATH", "");
   cfg.key_path = get_env("SWML_SSL_KEY_PATH", "");

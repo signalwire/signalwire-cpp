@@ -43,20 +43,23 @@ void sw_agent_destroy(sw_agent_t handle) { delete static_cast<agent::AgentBase*>
 // ========================================================================
 
 void sw_agent_set_prompt(sw_agent_t handle, const char* text) {
-  if (!handle || !text) { return;
-}
+  if (!handle || !text) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->set_prompt_text(text);
 }
 
 void sw_agent_add_section(sw_agent_t handle, const char* title, const char* body) {
-  if (!handle || !title) { return;
-}
+  if (!handle || !title) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->prompt_add_section(title, body ? body : "");
 }
 
 void sw_agent_add_section_bullets(sw_agent_t handle, const char* title, const char** bullets) {
-  if (!handle || !title) { return;
-}
+  if (!handle || !title) {
+    return;
+  }
   std::vector<std::string> bullet_vec;
   if (bullets) {
     for (const char** p = bullets; *p; ++p) {
@@ -67,8 +70,9 @@ void sw_agent_add_section_bullets(sw_agent_t handle, const char* title, const ch
 }
 
 void sw_agent_set_post_prompt(sw_agent_t handle, const char* text) {
-  if (!handle || !text) { return;
-}
+  if (!handle || !text) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->set_post_prompt(text);
 }
 
@@ -84,8 +88,9 @@ struct CToolContext {
 
 void sw_agent_define_tool(sw_agent_t handle, const char* name, const char* description,
                           const char* params_json, sw_tool_handler_t handler, void* user_data) {
-  if (!handle || !name || !description || !handler) { return;
-}
+  if (!handle || !name || !description || !handler) {
+    return;
+  }
 
   auto* agent = static_cast<agent::AgentBase*>(handle);
   nlohmann::json params;
@@ -125,12 +130,14 @@ void sw_agent_define_tool(sw_agent_t handle, const char* name, const char* descr
 }
 
 char** sw_agent_list_tools(sw_agent_t handle) {
-  if (!handle) { return nullptr;
-}
+  if (!handle) {
+    return nullptr;
+  }
   auto tools = static_cast<agent::AgentBase*>(handle)->list_tools();
   char** arr = static_cast<char**>(std::malloc((tools.size() + 1) * sizeof(char*)));
-  if (!arr) { return nullptr;
-}
+  if (!arr) {
+    return nullptr;
+  }
   for (size_t i = 0; i < tools.size(); ++i) {
     arr[i] = static_cast<char*>(std::malloc(tools[i].size() + 1));
     std::strcpy(arr[i], tools[i].c_str());
@@ -140,8 +147,9 @@ char** sw_agent_list_tools(sw_agent_t handle) {
 }
 
 void sw_free_string_array(char** arr) {
-  if (!arr) { return;
-}
+  if (!arr) {
+    return;
+  }
   for (char** p = arr; *p; ++p) {
     std::free(*p);
   }
@@ -153,8 +161,9 @@ void sw_free_string_array(char** arr) {
 // ========================================================================
 
 void sw_agent_set_param(sw_agent_t handle, const char* key, const char* value_json) {
-  if (!handle || !key || !value_json) { return;
-}
+  if (!handle || !key || !value_json) {
+    return;
+  }
   try {
     auto val = nlohmann::json::parse(value_json);
     static_cast<agent::AgentBase*>(handle)->set_param(key, val);
@@ -165,8 +174,9 @@ void sw_agent_set_param(sw_agent_t handle, const char* key, const char* value_js
 }
 
 void sw_agent_set_global_data(sw_agent_t handle, const char* json_str) {
-  if (!handle || !json_str) { return;
-}
+  if (!handle || !json_str) {
+    return;
+  }
   try {
     auto data = nlohmann::json::parse(json_str);
     static_cast<agent::AgentBase*>(handle)->set_global_data(data);
@@ -177,14 +187,16 @@ void sw_agent_set_global_data(sw_agent_t handle, const char* json_str) {
 }
 
 void sw_agent_add_hint(sw_agent_t handle, const char* hint) {
-  if (!handle || !hint) { return;
-}
+  if (!handle || !hint) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->add_hint(hint);
 }
 
 void sw_agent_set_auth(sw_agent_t handle, const char* username, const char* password) {
-  if (!handle || !username || !password) { return;
-}
+  if (!handle || !username || !password) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->set_auth(username, password);
 }
 
@@ -193,8 +205,9 @@ void sw_agent_set_auth(sw_agent_t handle, const char* username, const char* pass
 // ========================================================================
 
 void sw_agent_add_skill(sw_agent_t handle, const char* skill_name, const char* params_json) {
-  if (!handle || !skill_name) { return;
-}
+  if (!handle || !skill_name) {
+    return;
+  }
   nlohmann::json params;
   if (params_json) {
     try {
@@ -211,20 +224,23 @@ void sw_agent_add_skill(sw_agent_t handle, const char* skill_name, const char* p
 // ========================================================================
 
 void sw_agent_run(sw_agent_t handle) {
-  if (!handle) { return;
-}
+  if (!handle) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->run();
 }
 
 void sw_agent_serve(sw_agent_t handle) {
-  if (!handle) { return;
-}
+  if (!handle) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->serve();
 }
 
 void sw_agent_stop(sw_agent_t handle) {
-  if (!handle) { return;
-}
+  if (!handle) {
+    return;
+  }
   static_cast<agent::AgentBase*>(handle)->stop();
 }
 
@@ -233,13 +249,15 @@ void sw_agent_stop(sw_agent_t handle) {
 // ========================================================================
 
 char* sw_agent_render_swml(sw_agent_t handle) {
-  if (!handle) { return nullptr;
-}
+  if (!handle) {
+    return nullptr;
+  }
   auto swml = static_cast<agent::AgentBase*>(handle)->render_swml();
   std::string str = swml.dump(2);
   char* result = static_cast<char*>(std::malloc(str.size() + 1));
-  if (result) { std::strcpy(result, str.c_str());
-}
+  if (result) {
+    std::strcpy(result, str.c_str());
+  }
   return result;
 }
 
@@ -260,8 +278,9 @@ sw_function_result_t sw_result_create(const char* response) {
 
 void sw_result_add_action(sw_function_result_t handle, const char* action_name,
                           const char* action_data_json) {
-  if (!handle || !action_name) { return;
-}
+  if (!handle || !action_name) {
+    return;
+  }
   auto* result = static_cast<swaig::FunctionResult*>(handle);
   nlohmann::json data;
   if (action_data_json) {
@@ -275,12 +294,14 @@ void sw_result_add_action(sw_function_result_t handle, const char* action_name,
 }
 
 char* sw_result_to_json(sw_function_result_t handle) {
-  if (!handle) { return nullptr;
-}
+  if (!handle) {
+    return nullptr;
+  }
   auto str = static_cast<swaig::FunctionResult*>(handle)->to_string(2);
   char* result = static_cast<char*>(std::malloc(str.size() + 1));
-  if (result) { std::strcpy(result, str.c_str());
-}
+  if (result) {
+    std::strcpy(result, str.c_str());
+  }
   return result;
 }
 

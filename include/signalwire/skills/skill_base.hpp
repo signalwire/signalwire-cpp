@@ -106,8 +106,9 @@ class SkillBase {
       return params[key].get<std::string>();
     }
     const char* env = std::getenv(env_var.c_str());
-    if (env) { return std::string(env);
-}
+    if (env) {
+      return std::string(env);
+    }
     return default_val;
   }
 

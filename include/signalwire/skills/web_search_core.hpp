@@ -104,7 +104,7 @@ struct LatencyParams {
       snip.clear();
     } else {
       snip = snip.substr(b, e - b + 1);
-}
+    }
     out << "=== RESULT " << (i + 1) << " ===\n"
         << "Title: " << c.title << "\n"
         << "URL: " << c.link << "\n"
@@ -112,8 +112,9 @@ struct LatencyParams {
   }
   std::string s = out.str();
   // Drop the trailing blank line so wrapping is tidy.
-  while (!s.empty() && (s.back() == '\n')) { s.pop_back();
-}
+  while (!s.empty() && (s.back() == '\n')) {
+    s.pop_back();
+  }
   return s;
 }
 
@@ -144,8 +145,9 @@ struct LatencyParams {
         << "==================================================\n\n";
   }
   std::string s = out.str();
-  while (!s.empty() && (s.back() == '\n')) { s.pop_back();
-}
+  while (!s.empty() && (s.back() == '\n')) {
+    s.pop_back();
+  }
   return s;
 }
 
@@ -155,8 +157,9 @@ struct LatencyParams {
 /// converted to milliseconds so a sub-second budget is honored exactly.
 [[nodiscard]] inline Candidate scrape_one(const Candidate& in, double per_page_timeout) {
   Candidate c = in;
-  if (c.link.empty()) { return c;
-}
+  if (c.link.empty()) {
+    return c;
+  }
   long timeout_ms = static_cast<long>(per_page_timeout * 1000.0);
   // Belt-and-suspenders: http_get_ms already converts transport/scheme
   // failures into status 0, but guard here too so a scrape can never throw
@@ -196,11 +199,13 @@ struct LatencyParams {
 
   if (!lp.parallel_scrape) {
     for (const auto& c : cands) {
-      if (steady_clock::now() >= deadline_at) { break;  // out of budget
-}
+      if (steady_clock::now() >= deadline_at) {
+        break;  // out of budget
+      }
       Candidate r = scrape_one(c, lp.per_page_timeout);
-      if (r.scraped) { scraped.push_back(std::move(r));
-}
+      if (r.scraped) {
+        scraped.push_back(std::move(r));
+      }
     }
     return scraped;
   }
@@ -239,26 +244,30 @@ struct LatencyParams {
     auto now = steady_clock::now();
     if (now >= deadline_at) {
       // Deadline already blown — abandon this and everything after it.
-      if (f.valid()) { leftovers->push_back(std::move(f));
-}
+      if (f.valid()) {
+        leftovers->push_back(std::move(f));
+      }
       continue;
     }
     if (f.wait_until(deadline_at) == std::future_status::ready) {
       Candidate r = f.get();
-      if (r.scraped) { scraped.push_back(std::move(r));
-}
+      if (r.scraped) {
+        scraped.push_back(std::move(r));
+      }
     } else {
       // Timed out at the deadline — abandon.
-      if (f.valid()) { leftovers->push_back(std::move(f));
-}
+      if (f.valid()) {
+        leftovers->push_back(std::move(f));
+      }
     }
   }
 
   if (!leftovers->empty()) {
     std::thread([leftovers]() {
       for (auto& f : *leftovers) {
-        if (f.valid()) { f.wait();  // bounded by per_page_timeout
-}
+        if (f.valid()) {
+          f.wait();  // bounded by per_page_timeout
+        }
       }
     }).detach();
   }
@@ -277,7 +286,8 @@ struct LatencyParams {
 ///   2. scrape under deadline.
 ///   3. no scraped survivors -> snippet fallback (non-empty).
 ///   4. else                 -> format scraped results.
-[[nodiscard]] inline std::string run(const std::string& query, const std::vector<Candidate>& candidates,
+[[nodiscard]] inline std::string run(const std::string& query,
+                                     const std::vector<Candidate>& candidates,
                                      const LatencyParams& lp, int num_results,
                                      std::size_t max_content_length,
                                      const std::string& empty_no_items_message) {
@@ -307,16 +317,18 @@ struct LatencyParams {
 
   // Keep at most num_results scraped survivors.
   std::size_t keep = static_cast<std::size_t>(num_results < 1 ? 1 : num_results);
-  if (scraped.size() > keep) { scraped.resize(keep);
-}
+  if (scraped.size() > keep) {
+    scraped.resize(keep);
+  }
 
   // Per-result content budget (mirrors the spirit of Python's calculation).
   std::size_t overhead = scraped.size() * 400;
   std::size_t available =
       max_content_length > overhead ? max_content_length - overhead : max_content_length;
   std::size_t per_result_limit = scraped.empty() ? 2000 : available / scraped.size();
-  if (per_result_limit < 2000) { per_result_limit = 2000;
-}
+  if (per_result_limit < 2000) {
+    per_result_limit = 2000;
+  }
 
   return format_scraped_results(query, scraped, candidates.size(), per_result_limit);
 }

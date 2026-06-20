@@ -34,11 +34,13 @@ class WebSearchSkill : public SkillBase {
   bool setup(const json& params) override {
     params_ = params;
     api_key_ = get_param_or_env(params, "api_key", "GOOGLE_SEARCH_API_KEY");
-    if (api_key_.empty()) { api_key_ = get_env("GOOGLE_API_KEY");
-}
+    if (api_key_.empty()) {
+      api_key_ = get_env("GOOGLE_API_KEY");
+    }
     search_engine_id_ = get_param_or_env(params, "search_engine_id", "GOOGLE_SEARCH_ENGINE_ID");
-    if (search_engine_id_.empty()) { search_engine_id_ = get_env("GOOGLE_CSE_ID");
-}
+    if (search_engine_id_.empty()) {
+      search_engine_id_ = get_env("GOOGLE_CSE_ID");
+    }
     tool_name_ = get_param<std::string>(params, "tool_name", "web_search");
     num_results_ = get_param<int>(params, "num_results", 3);
     // Optional prefix/postfix wrapped around every successful (non-empty)
@@ -64,15 +66,16 @@ class WebSearchSkill : public SkillBase {
     return {define_tool(
         tool_name_,
         "Search the web for high-quality information, automatically filtering low-quality results",
-        json::object({{"type", "object"},
-                      {"properties",
-                       json::object({{"query", json::object({{"type", "string"},
-                                                             {"description", "Search query"}})}})},
-                      {"required", json::array({"query"})}}),
+        json::object(
+            {{"type", "object"},
+             {"properties",
+              json::object({{"query", json::object({{"type", "string"},
+                                                    {"description", "Search query"}})}})}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
           std::string query = args.value("query", "");
-          if (query.empty()) { return swaig::FunctionResult("No search query provided");
-}
+          if (query.empty()) {
+            return swaig::FunctionResult("No search query provided");
+          }
 
           // Base URL (default Google) plus the API path. When
           // WEB_SEARCH_BASE_URL points at a fixture, we still emit
@@ -80,8 +83,9 @@ class WebSearchSkill : public SkillBase {
           // sees the documented endpoint. Strip a trailing slash on
           // the base so we don't end up with `//`.
           std::string base = get_env("WEB_SEARCH_BASE_URL", "https://www.googleapis.com");
-          while (!base.empty() && base.back() == '/') { base.pop_back();
-}
+          while (!base.empty() && base.back() == '/') {
+            base.pop_back();
+          }
           std::ostringstream url;
           url << base << "/customsearch/v1"
               << "?key=" << url_encode(api_key_) << "&cx=" << url_encode(search_engine_id_)
@@ -112,8 +116,8 @@ class WebSearchSkill : public SkillBase {
           std::string no_items = "Web search results for '" + query + "':\n(no results)";
           // run() handles snippets_only / deadline-bounded scraping /
           // snippet fallback (Python 51101da). Returns UNWRAPPED body.
-          std::string response = web_search_core::run(query, cands, lp_, num_results_,
-                                                      max_content_length_, no_items);
+          std::string response =
+              web_search_core::run(query, cands, lp_, num_results_, max_content_length_, no_items);
           // Wrap the success / snippet / scraped response with the
           // configured prefix/postfix. Error / transport-error / no-API-key
           // / no-items paths are NOT wrapped, matching Python (8aad242).

@@ -68,8 +68,9 @@ std::string base64_encode_bytes(const std::string& data) {
   if (valb > -6) {
     out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
   }
-  while (out.size() % 4) { out.push_back('=');
-}
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
   return out;
 }
 
@@ -81,8 +82,9 @@ std::string b64_hmac_sha1(std::string_view key, std::string_view message) {
 /// Returns ``false`` on length mismatch (without leaking which one is
 /// longer beyond the guarantees of ``size()``).
 bool safe_eq(std::string_view a, std::string_view b) {
-  if (a.size() != b.size()) { return false;
-}
+  if (a.size() != b.size()) {
+    return false;
+  }
   return CRYPTO_memcmp(a.data(), b.data(), a.size()) == 0;
 }
 
@@ -239,26 +241,30 @@ std::vector<std::string> candidate_urls(std::string_view url) {
   out.emplace_back(url);
 
   auto p = parse_url(url);
-  if (p.host.empty()) { return out;
-}
+  if (p.host.empty()) {
+    return out;
+  }
 
   std::string standard;
   if (p.scheme == "http") {
     standard = "80";
   } else if (p.scheme == "https") {
     standard = "443";
-}
-  if (standard.empty()) { return out;
-}
+  }
+  if (standard.empty()) {
+    return out;
+  }
 
   if (p.port.empty()) {
     std::string with_port = build_url(p, standard);
-    if (with_port != out[0]) { out.push_back(std::move(with_port));
-}
+    if (with_port != out[0]) {
+      out.push_back(std::move(with_port));
+    }
   } else if (p.port == standard) {
     std::string without_port = build_url(p, "");
-    if (without_port != out[0]) { out.push_back(std::move(without_port));
-}
+    if (without_port != out[0]) {
+      out.push_back(std::move(without_port));
+    }
   }
   // else: explicit non-standard port — only as-is
   return out;
@@ -281,12 +287,15 @@ std::string urldecode_form(std::string_view in) {
                std::isxdigit(static_cast<unsigned char>(in[i + 1])) &&
                std::isxdigit(static_cast<unsigned char>(in[i + 2]))) {
       auto hex_to_int = [](char h) {
-        if (h >= '0' && h <= '9') { return h - '0';
-}
-        if (h >= 'a' && h <= 'f') { return h - 'a' + 10;
-}
-        if (h >= 'A' && h <= 'F') { return h - 'A' + 10;
-}
+        if (h >= '0' && h <= '9') {
+          return h - '0';
+        }
+        if (h >= 'a' && h <= 'f') {
+          return h - 'a' + 10;
+        }
+        if (h >= 'A' && h <= 'F') {
+          return h - 'A' + 10;
+        }
         return 0;
       };
       int hi = hex_to_int(in[i + 1]);
@@ -307,8 +316,9 @@ std::string urldecode_form(std::string_view in) {
 /// porting-sdk/webhooks.md.
 std::vector<std::pair<std::string, std::string>> parse_form_body(std::string_view body) {
   std::vector<std::pair<std::string, std::string>> items;
-  if (body.empty()) { return items;
-}
+  if (body.empty()) {
+    return items;
+  }
   size_t i = 0;
   while (i < body.size()) {
     auto amp = body.find('&', i);
@@ -325,8 +335,9 @@ std::vector<std::pair<std::string, std::string>> parse_form_body(std::string_vie
       }
       items.emplace_back(std::move(k), std::move(v));
     }
-    if (amp == std::string_view::npos) { break;
-}
+    if (amp == std::string_view::npos) {
+      break;
+    }
     i = amp + 1;
   }
   return items;
@@ -337,8 +348,9 @@ std::vector<std::pair<std::string, std::string>> parse_form_body(std::string_vie
 ///   - within repeated keys, preserve original submission order
 ///   - emit ``key + value`` for each pair
 std::string sorted_concat_pairs(const std::vector<std::pair<std::string, std::string>>& items) {
-  if (items.empty()) { return {};
-}
+  if (items.empty()) {
+    return {};
+  }
   // Stable sort by key — preserves order within repeated keys.
   auto sorted = items;
   std::stable_sort(sorted.begin(), sorted.end(),
@@ -356,8 +368,9 @@ std::string sorted_concat_pairs(const std::vector<std::pair<std::string, std::st
 ///   - within a key, preserve order of values exactly as supplied
 ///   - emit ``key + v1 + key + v2 + ...``
 std::string sorted_concat_form_params(const FormParams& params) {
-  if (params.empty()) { return {};
-}
+  if (params.empty()) {
+    return {};
+  }
   auto sorted = params;
   std::stable_sort(sorted.begin(), sorted.end(),
                    [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -386,8 +399,9 @@ std::string find_query_param(std::string_view query, std::string_view name) {
           eq == std::string_view::npos ? std::string_view{} : pair.substr(eq + 1);
       return urldecode_form(raw_v);
     }
-    if (amp == std::string_view::npos) { break;
-}
+    if (amp == std::string_view::npos) {
+      break;
+    }
     i = amp + 1;
   }
   return {};
@@ -398,11 +412,13 @@ std::string find_query_param(std::string_view query, std::string_view name) {
 /// Returns ``false`` only when present and mismatches.
 bool check_body_sha256(std::string_view url, std::string_view raw_body) {
   auto p = parse_url(url);
-  if (p.query.empty()) { return true;
-}
+  if (p.query.empty()) {
+    return true;
+  }
   std::string expected = find_query_param(p.query, "bodySHA256");
-  if (expected.empty()) { return true;
-}
+  if (expected.empty()) {
+    return true;
+  }
   return safe_eq(sha256_hex(raw_body), expected);
 }
 

@@ -1,9 +1,9 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
-#include <nlohmann/json.hpp>
 
 namespace signalwire {
 namespace swaig {
@@ -35,34 +35,44 @@ enum class CallbackMethod { Get, Post };
 // the returned wire string — [[nodiscard]] so a stray `conference_beep_value(x);`
 // (forgetting to use the result) is flagged.
 [[nodiscard]] inline std::string conference_beep_value(ConferenceBeep v) {
-    switch (v) {
-        case ConferenceBeep::True:    return "true";
-        case ConferenceBeep::False:   return "false";
-        case ConferenceBeep::OnEnter: return "onEnter";
-        case ConferenceBeep::OnExit:  return "onExit";
-    }
-    return "";
+  switch (v) {
+    case ConferenceBeep::True:
+      return "true";
+    case ConferenceBeep::False:
+      return "false";
+    case ConferenceBeep::OnEnter:
+      return "onEnter";
+    case ConferenceBeep::OnExit:
+      return "onExit";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string conference_record_value(ConferenceRecord v) {
-    switch (v) {
-        case ConferenceRecord::DoNotRecord:     return "do-not-record";
-        case ConferenceRecord::RecordFromStart: return "record-from-start";
-    }
-    return "";
+  switch (v) {
+    case ConferenceRecord::DoNotRecord:
+      return "do-not-record";
+    case ConferenceRecord::RecordFromStart:
+      return "record-from-start";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string conference_trim_value(ConferenceTrim v) {
-    switch (v) {
-        case ConferenceTrim::TrimSilence: return "trim-silence";
-        case ConferenceTrim::DoNotTrim:   return "do-not-trim";
-    }
-    return "";
+  switch (v) {
+    case ConferenceTrim::TrimSilence:
+      return "trim-silence";
+    case ConferenceTrim::DoNotTrim:
+      return "do-not-trim";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string callback_method_value(CallbackMethod v) {
-    switch (v) {
-        case CallbackMethod::Get:  return "GET";
-        case CallbackMethod::Post: return "POST";
-    }
-    return "";
+  switch (v) {
+    case CallbackMethod::Get:
+      return "GET";
+    case CallbackMethod::Post:
+      return "POST";
+  }
+  return "";
 }
 
 // ===========================================================================
@@ -105,43 +115,54 @@ enum class TapDirection { Speak, Hear, Both };
 enum class Codec { Pcmu, Pcma };
 
 [[nodiscard]] inline std::string record_format_value(RecordFormat v) {
-    switch (v) {
-        case RecordFormat::Wav: return "wav";
-        case RecordFormat::Mp3: return "mp3";
-        case RecordFormat::Mp4: return "mp4";
-    }
-    return "";
+  switch (v) {
+    case RecordFormat::Wav:
+      return "wav";
+    case RecordFormat::Mp3:
+      return "mp3";
+    case RecordFormat::Mp4:
+      return "mp4";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string record_direction_value(RecordDirection v) {
-    switch (v) {
-        case RecordDirection::Speak:  return "speak";
-        case RecordDirection::Listen: return "listen";
-        case RecordDirection::Both:   return "both";
-    }
-    return "";
+  switch (v) {
+    case RecordDirection::Speak:
+      return "speak";
+    case RecordDirection::Listen:
+      return "listen";
+    case RecordDirection::Both:
+      return "both";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string tap_direction_value(TapDirection v) {
-    switch (v) {
-        case TapDirection::Speak: return "speak";
-        case TapDirection::Hear:  return "hear";
-        case TapDirection::Both:  return "both";
-    }
-    return "";
+  switch (v) {
+    case TapDirection::Speak:
+      return "speak";
+    case TapDirection::Hear:
+      return "hear";
+    case TapDirection::Both:
+      return "both";
+  }
+  return "";
 }
 [[nodiscard]] inline std::string codec_value(Codec v) {
-    switch (v) {
-        case Codec::Pcmu: return "PCMU";
-        case Codec::Pcma: return "PCMA";
-    }
-    return "";
+  switch (v) {
+    case Codec::Pcmu:
+      return "PCMU";
+    case Codec::Pcma:
+      return "PCMA";
+  }
+  return "";
 }
 
 /// ADL `to_string` overloads so these enums stringify the same way the
 /// `*_value()` mappers do (the single wire-string normalization point).
-[[nodiscard]] inline std::string to_string(RecordFormat v)    { return record_format_value(v); }
+[[nodiscard]] inline std::string to_string(RecordFormat v) { return record_format_value(v); }
 [[nodiscard]] inline std::string to_string(RecordDirection v) { return record_direction_value(v); }
-[[nodiscard]] inline std::string to_string(TapDirection v)    { return tap_direction_value(v); }
-[[nodiscard]] inline std::string to_string(Codec v)           { return codec_value(v); }
+[[nodiscard]] inline std::string to_string(TapDirection v) { return tap_direction_value(v); }
+[[nodiscard]] inline std::string to_string(Codec v) { return codec_value(v); }
 
 /// A closed-set field that accepts EITHER the typed enum OR a bare string.
 ///
@@ -153,16 +174,16 @@ enum class Codec { Pcmu, Pcma };
 /// covers all four sets.
 template <typename E, std::string (*Map)(E)>
 struct EnumOrString {
-    std::string value;
-    EnumOrString(E e) : value(Map(e)) {}                 // NOLINT(google-explicit-constructor)
-    EnumOrString(const std::string& s) : value(s) {}     // NOLINT
-    EnumOrString(const char* s) : value(s) {}            // NOLINT
-    [[nodiscard]] const std::string& str() const { return value; }
+  std::string value;
+  EnumOrString(E e) : value(Map(e)) {}              // NOLINT(google-explicit-constructor)
+  EnumOrString(const std::string& s) : value(s) {}  // NOLINT
+  EnumOrString(const char* s) : value(s) {}         // NOLINT
+  [[nodiscard]] const std::string& str() const { return value; }
 };
 
-using BeepField   = EnumOrString<ConferenceBeep, &conference_beep_value>;
+using BeepField = EnumOrString<ConferenceBeep, &conference_beep_value>;
 using RecordField = EnumOrString<ConferenceRecord, &conference_record_value>;
-using TrimField   = EnumOrString<ConferenceTrim, &conference_trim_value>;
+using TrimField = EnumOrString<ConferenceTrim, &conference_trim_value>;
 using MethodField = EnumOrString<CallbackMethod, &callback_method_value>;
 
 /// Options bag for `FunctionResult::join_conference`.
@@ -173,256 +194,225 @@ using MethodField = EnumOrString<CallbackMethod, &callback_method_value>;
 /// sets use the enum-or-string wrapper above; open fields are plain
 /// `std::optional`. `result` is a free-form `json` (Python's `Optional[Any]`).
 struct JoinConferenceOptions {
-    std::optional<bool>        muted;
-    std::optional<BeepField>   beep;
-    std::optional<bool>        start_on_enter;
-    std::optional<bool>        end_on_exit;
-    std::optional<std::string> wait_url;
-    std::optional<int>         max_participants;
-    std::optional<RecordField> record;
-    std::optional<std::string> region;
-    std::optional<TrimField>   trim;
-    std::optional<std::string> coach;
-    std::optional<std::string> status_callback_event;
-    std::optional<std::string> status_callback;
-    std::optional<MethodField> status_callback_method;
-    std::optional<std::string> recording_status_callback;
-    std::optional<MethodField> recording_status_callback_method;
-    std::optional<std::string> recording_status_callback_event;
-    std::optional<json>        result;
+  std::optional<bool> muted;
+  std::optional<BeepField> beep;
+  std::optional<bool> start_on_enter;
+  std::optional<bool> end_on_exit;
+  std::optional<std::string> wait_url;
+  std::optional<int> max_participants;
+  std::optional<RecordField> record;
+  std::optional<std::string> region;
+  std::optional<TrimField> trim;
+  std::optional<std::string> coach;
+  std::optional<std::string> status_callback_event;
+  std::optional<std::string> status_callback;
+  std::optional<MethodField> status_callback_method;
+  std::optional<std::string> recording_status_callback;
+  std::optional<MethodField> recording_status_callback_method;
+  std::optional<std::string> recording_status_callback_event;
+  std::optional<json> result;
 };
 
 /// Builder for SWAIG function results with 40+ action methods.
 /// Every method returns *this for chaining.
 class FunctionResult {
-public:
-    explicit FunctionResult(const std::string& response = "", bool post_process = false);
+ public:
+  explicit FunctionResult(const std::string& response = "", bool post_process = false);
 
-    // ========================================================================
-    // Core
-    // ========================================================================
+  // ========================================================================
+  // Core
+  // ========================================================================
 
-    FunctionResult& set_response(const std::string& response);
-    FunctionResult& set_post_process(bool pp);
-    FunctionResult& add_action(const std::string& name, const json& data);
-    FunctionResult& add_actions(const std::vector<json>& actions);
+  FunctionResult& set_response(const std::string& response);
+  FunctionResult& set_post_process(bool pp);
+  FunctionResult& add_action(const std::string& name, const json& data);
+  FunctionResult& add_actions(const std::vector<json>& actions);
 
-    // ========================================================================
-    // Call Control
-    // ========================================================================
+  // ========================================================================
+  // Call Control
+  // ========================================================================
 
-    FunctionResult& connect(const std::string& destination, bool final = true,
-                            const std::string& from_addr = "");
-    FunctionResult& swml_transfer(const std::string& dest, const std::string& ai_response,
-                                   bool final = true);
-    FunctionResult& hangup();
-    FunctionResult& hold(int timeout = 300);
-    FunctionResult& wait_for_user(std::optional<bool> enabled = std::nullopt,
-                                   std::optional<int> timeout = std::nullopt,
-                                   bool answer_first = false);
-    FunctionResult& stop();
+  FunctionResult& connect(const std::string& destination, bool final = true,
+                          const std::string& from_addr = "");
+  FunctionResult& swml_transfer(const std::string& dest, const std::string& ai_response,
+                                bool final = true);
+  FunctionResult& hangup();
+  FunctionResult& hold(int timeout = 300);
+  FunctionResult& wait_for_user(std::optional<bool> enabled = std::nullopt,
+                                std::optional<int> timeout = std::nullopt,
+                                bool answer_first = false);
+  FunctionResult& stop();
 
-    // ========================================================================
-    // State & Data
-    // ========================================================================
+  // ========================================================================
+  // State & Data
+  // ========================================================================
 
-    FunctionResult& update_global_data(const json& data);
-    FunctionResult& remove_global_data(const json& keys);
-    FunctionResult& set_metadata(const json& data);
-    FunctionResult& remove_metadata(const json& keys);
-    FunctionResult& swml_user_event(const json& event_data);
-    FunctionResult& swml_change_step(const std::string& step_name);
-    FunctionResult& swml_change_context(const std::string& context_name);
-    FunctionResult& switch_context(const std::string& system_prompt = "",
-                                    const std::string& user_prompt = "",
-                                    bool consolidate = false,
-                                    bool full_reset = false);
-    FunctionResult& replace_in_history(const json& text);
+  FunctionResult& update_global_data(const json& data);
+  FunctionResult& remove_global_data(const json& keys);
+  FunctionResult& set_metadata(const json& data);
+  FunctionResult& remove_metadata(const json& keys);
+  FunctionResult& swml_user_event(const json& event_data);
+  FunctionResult& swml_change_step(const std::string& step_name);
+  FunctionResult& swml_change_context(const std::string& context_name);
+  FunctionResult& switch_context(const std::string& system_prompt = "",
+                                 const std::string& user_prompt = "", bool consolidate = false,
+                                 bool full_reset = false);
+  FunctionResult& replace_in_history(const json& text);
 
-    // ========================================================================
-    // Media
-    // ========================================================================
+  // ========================================================================
+  // Media
+  // ========================================================================
 
-    FunctionResult& say(const std::string& text);
-    FunctionResult& play_background_file(const std::string& filename, bool wait = false);
-    FunctionResult& stop_background_file();
-    FunctionResult& record_call(const std::string& control_id = "",
-                                 bool stereo = false,
-                                 const std::string& format = "wav",
-                                 const std::string& direction = "both",
-                                 const std::string& terminators = "",
-                                 bool beep = false,
-                                 double input_sensitivity = 44.0,
-                                 std::optional<double> initial_timeout = std::nullopt,
-                                 std::optional<double> end_silence_timeout = std::nullopt,
-                                 std::optional<double> max_length = std::nullopt,
-                                 const std::string& status_url = "");
+  FunctionResult& say(const std::string& text);
+  FunctionResult& play_background_file(const std::string& filename, bool wait = false);
+  FunctionResult& stop_background_file();
+  FunctionResult& record_call(
+      const std::string& control_id = "", bool stereo = false, const std::string& format = "wav",
+      const std::string& direction = "both", const std::string& terminators = "", bool beep = false,
+      double input_sensitivity = 44.0, std::optional<double> initial_timeout = std::nullopt,
+      std::optional<double> end_silence_timeout = std::nullopt,
+      std::optional<double> max_length = std::nullopt, const std::string& status_url = "");
 
-    /// Typed overload — `format`/`direction` as the `RecordFormat` /
-    /// `RecordDirection` closed-set enums for call-site typo checking. Declared
-    /// after the std::string overload (equal arity) so the enumerator's dedup
-    /// keeps the string signature canonical; normalizes the enums to their wire
-    /// strings via `record_format_value`/`record_direction_value` and delegates
-    /// to the std::string `record_call`, so the emitted SWML is byte-identical.
-    FunctionResult& record_call(const std::string& control_id,
-                                 bool stereo,
-                                 RecordFormat format,
-                                 RecordDirection direction,
-                                 const std::string& terminators = "",
-                                 bool beep = false,
-                                 double input_sensitivity = 44.0,
-                                 std::optional<double> initial_timeout = std::nullopt,
-                                 std::optional<double> end_silence_timeout = std::nullopt,
-                                 std::optional<double> max_length = std::nullopt,
-                                 const std::string& status_url = "");
-    FunctionResult& stop_record_call(const std::string& control_id = "");
+  /// Typed overload — `format`/`direction` as the `RecordFormat` /
+  /// `RecordDirection` closed-set enums for call-site typo checking. Declared
+  /// after the std::string overload (equal arity) so the enumerator's dedup
+  /// keeps the string signature canonical; normalizes the enums to their wire
+  /// strings via `record_format_value`/`record_direction_value` and delegates
+  /// to the std::string `record_call`, so the emitted SWML is byte-identical.
+  FunctionResult& record_call(const std::string& control_id, bool stereo, RecordFormat format,
+                              RecordDirection direction, const std::string& terminators = "",
+                              bool beep = false, double input_sensitivity = 44.0,
+                              std::optional<double> initial_timeout = std::nullopt,
+                              std::optional<double> end_silence_timeout = std::nullopt,
+                              std::optional<double> max_length = std::nullopt,
+                              const std::string& status_url = "");
+  FunctionResult& stop_record_call(const std::string& control_id = "");
 
-    // ========================================================================
-    // Speech & AI
-    // ========================================================================
+  // ========================================================================
+  // Speech & AI
+  // ========================================================================
 
-    FunctionResult& add_dynamic_hints(const json& hints);
-    FunctionResult& clear_dynamic_hints();
-    FunctionResult& set_end_of_speech_timeout(int milliseconds);
-    FunctionResult& set_speech_event_timeout(int milliseconds);
-    FunctionResult& toggle_functions(const json& function_toggles);
-    FunctionResult& enable_functions_on_timeout(bool enabled = true);
-    FunctionResult& enable_extensive_data(bool enabled = true);
-    FunctionResult& update_settings(const json& settings);
-    FunctionResult& simulate_user_input(const std::string& text);
+  FunctionResult& add_dynamic_hints(const json& hints);
+  FunctionResult& clear_dynamic_hints();
+  FunctionResult& set_end_of_speech_timeout(int milliseconds);
+  FunctionResult& set_speech_event_timeout(int milliseconds);
+  FunctionResult& toggle_functions(const json& function_toggles);
+  FunctionResult& enable_functions_on_timeout(bool enabled = true);
+  FunctionResult& enable_extensive_data(bool enabled = true);
+  FunctionResult& update_settings(const json& settings);
+  FunctionResult& simulate_user_input(const std::string& text);
 
-    // ========================================================================
-    // Advanced / SWML
-    // ========================================================================
+  // ========================================================================
+  // Advanced / SWML
+  // ========================================================================
 
-    FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
+  FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
 
-    /// Join an ad-hoc audio conference (SWML `join_conference`). Full parity
-    /// with Python `core/function_result.py`: 18 optional params past `name`,
-    /// 7 validations, and simple (bare-name) vs full-object emission.
-    ///
-    /// Flat positional overload — mirrors the Python signature 1:1 so the
-    /// cross-language audit lines up on parameter count/types. The closed-set
-    /// params are bare `std::string` (Python uses bare `str`); the
-    /// options-struct overload below adds the typed `enum class` affordance.
-    FunctionResult& join_conference(
-        const std::string& name,
-        bool muted = false,
-        const std::string& beep = "true",
-        bool start_on_enter = true,
-        bool end_on_exit = false,
-        std::optional<std::string> wait_url = std::nullopt,
-        int max_participants = 250,
-        const std::string& record = "do-not-record",
-        std::optional<std::string> region = std::nullopt,
-        const std::string& trim = "trim-silence",
-        std::optional<std::string> coach = std::nullopt,
-        std::optional<std::string> status_callback_event = std::nullopt,
-        std::optional<std::string> status_callback = std::nullopt,
-        const std::string& status_callback_method = "POST",
-        std::optional<std::string> recording_status_callback = std::nullopt,
-        const std::string& recording_status_callback_method = "POST",
-        const std::string& recording_status_callback_event = "completed",
-        std::optional<json> result = std::nullopt);
+  /// Join an ad-hoc audio conference (SWML `join_conference`). Full parity
+  /// with Python `core/function_result.py`: 18 optional params past `name`,
+  /// 7 validations, and simple (bare-name) vs full-object emission.
+  ///
+  /// Flat positional overload — mirrors the Python signature 1:1 so the
+  /// cross-language audit lines up on parameter count/types. The closed-set
+  /// params are bare `std::string` (Python uses bare `str`); the
+  /// options-struct overload below adds the typed `enum class` affordance.
+  FunctionResult& join_conference(
+      const std::string& name, bool muted = false, const std::string& beep = "true",
+      bool start_on_enter = true, bool end_on_exit = false,
+      std::optional<std::string> wait_url = std::nullopt, int max_participants = 250,
+      const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt,
+      const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt,
+      std::optional<std::string> status_callback_event = std::nullopt,
+      std::optional<std::string> status_callback = std::nullopt,
+      const std::string& status_callback_method = "POST",
+      std::optional<std::string> recording_status_callback = std::nullopt,
+      const std::string& recording_status_callback_method = "POST",
+      const std::string& recording_status_callback_event = "completed",
+      std::optional<json> result = std::nullopt);
 
-    /// Options-bag overload — the C++-idiomatic way to pass the 18 optional
-    /// params (named `std::optional` fields + closed-set enums). Delegates to
-    /// the flat overload, so behavior + validation + emission are identical.
-    FunctionResult& join_conference(const std::string& name,
-                                    const JoinConferenceOptions& opts);
-    FunctionResult& join_room(const std::string& name);
-    FunctionResult& sip_refer(const std::string& to_uri);
-    FunctionResult& tap(const std::string& uri, const std::string& control_id = "",
-                        const std::string& direction = "both",
-                        const std::string& codec = "PCMU",
-                        int rtp_ptime = 20,
-                        const std::string& status_url = "");
+  /// Options-bag overload — the C++-idiomatic way to pass the 18 optional
+  /// params (named `std::optional` fields + closed-set enums). Delegates to
+  /// the flat overload, so behavior + validation + emission are identical.
+  FunctionResult& join_conference(const std::string& name, const JoinConferenceOptions& opts);
+  FunctionResult& join_room(const std::string& name);
+  FunctionResult& sip_refer(const std::string& to_uri);
+  FunctionResult& tap(const std::string& uri, const std::string& control_id = "",
+                      const std::string& direction = "both", const std::string& codec = "PCMU",
+                      int rtp_ptime = 20, const std::string& status_url = "");
 
-    /// Typed overload — `direction`/`codec` as the `TapDirection` / `Codec`
-    /// closed-set enums for call-site typo checking. Declared after the
-    /// std::string overload (equal arity) so the enumerator's dedup keeps the
-    /// string signature canonical; normalizes the enums via
-    /// `tap_direction_value`/`codec_value` and delegates to the std::string
-    /// `tap`, so the emitted SWML is byte-identical. NOTE the tap direction set
-    /// is {speak,hear,both} (`hear`, not record_call's `listen`).
-    FunctionResult& tap(const std::string& uri,
-                        const std::string& control_id,
-                        TapDirection direction,
-                        Codec codec,
-                        int rtp_ptime = 20,
-                        const std::string& status_url = "");
-    FunctionResult& stop_tap(const std::string& control_id = "");
-    FunctionResult& send_sms(const std::string& to, const std::string& from,
-                              const std::string& body = "",
-                              const std::vector<std::string>& media = {},
-                              const std::vector<std::string>& tags = {},
-                              const std::string& region = "");
-    FunctionResult& pay(const std::string& payment_connector_url,
-                         const std::string& input_method = "dtmf",
-                         const std::string& status_url = "",
-                         const std::string& payment_method = "credit-card",
-                         int timeout = 5,
-                         int max_attempts = 1,
-                         bool security_code = true,
-                         const std::string& postal_code = "true",
-                         int min_postal_code_length = 0,
-                         const std::string& token_type = "reusable",
-                         const std::string& charge_amount = "",
-                         const std::string& currency = "usd",
-                         const std::string& language = "en-US",
-                         const std::string& voice = "woman",
-                         const std::string& description = "",
-                         const std::string& valid_card_types = "visa mastercard amex",
-                         const std::vector<json>& parameters = {},
-                         const std::vector<json>& prompts = {},
-                         const std::string& ai_response =
-                             "The payment status is ${pay_result}, do not mention anything else about collecting payment if successful.");
+  /// Typed overload — `direction`/`codec` as the `TapDirection` / `Codec`
+  /// closed-set enums for call-site typo checking. Declared after the
+  /// std::string overload (equal arity) so the enumerator's dedup keeps the
+  /// string signature canonical; normalizes the enums via
+  /// `tap_direction_value`/`codec_value` and delegates to the std::string
+  /// `tap`, so the emitted SWML is byte-identical. NOTE the tap direction set
+  /// is {speak,hear,both} (`hear`, not record_call's `listen`).
+  FunctionResult& tap(const std::string& uri, const std::string& control_id, TapDirection direction,
+                      Codec codec, int rtp_ptime = 20, const std::string& status_url = "");
+  FunctionResult& stop_tap(const std::string& control_id = "");
+  FunctionResult& send_sms(const std::string& to, const std::string& from,
+                           const std::string& body = "", const std::vector<std::string>& media = {},
+                           const std::vector<std::string>& tags = {},
+                           const std::string& region = "");
+  FunctionResult& pay(const std::string& payment_connector_url,
+                      const std::string& input_method = "dtmf", const std::string& status_url = "",
+                      const std::string& payment_method = "credit-card", int timeout = 5,
+                      int max_attempts = 1, bool security_code = true,
+                      const std::string& postal_code = "true", int min_postal_code_length = 0,
+                      const std::string& token_type = "reusable",
+                      const std::string& charge_amount = "", const std::string& currency = "usd",
+                      const std::string& language = "en-US", const std::string& voice = "woman",
+                      const std::string& description = "",
+                      const std::string& valid_card_types = "visa mastercard amex",
+                      const std::vector<json>& parameters = {},
+                      const std::vector<json>& prompts = {},
+                      const std::string& ai_response =
+                          "The payment status is ${pay_result}, do not mention anything else about "
+                          "collecting payment if successful.");
 
-    // ========================================================================
-    // RPC
-    // ========================================================================
+  // ========================================================================
+  // RPC
+  // ========================================================================
 
-    FunctionResult& execute_rpc(const std::string& method, const json& params = json::object(),
-                                 const std::string& call_id = "",
-                                 const std::string& node_id = "");
-    FunctionResult& rpc_dial(const std::string& to_number, const std::string& from_number,
-                              const std::string& dest_swml,
-                              const std::string& device_type = "phone");
-    FunctionResult& rpc_ai_message(const std::string& call_id, const std::string& message_text,
-                                    const std::string& role = "system");
-    FunctionResult& rpc_ai_unhold(const std::string& call_id);
+  FunctionResult& execute_rpc(const std::string& method, const json& params = json::object(),
+                              const std::string& call_id = "", const std::string& node_id = "");
+  FunctionResult& rpc_dial(const std::string& to_number, const std::string& from_number,
+                           const std::string& dest_swml, const std::string& device_type = "phone");
+  FunctionResult& rpc_ai_message(const std::string& call_id, const std::string& message_text,
+                                 const std::string& role = "system");
+  FunctionResult& rpc_ai_unhold(const std::string& call_id);
 
-    // ========================================================================
-    // Static Payment Helpers
-    // ========================================================================
+  // ========================================================================
+  // Static Payment Helpers
+  // ========================================================================
 
-    // [[nodiscard]] on the static payment factories: each builds and returns
-    // a JSON fragment — calling one and dropping the result does nothing.
-    [[nodiscard]] static json create_payment_prompt(const std::string& for_situation,
-                                       const std::vector<json>& actions,
-                                       const std::string& card_type = "",
-                                       const std::string& error_type = "");
-    [[nodiscard]] static json create_payment_action(const std::string& action_type,
-                                       const std::string& phrase);
-    [[nodiscard]] static json create_payment_parameter(const std::string& name,
-                                          const std::string& value);
+  // [[nodiscard]] on the static payment factories: each builds and returns
+  // a JSON fragment — calling one and dropping the result does nothing.
+  [[nodiscard]] static json create_payment_prompt(const std::string& for_situation,
+                                                  const std::vector<json>& actions,
+                                                  const std::string& card_type = "",
+                                                  const std::string& error_type = "");
+  [[nodiscard]] static json create_payment_action(const std::string& action_type,
+                                                  const std::string& phrase);
+  [[nodiscard]] static json create_payment_parameter(const std::string& name,
+                                                     const std::string& value);
 
-    // ========================================================================
-    // Serialization
-    // ========================================================================
+  // ========================================================================
+  // Serialization
+  // ========================================================================
 
-    // [[nodiscard]]: these produce the serialized result the builder exists to
-    // create; discarding the rendered action/SWML is a bug. (The fluent
-    // FunctionResult& action builders above are intentionally NOT nodiscard —
-    // the terminal call in a build chain is routinely discarded.)
-    [[nodiscard]] json to_json() const;
-    [[nodiscard]] std::string to_string(int indent = -1) const;
+  // [[nodiscard]]: these produce the serialized result the builder exists to
+  // create; discarding the rendered action/SWML is a bug. (The fluent
+  // FunctionResult& action builders above are intentionally NOT nodiscard —
+  // the terminal call in a build chain is routinely discarded.)
+  [[nodiscard]] json to_json() const;
+  [[nodiscard]] std::string to_string(int indent = -1) const;
 
-private:
-    std::string response_;
-    std::vector<json> actions_;
-    bool post_process_;
+ private:
+  std::string response_;
+  std::vector<json> actions_;
+  bool post_process_;
 };
 
-} // namespace swaig
-} // namespace signalwire
+}  // namespace swaig
+}  // namespace signalwire

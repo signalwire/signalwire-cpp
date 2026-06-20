@@ -8,7 +8,10 @@
 
 #include "signalwire/security/webhook_validator.hpp"
 
-namespace httplib { class Request; class Response; }
+namespace httplib {
+class Request;
+class Response;
+}  // namespace httplib
 
 namespace signalwire {
 namespace security {
@@ -24,14 +27,14 @@ using HttpHandler = std::function<void(const httplib::Request&, httplib::Respons
 /// headers are spoofable. ``proxy_url_base`` is consulted before the
 /// proxy headers and is meant for ``SWML_PROXY_URL_BASE`` callers.
 struct WebhookValidatorOptions {
-    /// If true, honor ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` when
-    /// reconstructing the URL. Default false.
-    bool trust_proxy = false;
+  /// If true, honor ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` when
+  /// reconstructing the URL. Default false.
+  bool trust_proxy = false;
 
-    /// Optional base URL (e.g. ``https://abcd.ngrok.io``) joined with
-    /// the request path + query when reconstructing the URL. Wins over
-    /// proxy headers and ``request.host``.
-    std::string proxy_url_base;
+  /// Optional base URL (e.g. ``https://abcd.ngrok.io``) joined with
+  /// the request path + query when reconstructing the URL. Wins over
+  /// proxy headers and ``request.host``.
+  std::string proxy_url_base;
 };
 
 /// Wrap a downstream cpp-httplib POST handler with SignalWire webhook
@@ -61,9 +64,8 @@ struct WebhookValidatorOptions {
 /// @return A handler suitable for ``server.Post(path, handler)``.
 ///
 /// @throws std::invalid_argument if ``signing_key`` is empty.
-HttpHandler WrapWithSignatureValidation(std::string_view signing_key,
-                                        HttpHandler downstream,
+HttpHandler WrapWithSignatureValidation(std::string_view signing_key, HttpHandler downstream,
                                         WebhookValidatorOptions opts = {});
 
-} // namespace security
-} // namespace signalwire
+}  // namespace security
+}  // namespace signalwire

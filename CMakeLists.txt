@@ -86,6 +86,17 @@ add_test(NAME all_tests COMMAND run_tests)
 add_executable(emit_corpus tools/emit_corpus.cpp)
 target_link_libraries(emit_corpus signalwire)
 
+# emit_skills — the SKILL-DUMP program for the cross-port SKILL-CONTRACT differ
+# (porting-sdk/scripts/diff_skill_contracts.py). For each covered skill it
+# instantiates the registered skill, runs setup() with the shared corpus config,
+# and prints {id -> [{name, parameters, required?}]} from both register_tools()
+# and get_datamap_functions(). The differ (run via the SKILL-CONTRACT gate in
+# scripts/run-ci.sh) compares it against the Python reference. Mirrors the Java
+# port's EmitSkills and Go's cmd/emit-skills. Built in the TEST gate alongside
+# emit_corpus so the SKILL-CONTRACT gate has a ready binary.
+add_executable(emit_skills tools/emit_skills.cpp)
+target_link_libraries(emit_skills signalwire)
+
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that
 # every method referenced in docs and examples resolves to a real symbol; the

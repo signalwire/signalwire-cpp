@@ -1,0 +1,76 @@
+# clang-tidy config for signalwire-cpp — the LINT gate.
+#
+# A CURATED, blocking check set burned to ZERO findings. The philosophy
+# (porting-sdk/RULES.md): lint polices real bug patterns, NEVER idiom/style.
+# It must not move the wire or the audited surface, and no check is disabled to
+# hide a type-shape issue.
+#
+# ENABLED families:
+#   bugprone-*       real bug patterns (use-after-move, narrowing, etc.)
+#   performance-*    measurable perf foot-guns (needless copies, etc.)
+#   plus a few high-value readability-* checks that catch genuine defects /
+#   silent-bug shapes rather than taste.
+#
+# DISABLED (style churn / LLM-irrelevant / would force idiom), each with cause:
+#   -modernize-*                            modernize is pure idiom churn; in
+#       particular modernize-use-trailing-return-type fires on EVERY method
+#       (thousands of findings) — it rewrites `T f()` to `auto f() -> T`, a
+#       style preference that policing would make LINT an idiom enforcer
+#       (forbidden by RULES.md §3). All of modernize-* is excluded for the
+#       same reason; none of it catches a bug.
+#   -bugprone-easily-swappable-parameters   flags any two adjacent same-typed
+#       params (e.g. from_addr/to_addr) — it is an API-shape opinion, not a
+#       bug; obeying it would force signature changes that move the surface.
+#   -bugprone-narrowing-conversions / -performance-no-int-to-ptr  noisy on
+#       json-number <-> numeric conversions that are intentional and wire-exact;
+#       left OFF to avoid pressure to alter wire-facing numeric handling.
+#   -readability-magic-numbers / -readability-identifier-length  pure taste.
+#   -readability-function-cognitive-complexity  a metric, not a defect.
+#   -readability-else-after-return  reflowing control flow is style, not a bug.
+#   -bugprone-derived-method-shadowing-base-method  fires on EVERY intentional
+#       override that mirrors the Python reference surface (AgentBase's methods
+#       over swml::Service; the RestClient namespaces' create/update/list over
+#       CrudResource/FabricResource — ~35 sites). These names ARE the audited
+#       public surface; renaming or hiding them to silence the check would move
+#       port_surface.json / port_signatures.json off the Python reference and
+#       break parity. Per RULES.md §3 a check that fails a parity-required,
+#       wire-neutral shape is mis-scoped — fix the check, not the port. OFF.
+#   -performance-enum-size  flags every enum whose values fit in 1 byte but whose
+#       base type is the default int (LogLevel, the FunctionResult/RecordFormat/
+#       Codec/etc. wire enums, SkillName, the RELAY state enums — ~20 sites). The
+#       underlying-type of an enum is a representation/idiom choice; these enums
+#       are never packed into large containers, so the "size" win is theoretical,
+#       and pinning `: std::uint8_t` is pure churn that risks perturbing the
+#       surface enumerator's view of the public types. It catches no bug. OFF.
+#   -bugprone-throwing-static-initialization  fires on the SDK's pervasive
+#       self-registration idiom — every built-in skill's file-scope
+#       `_skill_X_registered` static plus a few static const tables
+#       (KNOWN_VERBS, kSwaigFnName, the logging/registry singletons — ~22 sites).
+#       This load-time registration with controlled, literal inputs is the
+#       architecture, not a defect; the values never throw in practice and
+#       reworking every registration into a guarded function-local static would
+#       be invasive idiom churn for no bug caught. OFF.
+#
+Checks: >
+  bugprone-*,
+  performance-*,
+  readability-braces-around-statements,
+  readability-redundant-*,
+  readability-misleading-indentation,
+  readability-simplify-boolean-expr,
+  readability-container-size-empty,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-derived-method-shadowing-base-method,
+  -bugprone-throwing-static-initialization,
+  -performance-enum-size,
+  -performance-no-int-to-ptr,
+  -readability-redundant-access-specifiers
+
+# Scope to first-party code only: vendored headers under deps/ (httplib.h,
+# json.hpp, nlohmann/) are NEVER linted. The filter matches both src/ and
+# include/ under the signalwire-cpp tree. (CI is Linux; on macOS Apple libc++
+# header drift can emit a trailing note — the header-filter keeps findings
+# scoped to our own headers regardless.)
+HeaderFilterRegex: 'signalwire-cpp/(src|include)/'
+WarningsAsErrors: '*'

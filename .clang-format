@@ -1,0 +1,15 @@
+# clang-format config for signalwire-cpp.
+#
+# Source-style ONLY: this gate is wire/surface-neutral by construction —
+# reformatting whitespace/line-breaks cannot change the enumerated public
+# surface (the libclang signature enumerator + the regex surface walker both
+# normalise to the symbol/shape, not the layout) nor the FunctionResult
+# emission. Verified during rollout: port_signatures.json + port_surface.json
+# stay byte-identical and EMISSION stays green across a full reformat.
+#
+# Google base (the canonical, widely-tooled C++ style — no bikeshedding),
+# with a 100-col limit to match the existing codebase's wider lines and keep
+# the diff mechanical rather than a re-wrap storm. Vendored deps/ are NEVER
+# formatted (the fmt gate scopes clang-format to src/ + include/ + tools/).
+BasedOnStyle: Google
+ColumnLimit: 100

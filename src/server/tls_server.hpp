@@ -28,27 +28,27 @@ namespace server {
 
 /// Resolved TLS configuration for an in-process HTTP server.
 struct TlsServerConfig {
-    bool enabled = false;
-    std::string cert_path;
-    std::string key_path;
+  bool enabled = false;
+  std::string cert_path;
+  std::string key_path;
 
-    /// True only when TLS is enabled AND both cert + key paths are present.
-    bool usable() const {
-        return enabled && !cert_path.empty() && !key_path.empty();
-    }
+  /// True only when TLS is enabled AND both cert + key paths are present.
+  bool usable() const { return enabled && !cert_path.empty() && !key_path.empty(); }
 };
 
 /// Resolve TLS config from the SWML_SSL_* environment variables, mirroring
 /// signalwire-python's SecurityConfig.load_from_env(). Returns enabled=false
 /// when SWML_SSL_ENABLED is unset/false.
 inline TlsServerConfig resolve_tls_config_from_env() {
-    TlsServerConfig cfg;
-    std::string enabled = get_env("SWML_SSL_ENABLED", "");
-    for (auto& c : enabled) c = static_cast<char>(::tolower(c));
-    cfg.enabled = (enabled == "true" || enabled == "1" || enabled == "yes" || enabled == "on");
-    cfg.cert_path = get_env("SWML_SSL_CERT_PATH", "");
-    cfg.key_path = get_env("SWML_SSL_KEY_PATH", "");
-    return cfg;
+  TlsServerConfig cfg;
+  std::string enabled = get_env("SWML_SSL_ENABLED", "");
+  for (auto& c : enabled) {
+    c = static_cast<char>(::tolower(c));
+  }
+  cfg.enabled = (enabled == "true" || enabled == "1" || enabled == "yes" || enabled == "on");
+  cfg.cert_path = get_env("SWML_SSL_CERT_PATH", "");
+  cfg.key_path = get_env("SWML_SSL_KEY_PATH", "");
+  return cfg;
 }
 
 /// Construct the httplib server for the given config. When cfg.usable(), an
@@ -58,12 +58,11 @@ inline TlsServerConfig resolve_tls_config_from_env() {
 /// server's is_valid() is false — callers log and refuse to listen, the same
 /// failure mode as a bad bind.
 inline std::unique_ptr<httplib::Server> make_http_server(const TlsServerConfig& cfg) {
-    if (cfg.usable()) {
-        return std::make_unique<httplib::SSLServer>(cfg.cert_path.c_str(),
-                                                    cfg.key_path.c_str());
-    }
-    return std::make_unique<httplib::Server>();
+  if (cfg.usable()) {
+    return std::make_unique<httplib::SSLServer>(cfg.cert_path.c_str(), cfg.key_path.c_str());
+  }
+  return std::make_unique<httplib::Server>();
 }
 
-} // namespace server
-} // namespace signalwire
+}  // namespace server
+}  // namespace signalwire

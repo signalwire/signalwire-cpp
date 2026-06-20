@@ -143,11 +143,12 @@ echo "==> TEST build mode: $BUILD_MODE"
 SWCPP_CONTAINER_REPO="${SWCPP_CONTAINER_REPO:-/src/$PORT_NAME}"
 SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"
 
-# Build run_tests + emit_corpus + execute run_tests, honoring BUILD_MODE. Each
-# branch produces the same observable result: a built run_tests (+ emit_corpus,
-# which the EMISSION gate reuses) and run_tests' exit code. emit_corpus is built
-# here too so the EMISSION gate doesn't reconfigure the tree (and so the host /
-# exec modes leave a ready-to-run binary).
+# Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
+# BUILD_MODE. Each branch produces the same observable result: a built run_tests
+# (+ emit_corpus, reused by the EMISSION gate; + emit_skills, reused by the
+# SKILL-CONTRACT gate) and run_tests' exit code. The two dump binaries are built
+# here too so the downstream gates don't reconfigure the tree (and so the host /
+# exec modes leave ready-to-run binaries).
 test_gate() {
     case "$BUILD_MODE" in
         host)
@@ -155,13 +156,13 @@ test_gate() {
                 echo "[BOOTSTRAP] cmake -S . -B build (initial configure)"
                 cmake -S . -B build || return 1
             fi
-            cmake --build build --target run_tests emit_corpus -j && ./build/run_tests
+            cmake --build build --target run_tests emit_corpus emit_skills -j && ./build/run_tests
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -170,7 +171,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -240,6 +241,167 @@ surface_fresh_gate() {
     return $rc
 }
 
+# SURFACE-DIFF gate: diff the port's public surface against the Python reference
+# (membership: omissions + additions). The signature DRIFT gate (Layer A) checks
+# method *signatures*; this checks surface *membership* — public symbols the port
+# has that Python doesn't and vice-versa. Like SURFACE-FRESH it regenerates
+# port_surface.json in place via the host regex enumerator (no compiler / no
+# mocks / BUILD_MODE-independent), diffs, then restores the committed copy
+# unconditionally so the gate is side-effect free.
+surface_diff_gate() {
+    if ! git show HEAD:port_surface.json > /tmp/committed_surface_diff.json 2>/dev/null; then
+        cp port_surface.json /tmp/committed_surface_diff.json || return 1
+    fi
+    python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_surface.py" \
+        --reference "$PORTING_SDK_DIR/python_surface.json" \
+        --port-surface port_surface.json \
+        --omissions "$PORT_ROOT/PORT_OMISSIONS.md" \
+        --additions "$PORT_ROOT/PORT_ADDITIONS.md"
+    local rc=$?
+    git checkout -- port_surface.json 2>/dev/null
+    return $rc
+}
+
+# SKILL-CONTRACT gate: the surface/drift/emission gates see signatures + symbol
+# names + FunctionResult.to_json(); NONE sees a built-in skill's SWAIG tool
+# contract ({name, parameters, required, enum} each skill registers). This differ
+# closes that gap: it builds the Python oracle by instantiating each covered
+# reference skill, runs the C++ skill-dump program (the emit_skills binary built
+# in the TEST gate, which reads the SAME shared corpus via
+# skill_contract_corpus.py), and structurally compares the two. DESCRIPTIONS +
+# implementation (handler vs DataMap) are not compared — only name / param-name /
+# param-type / enum / required. Mirrors the EMISSION gate's BUILD_MODE routing:
+# the emit_skills binary is resolved per host/exec/run mode exactly like
+# emit_corpus.
+skill_contract_gate() {
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)
+            dump_cmd="$PORT_ROOT/build/emit_skills"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/emit_skills"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                 && cmake --build $SWCPP_CONTAINER_BUILD --target emit_skills -j\$(nproc) 1>&2 \
+                 && exec $SWCPP_CONTAINER_BUILD/emit_skills'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/diff_skill_contracts.py" \
+        --dump-cmd "$dump_cmd" --port-repo "$PORT_ROOT"
+}
+
+# FMT gate: the C++ format gate (clang-format, config in .clang-format —
+# Google base / 100-col). Source-style only; proven surface/emission-neutral
+# (the libclang SIGNATURES enumerator + the regex SURFACE enumerator are both
+# whitespace-insensitive, so a reformat leaves port_signatures.json /
+# port_surface.json byte-identical and EMISSION 81/81). Mirrors the go/ruby/java
+# fmt_gate split:
+#   * LOCAL ($CI unset)  -> `clang-format -i`: reformats your working tree in
+#     place so you never hand-run it; notes if it changed files, then re-checks.
+#   * CI ($CI=true)      -> `clang-format --dry-run -Werror` (read-only): FAILS
+#     if any unformatted source reached CI.
+# Scope is first-party src/ + include/ ONLY — vendored deps/ (httplib.h,
+# json.hpp, nlohmann/) and the FetchContent IXWebSocket tree are never touched.
+# clang-format runs on the host regardless of BUILD_MODE (no compiler/SDK
+# needed — it only parses tokens).
+fmt_sources() {
+    find src include tools -type f \
+        \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' \) \
+        2>/dev/null
+}
+fmt_gate() {
+    local files
+    files="$(fmt_sources)"
+    [ -n "$files" ] || { echo "no C++ sources found to format" >&2; return 1; }
+    if [ -n "${CI:-}" ]; then
+        # shellcheck disable=SC2086
+        clang-format --dry-run -Werror $files
+    else
+        # shellcheck disable=SC2086
+        clang-format -i $files
+        if ! git diff --quiet 2>/dev/null; then
+            echo "    (FMT auto-applied formatting to your working tree — review & stage)"
+        fi
+        # A residual issue -i can't fix must still fail the gate.
+        # shellcheck disable=SC2086
+        clang-format --dry-run -Werror $files
+    fi
+}
+
+# LINT gate: the C++ lint gate (clang-tidy, curated check set in .clang-tidy
+# burned to ZERO findings; WarningsAsErrors:'*' makes any finding a nonzero
+# exit). The curated set polices real bug patterns (bugprone-*, performance-*,
+# select readability-*) and NEVER idiom — modernize-* / style-churn checks and
+# the three surface/idiom-forcing checks (derived-method-shadowing,
+# enum-size, throwing-static-init) are disabled with rationale at the config
+# site (RULES.md §3: a check that fails a parity-required, wire-neutral shape is
+# mis-scoped — fix the check, not the port). Scope is first-party src/+include/
+# only; vendored deps/ are excluded by the HeaderFilterRegex in .clang-tidy.
+#
+# clang-tidy needs a compile_commands.json AND a clang-tidy new enough to parse
+# the build's standard-library headers. On Linux CI the system clang-tidy and
+# the `build` tree's compile commands agree, so we reuse `build`. On macOS the
+# system SDK's libc++ can outrun an older Homebrew clang-tidy (e.g. clang-tidy
+# 18 cannot parse a macOS-26 SDK's __builtin_clzg), so the gate (a) picks the
+# newest clang-tidy it can find unless $SWCPP_CLANG_TIDY overrides, and (b)
+# generates a dedicated `build-tidy` compile_commands using THAT toolchain's
+# matching clang so headers always resolve, reusing it if already present.
+# $SWCPP_TIDY_BUILD overrides the build dir.
+resolve_clang_tidy() {
+    if [ -n "${SWCPP_CLANG_TIDY:-}" ]; then echo "$SWCPP_CLANG_TIDY"; return 0; fi
+    local c
+    for c in \
+        /opt/homebrew/opt/llvm/bin/clang-tidy \
+        /usr/local/opt/llvm/bin/clang-tidy \
+        clang-tidy; do
+        if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then echo "$c"; return 0; fi
+    done
+    return 1
+}
+lint_gate() {
+    local ct tidy_build cxx cc
+    ct="$(resolve_clang_tidy)" || { echo "no clang-tidy found" >&2; return 1; }
+    tidy_build="${SWCPP_TIDY_BUILD:-}"
+    if [ -z "$tidy_build" ]; then
+        # clang-tidy must read a CLANG-generated compile DB. Reuse an existing
+        # build-tidy (clang-built by construction below); otherwise generate one
+        # with the clang matching the chosen clang-tidy. Do NOT fall back to the
+        # plain build/ dir — the TEST gate builds that with g++ (CI) whose
+        # compile_commands carries g++-specific flags + system-header paths that
+        # clang-tidy can't parse as C++17 (it falls back to a pre-C++17 parse,
+        # yielding bogus "no template named 'optional'" / "decomposition
+        # declarations are a C++17 extension" errors). Always use clang's DB.
+        if [ -f build-tidy/compile_commands.json ]; then
+            tidy_build="build-tidy"
+        else
+            cxx="$(dirname "$ct")/clang++"; cc="$(dirname "$ct")/clang"
+            # When clang-tidy resolved to a bare name on PATH, dirname is "." and
+            # the sibling clang++/clang may not exist there — fall back to the
+            # PATH-resolved clang++/clang so CMake still gets a clang compiler.
+            [ -x "$cxx" ] || cxx="$(command -v clang++ || true)"
+            [ -x "$cc" ] || cc="$(command -v clang || true)"
+            local cmake_args=(-S . -B build-tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
+            [ -n "$cxx" ] && cmake_args+=(-DCMAKE_CXX_COMPILER="$cxx")
+            [ -n "$cc" ] && cmake_args+=(-DCMAKE_C_COMPILER="$cc")
+            cmake "${cmake_args[@]}" >&2 || return 1
+            tidy_build="build-tidy"
+        fi
+    fi
+    local files
+    files="$(find src include -name '*.cpp')"
+    [ -n "$files" ] || { echo "no C++ sources found to lint" >&2; return 1; }
+    # shellcheck disable=SC2086
+    "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet $files
+}
+
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
 run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
 
@@ -267,6 +429,31 @@ run_gate "NO-CHEAT" "audit_no_cheat_tests" \
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
     emission_gate
+
+# Gate 7: FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
+run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
+
+# Gate 8: LINT — clang-tidy curated set burned to zero (WarningsAsErrors:'*')
+run_gate "LINT" "clang-tidy curated set, zero findings" lint_gate
+
+# Gate 9: DOC-AUDIT — every symbol referenced in docs/ + examples/ fenced code
+# blocks must resolve to a real symbol in the committed port_surface.json (the
+# SURFACE-FRESH gate above already proved it fresh). DOC_AUDIT_IGNORE.md lists
+# intentional non-symbol references. Pure python; host-side, BUILD_MODE-blind.
+run_gate "DOC-AUDIT" "audit_docs vs port_surface.json" \
+    python3 "$PORTING_SDK_DIR/scripts/audit_docs.py" \
+        --root "$PORT_ROOT" \
+        --surface "$PORT_ROOT/port_surface.json" \
+        --ignore "$PORT_ROOT/DOC_AUDIT_IGNORE.md"
+
+# Gate 10: SURFACE-DIFF — diff public surface membership vs the Python reference
+run_gate "SURFACE-DIFF" "diff_port_surface vs python reference" \
+    surface_diff_gate
+
+# Gate 11: SKILL-CONTRACT — diff each built-in skill's SWAIG tool contract vs
+# the Python reference (emit_skills built in the TEST gate)
+run_gate "SKILL-CONTRACT" "diff_skill_contracts vs python reference" \
+    skill_contract_gate
 
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"

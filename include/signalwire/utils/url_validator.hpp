@@ -29,8 +29,7 @@ extern const std::array<const char*, 9> BLOCKED_NETWORKS;
  * The signature: function(hostname) -> optional<vector<string>> of
  * IP-string addresses.
  */
-using ResolverFn =
-    std::function<std::optional<std::vector<std::string>>(const std::string&)>;
+using ResolverFn = std::function<std::optional<std::vector<std::string>>(const std::string&)>;
 
 /** Install a custom resolver (for tests).  Pass nullptr to clear. */
 void _set_resolver(ResolverFn resolver);

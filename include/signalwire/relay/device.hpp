@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <string>
 #include <nlohmann/json.hpp>
+#include <string>
 
 namespace signalwire {
 namespace relay {
@@ -30,26 +30,26 @@ using json = nlohmann::json;
 // brace-soup and can't typo the two top-level keys.
 // ===========================================================================
 struct Device {
-    /// REQUIRED endpoint-type discriminant. Open set (not schema-enumerated) →
-    /// kept a std::string. Common values: "phone", "sip", "webrtc".
-    std::string type;
-    /// Type-specific parameters (e.g. {"to_number","from_number"} for "phone").
-    /// Free json map — the wire schema is additionalProperties:true.
-    json params = json::object();
+  /// REQUIRED endpoint-type discriminant. Open set (not schema-enumerated) →
+  /// kept a std::string. Common values: "phone", "sip", "webrtc".
+  std::string type;
+  /// Type-specific parameters (e.g. {"to_number","from_number"} for "phone").
+  /// Free json map — the wire schema is additionalProperties:true.
+  json params = json::object();
 
-    Device() = default;
-    Device(std::string type_, json params_ = json::object())
-        : type(std::move(type_)), params(std::move(params_)) {}
+  Device() = default;
+  Device(std::string type_, json params_ = json::object())
+      : type(std::move(type_)), params(std::move(params_)) {}
 
-    /// Serialize to the exact RELAY device wire shape: {"type":..,"params":..}.
-    /// Byte-identical to the hand-written map the raw-json call sites build.
-    [[nodiscard]] json to_json() const {
-        json j;
-        j["type"] = type;
-        j["params"] = params;
-        return j;
-    }
+  /// Serialize to the exact RELAY device wire shape: {"type":..,"params":..}.
+  /// Byte-identical to the hand-written map the raw-json call sites build.
+  [[nodiscard]] json to_json() const {
+    json j;
+    j["type"] = type;
+    j["params"] = params;
+    return j;
+  }
 };
 
-} // namespace relay
-} // namespace signalwire
+}  // namespace relay
+}  // namespace signalwire

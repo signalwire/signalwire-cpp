@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <string>
 #include <map>
-#include <stdexcept>
-#include <vector>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-namespace httplib { class Client; }
+namespace httplib {
+class Client;
+}
 
 namespace signalwire {
 namespace rest {
@@ -17,90 +19,86 @@ using json = nlohmann::json;
 
 /// Error thrown on non-2xx REST API responses
 class SignalWireRestError : public std::runtime_error {
-public:
-    SignalWireRestError(int status, const std::string& message, const std::string& body = "")
-        : std::runtime_error(message), status_(status), body_(body) {}
-    int status() const { return status_; }
-    const std::string& body() const { return body_; }
-private:
-    int status_;
-    std::string body_;
+ public:
+  SignalWireRestError(int status, const std::string& message, const std::string& body = "")
+      : std::runtime_error(message), status_(status), body_(body) {}
+  int status() const { return status_; }
+  const std::string& body() const { return body_; }
+
+ private:
+  int status_;
+  std::string body_;
 };
 
 /// HTTP client with Basic Auth support using cpp-httplib
 class HttpClient {
-public:
-    HttpClient(const std::string& base_url,
-               const std::string& username,
-               const std::string& password);
+ public:
+  HttpClient(const std::string& base_url, const std::string& username, const std::string& password);
 
-    // [[nodiscard]] on every verb: the returned JSON IS the API response.
-    // Dropping it discards the call's result (and the only place errors that
-    // aren't thrown would surface), which is always a bug.
+  // [[nodiscard]] on every verb: the returned JSON IS the API response.
+  // Dropping it discards the call's result (and the only place errors that
+  // aren't thrown would surface), which is always a bug.
 
-    /// GET request
-    [[nodiscard]] json get(const std::string& path,
-             const std::map<std::string, std::string>& params = {}) const;
+  /// GET request
+  [[nodiscard]] json get(const std::string& path,
+                         const std::map<std::string, std::string>& params = {}) const;
 
-    /// POST request
-    [[nodiscard]] json post(const std::string& path,
-              const json& body = json::object()) const;
+  /// POST request
+  [[nodiscard]] json post(const std::string& path, const json& body = json::object()) const;
 
-    /// PUT request
-    [[nodiscard]] json put(const std::string& path,
-             const json& body = json::object()) const;
+  /// PUT request
+  [[nodiscard]] json put(const std::string& path, const json& body = json::object()) const;
 
-    /// PATCH request
-    [[nodiscard]] json patch(const std::string& path,
-               const json& body = json::object()) const;
+  /// PATCH request
+  [[nodiscard]] json patch(const std::string& path, const json& body = json::object()) const;
 
-    /// DELETE request
-    [[nodiscard]] json del(const std::string& path) const;
+  /// DELETE request
+  [[nodiscard]] json del(const std::string& path) const;
 
-    /// Set additional default headers
-    void set_header(const std::string& key, const std::string& value);
+  /// Set additional default headers
+  void set_header(const std::string& key, const std::string& value);
 
-    /// Set request timeout in seconds
-    void set_timeout(int seconds);
+  /// Set request timeout in seconds
+  void set_timeout(int seconds);
 
-    /// Trust a private/self-signed CA bundle (PEM) for https:// requests.
-    /// Sets the underlying SSLClient's CA path and keeps server-certificate
-    /// verification ON. Production (public CAs) needs no call — the system
-    /// trust store is used, and SSL_CERT_FILE is also honored automatically.
-    /// C++-only ergonomic hook (Python's requests-based client trusts a custom
-    /// CA via the SSL_CERT_FILE / REQUESTS_CA_BUNDLE env vars instead).
-    void set_ca_cert_path(const std::string& path);
+  /// Trust a private/self-signed CA bundle (PEM) for https:// requests.
+  /// Sets the underlying SSLClient's CA path and keeps server-certificate
+  /// verification ON. Production (public CAs) needs no call — the system
+  /// trust store is used, and SSL_CERT_FILE is also honored automatically.
+  /// C++-only ergonomic hook (Python's requests-based client trusts a custom
+  /// CA via the SSL_CERT_FILE / REQUESTS_CA_BUNDLE env vars instead).
+  void set_ca_cert_path(const std::string& path);
 
-    const std::string& base_url() const { return base_url_; }
+  const std::string& base_url() const { return base_url_; }
 
-private:
-    json handle_response(int status, const std::string& body) const;
-    std::string build_query_string(const std::map<std::string, std::string>& params) const;
-    void configure_client(httplib::Client& cli) const;
+ private:
+  json handle_response(int status, const std::string& body) const;
+  std::string build_query_string(const std::map<std::string, std::string>& params) const;
+  void configure_client(httplib::Client& cli) const;
 
-    std::string base_url_;
-    std::string auth_header_;
-    std::map<std::string, std::string> headers_;
-    int timeout_ = 30;
-    std::string ca_cert_path_;
+  std::string base_url_;
+  std::string auth_header_;
+  std::map<std::string, std::string> headers_;
+  int timeout_ = 30;
+  std::string ca_cert_path_;
 };
 
 /// Generic CRUD resource for REST API namespaces
 class CrudResource {
-public:
-    CrudResource(const HttpClient& client, const std::string& base_path);
+ public:
+  CrudResource(const HttpClient& client, const std::string& base_path);
 
-    // [[nodiscard]]: each CRUD verb returns the REST response body; ignoring
-    // it drops the result of the call.
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const;
-    [[nodiscard]] json create(const json& data) const;
-    [[nodiscard]] json get(const std::string& id) const;
-    [[nodiscard]] json update(const std::string& id, const json& data) const;
-    [[nodiscard]] json del(const std::string& id) const;
+  // [[nodiscard]]: each CRUD verb returns the REST response body; ignoring
+  // it drops the result of the call.
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const;
+  [[nodiscard]] json create(const json& data) const;
+  [[nodiscard]] json get(const std::string& id) const;
+  [[nodiscard]] json update(const std::string& id, const json& data) const;
+  [[nodiscard]] json del(const std::string& id) const;
 
-protected:
-    const HttpClient& client_;
-    std::string base_path_;
+ protected:
+  const HttpClient& client_;
+  std::string base_path_;
 };
 
 /// Iterates items across paginated API responses.
@@ -115,44 +113,43 @@ protected:
 /// fetch. Cursor query params are extracted by parsing ``links.next`` like
 /// Python's ``urllib.parse.urlparse + parse_qs``.
 class PaginatedIterator {
-public:
-    PaginatedIterator(const HttpClient& http,
-                      const std::string& path,
-                      const std::map<std::string, std::string>& params = {},
-                      const std::string& data_key = "data");
+ public:
+  PaginatedIterator(const HttpClient& http, const std::string& path,
+                    const std::map<std::string, std::string>& params = {},
+                    const std::string& data_key = "data");
 
-    /// Returns true if another item can be fetched. Performs HTTP if
-    /// the in-memory buffer is exhausted but more pages remain.
-    /// [[nodiscard]]: this is the loop condition — discarding it loses the
-    /// "more items?" answer (and the side-effecting page fetch is not why
-    /// you'd call it).
-    [[nodiscard]] bool has_next();
+  /// Returns true if another item can be fetched. Performs HTTP if
+  /// the in-memory buffer is exhausted but more pages remain.
+  /// [[nodiscard]]: this is the loop condition — discarding it loses the
+  /// "more items?" answer (and the side-effecting page fetch is not why
+  /// you'd call it).
+  [[nodiscard]] bool has_next();
 
-    /// Returns the next item; throws std::out_of_range when the iterator
-    /// is exhausted (mirrors Python's StopIteration).
-    /// [[nodiscard]]: dropping the returned item silently consumes it.
-    [[nodiscard]] json next();
+  /// Returns the next item; throws std::out_of_range when the iterator
+  /// is exhausted (mirrors Python's StopIteration).
+  /// [[nodiscard]]: dropping the returned item silently consumes it.
+  [[nodiscard]] json next();
 
-    // -- Read-only state accessors used by tests ------------------------
-    const HttpClient& http() const { return http_; }
-    const std::string& path() const { return path_; }
-    const std::map<std::string, std::string>& params() const { return params_; }
-    const std::string& data_key() const { return data_key_; }
-    size_t index() const { return index_; }
-    const std::vector<json>& items() const { return items_; }
-    bool done() const { return done_; }
+  // -- Read-only state accessors used by tests ------------------------
+  const HttpClient& http() const { return http_; }
+  const std::string& path() const { return path_; }
+  const std::map<std::string, std::string>& params() const { return params_; }
+  const std::string& data_key() const { return data_key_; }
+  size_t index() const { return index_; }
+  const std::vector<json>& items() const { return items_; }
+  bool done() const { return done_; }
 
-private:
-    void fetch_next();
+ private:
+  void fetch_next();
 
-    const HttpClient& http_;
-    std::string path_;
-    std::map<std::string, std::string> params_;
-    std::string data_key_;
-    std::vector<json> items_;
-    size_t index_ = 0;
-    bool done_ = false;
+  const HttpClient& http_;
+  std::string path_;
+  std::map<std::string, std::string> params_;
+  std::string data_key_;
+  std::vector<json> items_;
+  size_t index_ = 0;
+  bool done_ = false;
 };
 
-} // namespace rest
-} // namespace signalwire
+}  // namespace rest
+}  // namespace signalwire

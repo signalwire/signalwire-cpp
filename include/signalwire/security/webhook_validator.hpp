@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <string_view>
-#include <vector>
-#include <variant>
 #include <utility>
-#include <stdexcept>
+#include <variant>
+#include <vector>
 
 /// SignalWire webhook signature validation.
 ///
@@ -62,10 +62,8 @@ using ParamsOrBody = std::variant<std::string, FormParams>;
 /// @return ``true`` if either scheme matches; ``false`` otherwise.
 ///
 /// @throws std::invalid_argument when ``signing_key`` is empty.
-bool ValidateWebhookSignature(std::string_view signing_key,
-                              std::string_view signature,
-                              std::string_view url,
-                              std::string_view raw_body);
+bool ValidateWebhookSignature(std::string_view signing_key, std::string_view signature,
+                              std::string_view url, std::string_view raw_body);
 
 /// Legacy ``@signalwire/compatibility-api`` drop-in entry point.
 ///
@@ -76,10 +74,8 @@ bool ValidateWebhookSignature(std::string_view signing_key,
 /// runs Scheme B directly (with URL port normalization).
 ///
 /// @throws std::invalid_argument when ``signing_key`` is empty.
-bool ValidateRequest(std::string_view signing_key,
-                     std::string_view signature,
-                     std::string_view url,
+bool ValidateRequest(std::string_view signing_key, std::string_view signature, std::string_view url,
                      const ParamsOrBody& params_or_raw_body);
 
-} // namespace security
-} // namespace signalwire
+}  // namespace security
+}  // namespace signalwire

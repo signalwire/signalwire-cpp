@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 
 namespace signalwire {
 namespace skills {
@@ -12,9 +12,9 @@ namespace skills {
 /// indicates a transport-level error — connection refused, DNS, etc.).
 /// `body` is the raw response body. `error` is non-empty when `status` is 0.
 struct SkillHttpResponse {
-    int status = 0;
-    std::string body;
-    std::string error;
+  int status = 0;
+  std::string body;
+  std::string error;
 };
 
 /// Issue a real HTTP GET. Implementation uses cpp-httplib so it works
@@ -25,8 +25,8 @@ struct SkillHttpResponse {
 /// or a dev-side rewriter; the SDK keeps its transport stack OpenSSL-3
 /// independent until the wider port adopts it.
 [[nodiscard]] SkillHttpResponse http_get(const std::string& url,
-                           const std::map<std::string, std::string>& headers = {},
-                           int timeout_seconds = 10);
+                                         const std::map<std::string, std::string>& headers = {},
+                                         int timeout_seconds = 10);
 
 /// Millisecond-precision variant of `http_get`. The connection and read
 /// timeouts are both bound to `timeout_ms`. Needed by web_search's
@@ -37,16 +37,15 @@ struct SkillHttpResponse {
 /// back to a 10s default so a misconfiguration can never produce an
 /// unbounded fetch.
 [[nodiscard]] SkillHttpResponse http_get_ms(const std::string& url,
-                              const std::map<std::string, std::string>& headers,
-                              long timeout_ms);
+                                            const std::map<std::string, std::string>& headers,
+                                            long timeout_ms);
 
 /// Issue a real HTTP POST with `body` as the request body and `content_type`
 /// for Content-Type. Same semantics as `http_get` for status / error / body.
-[[nodiscard]] SkillHttpResponse http_post(const std::string& url,
-                            const std::string& body,
-                            const std::string& content_type = "application/json",
-                            const std::map<std::string, std::string>& headers = {},
-                            int timeout_seconds = 10);
+[[nodiscard]] SkillHttpResponse http_post(const std::string& url, const std::string& body,
+                                          const std::string& content_type = "application/json",
+                                          const std::map<std::string, std::string>& headers = {},
+                                          int timeout_seconds = 10);
 
 }  // namespace skills
 }  // namespace signalwire

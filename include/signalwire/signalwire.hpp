@@ -3,23 +3,23 @@
 // SignalWire AI Agents SDK for C++
 // Main umbrella header — includes all sub-headers.
 
-#include "signalwire/logging.hpp"
-#include "signalwire/swml/document.hpp"
-#include "signalwire/swml/schema.hpp"
-#include "signalwire/swml/service.hpp"
-#include "signalwire/swaig/function_result.hpp"
-#include "signalwire/swaig/tool_definition.hpp"
-#include "signalwire/security/session_manager.hpp"
-#include "signalwire/datamap/datamap.hpp"
-#include "signalwire/contexts/contexts.hpp"
-#include "signalwire/rest/rest_client.hpp"
-#include "signalwire/skills/skill_base.hpp"
-#include "signalwire/skills/skill_registry.hpp"
-
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
+
+#include "signalwire/contexts/contexts.hpp"
+#include "signalwire/datamap/datamap.hpp"
+#include "signalwire/logging.hpp"
+#include "signalwire/rest/rest_client.hpp"
+#include "signalwire/security/session_manager.hpp"
+#include "signalwire/skills/skill_base.hpp"
+#include "signalwire/skills/skill_registry.hpp"
+#include "signalwire/swaig/function_result.hpp"
+#include "signalwire/swaig/tool_definition.hpp"
+#include "signalwire/swml/document.hpp"
+#include "signalwire/swml/schema.hpp"
+#include "signalwire/swml/service.hpp"
 
 namespace signalwire {
 
@@ -46,9 +46,8 @@ namespace signalwire {
 ///         from either ``args``, ``kwargs``, or the standard
 ///         environment variables (``SIGNALWIRE_PROJECT_ID``,
 ///         ``SIGNALWIRE_API_TOKEN``, ``SIGNALWIRE_SPACE``).
-[[nodiscard]] rest::RestClient RestClient(
-    const std::vector<std::string>& args = {},
-    const std::map<std::string, std::string>& kwargs = {});
+[[nodiscard]] rest::RestClient RestClient(const std::vector<std::string>& args = {},
+                                          const std::map<std::string, std::string>& kwargs = {});
 
 /// Register a custom skill class with the global skill registry.
 ///
@@ -79,7 +78,6 @@ void add_skill_directory(const std::string& path);
 /// in v1, so each entry contains the skill name and an empty parameter
 /// map; built-in skills that expose ``parameter_schema()`` via
 /// ``SkillBase`` get richer detail merged in.
-[[nodiscard]] std::map<std::string, std::map<std::string, std::string>>
-list_skills_with_params();
+[[nodiscard]] std::map<std::string, std::map<std::string, std::string>> list_skills_with_params();
 
-} // namespace signalwire
+}  // namespace signalwire

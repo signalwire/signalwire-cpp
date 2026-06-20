@@ -18,9 +18,8 @@ typedef void* sw_function_result_t;
 
 /* Tool handler callback: receives args JSON string and raw_data JSON string,
  * must return a sw_function_result_t (caller takes ownership). */
-typedef sw_function_result_t (*sw_tool_handler_t)(const char* args_json,
-                                                   const char* raw_data_json,
-                                                   void* user_data);
+typedef sw_function_result_t (*sw_tool_handler_t)(const char* args_json, const char* raw_data_json,
+                                                  void* user_data);
 
 /* ======================================================================== */
 /* Agent lifecycle                                                          */
@@ -32,8 +31,7 @@ typedef sw_function_result_t (*sw_tool_handler_t)(const char* args_json,
 sw_agent_t sw_agent_create(const char* name);
 
 /** Create a new agent with name, route, host, and port. */
-sw_agent_t sw_agent_create_full(const char* name, const char* route,
-                                 const char* host, int port);
+sw_agent_t sw_agent_create_full(const char* name, const char* route, const char* host, int port);
 
 /** Destroy an agent and free all associated resources. */
 void sw_agent_destroy(sw_agent_t agent);
@@ -50,8 +48,7 @@ void sw_agent_add_section(sw_agent_t agent, const char* title, const char* body)
 
 /** Add a POM section with title and bullet points.
  *  @param bullets  NULL-terminated array of C strings. */
-void sw_agent_add_section_bullets(sw_agent_t agent, const char* title,
-                                   const char** bullets);
+void sw_agent_add_section_bullets(sw_agent_t agent, const char* title, const char** bullets);
 
 /** Set the post-prompt text for summary generation. */
 void sw_agent_set_post_prompt(sw_agent_t agent, const char* text);
@@ -66,9 +63,8 @@ void sw_agent_set_post_prompt(sw_agent_t agent, const char* text);
  *  @param params_json  JSON string of the parameter schema (or NULL for none).
  *  @param handler      Callback invoked when the AI calls this function.
  *  @param user_data    Opaque pointer passed to the handler. */
-void sw_agent_define_tool(sw_agent_t agent, const char* name,
-                           const char* description, const char* params_json,
-                           sw_tool_handler_t handler, void* user_data);
+void sw_agent_define_tool(sw_agent_t agent, const char* name, const char* description,
+                          const char* params_json, sw_tool_handler_t handler, void* user_data);
 
 /** List tool names. Returns a NULL-terminated array of strings.
  *  Caller must free the array and each string with sw_free_string_array(). */
@@ -98,8 +94,7 @@ void sw_agent_set_auth(sw_agent_t agent, const char* username, const char* passw
 /* ======================================================================== */
 
 /** Add a skill by name with optional params (JSON string, or NULL). */
-void sw_agent_add_skill(sw_agent_t agent, const char* skill_name,
-                          const char* params_json);
+void sw_agent_add_skill(sw_agent_t agent, const char* skill_name, const char* params_json);
 
 /* ======================================================================== */
 /* Server                                                                   */
@@ -134,7 +129,7 @@ sw_function_result_t sw_result_create(const char* response);
 
 /** Add an action to a FunctionResult (action_data is a JSON string). */
 void sw_result_add_action(sw_function_result_t result, const char* action_name,
-                           const char* action_data_json);
+                          const char* action_data_json);
 
 /** Serialize a FunctionResult to a JSON string.
  *  Caller must free the returned string with sw_free_string(). */

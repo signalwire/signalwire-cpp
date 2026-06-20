@@ -103,7 +103,7 @@ void Schema::extract_verbs() {
 
   if (!schema_.contains("$defs")) {
     get_logger().warn("Schema missing $defs, using known verbs");
-    load_embedded();
+    static_cast<void>(load_embedded());  // best-effort fallback; result intentionally ignored
     return;
   }
 
@@ -111,7 +111,7 @@ void Schema::extract_verbs() {
 
   if (!defs.contains("SWMLMethod") || !defs["SWMLMethod"].contains("anyOf")) {
     get_logger().warn("SWMLMethod missing anyOf, using known verbs");
-    load_embedded();
+    static_cast<void>(load_embedded());  // best-effort fallback; result intentionally ignored
     return;
   }
 

@@ -19,7 +19,9 @@ namespace {
 const std::regex kSwaigFnName("^[a-zA-Z_][a-zA-Z0-9_]*$");
 }
 
-Service::Service() { schema_.load_embedded(); }
+Service::Service() {
+  static_cast<void>(schema_.load_embedded());  // best-effort; result intentionally ignored
+}
 
 signalwire::utils::SchemaUtils& Service::schema_utils() {
   if (!schema_utils_) {

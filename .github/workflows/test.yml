@@ -59,25 +59,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ libssl-dev
 
-      # The FMT (clang-format) + LINT (clang-tidy) gates in scripts/run-ci.sh
-      # require clang tooling PINNED to the same major the rollout was burned to
-      # zero against (18.1.x). ubuntu-latest ships a different clang-format major,
-      # whose formatting differs (spurious -Wclang-format-violations), and has no
-      # clang-tidy on PATH (so the gate generated build-tidy via g++, making
-      # clang-tidy mis-parse the C++17 stdlib: "no template named 'optional'",
-      # "decomposition declarations are a C++17 extension"). Install clang-18's
-      # format+tidy and make them the default `clang-format`/`clang-tidy` so the
-      # gates resolve them and run-ci.sh generates build-tidy with clang-18 — no
-      # drift between local and CI.
-      - name: Install clang-format-18 + clang-tidy-18 (FMT + LINT gates)
+      # The FMT (clang-format) + LINT (clang-tidy) gates need the gate tools
+      # PINNED to the EXACT patch the rollout was burned to zero against (18.1.8).
+      # clang-format formatting differs at PATCH level (ubuntu's 18.1.3 rejects
+      # code that 18.1.8 produced → spurious -Wclang-format-violations), so we
+      # install the version-exact pip distributions of clang-format + clang-tidy
+      # (same self-contained binaries on macOS + Linux → zero local/CI drift; a
+      # contributor reproduces with `pip install clang-format==18.1.8
+      # clang-tidy==18.1.8`). We ALSO apt-install the clang-18 COMPILER, because
+      # the LINT gate generates build-tidy's compile_commands with clang (run-ci
+      # never reuses the g++ build/ for clang-tidy — that made clang-tidy
+      # mis-parse the C++17 stdlib). pip's clang-format/clang-tidy land on PATH
+      # ahead of any apt copy.
+      - name: Install pinned clang-format + clang-tidy 18.1.8 + clang-18 compiler
         run: |
-          sudo apt-get install -y clang-format-18 clang-tidy-18
-          sudo update-alternatives --install /usr/bin/clang-format clang-format /usr/bin/clang-format-18 100
-          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-18 100
+          pip install "clang-format==18.1.8" "clang-tidy==18.1.8"
+          sudo apt-get install -y clang-18
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
           clang-format --version
           clang-tidy --version
+          clang++ --version | head -1
 
       # The SIGNATURES gate enumerates the C++ surface with libclang via Python.
       # The `clang` package provides the `clang.cindex` bindings; the `libclang`

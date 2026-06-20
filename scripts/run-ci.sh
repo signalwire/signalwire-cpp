@@ -371,17 +371,26 @@ lint_gate() {
     ct="$(resolve_clang_tidy)" || { echo "no clang-tidy found" >&2; return 1; }
     tidy_build="${SWCPP_TIDY_BUILD:-}"
     if [ -z "$tidy_build" ]; then
-        # Prefer an existing build-tidy; else a present build/; else generate
-        # build-tidy with the clang that matches the chosen clang-tidy.
+        # clang-tidy must read a CLANG-generated compile DB. Reuse an existing
+        # build-tidy (clang-built by construction below); otherwise generate one
+        # with the clang matching the chosen clang-tidy. Do NOT fall back to the
+        # plain build/ dir — the TEST gate builds that with g++ (CI) whose
+        # compile_commands carries g++-specific flags + system-header paths that
+        # clang-tidy can't parse as C++17 (it falls back to a pre-C++17 parse,
+        # yielding bogus "no template named 'optional'" / "decomposition
+        # declarations are a C++17 extension" errors). Always use clang's DB.
         if [ -f build-tidy/compile_commands.json ]; then
             tidy_build="build-tidy"
-        elif [ -f build/compile_commands.json ]; then
-            tidy_build="build"
         else
             cxx="$(dirname "$ct")/clang++"; cc="$(dirname "$ct")/clang"
+            # When clang-tidy resolved to a bare name on PATH, dirname is "." and
+            # the sibling clang++/clang may not exist there — fall back to the
+            # PATH-resolved clang++/clang so CMake still gets a clang compiler.
+            [ -x "$cxx" ] || cxx="$(command -v clang++ || true)"
+            [ -x "$cc" ] || cc="$(command -v clang || true)"
             local cmake_args=(-S . -B build-tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
-            [ -x "$cxx" ] && cmake_args+=(-DCMAKE_CXX_COMPILER="$cxx")
-            [ -x "$cc" ] && cmake_args+=(-DCMAKE_C_COMPILER="$cc")
+            [ -n "$cxx" ] && cmake_args+=(-DCMAKE_CXX_COMPILER="$cxx")
+            [ -n "$cc" ] && cmake_args+=(-DCMAKE_C_COMPILER="$cc")
             cmake "${cmake_args[@]}" >&2 || return 1
             tidy_build="build-tidy"
         fi

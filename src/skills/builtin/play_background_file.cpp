@@ -22,7 +22,8 @@ class PlayBackgroundFileSkill : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
 
   std::vector<json> get_datamap_functions() const override {
-    if (!params_.contains("files") || !params_["files"].is_array()) return {};
+    if (!params_.contains("files") || !params_["files"].is_array()) { return {};
+}
 
     std::vector<std::string> actions;
     for (const auto& f : params_["files"]) {

@@ -20,7 +20,8 @@ class CustomSkillsSkill : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::vector<swaig::ToolDefinition> tools;
 
-    if (!params_.contains("tools") || !params_["tools"].is_array()) return tools;
+    if (!params_.contains("tools") || !params_["tools"].is_array()) { return tools;
+}
 
     for (const auto& tool_def : params_["tools"]) {
       swaig::ToolDefinition td;

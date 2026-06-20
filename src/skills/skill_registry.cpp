@@ -74,9 +74,12 @@ class DateTimeSkill : public SkillBase {
 class MathSkillR : public SkillBase {
   static double eval(const std::string& e) {
     std::string s;
-    for (char c : e)
-      if (!std::isspace((unsigned char)c)) s += c;
-    if (s.empty()) throw std::runtime_error("Empty");
+    for (char c : e) {
+      if (!std::isspace((unsigned char)c)) { s += c;
+}
+}
+    if (s.empty()) { throw std::runtime_error("Empty");
+}
     struct P {
       const std::string& s;
       size_t p = 0;
@@ -92,16 +95,19 @@ class MathSkillR : public SkillBase {
       double term() {
         double r = pw();
         while (p < s.size() && (s[p] == '*' || s[p] == '/' || s[p] == '%')) {
-          if (s[p] == '*' && p + 1 < s.size() && s[p + 1] == '*') break;
+          if (s[p] == '*' && p + 1 < s.size() && s[p + 1] == '*') { break;
+}
           char o = s[p++];
           double t = pw();
-          if (o == '*')
+          if (o == '*') {
             r *= t;
-          else if (o == '/') {
-            if (t == 0) throw std::runtime_error("Div0");
+          } else if (o == '/') {
+            if (t == 0) { throw std::runtime_error("Div0");
+}
             r /= t;
           } else {
-            if (t == 0) throw std::runtime_error("Mod0");
+            if (t == 0) { throw std::runtime_error("Mod0");
+}
             r = std::fmod(r, t);
           }
         }
@@ -120,25 +126,30 @@ class MathSkillR : public SkillBase {
           p++;
           return -atom();
         }
-        if (p < s.size() && s[p] == '+') p++;
+        if (p < s.size() && s[p] == '+') { p++;
+}
         return atom();
       }
       double atom() {
         if (p < s.size() && s[p] == '(') {
           p++;
           double r = expr();
-          if (p < s.size() && s[p] == ')') p++;
+          if (p < s.size() && s[p] == ')') { p++;
+}
           return r;
         }
         size_t st = p;
-        while (p < s.size() && (std::isdigit((unsigned char)s[p]) || s[p] == '.')) p++;
-        if (st == p) throw std::runtime_error("Expected number");
+        while (p < s.size() && (std::isdigit((unsigned char)s[p]) || s[p] == '.')) { p++;
+}
+        if (st == p) { throw std::runtime_error("Expected number");
+}
         return std::stod(s.substr(st, p - st));
       }
     };
     P parser{s};
     double r = parser.expr();
-    if (parser.p != s.size()) throw std::runtime_error("Unexpected char");
+    if (parser.p != s.size()) { throw std::runtime_error("Unexpected char");
+}
     return r;
   }
 
@@ -160,7 +171,8 @@ class MathSkillR : public SkillBase {
              {"required", json::array({"expression"})}}),
         [](const json& a, const json&) -> swaig::FunctionResult {
           auto e = a.value("expression", "");
-          if (e.empty()) return swaig::FunctionResult("No expression");
+          if (e.empty()) { return swaig::FunctionResult("No expression");
+}
           try {
             double r = eval(e);
             std::ostringstream o;
@@ -262,9 +274,11 @@ class WebSearchSkillR : public SkillBase {
   bool setup(const json& p) override {
     params_ = p;
     ak_ = get_param_or_env(p, "api_key", "GOOGLE_SEARCH_API_KEY");
-    if (ak_.empty()) ak_ = get_env("GOOGLE_API_KEY");
+    if (ak_.empty()) { ak_ = get_env("GOOGLE_API_KEY");
+}
     sid_ = get_param_or_env(p, "search_engine_id", "GOOGLE_SEARCH_ENGINE_ID");
-    if (sid_.empty()) sid_ = get_env("GOOGLE_CSE_ID");
+    if (sid_.empty()) { sid_ = get_env("GOOGLE_CSE_ID");
+}
     tn_ = get_param<std::string>(p, "tool_name", "web_search");
     nr_ = get_param<int>(p, "num_results", 3);
     rp_ = get_param<std::string>(p, "response_prefix", "");
@@ -293,9 +307,11 @@ class WebSearchSkillR : public SkillBase {
                       {"required", json::array({"query"})}}),
         [ak, sid, nr, rp, rpf, lp, mcl](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) return swaig::FunctionResult("No search query provided");
+          if (q.empty()) { return swaig::FunctionResult("No search query provided");
+}
           std::string base = get_env("WEB_SEARCH_BASE_URL", "https://www.googleapis.com");
-          while (!base.empty() && base.back() == '/') base.pop_back();
+          while (!base.empty() && base.back() == '/') { base.pop_back();
+}
           std::ostringstream u;
           u << base << "/customsearch/v1"
             << "?key=" << url_encode(ak) << "&cx=" << url_encode(sid) << "&q=" << url_encode(q)
@@ -303,10 +319,12 @@ class WebSearchSkillR : public SkillBase {
           // The CSE fetch is the single non-cancelable step; the
           // overall_deadline budget starts after it (inside core::run).
           auto r = skills::http_get(u.str());
-          if (r.status == 0) return swaig::FunctionResult("Web search transport error: " + r.error);
-          if (r.status < 200 || r.status >= 300)
+          if (r.status == 0) { return swaig::FunctionResult("Web search transport error: " + r.error);
+}
+          if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("Web search HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
+}
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -317,12 +335,14 @@ class WebSearchSkillR : public SkillBase {
           std::string no_items = "Web search results for '" + q + "':\n(no results)";
           // run() handles snippets_only / deadline-bounded scraping /
           // snippet fallback. Returns UNWRAPPED body.
-          std::string response = web_search_core::run(q, std::move(cands), lp, nr, mcl, no_items);
+          std::string response = web_search_core::run(q, cands, lp, nr, mcl, no_items);
           // Wrap the success / snippet / scraped response (parity with
           // Python 8aad242). The no-items message stays unwrapped.
           if (response != no_items) {
-            if (!rp.empty()) response = rp + "\n\n" + response;
-            if (!rpf.empty()) response = response + "\n\n" + rpf;
+            if (!rp.empty()) { response = rp + "\n\n" + response;
+}
+            if (!rpf.empty()) { response = response + "\n\n" + rpf;
+}
           }
           return swaig::FunctionResult(response);
         })};
@@ -365,18 +385,22 @@ class WikipediaSearchSkillR : public SkillBase {
              {"required", json::array({"query"})}}),
         [nr, nm](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) return swaig::FunctionResult(nm);
+          if (q.empty()) { return swaig::FunctionResult(nm);
+}
           std::string base = get_env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org");
-          while (!base.empty() && base.back() == '/') base.pop_back();
+          while (!base.empty() && base.back() == '/') { base.pop_back();
+}
           std::ostringstream u;
           u << base << "/w/api.php"
             << "?action=query&list=search&format=json"
             << "&srlimit=" << nr << "&srsearch=" << url_encode(q);
           auto r = skills::http_get(u.str());
-          if (r.status == 0) return swaig::FunctionResult("Wikipedia transport error: " + r.error);
-          if (r.status < 200 || r.status >= 300)
+          if (r.status == 0) { return swaig::FunctionResult("Wikipedia transport error: " + r.error);
+}
+          if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("Wikipedia HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
+}
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -393,7 +417,8 @@ class WikipediaSearchSkillR : public SkillBase {
               any = true;
             }
           }
-          if (!any) return swaig::FunctionResult(nm);
+          if (!any) { return swaig::FunctionResult(nm);
+}
           return swaig::FunctionResult(out.str());
         })};
   }
@@ -437,13 +462,17 @@ class SpiderSkillR : public SkillBase {
     return std::regex_replace(nt, ws_re, " ");
   }
   static std::string apply_base(const std::string& url, const std::string& base) {
-    if (base.empty()) return url;
+    if (base.empty()) { return url;
+}
     auto se = url.find("://");
-    if (se == std::string::npos) return url;
+    if (se == std::string::npos) { return url;
+}
     auto ps = url.find('/', se + 3);
     std::string b = base;
-    while (!b.empty() && b.back() == '/') b.pop_back();
-    if (ps == std::string::npos) return b;
+    while (!b.empty() && b.back() == '/') { b.pop_back();
+}
+    if (ps == std::string::npos) { return b;
+}
     return b + url.substr(ps);
   }
 
@@ -465,14 +494,17 @@ class SpiderSkillR : public SkillBase {
                       {"required", json::array({"url"})}}),
         [](const json& a, const json&) -> swaig::FunctionResult {
           std::string url = a.value("url", "");
-          if (url.empty()) return swaig::FunctionResult("No URL provided");
+          if (url.empty()) { return swaig::FunctionResult("No URL provided");
+}
           std::string base = get_env("SPIDER_BASE_URL");
           std::string eff = apply_base(url, base);
           auto r = skills::http_get(eff);
-          if (r.status == 0) return swaig::FunctionResult("Spider transport error: " + r.error);
-          if (r.status < 200 || r.status >= 300)
+          if (r.status == 0) { return swaig::FunctionResult("Spider transport error: " + r.error);
+}
+          if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("Spider HTTP " + std::to_string(r.status) + " from " +
                                          eff);
+}
           std::string text;
           if (!r.body.empty() && r.body.front() == '{') {
             try {
@@ -517,7 +549,8 @@ class DatasphereSkillR : public SkillBase {
     sp_ = get_param_or_env(p, "space_name", "SIGNALWIRE_SPACE_NAME");
     pi_ = get_param_or_env(p, "project_id", "SIGNALWIRE_PROJECT_ID");
     tk_ = get_param_or_env(p, "token", "SIGNALWIRE_TOKEN");
-    if (tk_.empty()) tk_ = get_env("DATASPHERE_TOKEN");
+    if (tk_.empty()) { tk_ = get_env("DATASPHERE_TOKEN");
+}
     di_ = get_param<std::string>(p, "document_id", "");
     tn_ = get_param<std::string>(p, "tool_name", "search_knowledge");
     count_ = get_param<int>(p, "count", 1);
@@ -537,9 +570,11 @@ class DatasphereSkillR : public SkillBase {
                       {"required", json::array({"query"})}}),
         [sp, pi, tk, di, cnt, dist](const json& a, const json&) -> swaig::FunctionResult {
           std::string q = a.value("query", "");
-          if (q.empty()) return swaig::FunctionResult("No search query provided");
+          if (q.empty()) { return swaig::FunctionResult("No search query provided");
+}
           std::string base = get_env("DATASPHERE_BASE_URL");
-          if (base.empty()) base = "https://" + sp + ".signalwire.com";
+          if (base.empty()) { base = "https://" + sp + ".signalwire.com";
+}
           std::string url = base + "/api/datasphere/documents/search";
           json body = json::object({
               {"document_id", di},
@@ -551,10 +586,12 @@ class DatasphereSkillR : public SkillBase {
           hdrs["Authorization"] = "Basic " + base64_encode(pi + ":" + tk);
           hdrs["Accept"] = "application/json";
           auto r = skills::http_post(url, body.dump(), "application/json", hdrs);
-          if (r.status == 0) return swaig::FunctionResult("DataSphere transport error: " + r.error);
-          if (r.status < 200 || r.status >= 300)
+          if (r.status == 0) { return swaig::FunctionResult("DataSphere transport error: " + r.error);
+}
+          if (r.status < 200 || r.status >= 300) {
             return swaig::FunctionResult("DataSphere HTTP " + std::to_string(r.status) + ": " +
                                          r.body);
+}
           json parsed;
           try {
             parsed = json::parse(r.body);
@@ -799,7 +836,8 @@ class CustomSkillsSkillR : public SkillBase {
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::vector<swaig::ToolDefinition> t;
-    if (!params_.contains("tools")) return t;
+    if (!params_.contains("tools")) { return t;
+}
     for (const auto& td : params_["tools"]) {
       auto n = td.value("name", "tool");
       auto d = td.value("description", "");

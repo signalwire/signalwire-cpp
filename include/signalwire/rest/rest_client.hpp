@@ -279,7 +279,8 @@ class RestClient {
     [[nodiscard]] json execute(const std::string& command, const json& params,
                                const std::optional<std::string>& call_id = std::nullopt) const {
       json body = {{"command", command}, {"params", params}};
-      if (call_id) body["id"] = *call_id;
+      if (call_id) { body["id"] = *call_id;
+}
       return client.post("/api/calling/calls", body);
     }
 
@@ -522,8 +523,10 @@ class RestClient {
           {"call_handler", to_wire_string(PhoneCallHandler::LamlWebhooks)},
           {"call_request_url", url},
       };
-      if (opts.fallback_url) body["call_fallback_url"] = *opts.fallback_url;
-      if (opts.status_callback_url) body["call_status_callback_url"] = *opts.status_callback_url;
+      if (opts.fallback_url) { body["call_fallback_url"] = *opts.fallback_url;
+}
+      if (opts.status_callback_url) { body["call_status_callback_url"] = *opts.status_callback_url;
+}
       return body;
     }
 
@@ -547,7 +550,8 @@ class RestClient {
           {"call_handler", to_wire_string(PhoneCallHandler::CallFlow)},
           {"call_flow_id", flow_id},
       };
-      if (opts.version) body["call_flow_version"] = *opts.version;
+      if (opts.version) { body["call_flow_version"] = *opts.version;
+}
       return body;
     }
 
@@ -564,8 +568,9 @@ class RestClient {
           {"call_handler", to_wire_string(PhoneCallHandler::RelayTopic)},
           {"call_relay_topic", topic},
       };
-      if (opts.status_callback_url)
+      if (opts.status_callback_url) {
         body["call_relay_topic_status_callback_url"] = *opts.status_callback_url;
+}
       return body;
     }
 

@@ -44,7 +44,8 @@ Service& Service::set_name(const std::string& name) {
 
 Service& Service::set_route(const std::string& route) {
   route_ = route;
-  if (!route_.empty() && route_.front() != '/') route_ = "/" + route_;
+  if (!route_.empty() && route_.front() != '/') { route_ = "/" + route_;
+}
   return *this;
 }
 
@@ -66,19 +67,21 @@ Service& Service::set_auth(const std::string& username, const std::string& passw
 }
 
 void Service::init_auth() {
-  if (auth_initialized_) return;
+  if (auth_initialized_) { return;
+}
 
   std::string env_user = signalwire::get_env("SWML_BASIC_AUTH_USER");
   std::string env_pass = signalwire::get_env("SWML_BASIC_AUTH_PASSWORD");
 
-  if (!env_user.empty())
+  if (!env_user.empty()) {
     auth_user_ = env_user;
-  else
+  } else {
     auth_user_ = "agent";
+}
 
-  if (!env_pass.empty())
+  if (!env_pass.empty()) {
     auth_pass_ = env_pass;
-  else {
+  } else {
     auth_pass_ = generate_random_hex(16);
     if (auth_pass_.empty()) {
       throw std::runtime_error(
@@ -90,7 +93,8 @@ void Service::init_auth() {
 }
 
 bool Service::timing_safe_compare(const std::string& a, const std::string& b) {
-  if (a.size() != b.size()) return false;
+  if (a.size() != b.size()) { return false;
+}
   return CRYPTO_memcmp(a.data(), b.data(), a.size()) == 0;
 }
 
@@ -287,7 +291,8 @@ Service& Service::define_tool(const swaig::ToolDefinition& tool) {
 }
 
 Service& Service::register_swaig_function(const json& func_def) {
-  if (!func_def.contains("function")) return *this;
+  if (!func_def.contains("function")) { return *this;
+}
   std::string name = func_def["function"].get<std::string>();
   registered_swaig_functions_.push_back(func_def);
   if (std::find(tool_order_.begin(), tool_order_.end(), name) == tool_order_.end()) {
@@ -315,7 +320,8 @@ bool Service::has_function(const std::string& name) const { return tools_.count(
 
 const swaig::ToolDefinition* Service::get_function(const std::string& name) const {
   auto it = tools_.find(name);
-  if (it == tools_.end()) return nullptr;
+  if (it == tools_.end()) { return nullptr;
+}
   return &it->second;
 }
 
@@ -323,7 +329,8 @@ std::map<std::string, swaig::ToolDefinition> Service::get_all_functions() const 
 
 bool Service::remove_function(const std::string& name) {
   auto it = tools_.find(name);
-  if (it == tools_.end()) return false;
+  if (it == tools_.end()) { return false;
+}
   tools_.erase(it);
   tool_order_.erase(std::remove(tool_order_.begin(), tool_order_.end(), name), tool_order_.end());
   return true;
@@ -367,21 +374,25 @@ std::string Service::extract_introspect_payload(const std::string& stdout_captur
   static const std::string kBegin = "__SWAIG_TOOLS_BEGIN__";
   static const std::string kEnd = "__SWAIG_TOOLS_END__";
   auto begin = stdout_capture.find(kBegin);
-  if (begin == std::string::npos) return std::string();
+  if (begin == std::string::npos) { return std::string();
+}
   size_t after_begin = begin + kBegin.size();
   auto end = stdout_capture.find(kEnd, after_begin);
-  if (end == std::string::npos) return std::string();
+  if (end == std::string::npos) { return std::string();
+}
   std::string slice = stdout_capture.substr(after_begin, end - after_begin);
   // Trim leading/trailing whitespace (newlines).
   size_t s = slice.find_first_not_of(" \t\r\n");
-  if (s == std::string::npos) return std::string();
+  if (s == std::string::npos) { return std::string();
+}
   size_t e = slice.find_last_not_of(" \t\r\n");
   return slice.substr(s, e - s + 1);
 }
 
 void Service::handle_swaig_endpoint(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) return;
+  if (!validate_auth(req, res)) { return;
+}
 
   if (req.method == "GET") {
     json swml = render_main_swml(req);
@@ -452,8 +463,8 @@ void Service::setup_routes(httplib::Server& server) {
   auto swaig_handler = [this](const httplib::Request& req, httplib::Response& res) {
     handle_swaig_endpoint(req, res);
   };
-  server.Get((base_path + "/swaig").c_str(), swaig_handler);
-  server.Post((base_path + "/swaig").c_str(), swaig_handler);
+  server.Get(base_path + "/swaig", swaig_handler);
+  server.Post(base_path + "/swaig", swaig_handler);
 
   // Subclass extension hook (AgentBase adds /post_prompt, /mcp).
   register_additional_routes(server);
@@ -461,12 +472,13 @@ void Service::setup_routes(httplib::Server& server) {
   // Main SWML endpoint
   auto swml_handler = [this](const httplib::Request& req, httplib::Response& res) {
     add_security_headers(res);
-    if (!validate_auth(req, res)) return;
+    if (!validate_auth(req, res)) { return;
+}
     json swml = render_main_swml(req);
     res.set_content(swml.dump(), "application/json");
   };
-  server.Get(route_.c_str(), swml_handler);
-  server.Post(route_.c_str(), swml_handler);
+  server.Get(route_, swml_handler);
+  server.Post(route_, swml_handler);
 }
 
 void Service::serve() {

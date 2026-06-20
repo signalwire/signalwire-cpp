@@ -96,7 +96,8 @@ namespace {
 std::string join_section_number(const std::vector<int>& nums) {
   std::string s;
   for (size_t i = 0; i < nums.size(); ++i) {
-    if (i > 0) s += ".";
+    if (i > 0) { s += ".";
+}
     s += std::to_string(nums[i]);
   }
   return s;
@@ -174,7 +175,8 @@ std::string Section::render_markdown(int level, const std::vector<int>& section_
   // Join with "\n" — same as Python.
   std::string out;
   for (size_t i = 0; i < parts.size(); ++i) {
-    if (i > 0) out += "\n";
+    if (i > 0) { out += "\n";
+}
     out += parts[i];
   }
   return out;
@@ -243,7 +245,8 @@ std::string Section::render_xml(int indent, const std::vector<int>& section_numb
 
   std::string out;
   for (size_t i = 0; i < parts.size(); ++i) {
-    if (i > 0) out += "\n";
+    if (i > 0) { out += "\n";
+}
     out += parts[i];
   }
   return out;
@@ -287,10 +290,12 @@ Section PromptObjectModel::build_section(const json& d, bool is_subsection) {
   }
 
   std::optional<std::string> t;
-  if (d.contains("title")) t = d["title"].get<std::string>();
+  if (d.contains("title")) { t = d["title"].get<std::string>();
+}
 
   std::string body;
-  if (d.contains("body")) body = d["body"].get<std::string>();
+  if (d.contains("body")) { body = d["body"].get<std::string>();
+}
 
   std::vector<std::string> bullets;
   if (d.contains("bullets")) {
@@ -300,10 +305,12 @@ Section PromptObjectModel::build_section(const json& d, bool is_subsection) {
   }
 
   std::optional<bool> numbered;
-  if (d.contains("numbered")) numbered = d["numbered"].get<bool>();
+  if (d.contains("numbered")) { numbered = d["numbered"].get<bool>();
+}
 
   bool numbered_bullets = false;
-  if (d.contains("numberedBullets")) numbered_bullets = d["numberedBullets"].get<bool>();
+  if (d.contains("numberedBullets")) { numbered_bullets = d["numberedBullets"].get<bool>();
+}
 
   Section section(t, body, bullets, numbered, numbered_bullets);
 
@@ -351,7 +358,8 @@ Section& PromptObjectModel::add_section(const std::string& title, const std::str
     throw std::invalid_argument("Only the first section can have no title");
   }
   std::optional<std::string> t;
-  if (!title.empty()) t = title;
+  if (!title.empty()) { t = title;
+}
   sections.emplace_back(t, body, bullets, numbered, numbered_bullets);
   return sections.back();
 }
@@ -447,7 +455,8 @@ std::string PromptObjectModel::render_markdown() const {
 
   std::string out;
   for (size_t i = 0; i < parts.size(); ++i) {
-    if (i > 0) out += "\n";
+    if (i > 0) { out += "\n";
+}
     out += parts[i];
   }
   return out;
@@ -483,7 +492,8 @@ std::string PromptObjectModel::render_xml() const {
 
   std::string out;
   for (size_t i = 0; i < parts.size(); ++i) {
-    if (i > 0) out += "\n";
+    if (i > 0) { out += "\n";
+}
     out += parts[i];
   }
   return out;
@@ -549,12 +559,15 @@ std::vector<Line> split_lines(const std::string& src) {
   while (i < src.size()) {
     line_no += 1;
     size_t start = i;
-    while (i < src.size() && src[i] != '\n') ++i;
+    while (i < src.size() && src[i] != '\n') { ++i;
+}
     std::string raw = src.substr(start, i - start);
-    if (i < src.size()) ++i;  // consume newline
+    if (i < src.size()) { ++i;  // consume newline
+}
 
     // strip CR
-    if (!raw.empty() && raw.back() == '\r') raw.pop_back();
+    if (!raw.empty() && raw.back() == '\r') { raw.pop_back();
+}
 
     // skip pure-whitespace / comment-only lines (but record indent of
     // non-blank lines only)
@@ -574,11 +587,11 @@ std::vector<Line> split_lines(const std::string& src) {
     size_t cut = std::string::npos;
     for (size_t k = first_nonspace; k < content_test.size(); ++k) {
       char c = content_test[k];
-      if (c == '"' && !in_sq)
+      if (c == '"' && !in_sq) {
         in_dq = !in_dq;
-      else if (c == '\'' && !in_dq)
+      } else if (c == '\'' && !in_dq) {
         in_sq = !in_sq;
-      else if (c == '#' && !in_dq && !in_sq && k > 0 && content_test[k - 1] == ' ') {
+      } else if (c == '#' && !in_dq && !in_sq && k > 0 && content_test[k - 1] == ' ') {
         cut = k;
         break;
       }
@@ -586,7 +599,8 @@ std::vector<Line> split_lines(const std::string& src) {
     if (cut != std::string::npos) {
       content_test = content_test.substr(0, cut);
       // trim trailing spaces
-      while (!content_test.empty() && content_test.back() == ' ') content_test.pop_back();
+      while (!content_test.empty() && content_test.back() == ' ') { content_test.pop_back();
+}
     }
 
     Line L;
@@ -601,9 +615,11 @@ std::vector<Line> split_lines(const std::string& src) {
 // Trim leading/trailing whitespace
 std::string trim(const std::string& s) {
   size_t start = 0;
-  while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
+  while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) { ++start;
+}
   size_t end = s.size();
-  while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) --end;
+  while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) { --end;
+}
   return s.substr(start, end - start);
 }
 
@@ -611,7 +627,8 @@ std::string trim(const std::string& s) {
 // Handles double-quoted, single-quoted, true/false, plain string.
 json parse_scalar(const std::string& raw) {
   std::string s = trim(raw);
-  if (s.empty()) return json(nullptr);
+  if (s.empty()) { return json(nullptr);
+}
 
   // Double-quoted
   if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
@@ -667,17 +684,23 @@ json parse_scalar(const std::string& raw) {
   }
 
   // Booleans
-  if (s == "true" || s == "True" || s == "TRUE") return true;
-  if (s == "false" || s == "False" || s == "FALSE") return false;
-  if (s == "null" || s == "Null" || s == "NULL" || s == "~") return nullptr;
+  if (s == "true" || s == "True" || s == "TRUE") { return true;
+}
+  if (s == "false" || s == "False" || s == "FALSE") { return false;
+}
+  if (s == "null" || s == "Null" || s == "NULL" || s == "~") { return nullptr;
+}
 
   // Integers (POM doesn't use them directly, but be permissive)
   bool is_int = !s.empty();
   size_t start = 0;
-  if (s[0] == '-' || s[0] == '+') start = 1;
-  if (start == s.size()) is_int = false;
+  if (s[0] == '-' || s[0] == '+') { start = 1;
+}
+  if (start == s.size()) { is_int = false;
+}
   for (size_t i = start; i < s.size() && is_int; ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(s[i]))) is_int = false;
+    if (!std::isdigit(static_cast<unsigned char>(s[i]))) { is_int = false;
+}
   }
   if (is_int) {
     try {
@@ -701,7 +724,8 @@ json parse_sequence(const std::vector<Line>& lines, size_t& idx, int seq_indent)
   json arr = json::array();
   while (idx < lines.size()) {
     const Line& L = lines[idx];
-    if (L.indent < seq_indent) break;
+    if (L.indent < seq_indent) { break;
+}
     if (L.indent > seq_indent) {
       throw std::invalid_argument("YAML parse error: unexpected indent at line " +
                                   std::to_string(L.line_no));
@@ -737,11 +761,11 @@ json parse_sequence(const std::vector<Line>& lines, size_t& idx, int seq_indent)
     bool in_dq = false, in_sq = false;
     for (size_t k = 0; k < trimmed_first.size(); ++k) {
       char c = trimmed_first[k];
-      if (c == '"' && !in_sq)
+      if (c == '"' && !in_sq) {
         in_dq = !in_dq;
-      else if (c == '\'' && !in_dq)
+      } else if (c == '\'' && !in_dq) {
         in_sq = !in_sq;
-      else if (c == ':' && !in_dq && !in_sq) {
+      } else if (c == ':' && !in_dq && !in_sq) {
         if (k + 1 == trimmed_first.size() || trimmed_first[k + 1] == ' ') {
           colon_pos = k;
           is_mapping_inline = true;
@@ -781,23 +805,25 @@ json parse_sequence(const std::vector<Line>& lines, size_t& idx, int seq_indent)
       // Continue reading more "key: value" lines at item_inline_indent
       while (idx < lines.size() && lines[idx].indent == item_inline_indent) {
         const Line& L2 = lines[idx];
-        if (L2.text.empty() || L2.text[0] == '-') break;
+        if (L2.text.empty() || L2.text[0] == '-') { break;
+}
         size_t cp2 = std::string::npos;
         bool dq2 = false, sq2 = false;
         for (size_t k = 0; k < L2.text.size(); ++k) {
           char c = L2.text[k];
-          if (c == '"' && !sq2)
+          if (c == '"' && !sq2) {
             dq2 = !dq2;
-          else if (c == '\'' && !dq2)
+          } else if (c == '\'' && !dq2) {
             sq2 = !sq2;
-          else if (c == ':' && !dq2 && !sq2) {
+          } else if (c == ':' && !dq2 && !sq2) {
             if (k + 1 == L2.text.size() || L2.text[k + 1] == ' ') {
               cp2 = k;
               break;
             }
           }
         }
-        if (cp2 == std::string::npos) break;
+        if (cp2 == std::string::npos) { break;
+}
         std::string k2 = trim(L2.text.substr(0, cp2));
         std::string v2 = (cp2 + 1 < L2.text.size()) ? trim(L2.text.substr(cp2 + 1)) : "";
         idx += 1;
@@ -838,22 +864,24 @@ json parse_mapping(const std::vector<Line>& lines, size_t& idx, int map_indent) 
   json obj = json::object();
   while (idx < lines.size()) {
     const Line& L = lines[idx];
-    if (L.indent < map_indent) break;
+    if (L.indent < map_indent) { break;
+}
     if (L.indent > map_indent) {
       throw std::invalid_argument("YAML parse error: unexpected over-indent at line " +
                                   std::to_string(L.line_no));
     }
-    if (!L.text.empty() && L.text[0] == '-') break;
+    if (!L.text.empty() && L.text[0] == '-') { break;
+}
 
     size_t colon_pos = std::string::npos;
     bool dq = false, sq = false;
     for (size_t k = 0; k < L.text.size(); ++k) {
       char c = L.text[k];
-      if (c == '"' && !sq)
+      if (c == '"' && !sq) {
         dq = !dq;
-      else if (c == '\'' && !dq)
+      } else if (c == '\'' && !dq) {
         sq = !sq;
-      else if (c == ':' && !dq && !sq) {
+      } else if (c == ':' && !dq && !sq) {
         if (k + 1 == L.text.size() || L.text[k + 1] == ' ') {
           colon_pos = k;
           break;
@@ -894,7 +922,8 @@ json parse_mapping(const std::vector<Line>& lines, size_t& idx, int map_indent) 
 }
 
 json parse_block(const std::vector<Line>& lines, size_t& idx, int parent_indent) {
-  if (idx >= lines.size()) return nullptr;
+  if (idx >= lines.size()) { return nullptr;
+}
   const Line& L = lines[idx];
   int my_indent = L.indent;
   if (my_indent <= parent_indent) {
@@ -910,14 +939,20 @@ json parse_block(const std::vector<Line>& lines, size_t& idx, int parent_indent)
 // --------- YAML emitter helpers --------------------------------------------
 
 bool needs_quoting(const std::string& s) {
-  if (s.empty()) return true;
+  if (s.empty()) { return true;
+}
   // Any of these YAML special leading chars / reserved values force quoting.
   static const std::string special = "[]{},*&!|>'\"%@`#";
-  if (special.find(s.front()) != std::string::npos) return true;
-  if (s.front() == ' ' || s.back() == ' ') return true;
-  if (s.find(": ") != std::string::npos) return true;
-  if (s.back() == ':') return true;
-  if (s.find('\n') != std::string::npos) return true;
+  if (special.find(s.front()) != std::string::npos) { return true;
+}
+  if (s.front() == ' ' || s.back() == ' ') { return true;
+}
+  if (s.find(": ") != std::string::npos) { return true;
+}
+  if (s.back() == ':') { return true;
+}
+  if (s.find('\n') != std::string::npos) { return true;
+}
   // Reserved "boolean-shaped" values
   if (s == "true" || s == "True" || s == "TRUE" || s == "false" || s == "False" || s == "FALSE" ||
       s == "null" || s == "Null" || s == "NULL" || s == "yes" || s == "no" || s == "Yes" ||
@@ -927,10 +962,13 @@ bool needs_quoting(const std::string& s) {
   // Pure-numeric strings
   bool numeric = true;
   size_t start = 0;
-  if (s[0] == '-' || s[0] == '+') start = 1;
-  if (start == s.size()) numeric = false;
+  if (s[0] == '-' || s[0] == '+') { start = 1;
+}
+  if (start == s.size()) { numeric = false;
+}
   for (size_t i = start; i < s.size() && numeric; ++i) {
-    if (!std::isdigit(static_cast<unsigned char>(s[i]))) numeric = false;
+    if (!std::isdigit(static_cast<unsigned char>(s[i]))) { numeric = false;
+}
   }
   return numeric;
 }
@@ -940,10 +978,11 @@ std::string quote_string(const std::string& s) {
   // contains no special escapes. We use single quotes to match.
   std::string out = "'";
   for (char c : s) {
-    if (c == '\'')
+    if (c == '\'') {
       out += "''";
-    else
+    } else {
       out += c;
+}
   }
   out += "'";
   return out;
@@ -1096,7 +1135,8 @@ std::string yaml_dump_impl(const J& value) {
 
 json yaml_parse(const std::string& yaml_text) {
   auto lines = split_lines(yaml_text);
-  if (lines.empty()) return json::array();
+  if (lines.empty()) { return json::array();
+}
   size_t idx = 0;
   int top_indent = lines[0].indent;
   if (!lines[0].text.empty() && lines[0].text[0] == '-') {

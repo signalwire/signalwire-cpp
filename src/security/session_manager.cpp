@@ -39,8 +39,10 @@ std::string SessionManager::base64_encode(const std::string& data) {
       valb -= 6;
     }
   }
-  if (valb > -6) out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
-  while (out.size() % 4) out.push_back('=');
+  if (valb > -6) { out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+}
+  while (out.size() % 4) { out.push_back('=');
+}
   return out;
 }
 
@@ -62,7 +64,8 @@ std::string SessionManager::base64_decode(const std::string& encoded) {
   std::string out;
   int val = 0, valb = -8;
   for (unsigned char c : encoded) {
-    if (T[c] == -1) break;
+    if (T[c] == -1) { break;
+}
     val = (val << 6) + T[c];
     valb += 6;
     if (valb >= 0) {
@@ -93,7 +96,8 @@ std::string SessionManager::hmac_sha256(const std::string& data) const {
 }
 
 bool SessionManager::timing_safe_compare(const std::string& a, const std::string& b) {
-  if (a.size() != b.size()) return false;
+  if (a.size() != b.size()) { return false;
+}
   return CRYPTO_memcmp(a.data(), b.data(), a.size()) == 0;
 }
 
@@ -113,7 +117,8 @@ std::string SessionManager::create_token(const std::string& function_name,
 bool SessionManager::validate_token(std::string_view token, std::string_view function_name,
                                     std::string_view call_id) const {
   auto dot_pos = token.find('.');
-  if (dot_pos == std::string_view::npos) return false;
+  if (dot_pos == std::string_view::npos) { return false;
+}
 
   // token.substr now yields a string_view; materialise the slices we hand
   // to the std::string-taking helpers (hmac_sha256 / timing_safe_compare /
@@ -127,26 +132,32 @@ bool SessionManager::validate_token(std::string_view token, std::string_view fun
   std::string expected_sig = hex_encode(sig_bytes);
 
   // Timing-safe comparison
-  if (!timing_safe_compare(provided_sig, expected_sig)) return false;
+  if (!timing_safe_compare(provided_sig, expected_sig)) { return false;
+}
 
   // Decode payload and check fields
   std::string payload = base64_decode(encoded_payload);
   // format: functionName:callID:expiryTimestamp
   auto first_colon = payload.find(':');
-  if (first_colon == std::string::npos) return false;
+  if (first_colon == std::string::npos) { return false;
+}
   auto second_colon = payload.find(':', first_colon + 1);
-  if (second_colon == std::string::npos) return false;
+  if (second_colon == std::string::npos) { return false;
+}
 
   std::string token_func = payload.substr(0, first_colon);
   std::string token_call_id = payload.substr(first_colon + 1, second_colon - first_colon - 1);
   std::string token_expiry_str = payload.substr(second_colon + 1);
 
-  if (token_func != function_name) return false;
-  if (token_call_id != call_id) return false;
+  if (token_func != function_name) { return false;
+}
+  if (token_call_id != call_id) { return false;
+}
 
   try {
     int64_t expiry = std::stoll(token_expiry_str);
-    if (current_timestamp() > expiry) return false;
+    if (current_timestamp() > expiry) { return false;
+}
   } catch (...) {
     return false;
   }

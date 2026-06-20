@@ -47,23 +47,26 @@ rest::RestClient RestClient(const std::vector<std::string>& args,
                             const std::map<std::string, std::string>& kwargs) {
   std::string project, token, space;
 
-  if (args.size() > 0) {
+  if (!args.empty()) {
     project = args[0];
   } else {
     project = lookup(kwargs, {"project", "project_id"});
-    if (project.empty()) project = env_or_empty("SIGNALWIRE_PROJECT_ID");
+    if (project.empty()) { project = env_or_empty("SIGNALWIRE_PROJECT_ID");
+}
   }
   if (args.size() > 1) {
     token = args[1];
   } else {
     token = lookup(kwargs, {"token"});
-    if (token.empty()) token = env_or_empty("SIGNALWIRE_API_TOKEN");
+    if (token.empty()) { token = env_or_empty("SIGNALWIRE_API_TOKEN");
+}
   }
   if (args.size() > 2) {
     space = args[2];
   } else {
     space = lookup(kwargs, {"space", "host"});
-    if (space.empty()) space = env_or_empty("SIGNALWIRE_SPACE");
+    if (space.empty()) { space = env_or_empty("SIGNALWIRE_SPACE");
+}
   }
 
   if (project.empty() || token.empty() || space.empty()) {

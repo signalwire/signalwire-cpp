@@ -61,10 +61,14 @@ DataMap& DataMap::webhook(const std::string& method, const std::string& url, con
   json wh;
   wh["method"] = method;
   wh["url"] = url;
-  if (!headers.empty()) wh["headers"] = headers;
-  if (!form_param.empty()) wh["form_param"] = form_param;
-  if (input_args_as_params) wh["input_args_as_params"] = true;
-  if (!require_args.empty()) wh["require_args"] = require_args;
+  if (!headers.empty()) { wh["headers"] = headers;
+}
+  if (!form_param.empty()) { wh["form_param"] = form_param;
+}
+  if (input_args_as_params) { wh["input_args_as_params"] = true;
+}
+  if (!require_args.empty()) { wh["require_args"] = require_args;
+}
   webhooks_.push_back(wh);
   return *this;
 }
@@ -130,7 +134,8 @@ DataMap& DataMap::global_error_keys(const std::vector<std::string>& keys) {
 json DataMap::to_swaig_function() const {
   json func;
   func["function"] = function_name_;
-  if (!purpose_.empty()) func["description"] = purpose_;
+  if (!purpose_.empty()) { func["description"] = purpose_;
+}
 
   if (!parameters_.empty()) {
     func["parameters"] = parameters_;

@@ -23,7 +23,7 @@ namespace agent {
 
 AgentBase::AgentBase(const std::string& name, const std::string& route, const std::string& host,
                      int port)
-    : swml::Service() {
+     {
   name_ = name;
   route_ = route;
   host_ = host;
@@ -53,7 +53,7 @@ AgentBase::AgentBase(const std::string& name, const std::string& route, const st
 
 AgentBase::~AgentBase() { stop(); }
 
-AgentBase::AgentBase(const AgentBase& other) : swml::Service() {
+AgentBase::AgentBase(const AgentBase& other)  {
   // Service-level state copied through the protected fields the parent owns.
   name_ = other.name_;
   route_ = other.route_;
@@ -156,8 +156,10 @@ AgentBase& AgentBase::prompt_add_to_section(const std::string& title, const std:
                                             const std::vector<std::string>& bullets) {
   for (auto& section : pom_sections_) {
     if (section.title.has_value() && *section.title == title) {
-      if (!body.empty()) section.body += "\n" + body;
-      for (const auto& b : bullets) section.bullets.push_back(b);
+      if (!body.empty()) { section.body += "\n" + body;
+}
+      for (const auto& b : bullets) { section.bullets.push_back(b);
+}
       return *this;
     }
   }
@@ -167,24 +169,30 @@ AgentBase& AgentBase::prompt_add_to_section(const std::string& title, const std:
 
 bool AgentBase::prompt_has_section(const std::string& title) const {
   for (const auto& s : pom_sections_) {
-    if (s.title.has_value() && *s.title == title) return true;
+    if (s.title.has_value() && *s.title == title) { return true;
+}
   }
   return false;
 }
 
 std::string AgentBase::get_prompt() const {
-  if (raw_prompt_text_) return *raw_prompt_text_;
+  if (raw_prompt_text_) { return *raw_prompt_text_;
+}
   std::string result;
   for (const auto& s : pom_sections_) {
     const std::string& title_str = s.title.has_value() ? *s.title : std::string();
     result += "## " + title_str + "\n";
-    if (!s.body.empty()) result += s.body + "\n";
-    for (const auto& b : s.bullets) result += "- " + b + "\n";
+    if (!s.body.empty()) { result += s.body + "\n";
+}
+    for (const auto& b : s.bullets) { result += "- " + b + "\n";
+}
     for (const auto& sub : s.subsections) {
       const std::string& sub_title = sub.title.has_value() ? *sub.title : std::string();
       result += "### " + sub_title + "\n";
-      if (!sub.body.empty()) result += sub.body + "\n";
-      for (const auto& b : sub.bullets) result += "- " + b + "\n";
+      if (!sub.body.empty()) { result += sub.body + "\n";
+}
+      for (const auto& b : sub.bullets) { result += "- " + b + "\n";
+}
     }
     result += "\n";
   }
@@ -338,7 +346,8 @@ AgentBase& AgentBase::add_hint(const std::string& hint) {
 }
 
 AgentBase& AgentBase::add_hints(const std::vector<std::string>& hints) {
-  for (const auto& h : hints) hints_.push_back(h);
+  for (const auto& h : hints) { hints_.push_back(h);
+}
   return *this;
 }
 
@@ -418,7 +427,8 @@ AgentBase& AgentBase::set_global_data(const json& data) {
 }
 
 AgentBase& AgentBase::update_global_data(const json& data) {
-  if (global_data_.is_null()) global_data_ = json::object();
+  if (global_data_.is_null()) { global_data_ = json::object();
+}
   for (auto& [k, v] : data.items()) {
     global_data_[k] = v;
   }
@@ -450,7 +460,8 @@ static std::string sorted_list_str(const std::set<std::string>& s) {
   std::sort(v.begin(), v.end());
   std::string out = "[";
   for (std::size_t i = 0; i < v.size(); ++i) {
-    if (i > 0) out += ", ";
+    if (i > 0) { out += ", ";
+}
     out += "'" + v[i] + "'";
   }
   out += "]";
@@ -470,7 +481,8 @@ AgentBase& AgentBase::set_internal_fillers(const json& fillers) {
       std::sort(unknown.begin(), unknown.end());
       std::string unknown_str = "[";
       for (std::size_t i = 0; i < unknown.size(); ++i) {
-        if (i > 0) unknown_str += ", ";
+        if (i > 0) { unknown_str += ", ";
+}
         unknown_str += "'" + unknown[i] + "'";
       }
       unknown_str += "]";
@@ -487,7 +499,8 @@ AgentBase& AgentBase::set_internal_fillers(const json& fillers) {
 
 AgentBase& AgentBase::add_internal_filler(const std::string& lang,
                                           const std::vector<std::string>& fillers) {
-  if (internal_fillers_.is_null()) internal_fillers_ = json::object();
+  if (internal_fillers_.is_null()) { internal_fillers_ = json::object();
+}
   internal_fillers_[lang] = fillers;
   return *this;
 }
@@ -504,7 +517,8 @@ AgentBase& AgentBase::add_internal_filler(const std::string& function_name,
                       "names: " +
                       sorted_list_str(supported) + ".");
   }
-  if (internal_fillers_.is_null()) internal_fillers_ = json::object();
+  if (internal_fillers_.is_null()) { internal_fillers_ = json::object();
+}
   if (!internal_fillers_.contains(function_name) || !internal_fillers_[function_name].is_object()) {
     internal_fillers_[function_name] = json::object();
   }
@@ -616,8 +630,10 @@ AgentBase& AgentBase::add_skill(const std::string& skill_name, const json& param
   skills::ensure_builtin_skills_registered();
   auto& reg = skills::SkillRegistry::instance();
   auto skill = reg.create(skill_name);
-  if (!skill) return *this;
-  if (!skill->setup(params)) return *this;
+  if (!skill) { return *this;
+}
+  if (!skill->setup(params)) { return *this;
+}
 
   // Register tools from the skill
   for (auto& tool : skill->register_tools()) {
@@ -632,7 +648,8 @@ AgentBase& AgentBase::add_skill(const std::string& skill_name, const json& param
   // Add prompt sections
   for (const auto& section : skill->get_prompt_sections()) {
     std::vector<std::string> bullets;
-    for (const auto& b : section.bullets) bullets.push_back(b);
+    for (const auto& b : section.bullets) { bullets.push_back(b);
+}
     prompt_add_section(section.title, section.body, bullets);
   }
 
@@ -723,7 +740,8 @@ AgentBase& AgentBase::add_mcp_server(const std::string& url,
   server["url"] = url;
   if (!headers.empty()) {
     json h = json::object();
-    for (const auto& [k, v] : headers) h[k] = v;
+    for (const auto& [k, v] : headers) { h[k] = v;
+}
     server["headers"] = h;
   }
   if (resources) {
@@ -731,7 +749,8 @@ AgentBase& AgentBase::add_mcp_server(const std::string& url,
   }
   if (!resource_vars.empty()) {
     json rv = json::object();
-    for (const auto& [k, v] : resource_vars) rv[k] = v;
+    for (const auto& [k, v] : resource_vars) { rv[k] = v;
+}
     server["resource_vars"] = rv;
   }
   mcp_servers_.push_back(server);
@@ -912,7 +931,8 @@ AgentBase& AgentBase::trust_proxy_for_signature(bool trust) {
 }
 
 void AgentBase::init_auth() {
-  if (auth_initialized_) return;
+  if (auth_initialized_) { return;
+}
 
   std::string env_user = get_env("SWML_BASIC_AUTH_USER");
   std::string env_pass = get_env("SWML_BASIC_AUTH_PASSWORD");
@@ -1001,7 +1021,8 @@ json AgentBase::build_prompt() const {
 }
 
 std::string AgentBase::build_webhook_url(const std::string& base_url) const {
-  if (webhook_url_) return *webhook_url_;
+  if (webhook_url_) { return *webhook_url_;
+}
 
   std::string url = base_url;
   // Add auth credentials to URL
@@ -1017,7 +1038,8 @@ std::string AgentBase::build_webhook_url(const std::string& base_url) const {
   }
 
   url += route_;
-  if (url.back() != '/') url += "/";
+  if (url.back() != '/') { url += "/";
+}
   url += "swaig";
 
   // Add query params
@@ -1025,7 +1047,8 @@ std::string AgentBase::build_webhook_url(const std::string& base_url) const {
     url += "?";
     bool first = true;
     for (const auto& p : swaig_query_params_) {
-      if (!first) url += "&";
+      if (!first) { url += "&";
+}
       url += signalwire::url_encode(p.key) + "=" + signalwire::url_encode(p.value);
       first = false;
     }
@@ -1035,10 +1058,12 @@ std::string AgentBase::build_webhook_url(const std::string& base_url) const {
 }
 
 std::string AgentBase::detect_proxy_url(const std::map<std::string, std::string>& headers) const {
-  if (proxy_url_) return *proxy_url_;
+  if (proxy_url_) { return *proxy_url_;
+}
 
   std::string env_proxy = get_env("SWML_PROXY_URL_BASE");
-  if (!env_proxy.empty()) return env_proxy;
+  if (!env_proxy.empty()) { return env_proxy;
+}
 
   // Check forwarded headers
   auto fwd_proto = headers.find("x-forwarded-proto");
@@ -1289,7 +1314,8 @@ bool AgentBase::validate_auth(const httplib::Request& req, httplib::Response& re
 
 void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) return;
+  if (!validate_auth(req, res)) { return;
+}
 
   // Extract query params
   std::map<std::string, std::string> query_params;
@@ -1320,7 +1346,8 @@ void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Respon
 
 void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) return;
+  if (!validate_auth(req, res)) { return;
+}
 
   if (req.body.empty()) {
     res.status = 400;
@@ -1378,7 +1405,8 @@ void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Respo
 
 void AgentBase::handle_post_prompt_request(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) return;
+  if (!validate_auth(req, res)) { return;
+}
 
   json body;
   try {
@@ -1413,8 +1441,10 @@ void AgentBase::handle_post_prompt_request(const httplib::Request& req, httplib:
 
 void AgentBase::setup_routes(httplib::Server& server) {
   std::string base = route_;
-  if (base.empty()) base = "/";
-  if (base.back() == '/' && base.size() > 1) base.pop_back();
+  if (base.empty()) { base = "/";
+}
+  if (base.back() == '/' && base.size() > 1) { base.pop_back();
+}
 
   // Webhook signature validation (porting-sdk/webhooks.md):
   // when signing_key is set, wrap POST handlers with the validator;
@@ -1459,19 +1489,19 @@ void AgentBase::setup_routes(httplib::Server& server) {
       wrap_post([this](const httplib::Request& req, httplib::Response& res) {
         handle_swml_request(req, res);
       });
-  server.Get(base.c_str(), swml_get);
-  server.Post(base.c_str(), swml_post);
+  server.Get(base, swml_get);
+  server.Post(base, swml_post);
 
   // SWAIG endpoint — POST signature-validated when key is set.
   std::string swaig_path = base + (base.back() == '/' ? "" : "/") + "swaig";
-  server.Post(swaig_path.c_str(),
+  server.Post(swaig_path,
               wrap_post([this](const httplib::Request& req, httplib::Response& res) {
                 handle_swaig_request(req, res);
               }));
 
   // Post-prompt endpoint — POST signature-validated when key is set.
   std::string pp_path = base + (base.back() == '/' ? "" : "/") + "post_prompt";
-  server.Post(pp_path.c_str(),
+  server.Post(pp_path,
               wrap_post([this](const httplib::Request& req, httplib::Response& res) {
                 handle_post_prompt_request(req, res);
               }));
@@ -1479,7 +1509,7 @@ void AgentBase::setup_routes(httplib::Server& server) {
   // MCP server endpoint (JSON-RPC 2.0)
   if (mcp_server_enabled_) {
     std::string mcp_path = base + (base.back() == '/' ? "" : "/") + "mcp";
-    server.Post(mcp_path.c_str(), [this](const httplib::Request& req, httplib::Response& res) {
+    server.Post(mcp_path, [this](const httplib::Request& req, httplib::Response& res) {
       add_security_headers(res);
 
       if (req.body.empty()) {
@@ -1512,7 +1542,7 @@ void AgentBase::setup_routes(httplib::Server& server) {
   // Debug routes
   if (debug_routes_) {
     std::string debug_path = base + (base.back() == '/' ? "" : "/") + "debug";
-    server.Get(debug_path.c_str(), [this](const httplib::Request&, httplib::Response& res) {
+    server.Get(debug_path, [this](const httplib::Request&, httplib::Response& res) {
       add_security_headers(res);
       json info;
       info["name"] = name_;

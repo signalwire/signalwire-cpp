@@ -18,9 +18,11 @@ double evaluate_expression(const std::string& expr) {
   // Tokenize and evaluate using shunting-yard
   std::string cleaned;
   for (char c : expr) {
-    if (!std::isspace(static_cast<unsigned char>(c))) cleaned += c;
+    if (!std::isspace(static_cast<unsigned char>(c))) { cleaned += c;
+}
   }
-  if (cleaned.empty()) throw std::runtime_error("Empty expression");
+  if (cleaned.empty()) { throw std::runtime_error("Empty expression");
+}
 
   // Simple recursive descent parser for +, -, *, /, %, **
   struct Parser {
@@ -40,16 +42,19 @@ double evaluate_expression(const std::string& expr) {
     double parse_term() {
       double result = parse_power();
       while (pos < s.size() && (s[pos] == '*' || s[pos] == '/' || s[pos] == '%')) {
-        if (s[pos] == '*' && pos + 1 < s.size() && s[pos + 1] == '*') break;  // ** handled in power
+        if (s[pos] == '*' && pos + 1 < s.size() && s[pos + 1] == '*') { break;  // ** handled in power
+}
         char op = s[pos++];
         double right = parse_power();
-        if (op == '*')
+        if (op == '*') {
           result *= right;
-        else if (op == '/') {
-          if (right == 0) throw std::runtime_error("Division by zero");
+        } else if (op == '/') {
+          if (right == 0) { throw std::runtime_error("Division by zero");
+}
           result /= right;
         } else {
-          if (right == 0) throw std::runtime_error("Modulo by zero");
+          if (right == 0) { throw std::runtime_error("Modulo by zero");
+}
           result = std::fmod(result, right);
         }
       }
@@ -81,21 +86,25 @@ double evaluate_expression(const std::string& expr) {
       if (pos < s.size() && s[pos] == '(') {
         pos++;  // skip (
         double result = parse_expr();
-        if (pos < s.size() && s[pos] == ')') pos++;
+        if (pos < s.size() && s[pos] == ')') { pos++;
+}
         return result;
       }
       // Number
       size_t start = pos;
-      while (pos < s.size() && (std::isdigit(static_cast<unsigned char>(s[pos])) || s[pos] == '.'))
+      while (pos < s.size() && (std::isdigit(static_cast<unsigned char>(s[pos])) || s[pos] == '.')) {
         pos++;
-      if (start == pos) throw std::runtime_error("Expected number");
+}
+      if (start == pos) { throw std::runtime_error("Expected number");
+}
       return std::stod(s.substr(start, pos - start));
     }
   };
 
   Parser p{cleaned};
   double result = p.parse_expr();
-  if (p.pos != cleaned.size()) throw std::runtime_error("Unexpected character");
+  if (p.pos != cleaned.size()) { throw std::runtime_error("Unexpected character");
+}
   return result;
 }
 }  // anonymous namespace

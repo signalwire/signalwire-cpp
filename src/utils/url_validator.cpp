@@ -43,7 +43,8 @@ ResolverFn& resolver_slot() {
 
 bool env_allows_private() {
   const char* raw = std::getenv("SWML_ALLOW_PRIVATE_URLS");
-  if (!raw) return false;
+  if (!raw) { return false;
+}
   std::string v(raw);
   std::transform(v.begin(), v.end(), v.begin(),
                  [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -62,7 +63,8 @@ struct ParsedUrl {
 ParsedUrl parse_url(const std::string& url) {
   ParsedUrl p;
   auto colon = url.find(':');
-  if (colon == std::string::npos) return p;
+  if (colon == std::string::npos) { return p;
+}
   p.scheme = url.substr(0, colon);
   std::string lower = p.scheme;
   std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -123,24 +125,30 @@ std::vector<uint8_t> ip_to_bytes(const std::string& ip) {
 
 bool cidr_contains(const std::string& cidr, const std::string& ip) {
   auto slash = cidr.find('/');
-  if (slash == std::string::npos) return false;
+  if (slash == std::string::npos) { return false;
+}
   std::string net_str = cidr.substr(0, slash);
   int prefix = std::atoi(cidr.substr(slash + 1).c_str());
 
   auto ip_bytes = ip_to_bytes(ip);
   auto net_bytes = ip_to_bytes(net_str);
-  if (ip_bytes.empty() || net_bytes.empty()) return false;
-  if (ip_bytes.size() != net_bytes.size()) return false;
+  if (ip_bytes.empty() || net_bytes.empty()) { return false;
+}
+  if (ip_bytes.size() != net_bytes.size()) { return false;
+}
   int total = static_cast<int>(ip_bytes.size()) * 8;
-  if (prefix < 0 || prefix > total) return false;
+  if (prefix < 0 || prefix > total) { return false;
+}
   int full = prefix / 8;
   int rem = prefix % 8;
   for (int i = 0; i < full; ++i) {
-    if (ip_bytes[i] != net_bytes[i]) return false;
+    if (ip_bytes[i] != net_bytes[i]) { return false;
+}
   }
   if (rem > 0) {
     uint8_t mask = static_cast<uint8_t>((0xFF << (8 - rem)) & 0xFF);
-    if ((ip_bytes[full] & mask) != (net_bytes[full] & mask)) return false;
+    if ((ip_bytes[full] & mask) != (net_bytes[full] & mask)) { return false;
+}
   }
   return true;
 }
@@ -158,7 +166,8 @@ std::optional<std::vector<std::string>> resolve(const std::string& hostname) {
   hints.ai_socktype = SOCK_STREAM;
   addrinfo* res = nullptr;
   int rc = ::getaddrinfo(hostname.c_str(), nullptr, &hints, &res);
-  if (rc != 0) return std::nullopt;
+  if (rc != 0) { return std::nullopt;
+}
   std::vector<std::string> ips;
   for (auto* p = res; p; p = p->ai_next) {
     char buf[INET6_ADDRSTRLEN] = {0};
@@ -173,7 +182,8 @@ std::optional<std::vector<std::string>> resolve(const std::string& hostname) {
     }
   }
   ::freeaddrinfo(res);
-  if (ips.empty()) return std::nullopt;
+  if (ips.empty()) { return std::nullopt;
+}
   return ips;
 }
 

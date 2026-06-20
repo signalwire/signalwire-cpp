@@ -18,7 +18,8 @@ std::string SchemaValidationError::build_message(const std::string& vn,
   std::ostringstream os;
   os << "Schema validation failed for '" << vn << "': ";
   for (size_t i = 0; i < errs.size(); ++i) {
-    if (i != 0) os << "; ";
+    if (i != 0) { os << "; ";
+}
     os << errs[i];
   }
   return os.str();
@@ -32,15 +33,19 @@ std::string to_lower(std::string s) {
 }
 
 bool env_boolish(const char* raw) {
-  if (raw == nullptr) return false;
+  if (raw == nullptr) { return false;
+}
   std::string s = to_lower(raw);
-  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) s.erase(s.begin());
-  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) s.pop_back();
+  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) { s.erase(s.begin());
+}
+  while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) { s.pop_back();
+}
   return s == "1" || s == "true" || s == "yes";
 }
 
 std::string python_type_annotation(const json& def) {
-  if (!def.is_object()) return "Any";
+  if (!def.is_object()) { return "Any";
+}
   auto it = def.find("type");
   if (it == def.end() || !it->is_string()) {
     if (def.contains("anyOf") || def.contains("oneOf") || def.contains("$ref")) {
@@ -49,17 +54,23 @@ std::string python_type_annotation(const json& def) {
     return "Any";
   }
   const std::string t = it->get<std::string>();
-  if (t == "string") return "str";
-  if (t == "integer") return "int";
-  if (t == "number") return "float";
-  if (t == "boolean") return "bool";
+  if (t == "string") { return "str";
+}
+  if (t == "integer") { return "int";
+}
+  if (t == "number") { return "float";
+}
+  if (t == "boolean") { return "bool";
+}
   if (t == "array") {
     std::string item = "Any";
     auto items = def.find("items");
-    if (items != def.end()) item = python_type_annotation(*items);
+    if (items != def.end()) { item = python_type_annotation(*items);
+}
     return std::string("List[") + item + "]";
   }
-  if (t == "object") return "Dict[str, Any]";
+  if (t == "object") { return "Dict[str, Any]";
+}
   return "Any";
 }
 
@@ -96,7 +107,8 @@ std::vector<std::string> default_schema_candidates() {
 
 json read_json_file(const std::string& path) {
   std::ifstream f(path);
-  if (!f.is_open()) return json::object();
+  if (!f.is_open()) { return json::object();
+}
   std::stringstream ss;
   ss << f.rdbuf();
   try {
@@ -132,23 +144,32 @@ json SchemaUtils::load_schema() {
 }
 
 void SchemaUtils::extract_verbs() {
-  if (!schema_.contains("$defs") || !schema_["$defs"].is_object()) return;
+  if (!schema_.contains("$defs") || !schema_["$defs"].is_object()) { return;
+}
   const auto& defs = schema_["$defs"];
-  if (!defs.contains("SWMLMethod") || !defs["SWMLMethod"].is_object()) return;
+  if (!defs.contains("SWMLMethod") || !defs["SWMLMethod"].is_object()) { return;
+}
   const auto& swml_method = defs["SWMLMethod"];
-  if (!swml_method.contains("anyOf") || !swml_method["anyOf"].is_array()) return;
+  if (!swml_method.contains("anyOf") || !swml_method["anyOf"].is_array()) { return;
+}
   for (const auto& entry : swml_method["anyOf"]) {
-    if (!entry.is_object() || !entry.contains("$ref")) continue;
-    if (!entry["$ref"].is_string()) continue;
+    if (!entry.is_object() || !entry.contains("$ref")) { continue;
+}
+    if (!entry["$ref"].is_string()) { continue;
+}
     const std::string ref = entry["$ref"].get<std::string>();
     const std::string prefix = "#/$defs/";
-    if (ref.rfind(prefix, 0) != 0) continue;
+    if (ref.rfind(prefix, 0) != 0) { continue;
+}
     const std::string schema_name = ref.substr(prefix.size());
-    if (!defs.contains(schema_name)) continue;
+    if (!defs.contains(schema_name)) { continue;
+}
     const auto& defn = defs[schema_name];
-    if (!defn.is_object() || !defn.contains("properties")) continue;
+    if (!defn.is_object() || !defn.contains("properties")) { continue;
+}
     const auto& props = defn["properties"];
-    if (!props.is_object() || props.empty()) continue;
+    if (!props.is_object() || props.empty()) { continue;
+}
     const std::string actual_verb = props.begin().key();
     verbs_[actual_verb] = VerbInfo{actual_verb, schema_name, defn};
   }
@@ -162,35 +183,42 @@ void SchemaUtils::init_full_validator() {
 std::vector<std::string> SchemaUtils::get_all_verb_names() const {
   std::vector<std::string> out;
   out.reserve(verbs_.size());
-  for (const auto& [k, _] : verbs_) out.push_back(k);
+  for (const auto& [k, _] : verbs_) { out.push_back(k);
+}
   std::sort(out.begin(), out.end());
   return out;
 }
 
 json SchemaUtils::get_verb_properties(const std::string& verb_name) const {
   auto it = verbs_.find(verb_name);
-  if (it == verbs_.end()) return json::object();
+  if (it == verbs_.end()) { return json::object();
+}
   const auto& defn = it->second.definition;
-  if (!defn.contains("properties") || !defn["properties"].is_object()) return json::object();
+  if (!defn.contains("properties") || !defn["properties"].is_object()) { return json::object();
+}
   const auto& outer = defn["properties"];
-  if (!outer.contains(verb_name) || !outer[verb_name].is_object()) return json::object();
+  if (!outer.contains(verb_name) || !outer[verb_name].is_object()) { return json::object();
+}
   return outer[verb_name];
 }
 
 std::vector<std::string> SchemaUtils::get_verb_required_properties(
     const std::string& verb_name) const {
   json inner = get_verb_properties(verb_name);
-  if (!inner.contains("required") || !inner["required"].is_array()) return {};
+  if (!inner.contains("required") || !inner["required"].is_array()) { return {};
+}
   std::vector<std::string> out;
   for (const auto& v : inner["required"]) {
-    if (v.is_string()) out.push_back(v.get<std::string>());
+    if (v.is_string()) { out.push_back(v.get<std::string>());
+}
   }
   return out;
 }
 
 json SchemaUtils::get_verb_parameters(const std::string& verb_name) const {
   json inner = get_verb_properties(verb_name);
-  if (!inner.contains("properties") || !inner["properties"].is_object()) return json::object();
+  if (!inner.contains("properties") || !inner["properties"].is_object()) { return json::object();
+}
   return inner["properties"];
 }
 
@@ -238,7 +266,8 @@ std::pair<bool, std::vector<std::string>> SchemaUtils::validate_document(
 std::string SchemaUtils::generate_method_signature(const std::string& verb_name) const {
   json params = get_verb_parameters(verb_name);
   std::set<std::string> required;
-  for (auto& r : get_verb_required_properties(verb_name)) required.insert(r);
+  for (auto& r : get_verb_required_properties(verb_name)) { required.insert(r);
+}
 
   std::vector<std::string> param_keys;
   if (params.is_object()) {
@@ -263,7 +292,8 @@ std::string SchemaUtils::generate_method_signature(const std::string& verb_name)
   std::ostringstream os;
   os << "def " << verb_name << "(";
   for (size_t i = 0; i < parts.size(); ++i) {
-    if (i != 0) os << ", ";
+    if (i != 0) { os << ", ";
+}
     os << parts[i];
   }
   os << ") -> bool:\n";
@@ -275,10 +305,12 @@ std::string SchemaUtils::generate_method_signature(const std::string& verb_name)
       desc = d["description"].get<std::string>();
       std::replace(desc.begin(), desc.end(), '\n', ' ');
       // trim
-      while (!desc.empty() && std::isspace(static_cast<unsigned char>(desc.front())))
+      while (!desc.empty() && std::isspace(static_cast<unsigned char>(desc.front()))) {
         desc.erase(desc.begin());
-      while (!desc.empty() && std::isspace(static_cast<unsigned char>(desc.back())))
+}
+      while (!desc.empty() && std::isspace(static_cast<unsigned char>(desc.back()))) {
         desc.pop_back();
+}
     }
     os << "        Args:\n            " << name << ": " << desc << "\n";
   }

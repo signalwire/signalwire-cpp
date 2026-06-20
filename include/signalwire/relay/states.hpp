@@ -86,11 +86,16 @@ enum class CallState {
 /// Parse a wire string into a `CallState`. Returns `std::nullopt` for any
 /// value not in the known set (server may introduce new states) — NEVER throws.
 [[nodiscard]] inline std::optional<CallState> call_state_from_string(const std::string& s) {
-  if (s == "created") return CallState::Created;
-  if (s == "ringing") return CallState::Ringing;
-  if (s == "answered") return CallState::Answered;
-  if (s == "ending") return CallState::Ending;
-  if (s == "ended") return CallState::Ended;
+  if (s == "created") { return CallState::Created;
+}
+  if (s == "ringing") { return CallState::Ringing;
+}
+  if (s == "answered") { return CallState::Answered;
+}
+  if (s == "ending") { return CallState::Ending;
+}
+  if (s == "ended") { return CallState::Ended;
+}
   return std::nullopt;
 }
 
@@ -127,9 +132,12 @@ enum class DialState {
 [[nodiscard]] inline std::string to_string(DialState v) { return dial_state_value(v); }
 
 [[nodiscard]] inline std::optional<DialState> dial_state_from_string(const std::string& s) {
-  if (s == "dialing") return DialState::Dialing;
-  if (s == "answered") return DialState::Answered;
-  if (s == "failed") return DialState::Failed;
+  if (s == "dialing") { return DialState::Dialing;
+}
+  if (s == "answered") { return DialState::Answered;
+}
+  if (s == "failed") { return DialState::Failed;
+}
   return std::nullopt;
 }
 
@@ -181,13 +189,20 @@ enum class MessageState {
 [[nodiscard]] inline std::string to_string(MessageState v) { return message_state_value(v); }
 
 [[nodiscard]] inline std::optional<MessageState> message_state_from_string(const std::string& s) {
-  if (s == "queued") return MessageState::Queued;
-  if (s == "initiated") return MessageState::Initiated;
-  if (s == "sent") return MessageState::Sent;
-  if (s == "delivered") return MessageState::Delivered;
-  if (s == "undelivered") return MessageState::Undelivered;
-  if (s == "failed") return MessageState::Failed;
-  if (s == "received") return MessageState::Received;
+  if (s == "queued") { return MessageState::Queued;
+}
+  if (s == "initiated") { return MessageState::Initiated;
+}
+  if (s == "sent") { return MessageState::Sent;
+}
+  if (s == "delivered") { return MessageState::Delivered;
+}
+  if (s == "undelivered") { return MessageState::Undelivered;
+}
+  if (s == "failed") { return MessageState::Failed;
+}
+  if (s == "received") { return MessageState::Received;
+}
   return std::nullopt;
 }
 

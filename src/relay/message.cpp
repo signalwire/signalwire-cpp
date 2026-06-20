@@ -66,7 +66,8 @@ void Message::update_state(const std::string& new_state) {
 
 bool Message::wait(int timeout_ms) {
   std::unique_lock<std::mutex> lock(sync_->mutex);
-  if (sync_->completed) return true;
+  if (sync_->completed) { return true;
+}
   if (timeout_ms > 0) {
     return sync_->cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
                               [this] { return sync_->completed; });

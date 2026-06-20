@@ -34,9 +34,11 @@ class WebSearchSkill : public SkillBase {
   bool setup(const json& params) override {
     params_ = params;
     api_key_ = get_param_or_env(params, "api_key", "GOOGLE_SEARCH_API_KEY");
-    if (api_key_.empty()) api_key_ = get_env("GOOGLE_API_KEY");
+    if (api_key_.empty()) { api_key_ = get_env("GOOGLE_API_KEY");
+}
     search_engine_id_ = get_param_or_env(params, "search_engine_id", "GOOGLE_SEARCH_ENGINE_ID");
-    if (search_engine_id_.empty()) search_engine_id_ = get_env("GOOGLE_CSE_ID");
+    if (search_engine_id_.empty()) { search_engine_id_ = get_env("GOOGLE_CSE_ID");
+}
     tool_name_ = get_param<std::string>(params, "tool_name", "web_search");
     num_results_ = get_param<int>(params, "num_results", 3);
     // Optional prefix/postfix wrapped around every successful (non-empty)
@@ -69,7 +71,8 @@ class WebSearchSkill : public SkillBase {
                       {"required", json::array({"query"})}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
           std::string query = args.value("query", "");
-          if (query.empty()) return swaig::FunctionResult("No search query provided");
+          if (query.empty()) { return swaig::FunctionResult("No search query provided");
+}
 
           // Base URL (default Google) plus the API path. When
           // WEB_SEARCH_BASE_URL points at a fixture, we still emit
@@ -77,7 +80,8 @@ class WebSearchSkill : public SkillBase {
           // sees the documented endpoint. Strip a trailing slash on
           // the base so we don't end up with `//`.
           std::string base = get_env("WEB_SEARCH_BASE_URL", "https://www.googleapis.com");
-          while (!base.empty() && base.back() == '/') base.pop_back();
+          while (!base.empty() && base.back() == '/') { base.pop_back();
+}
           std::ostringstream url;
           url << base << "/customsearch/v1"
               << "?key=" << url_encode(api_key_) << "&cx=" << url_encode(search_engine_id_)

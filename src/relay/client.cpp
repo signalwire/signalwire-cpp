@@ -53,16 +53,20 @@ RelayClient::~RelayClient() { disconnect(); }
 RelayClient RelayClient::from_env() {
   RelayConfig cfg;
   const char* pid = std::getenv("SIGNALWIRE_PROJECT_ID");
-  if (pid) cfg.project = pid;
+  if (pid) { cfg.project = pid;
+}
   const char* tok = std::getenv("SIGNALWIRE_API_TOKEN");
-  if (tok) cfg.token = tok;
+  if (tok) { cfg.token = tok;
+}
   const char* host = std::getenv("SIGNALWIRE_SPACE");
-  if (host) cfg.host = host;
+  if (host) { cfg.host = host;
+}
   return RelayClient(cfg);
 }
 
 bool RelayClient::connect() {
-  if (connected_.load()) return true;
+  if (connected_.load()) { return true;
+}
 
   ws_ = std::make_unique<WebSocketClient>();
 
@@ -406,7 +410,8 @@ void RelayClient::handle_inbound_call(const RelayEvent& ev) {
   std::string call_id = ev.params.value("call_id", "");
   std::string node_id = ev.params.value("node_id", "");
 
-  if (call_id.empty()) return;
+  if (call_id.empty()) { return;
+}
 
   // Create a new Call object
   auto call = std::make_unique<Call>(call_id, node_id, this);
@@ -461,7 +466,8 @@ void RelayClient::handle_dial_event(const RelayEvent& ev) {
     }
   }
 
-  if (!pending) return;
+  if (!pending) { return;
+}
 
   if (de.dial_state == "answered") {
     std::string call_id = de.call_info.value("call_id", "");
@@ -489,7 +495,8 @@ void RelayClient::handle_call_state(const RelayEvent& ev) {
   CallEvent ce = CallEvent::from_relay_event(ev);
   std::string call_id = ce.call_id;
 
-  if (call_id.empty()) return;
+  if (call_id.empty()) { return;
+}
 
   // During dial, create Call objects for dial legs
   if (!ce.tag.empty()) {
@@ -527,10 +534,12 @@ void RelayClient::handle_component_event(const RelayEvent& ev) {
   std::string call_id = ce.call_id;
   std::string control_id = ce.control_id;
 
-  if (call_id.empty()) return;
+  if (call_id.empty()) { return;
+}
 
   Call* call = find_call(call_id);
-  if (!call) return;
+  if (!call) { return;
+}
 
   // Route to the action by control_id, honoring per-Action filtering:
   // - event_type_filter: e.g. play_and_collect only resolves on
@@ -641,7 +650,8 @@ Call RelayClient::dial(const json& devices, const std::string& tag_in, int dial_
   json params;
   params["tag"] = tag;
   params["devices"] = devices;
-  if (max_duration > 0) params["max_duration"] = max_duration;
+  if (max_duration > 0) { params["max_duration"] = max_duration;
+}
 
   try {
     execute("calling.dial", params);
@@ -683,10 +693,14 @@ Message RelayClient::send_message(const std::string& from, const std::string& to
   json params;
   params["from_number"] = from;
   params["to_number"] = to;
-  if (!body.empty()) params["body"] = body;
-  if (!media.empty()) params["media"] = media;
-  if (!tags.empty()) params["tags"] = tags;
-  if (!region.empty()) params["region"] = region;
+  if (!body.empty()) { params["body"] = body;
+}
+  if (!media.empty()) { params["media"] = media;
+}
+  if (!tags.empty()) { params["tags"] = tags;
+}
+  if (!region.empty()) { params["region"] = region;
+}
   if (!context.empty()) {
     params["context"] = context;
   } else if (!protocol_.empty()) {
@@ -790,7 +804,8 @@ bool RelayClient::reconnect() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(reconnect_delay_ms_));
 
-    if (!running_.load()) return false;
+    if (!running_.load()) { return false;
+}
 
     // Create new WebSocket
     ws_ = std::make_unique<WebSocketClient>();

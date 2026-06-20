@@ -27,7 +27,8 @@ AgentServer& AgentServer::register_agent(std::shared_ptr<agent::AgentBase> agent
                                          const std::string& route) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::string normalized = route;
-  if (!normalized.empty() && normalized.front() != '/') normalized = "/" + normalized;
+  if (!normalized.empty() && normalized.front() != '/') { normalized = "/" + normalized;
+}
   agents_[normalized] = std::move(agent);
   get_logger().info("Registered agent at route: " + normalized);
   return *this;
@@ -95,25 +96,26 @@ void AgentServer::setup_routes(httplib::Server& server) {
     agent->init_auth();
 
     std::string base = route;
-    if (base.empty()) base = "/";
+    if (base.empty()) { base = "/";
+}
 
     // SWML endpoint
     auto swml_handler = [&ag = *agent](const httplib::Request& req, httplib::Response& res) {
       ag.handle_swml_request(req, res);
     };
-    server.Get(base.c_str(), swml_handler);
-    server.Post(base.c_str(), swml_handler);
+    server.Get(base, swml_handler);
+    server.Post(base, swml_handler);
 
     // SWAIG endpoint
     std::string swaig_path = base + (base.back() == '/' ? "" : "/") + "swaig";
-    server.Post(swaig_path.c_str(),
+    server.Post(swaig_path,
                 [&ag = *agent](const httplib::Request& req, httplib::Response& res) {
                   ag.handle_swaig_request(req, res);
                 });
 
     // Post-prompt endpoint
     std::string pp_path = base + (base.back() == '/' ? "" : "/") + "post_prompt";
-    server.Post(pp_path.c_str(),
+    server.Post(pp_path,
                 [&ag = *agent](const httplib::Request& req, httplib::Response& res) {
                   ag.handle_post_prompt_request(req, res);
                 });

@@ -59,7 +59,8 @@ bool WebSocketClient::connect_plain(const std::string& host, int port) {
 }
 
 bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) {
-  if (connected_.load()) return true;
+  if (connected_.load()) { return true;
+}
 
   ws_ = std::make_unique<ix::WebSocket>();
 
@@ -81,7 +82,8 @@ bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) 
     // caFile at its "SYSTEM" default so production verifies against the
     // OS trust store. Verification is NEVER disabled.
     if (const char* ca = std::getenv("SSL_CERT_FILE")) {
-      if (ca && *ca) tlsOpts.caFile = ca;
+      if (ca && *ca) { tlsOpts.caFile = ca;
+}
     }
     ws_->setTLSOptions(tlsOpts);
   }
@@ -104,14 +106,16 @@ bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) 
         break;
       }
       case ix::WebSocketMessageType::Message: {
-        if (on_message_) on_message_(msg->str);
+        if (on_message_) { on_message_(msg->str);
+}
         break;
       }
       case ix::WebSocketMessageType::Error: {
         // A handshake/TLS failure before Open: fail connect(). After
         // Open, surface via on_error_.
         bool was_connected = connected_.load();
-        if (on_error_) on_error_(msg->errorInfo.reason);
+        if (on_error_) { on_error_(msg->errorInfo.reason);
+}
         std::lock_guard<std::mutex> lk(connect_mutex_);
         if (!was_connected && !connect_done_) {
           connect_ok_ = false;
@@ -169,7 +173,8 @@ bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) 
 }
 
 void WebSocketClient::close(int code, const std::string& reason) {
-  if (!ws_) return;
+  if (!ws_) { return;
+}
   closing_.store(true);
   connected_.store(false);
   // stop() sends the close frame (with code/reason) and joins the background
@@ -180,7 +185,8 @@ void WebSocketClient::close(int code, const std::string& reason) {
 }
 
 bool WebSocketClient::send(const std::string& message) {
-  if (!connected_.load() || !ws_) return false;
+  if (!connected_.load() || !ws_) { return false;
+}
   auto info = ws_->sendText(message);
   return info.success;
 }

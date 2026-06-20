@@ -58,8 +58,10 @@ ConciergeAgent& ConciergeAgent::set_amenities(const std::vector<json>& amenities
 
           if (lower_an.find(lower_name) != std::string::npos) {
             std::string info = an;
-            if (a.contains("location")) info += " - Location: " + a["location"].get<std::string>();
-            if (a.contains("hours")) info += " - Hours: " + a["hours"].get<std::string>();
+            if (a.contains("location")) { info += " - Location: " + a["location"].get<std::string>();
+}
+            if (a.contains("hours")) { info += " - Hours: " + a["hours"].get<std::string>();
+}
             if (a.contains("available")) {
               info += a["available"].get<bool>() ? " (Available)" : " (Currently unavailable)";
             }

@@ -68,7 +68,7 @@ Action Call::execute_simple(const std::string& method, const json& extra_params)
     try {
       json result = s_->client->execute("calling." + method, params);
       std::string code = result.value("code", "");
-      if (code.size() >= 1 && code[0] == '2') {
+      if (!code.empty() && code[0] == '2') {
         action.resolve("finished", result);
       } else if (code == "404" || code == "410") {
         get_logger().info("Call gone during " + method + " (code " + code + ")");
@@ -101,7 +101,8 @@ Action Call::execute_action(const std::string& method, const json& extra_params)
   json params = base_params();
   params["control_id"] = control_id;
   for (auto& [key, val] : extra_params.items()) {
-    if (key == "control_id") continue;  // already set
+    if (key == "control_id") { continue;  // already set
+}
     params[key] = val;
   }
 
@@ -119,7 +120,7 @@ Action Call::execute_action(const std::string& method, const json& extra_params)
         get_logger().info("Call gone during " + method + " (code " + code + ")");
         unregister_action(control_id);
         action.resolve("finished", json::object());
-      } else if (code.size() >= 1 && code[0] != '2') {
+      } else if (!code.empty() && code[0] != '2') {
         unregister_action(control_id);
         action.resolve("error", result);
       }
@@ -140,7 +141,8 @@ Action Call::answer() { return execute_simple("answer"); }
 
 Action Call::hangup(const std::string& reason) {
   json p;
-  if (reason != "hangup") p["reason"] = reason;
+  if (reason != "hangup") { p["reason"] = reason;
+}
   return execute_simple("end", p);
 }
 
@@ -202,8 +204,10 @@ Action Call::execute_swml(const json& swml) {
 Action Call::play(const json& media, double volume, const std::string& control_id) {
   json p;
   p["play"] = media;
-  if (volume != 0.0) p["volume"] = volume;
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (volume != 0.0) { p["volume"] = volume;
+}
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("play", p);
 }
 
@@ -216,9 +220,12 @@ Action Call::play_tts(const std::string& text, const std::string& language,
                       const std::string& gender, const std::string& voice, double volume) {
   json tts;
   tts["text"] = text;
-  if (!language.empty()) tts["language"] = language;
-  if (!gender.empty()) tts["gender"] = gender;
-  if (!voice.empty()) tts["voice"] = voice;
+  if (!language.empty()) { tts["language"] = language;
+}
+  if (!gender.empty()) { tts["gender"] = gender;
+}
+  if (!voice.empty()) { tts["voice"] = voice;
+}
   json media = json::array({{{"type", "tts"}, {"params", tts}}});
   return play(media, volume);
 }
@@ -244,15 +251,18 @@ Action Call::play_silence(double duration) {
 Action Call::play_ringtone(const std::string& name, double duration, double volume) {
   json rt;
   rt["name"] = name;
-  if (duration >= 0.0) rt["duration"] = duration;
+  if (duration >= 0.0) { rt["duration"] = duration;
+}
   json media = json::array({{{"type", "ringtone"}, {"params", rt}}});
   return play(media, volume);
 }
 
 Action Call::record(const json& params, const std::string& control_id) {
   json p;
-  if (!params.empty()) p["record"] = params;
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!params.empty()) { p["record"] = params;
+}
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("record", p);
 }
 
@@ -268,7 +278,8 @@ Action Call::play_and_collect(const json& play_media, const json& collect_params
   json p;
   p["play"] = play_media;
   p["collect"] = collect_params;
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   Action a = execute_action("play_and_collect", p);
   // Per RELAY_IMPLEMENTATION_GUIDE: a play_and_collect resolves on the
   // calling.call.collect event ONLY. A calling.call.play(finished)
@@ -293,7 +304,8 @@ Action Call::prompt_with_media(const json& media, const json& collect, double vo
   json p;
   p["play"] = media;
   p["collect"] = collect;
-  if (volume != 0.0) p["volume"] = volume;
+  if (volume != 0.0) { p["volume"] = volume;
+}
   Action a = execute_action("play_and_collect", p);
   // Same gotcha as play_and_collect(): resolve on the collect event only,
   // and on the result payload (not a play(finished)).
@@ -306,9 +318,12 @@ Action Call::prompt_tts(const std::string& text, const json& collect, const std:
                         const std::string& gender, const std::string& voice, double volume) {
   json tts;
   tts["text"] = text;
-  if (!language.empty()) tts["language"] = language;
-  if (!gender.empty()) tts["gender"] = gender;
-  if (!voice.empty()) tts["voice"] = voice;
+  if (!language.empty()) { tts["language"] = language;
+}
+  if (!gender.empty()) { tts["gender"] = gender;
+}
+  if (!voice.empty()) { tts["voice"] = voice;
+}
   json media = json::array({{{"type", "tts"}, {"params", tts}}});
   return prompt_with_media(media, collect, volume);
 }
@@ -327,7 +342,8 @@ Action Call::prompt_audio(const std::string& url, const json& collect, double vo
 
 Action Call::collect(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   Action a = execute_action("collect", p);
   a.set_event_type_filter({"calling.call.collect"});
   a.set_resolve_on_result(true);
@@ -336,7 +352,8 @@ Action Call::collect(const json& params, const std::string& control_id) {
 
 Action Call::detect(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   Action a = execute_action("detect", p);
   // Detect resolves on the first event carrying a `detect` payload —
   // a state(finished) without a detect payload must NOT resolve the
@@ -351,10 +368,12 @@ Action Call::detect(const json& params, const std::string& control_id) {
 // detect()'s "resolve on first detect payload" semantics.
 Action Call::detect_digit(const std::string& digits, double timeout) {
   json params = json::object();
-  if (!digits.empty()) params["digits"] = digits;
+  if (!digits.empty()) { params["digits"] = digits;
+}
   json p;
   p["detect"] = {{"type", "digit"}, {"params", params}};
-  if (timeout >= 0.0) p["timeout"] = timeout;
+  if (timeout >= 0.0) { p["timeout"] = timeout;
+}
   return detect(p);
 }
 
@@ -365,16 +384,19 @@ Action Call::detect_answering_machine(const json& amd_params, double timeout) {
   json params = amd_params.is_object() ? amd_params : json::object();
   json p;
   p["detect"] = {{"type", "machine"}, {"params", params}};
-  if (timeout >= 0.0) p["timeout"] = timeout;
+  if (timeout >= 0.0) { p["timeout"] = timeout;
+}
   return detect(p);
 }
 
 Action Call::detect_fax(const std::string& tone, double timeout) {
   json params = json::object();
-  if (!tone.empty()) params["tone"] = tone;
+  if (!tone.empty()) { params["tone"] = tone;
+}
   json p;
   p["detect"] = {{"type", "fax"}, {"params", params}};
-  if (timeout >= 0.0) p["timeout"] = timeout;
+  if (timeout >= 0.0) { p["timeout"] = timeout;
+}
   return detect(p);
 }
 
@@ -384,7 +406,8 @@ Action Call::tap_audio(const json& params, const std::string& control_id) {
 
 Action Call::tap(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("tap", p);
 }
 
@@ -406,13 +429,15 @@ Action Call::stop_tap(const std::string& control_id) {
 
 Action Call::ai(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("ai", p);
 }
 
 Action Call::pay(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("pay", p);
 }
 
@@ -420,27 +445,33 @@ Action Call::send_fax(const std::string& document_url, const std::string& header
                       const std::string& identity, const std::string& control_id) {
   json p;
   p["document"] = document_url;
-  if (!header.empty()) p["header_info"] = header;
-  if (!identity.empty()) p["identity"] = identity;
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!header.empty()) { p["header_info"] = header;
+}
+  if (!identity.empty()) { p["identity"] = identity;
+}
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("send_fax", p);
 }
 
 Action Call::receive_fax(const std::string& control_id) {
   json p = json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("receive_fax", p);
 }
 
 Action Call::stream(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("stream", p);
 }
 
 Action Call::transcribe(const json& params, const std::string& control_id) {
   json p = params.is_object() ? params : json::object();
-  if (!control_id.empty()) p["control_id"] = control_id;
+  if (!control_id.empty()) { p["control_id"] = control_id;
+}
   return execute_action("transcribe", p);
 }
 
@@ -449,7 +480,8 @@ void Call::on_event(CallEventHandler handler) { s_->event_handlers.push_back(std
 
 bool Call::wait_for_ended(int timeout_ms) {
   std::unique_lock<std::mutex> lock(s_->ended_mutex);
-  if (s_->state == CALL_STATE_ENDED) return true;
+  if (s_->state == CALL_STATE_ENDED) { return true;
+}
 
   if (timeout_ms > 0) {
     return s_->ended_cv.wait_for(lock, std::chrono::milliseconds(timeout_ms),
@@ -464,11 +496,16 @@ namespace {
 // (created < ringing < answered < ending < ended). Unknown states rank -1
 // so they never satisfy a wait. Mirrors Python's _wait_for_state ordering.
 int call_state_rank(const std::string& s) {
-  if (s == CALL_STATE_CREATED) return 0;
-  if (s == CALL_STATE_RINGING) return 1;
-  if (s == CALL_STATE_ANSWERED) return 2;
-  if (s == CALL_STATE_ENDING) return 3;
-  if (s == CALL_STATE_ENDED) return 4;
+  if (s == CALL_STATE_CREATED) { return 0;
+}
+  if (s == CALL_STATE_RINGING) { return 1;
+}
+  if (s == CALL_STATE_ANSWERED) { return 2;
+}
+  if (s == CALL_STATE_ENDING) { return 3;
+}
+  if (s == CALL_STATE_ENDED) { return 4;
+}
   return -1;
 }
 }  // namespace
@@ -479,7 +516,8 @@ bool Call::wait_for_state(const std::string& target, int timeout_ms) {
   // Already at or past the target -> return immediately (matches Python's
   // _wait_for_state short-circuit when rank(state) >= rank(target)).
   auto reached = [this, target_rank] { return call_state_rank(s_->state) >= target_rank; };
-  if (reached()) return true;
+  if (reached()) { return true;
+}
   if (timeout_ms > 0) {
     return s_->state_cv.wait_for(lock, std::chrono::milliseconds(timeout_ms), reached);
   }

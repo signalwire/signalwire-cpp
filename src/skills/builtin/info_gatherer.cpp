@@ -122,7 +122,8 @@ class InfoGathererSkill : public SkillBase {
   }
 
   std::string get_instance_key() const override {
-    if (!prefix_.empty()) return "info_gatherer_" + prefix_;
+    if (!prefix_.empty()) { return "info_gatherer_" + prefix_;
+}
     return "info_gatherer";
   }
 

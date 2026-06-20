@@ -11,6 +11,7 @@
 #include <cctype>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 #include "httplib.h"
 #include "signalwire/common.hpp"
@@ -32,7 +33,8 @@ std::string ascii_lower(std::string s) {
 std::string header_ci(const httplib::Request& req, const char* name) {
   std::string want = ascii_lower(name);
   for (const auto& kv : req.headers) {
-    if (ascii_lower(kv.first) == want) return kv.second;
+    if (ascii_lower(kv.first) == want) { return kv.second;
+}
   }
   return {};
 }
@@ -52,7 +54,8 @@ std::string reconstruct_url(const httplib::Request& req, const WebhookValidatorO
     path_and_query += "?";
     bool first = true;
     for (const auto& kv : req.params) {
-      if (!first) path_and_query += "&";
+      if (!first) { path_and_query += "&";
+}
       first = false;
       path_and_query += url_encode(kv.first);
       path_and_query += "=";
@@ -75,7 +78,8 @@ std::string reconstruct_url(const httplib::Request& req, const WebhookValidatorO
   if (opts.trust_proxy) {
     std::string fwd_host = header_ci(req, "X-Forwarded-Host");
     std::string fwd_proto = header_ci(req, "X-Forwarded-Proto");
-    if (fwd_proto.empty()) fwd_proto = "https";
+    if (fwd_proto.empty()) { fwd_proto = "https";
+}
     if (!fwd_host.empty()) {
       return fwd_proto + "://" + fwd_host + path_and_query;
     }
@@ -114,7 +118,7 @@ HttpHandler WrapWithSignatureValidation(std::string_view signing_key, HttpHandle
   // Capture by value: the wrapper owns its own copy of the key for
   // the lifetime of the returned closure. Never logged anywhere.
   std::string key_copy(signing_key);
-  auto opts_copy = opts;
+  auto opts_copy = std::move(opts);
   auto handler = std::move(downstream);
 
   return [key_copy = std::move(key_copy), opts_copy = std::move(opts_copy),

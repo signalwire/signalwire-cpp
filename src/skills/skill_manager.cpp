@@ -98,7 +98,8 @@ void SkillManager::unload_skill(const std::string& skill_name) {
 
 bool SkillManager::is_loaded(const std::string& skill_name) const {
   for (const auto& ls : loaded_skills_) {
-    if (ls.name == skill_name) return true;
+    if (ls.name == skill_name) { return true;
+}
   }
   return false;
 }

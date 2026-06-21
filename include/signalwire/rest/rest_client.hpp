@@ -1218,7 +1218,15 @@ class RestClient {
 
   struct VerifiedCallersNamespace : public CrudResource {
     VerifiedCallersNamespace(const HttpClient& c)
-        : CrudResource(c, "/api/relay/rest/verified_callers") {}
+        : CrudResource(c, "/api/relay/rest/verified_caller_ids") {}
+    // Python parity (redial_verification): POST {base}/{id}/verification.
+    [[nodiscard]] json redial_verification(const std::string& caller_id) const {
+      return client_.post(base_path_ + "/" + caller_id + "/verification", json::object());
+    }
+    // Python parity (submit_verification): PUT {base}/{id}/verification.
+    [[nodiscard]] json submit_verification(const std::string& caller_id, const json& data) const {
+      return client_.put(base_path_ + "/" + caller_id + "/verification", data);
+    }
   };
 
   // SipProfile is a singleton (no resource id). We expose ``get`` /
@@ -1452,6 +1460,10 @@ class RestClient {
     [[nodiscard]] json publish(const json& data) const {
       return client.post("/api/pubsub/publish", data);
     }
+    // Python parity (pubsub.create_token): POST /api/pubsub/tokens.
+    [[nodiscard]] json create_token(const json& data) const {
+      return client.post("/api/pubsub/tokens", data);
+    }
   };
 
   struct ChatNamespace {
@@ -1462,6 +1474,10 @@ class RestClient {
     }
     [[nodiscard]] json list_messages(const std::map<std::string, std::string>& p = {}) const {
       return client.get("/api/chat/messages", p);
+    }
+    // Python parity (chat.create_token): POST /api/chat/tokens.
+    [[nodiscard]] json create_token(const json& data) const {
+      return client.post("/api/chat/tokens", data);
     }
   };
 

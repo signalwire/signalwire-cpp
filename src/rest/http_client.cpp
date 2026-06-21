@@ -210,7 +210,12 @@ json CrudResource::create(const json& data) const { return client_.post(base_pat
 json CrudResource::get(const std::string& id) const { return client_.get(base_path_ + "/" + id); }
 
 json CrudResource::update(const std::string& id, const json& data) const {
-  return client_.put(base_path_ + "/" + id, data);
+  // Python parity: CrudResource._update_method defaults to "PATCH". Resources
+  // whose canonical update verb is PUT/POST (phone_numbers, verified_callers,
+  // video rooms/conferences/streams, queues, number_groups, short_codes,
+  // registry campaigns, sip_profile, the FabricResourcePUT family, the compat
+  // POST-update resources) override this; the inherited default is PATCH.
+  return client_.patch(base_path_ + "/" + id, data);
 }
 
 json CrudResource::del(const std::string& id) const { return client_.del(base_path_ + "/" + id); }

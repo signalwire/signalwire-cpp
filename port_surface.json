@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ a457ae727852f2edc2b1cae2491f1d07bad37fae",
+  "generated_from": "signalwire-cpp @ 7ce74a6b0cde0f8d6784674305f4e4774bde4ada",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -1047,6 +1047,7 @@
       "classes": {
         "ChatResource": [
           "__init__",
+          "create_token",
           "list_messages",
           "send_message"
         ]
@@ -1362,7 +1363,8 @@
           "set_cxml_webhook",
           "set_relay_application",
           "set_relay_topic",
-          "set_swml_webhook"
+          "set_swml_webhook",
+          "update"
         ]
       },
       "functions": []
@@ -1387,6 +1389,7 @@
       "classes": {
         "PubSubResource": [
           "__init__",
+          "create_token",
           "publish"
         ]
       },
@@ -1467,7 +1470,10 @@
     "signalwire.rest.namespaces.verified_callers": {
       "classes": {
         "VerifiedCallersResource": [
-          "__init__"
+          "__init__",
+          "redial_verification",
+          "submit_verification",
+          "update"
         ]
       },
       "functions": []

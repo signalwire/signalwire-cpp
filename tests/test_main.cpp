@@ -154,6 +154,7 @@ static std::vector<TestCase>& get_tests() {
 // Webhook signature validation (porting-sdk/webhooks.md)
 #include "test_webhook_validator.cpp"
 #include "test_webhook_middleware.cpp"
+#include "test_security_utils.cpp"
 
 // Mock-server-backed REST tests (translated from
 // signalwire-python/tests/unit/rest/*.py). These hit the local

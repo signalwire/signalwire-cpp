@@ -390,6 +390,19 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     ("signalwire::security", "ValidateRequest"): (
         "signalwire.core.security.webhook_validator", "validate_request",
     ),
+    # Standalone security-hygiene utils (security_utils.py). C++ groups them in
+    # a nested ``signalwire::security::security_utils`` namespace with PascalCase
+    # names; Python keeps them as module-level snake_case functions under
+    # ``signalwire.core.security.security_utils``.
+    ("signalwire::security::security_utils", "FilterSensitiveHeaders"): (
+        "signalwire.core.security.security_utils", "filter_sensitive_headers",
+    ),
+    ("signalwire::security::security_utils", "RedactUrl"): (
+        "signalwire.core.security.security_utils", "redact_url",
+    ),
+    ("signalwire::security::security_utils", "IsValidHostname"): (
+        "signalwire.core.security.security_utils", "is_valid_hostname",
+    ),
 }
 
 

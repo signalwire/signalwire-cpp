@@ -175,6 +175,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_mock_logs.cpp"
 #include "test_rest_mock_registry.cpp"
 #include "test_rest_mock_pagination.cpp"
+#include "test_rest_full_coverage.cpp"
 
 // TLS capability tests (template: signalwire-go b6b2b6d). Prove the SDK does
 // REAL, certificate-verified TLS: REST https:// + RELAY wss:// against the

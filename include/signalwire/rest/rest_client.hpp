@@ -467,6 +467,11 @@ class RestClient {
 
   struct PhoneNumbersNamespace : public CrudResource {
     PhoneNumbersNamespace(const HttpClient& c) : CrudResource(c, "/api/relay/rest/phone_numbers") {}
+    // Python parity: PhoneNumbersResource._update_method = "PUT" (overrides the
+    // CrudResource PATCH default). The set_* binding helpers route through this.
+    [[nodiscard]] json update(const std::string& id, const json& data) const {
+      return client_.put(base_path_ + "/" + id, data);
+    }
     [[nodiscard]] json search(const std::map<std::string, std::string>& p) const {
       return client_.get(base_path_ + "/search", p);
     }
@@ -1219,6 +1224,11 @@ class RestClient {
   struct VerifiedCallersNamespace : public CrudResource {
     VerifiedCallersNamespace(const HttpClient& c)
         : CrudResource(c, "/api/relay/rest/verified_caller_ids") {}
+    // Python parity: VerifiedCallersResource._update_method = "PUT" (overrides
+    // the CrudResource PATCH default).
+    [[nodiscard]] json update(const std::string& id, const json& data) const {
+      return client_.put(base_path_ + "/" + id, data);
+    }
     // Python parity (redial_verification): POST {base}/{id}/verification.
     [[nodiscard]] json redial_verification(const std::string& caller_id) const {
       return client_.post(base_path_ + "/" + caller_id + "/verification", json::object());
@@ -1241,7 +1251,9 @@ class RestClient {
     const HttpClient& client;
     LookupNamespace(const HttpClient& c) : client(c) {}
     [[nodiscard]] json lookup(const std::string& number) const {
-      return client.get("/api/relay/rest/lookup/" + number);
+      // Python parity: LookupResource.phone_number -> GET
+      // /api/relay/rest/lookup/phone_number/{e164}.
+      return client.get("/api/relay/rest/lookup/phone_number/" + number);
     }
   };
 

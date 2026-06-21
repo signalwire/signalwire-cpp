@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 109cbb9dd3904d4859e449288716787682719926",
+  "generated_from": "signalwire-cpp @ 7ce74a6b0cde0f8d6784674305f4e4774bde4ada",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -1363,7 +1363,8 @@
           "set_cxml_webhook",
           "set_relay_application",
           "set_relay_topic",
-          "set_swml_webhook"
+          "set_swml_webhook",
+          "update"
         ]
       },
       "functions": []
@@ -1471,7 +1472,8 @@
         "VerifiedCallersResource": [
           "__init__",
           "redial_verification",
-          "submit_verification"
+          "submit_verification",
+          "update"
         ]
       },
       "functions": []

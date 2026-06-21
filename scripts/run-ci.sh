@@ -298,6 +298,70 @@ skill_contract_gate() {
         --dump-cmd "$dump_cmd" --port-repo "$PORT_ROOT"
 }
 
+# REST-COVERAGE gate: every canonical REST route the SDK implements must be
+# exercised with BOTH a success (2xx) AND an error (4xx/5xx) response on the
+# correct on-the-wire path (parity). Measured by replaying the mock journal of a
+# REST-suite run through porting-sdk's rest_coverage checker. Accepted gaps —
+# routes with no SDK method, malformed canonical routes, mock-router collisions —
+# are allowlisted: the shared baseline (porting-sdk/REST_COVERAGE_BASELINE.md) +
+# this port's REST_COVERAGE_GAPS.md. A stale entry (route now covered) fails the
+# gate. Self-contained: spins its own mock, runs the rest_mock_ suite SERIALLY
+# (run_tests on one thread) so all traffic lands in one journal, then checks that
+# journal. Same shape as go's/python's/java's gate.
+#
+# The run_tests binary was already built by the TEST gate (gate 1). It is
+# resolved per BUILD_MODE exactly like the EMISSION / SKILL-CONTRACT gates: host
+# uses ./build/run_tests; exec/run modes go through the container. The mock runs
+# on the HOST regardless (the container reaches it via --network host).
+rest_coverage_gate() {
+    local port=8773
+    local mock_pkg_parent="$PORTING_SDK_DIR/test_harness/mock_signalwire"
+    export PYTHONPATH="$mock_pkg_parent${PYTHONPATH:+:$PYTHONPATH}"
+    python3 -m mock_signalwire --host 127.0.0.1 --port "$port" --log-level error \
+        >/tmp/rest_cov_mock_cpp.$$.log 2>&1 &
+    local mock_pid=$!
+    # shellcheck disable=SC2064
+    trap "kill $mock_pid 2>/dev/null" RETURN
+    local i
+    for i in $(seq 1 60); do
+        if python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$port/__mock__/health',timeout=1)" 2>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
+    # Fresh journal + scenarios so only this run's traffic is measured.
+    python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/journal/reset',method='POST'),timeout=5).read()"
+    python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/scenarios/reset',method='POST'),timeout=5).read()"
+    # Run the REST suite serially (one thread => one ordered journal) against the
+    # mock, filtered to the mock-backed rest cases.
+    case "$BUILD_MODE" in
+        host)
+            MOCK_SIGNALWIRE_PORT="$port" SW_TEST_PARALLEL=1 \
+                "$PORT_ROOT/build/run_tests" rest_mock_ || return 1
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            docker exec -e MOCK_SIGNALWIRE_PORT="$port" -e SW_TEST_PARALLEL=1 "$c" \
+                "$SWCPP_CONTAINER_BUILD/run_tests" rest_mock_ || return 1
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
+                -e MOCK_SIGNALWIRE_PORT="$port" -e SW_TEST_PARALLEL=1 "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
+                && '$SWCPP_CONTAINER_BUILD/run_tests' rest_mock_" || return 1
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 -m mock_signalwire.rest_coverage \
+        --mock-url "http://127.0.0.1:$port" \
+        --spec-root "$PORTING_SDK_DIR/rest-apis" \
+        --allowlist "$PORTING_SDK_DIR/REST_COVERAGE_BASELINE.md" \
+        --allowlist "$PORT_ROOT/REST_COVERAGE_GAPS.md"
+}
+
 # FMT gate: the C++ format gate (clang-format, config in .clang-format —
 # Google base / 100-col). Source-style only; proven surface/emission-neutral
 # (the libclang SIGNATURES enumerator + the regex SURFACE enumerator are both
@@ -425,6 +489,11 @@ run_gate "SURFACE-FRESH" "check_surface_freshness vs regenerated port_surface.js
 # Gate 5: no-cheat
 run_gate "NO-CHEAT" "audit_no_cheat_tests" \
     python3 "$PORTING_SDK_DIR/scripts/audit_no_cheat_tests.py" --root "$PORT_ROOT"
+
+# Gate 5b: REST-COVERAGE — every implemented REST route covered success+error
+# (parity + allowlist). Runs after NO-CHEAT.
+run_gate "REST-COVERAGE" "every implemented REST route covered success+error (parity + allowlist)" \
+    rest_coverage_gate
 
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \

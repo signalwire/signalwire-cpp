@@ -17,6 +17,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <fcntl.h>
 
@@ -28,8 +30,33 @@ namespace mocktest {
 
 namespace {
 
-constexpr int kDefaultWsPort = 8782;
 constexpr int kStartupTimeoutSeconds = 30;
+
+// Pick a free TCP port by binding 127.0.0.1:0, reading back the OS-assigned
+// port, then closing the socket so the forked `python -m mock_relay` can bind
+// it. The ws and http endpoints get two INDEPENDENT free ports (not ws+1000),
+// so leftover listeners / parallel runs can't collide on a fixed pair.
+// Returns a negative value on failure; callers throw.
+int pick_free_port() {
+    int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) return -1;
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    if (::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        ::close(s);
+        return -1;
+    }
+    socklen_t len = sizeof(addr);
+    if (::getsockname(s, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+        ::close(s);
+        return -1;
+    }
+    int port = ntohs(addr.sin_port);
+    ::close(s);
+    return port;
+}
 
 std::mutex& server_mutex() {
     static std::mutex m;
@@ -258,7 +285,15 @@ int resolve_ws_port() {
             try { return std::stoi(env); } catch (...) {}
         }
     }
-    return kDefaultWsPort;
+    // No override: pick a free port once and memoize it so ensure_server's
+    // spawn and make_config()/test callers all agree on the same ws port.
+    static const int dynamic_ws_port = pick_free_port();
+    if (dynamic_ws_port < 0) {
+        throw std::runtime_error(
+            "relay_mocktest: could not allocate a free ws port for "
+            "`python -m mock_relay` (set MOCK_RELAY_PORT to a pre-running instance)");
+    }
+    return dynamic_ws_port;
 }
 
 int resolve_http_port() {
@@ -267,7 +302,14 @@ int resolve_http_port() {
             try { return std::stoi(env); } catch (...) {}
         }
     }
-    return resolve_ws_port() + 1000;
+    // Independent free port (NOT ws+1000), memoized for the same reason.
+    static const int dynamic_http_port = pick_free_port();
+    if (dynamic_http_port < 0) {
+        throw std::runtime_error(
+            "relay_mocktest: could not allocate a free http port for "
+            "`python -m mock_relay` (set MOCK_RELAY_HTTP_PORT to a pre-running instance)");
+    }
+    return dynamic_http_port;
 }
 
 std::string ensure_server() {

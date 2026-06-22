@@ -19,6 +19,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <signal.h>
 #include <fcntl.h>
 
@@ -31,8 +33,33 @@ namespace mocktest {
 
 namespace {
 
-constexpr int kDefaultPort = 8772;
 constexpr int kStartupTimeoutSeconds = 30;
+
+// Pick a free TCP port by binding 127.0.0.1:0, reading back the OS-assigned
+// port, then closing the socket so the forked `python -m mock_signalwire` can
+// bind it. Picking dynamically (instead of a fixed default) keeps parallel
+// runs / leftover listeners from colliding on one hardcoded port. Returns a
+// negative value on failure; the caller throws.
+int pick_free_port() {
+    int s = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) return -1;
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    if (::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+        ::close(s);
+        return -1;
+    }
+    socklen_t len = sizeof(addr);
+    if (::getsockname(s, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+        ::close(s);
+        return -1;
+    }
+    int port = ntohs(addr.sin_port);
+    ::close(s);
+    return port;
+}
 
 // Serialise port resolution + spawn so concurrent tests don't fight over
 // the singleton.
@@ -224,7 +251,15 @@ int resolve_port() {
             try { return std::stoi(env); } catch (...) {}
         }
     }
-    return kDefaultPort;
+    // No override: pick a free port once and memoize it so every caller (and
+    // the spawn in ensure_server) agrees on the same port for this process.
+    static const int dynamic_port = pick_free_port();
+    if (dynamic_port < 0) {
+        throw std::runtime_error(
+            "mocktest: could not allocate a free port for `python -m mock_signalwire` "
+            "(set MOCK_SIGNALWIRE_PORT to a pre-running instance)");
+    }
+    return dynamic_port;
 }
 
 std::string ensure_server() {

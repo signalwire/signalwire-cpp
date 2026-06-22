@@ -385,6 +385,9 @@ spec_parity_gate() {
     trap "rm -f '$reg'" RETURN
     case "$BUILD_MODE" in
         host)
+            # The TEST gate builds run_tests/emit_corpus/emit_skills but not
+            # route_registry, so build it here before invoking it.
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
             "$PORT_ROOT/build/route_registry" >"$reg" || return 1
             ;;
         exec:*)

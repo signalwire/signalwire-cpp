@@ -15,7 +15,7 @@ int main() {
     auto client = RestClient::from_env();
 
     // List AI agents
-    auto agents = client.fabric().agents.list();
+    auto agents = client.fabric().ai_agents.list();
 
     // Search for a phone number
     auto results = client.phone_numbers().search({{"area_code", "512"}});

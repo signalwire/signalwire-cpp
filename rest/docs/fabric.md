@@ -8,44 +8,50 @@ All exposed resource types share the same methods:
 
 ```cpp
 // List all resources of this type
-auto items = client.fabric().agents.list();
-items = client.fabric().agents.list({{"page", "2"}, {"page_size", "10"}});
+auto items = client.fabric().ai_agents.list();
+items = client.fabric().ai_agents.list({{"page", "2"}, {"page_size", "10"}});
 
 // Create a new resource
-auto agent = client.fabric().agents.create({
+auto agent = client.fabric().ai_agents.create({
     {"name", "Support Bot"},
     {"prompt", {{"text", "You are a helpful support agent."}}},
 });
 
 // Get a resource by ID
-auto got = client.fabric().agents.get("agent-uuid");
+auto got = client.fabric().ai_agents.get("agent-uuid");
 
 // Update a resource
-client.fabric().agents.update("agent-uuid", {{"name", "Updated Name"}});
+client.fabric().ai_agents.update("agent-uuid", {{"name", "Updated Name"}});
 
 // Delete a resource
-client.fabric().agents.del("agent-uuid");
+client.fabric().ai_agents.del("agent-uuid");
 ```
 
-Every `client.fabric().<name>` member is a `CrudResource` with `list / create / get / update / del`. The per-resource notes below cover only the exceptions.
+Every typed `client.fabric().<name>` member is a `CrudResource` with `list / create / get / update / del`. The per-resource notes below cover only the exceptions.
 
 ## Resource Types
 
-| Accessor                           | API Path                                    | Notes |
-|------------------------------------|---------------------------------------------|-------|
-| `fabric().subscribers`             | `/api/fabric/subscribers`                   | |
-| `fabric().addresses`               | `/api/fabric/addresses`                     | |
-| `fabric().sip_endpoints`           | `/api/fabric/sip_endpoints`                 | |
-| `fabric().call_flows`              | `/api/fabric/call_flows`                    | |
-| `fabric().swml_scripts`            | `/api/fabric/swml_scripts`                  | |
-| `fabric().conferences`             | `/api/fabric/conferences`                   | |
-| `fabric().resources`               | `/api/fabric/resources`                     | Generic-resource CRUD. |
-| `fabric().tokens`                  | `/api/fabric/tokens`                        | |
-| `fabric().routing`                 | `/api/fabric/routing`                       | |
-| `fabric().agents`                  | `/api/fabric/agents`                        | AI Agent resources. |
-| `fabric().domains`                 | `/api/fabric/domains`                       | |
-| `fabric().topics`                  | `/api/fabric/topics`                        | |
-| `fabric().webhooks`                | `/api/fabric/webhooks`                      | |
+These map 1:1 to the SignalWire Python SDK's `fabric` resources. Most sit under
+`/api/fabric/resources/<type>`; `addresses` and `tokens` use their own bases.
+
+| Accessor                           | API Path                                          | Notes |
+|------------------------------------|---------------------------------------------------|-------|
+| `fabric().subscribers`             | `/api/fabric/resources/subscribers`               | + sip_endpoint sub-resource. |
+| `fabric().ai_agents`               | `/api/fabric/resources/ai_agents`                 | AI Agent resources. |
+| `fabric().call_flows`              | `/api/fabric/resources/call_flows`                | + versions / deploy. |
+| `fabric().conference_rooms`        | `/api/fabric/resources/conference_rooms`          | |
+| `fabric().swml_scripts`            | `/api/fabric/resources/swml_scripts`              | |
+| `fabric().cxml_scripts`            | `/api/fabric/resources/cxml_scripts`              | |
+| `fabric().cxml_applications`       | `/api/fabric/resources/cxml_applications`         | `create` is unsupported by design. |
+| `fabric().relay_applications`      | `/api/fabric/resources/relay_applications`        | |
+| `fabric().freeswitch_connectors`   | `/api/fabric/resources/freeswitch_connectors`     | |
+| `fabric().sip_endpoints`           | `/api/fabric/resources/sip_endpoints`             | |
+| `fabric().sip_gateways`            | `/api/fabric/resources/sip_gateways`              | |
+| `fabric().swml_webhooks`           | `/api/fabric/resources/swml_webhooks`             | Auto-materialized — read only (see below). |
+| `fabric().cxml_webhooks`           | `/api/fabric/resources/cxml_webhooks`             | Auto-materialized — read only (see below). |
+| `fabric().resources`               | `/api/fabric/resources`                           | Generic read/delete + address assignment. |
+| `fabric().addresses`               | `/api/fabric/addresses`                           | List/get only. |
+| `fabric().tokens`                  | `/api/fabric/subscribers/tokens`, …               | Subscriber / guest / embed token mints. |
 
 ### Auto-materialized resource types (not exposed as a create surface)
 

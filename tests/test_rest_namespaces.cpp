@@ -15,7 +15,7 @@ TEST(rest_ns_video) {
     auto& v = client.video();
     (void)v.rooms;
     (void)v.room_sessions;
-    (void)v.recordings;
+    (void)v.room_recordings;
     return true;
 }
 

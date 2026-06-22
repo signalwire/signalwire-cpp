@@ -13,7 +13,7 @@ int main() {
 
         // List AI agents
         std::cout << "Listing AI agents...\n";
-        auto agents = client.fabric().agents.list();
+        auto agents = client.fabric().ai_agents.list();
         std::cout << "  Found: " << agents.dump(2) << "\n";
 
         // Search phone numbers

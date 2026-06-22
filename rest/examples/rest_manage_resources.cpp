@@ -13,7 +13,7 @@ int main() {
 
         // Create an AI agent
         std::cout << "Creating AI agent...\n";
-        auto agent = client.fabric().agents.create({
+        auto agent = client.fabric().ai_agents.create({
             {"name", "Demo Support Bot"},
             {"prompt", {{"text", "You are a friendly support agent."}}}
         });
@@ -21,7 +21,7 @@ int main() {
         std::cout << "  Created: " << agent_id << "\n";
 
         // List agents
-        auto agents = client.fabric().agents.list();
+        auto agents = client.fabric().ai_agents.list();
         std::cout << "  Total agents: " << agents.dump() << "\n";
 
         // Search phone numbers
@@ -36,7 +36,7 @@ int main() {
         std::cout << "  Call: " << call.dump() << "\n";
 
         // Cleanup
-        client.fabric().agents.del(agent_id);
+        client.fabric().ai_agents.del(agent_id);
         std::cout << "  Deleted agent\n";
 
     } catch (const SignalWireRestError& e) {

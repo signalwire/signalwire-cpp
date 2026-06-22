@@ -13,7 +13,7 @@ int main() {
 
         // Create a call via compat API
         std::cout << "Creating call via LAML compat...\n";
-        auto call = client.compat().create_call({
+        auto call = client.compat().calls.create({
             {"To", "+15551234567"},
             {"From", "+15559876543"},
             {"Url", "https://example.com/twiml"}
@@ -22,7 +22,7 @@ int main() {
 
         // Send a message
         std::cout << "\nSending message via LAML compat...\n";
-        auto msg = client.compat().send_message({
+        auto msg = client.compat().messages.create({
             {"To", "+15551234567"},
             {"From", "+15559876543"},
             {"Body", "Hello from SignalWire!"}
@@ -30,7 +30,7 @@ int main() {
         std::cout << "  Message: " << msg.dump(2) << "\n";
 
         // List calls
-        auto calls = client.compat().list_calls();
+        auto calls = client.compat().calls.list();
         std::cout << "\nCalls: " << calls.dump(2) << "\n";
 
     } catch (const SignalWireRestError& e) {

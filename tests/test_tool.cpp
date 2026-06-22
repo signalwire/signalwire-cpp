@@ -229,8 +229,15 @@ TEST(tool_function_includes) {
 TEST(tool_set_function_includes_replaces) {
     AgentBase agent;
     agent.set_auth("u", "p");
-    agent.add_function_include(json::object({{"url", "a"}}));
-    agent.set_function_includes({json::object({{"url", "b"}}), json::object({{"url", "c"}})});
+    // set_function_includes REPLACES the prior add_function_include. Use
+    // well-formed entries (non-empty string `url` + array `functions`) so the
+    // #191 validity filter keeps them; this test isolates replace-vs-merge.
+    agent.add_function_include(
+        json::object({{"url", "https://a/swaig"}, {"functions", json::array({"a"})}}));
+    agent.set_function_includes({
+        json::object({{"url", "https://b/swaig"}, {"functions", json::array({"b"})}}),
+        json::object({{"url", "https://c/swaig"}, {"functions", json::array({"c"})}}),
+    });
 
     json swml = agent.render_swml();
     auto& main = swml["sections"]["main"];

@@ -521,3 +521,114 @@ TEST(agent_validate_tool_token_rejects_wrong_call_id) {
     ASSERT_FALSE(agent.validate_tool_token("test_tool", token, "call_B"));
     return true;
 }
+
+// ========================================================================
+// Behavior parity bundle (#190/#191/#185/#182) regression tests
+// ========================================================================
+
+// Helper: pull the `ai` verb's prompt object out of rendered SWML.
+static json find_ai_prompt(const json& swml) {
+    const auto& main = swml["sections"]["main"];
+    for (const auto& verb : main) {
+        if (verb.contains("ai") && verb["ai"].contains("prompt")) {
+            return verb["ai"]["prompt"];
+        }
+    }
+    return json();
+}
+
+TEST(agent_set_global_data_merges_not_replaces) {
+    // #190: a second set_global_data must MERGE over the first, not replace.
+    AgentBase agent;
+    agent.set_global_data(json::object({{"a", 1}}));
+    agent.set_global_data(json::object({{"b", 2}}));
+    json swml = agent.render_swml();
+    bool found = false;
+    for (const auto& verb : swml["sections"]["main"]) {
+        if (verb.contains("ai") && verb["ai"].contains("global_data")) {
+            auto& gd = verb["ai"]["global_data"];
+            ASSERT_EQ(gd.size(), 2u);  // second set must merge, not replace
+            ASSERT_EQ(gd["a"].get<int>(), 1);
+            ASSERT_EQ(gd["b"].get<int>(), 2);
+            found = true;
+        }
+    }
+    ASSERT_TRUE(found);
+    return true;
+}
+
+TEST(agent_set_function_includes_drops_invalid) {
+    // #191: keep only entries with a non-empty string `url` AND an array
+    // `functions`; drop the rest.
+    AgentBase agent;
+    agent.set_function_includes({
+        json::object({{"url", "https://x/swaig"}, {"functions", json::array({"a", "b"})}}),  // valid
+        json::object({{"url", "https://y/swaig"}}),                  // no functions
+        json::object({{"functions", json::array({"c"})}}),           // no url
+        json::object({{"url", ""}, {"functions", json::array({"d"})}}),  // empty url
+        json::object({{"url", "https://z/swaig"}, {"functions", "nope"}}),  // functions not array
+    });
+    json swml = agent.render_swml();
+    bool found = false;
+    for (const auto& verb : swml["sections"]["main"]) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG") &&
+            verb["ai"]["SWAIG"].contains("includes")) {
+            auto& includes = verb["ai"]["SWAIG"]["includes"];
+            ASSERT_EQ(includes.size(), 1u);  // only the well-formed entry survives
+            ASSERT_EQ(includes[0]["url"].get<std::string>(), "https://x/swaig");
+            found = true;
+        }
+    }
+    ASSERT_TRUE(found);
+    return true;
+}
+
+TEST(agent_default_prompt_fallback_with_contexts) {
+    // #185: with contexts and no prompt text, render emits the fallback.
+    AgentBase agent("test-agent");
+    auto& ctx = agent.add_context("default");
+    ctx.add_step("intro", "Hi");
+    json swml = agent.render_swml();
+    json prompt = find_ai_prompt(swml);
+    ASSERT_EQ(prompt["text"].get<std::string>(),
+              "You are test-agent, a helpful AI assistant.");
+    return true;
+}
+
+TEST(agent_no_default_prompt_fallback_without_contexts) {
+    // #185: WITHOUT contexts, an empty prompt is passed through (no fallback).
+    AgentBase agent("test-agent");
+    json swml = agent.render_swml();
+    json prompt = find_ai_prompt(swml);
+    ASSERT_EQ(prompt["text"].get<std::string>(), "");
+    return true;
+}
+
+TEST(agent_prompt_add_to_section_autocreates) {
+    // #182: appending to a missing section auto-creates it.
+    AgentBase agent;
+    agent.prompt_add_to_section("Fresh", "body text", {"b1"});
+    ASSERT_TRUE(agent.prompt_has_section("Fresh"));
+    auto pom = agent.pom();
+    ASSERT_TRUE(pom.has_value());
+    ASSERT_EQ(pom->sections.size(), 1u);
+    ASSERT_TRUE(pom->sections[0].title.has_value());
+    ASSERT_EQ(*pom->sections[0].title, "Fresh");
+    ASSERT_EQ(pom->sections[0].body, "body text");
+    ASSERT_EQ(pom->sections[0].bullets.size(), 1u);
+    return true;
+}
+
+TEST(agent_prompt_add_subsection_autocreates) {
+    // #182: adding a subsection under a missing parent auto-creates the parent.
+    AgentBase agent;
+    agent.prompt_add_subsection("Parent", "Child", "detail");
+    ASSERT_TRUE(agent.prompt_has_section("Parent"));
+    auto pom = agent.pom();
+    ASSERT_TRUE(pom.has_value());
+    ASSERT_EQ(pom->sections.size(), 1u);
+    ASSERT_EQ(pom->sections[0].subsections.size(), 1u);
+    ASSERT_TRUE(pom->sections[0].subsections[0].title.has_value());
+    ASSERT_EQ(*pom->sections[0].subsections[0].title, "Child");
+    return true;
+}

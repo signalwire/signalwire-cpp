@@ -140,6 +140,12 @@ AgentBase& AgentBase::prompt_add_section(const std::string& title, const std::st
 AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
                                             const std::string& title, const std::string& body,
                                             const std::vector<std::string>& bullets) {
+  // #182: auto-create the parent section if it does not exist yet, matching
+  // the TS reference (`addSubsection` calls `addSection(parentTitle)` when
+  // missing) — previously this was a no-op for an unknown parent.
+  if (!prompt_has_section(parent_title)) {
+    prompt_add_section(parent_title, "", {});
+  }
   for (auto& section : pom_sections_) {
     if (section.title.has_value() && *section.title == parent_title) {
       PomSection sub;
@@ -432,7 +438,17 @@ AgentBase& AgentBase::set_params(const json& params) {
 }
 
 AgentBase& AgentBase::set_global_data(const json& data) {
-  global_data_ = data;
+  // #190: merge incoming keys over existing global data (shallow), matching
+  // the TS reference (`setGlobalData` shallow-merges like `updateGlobalData`)
+  // rather than replacing the whole map.
+  if (data.is_object()) {
+    if (!global_data_.is_object()) {
+      global_data_ = json::object();
+    }
+    for (auto& [k, v] : data.items()) {
+      global_data_[k] = v;
+    }
+  }
   return *this;
 }
 
@@ -552,7 +568,27 @@ AgentBase& AgentBase::add_function_include(const json& include) {
 }
 
 AgentBase& AgentBase::set_function_includes(const std::vector<json>& includes) {
-  function_includes_ = includes;
+  // #191: keep only well-formed entries — a non-empty string `url` AND an
+  // array `functions` — matching the TS reference's filter
+  // (`inc.url && Array.isArray(inc.functions)`). Each dropped entry is
+  // logged (log-only, wire-neutral) so a misconfigured include is not
+  // silently discarded.
+  std::vector<json> kept;
+  kept.reserve(includes.size());
+  for (const auto& inc : includes) {
+    bool url_ok = inc.is_object() && inc.contains("url") && inc["url"].is_string() &&
+                  !inc["url"].get<std::string>().empty();
+    bool functions_ok = inc.is_object() && inc.contains("functions") && inc["functions"].is_array();
+    if (url_ok && functions_ok) {
+      kept.push_back(inc);
+    } else {
+      get_logger().warn(
+          "set_function_includes: dropping invalid include (needs a non-empty "
+          "string `url` and an array `functions`): " +
+          inc.dump());
+    }
+  }
+  function_includes_ = std::move(kept);
   return *this;
 }
 
@@ -1018,12 +1054,21 @@ AgentBase& AgentBase::on_debug_event(DebugEventCallback cb) {
 
 json AgentBase::build_prompt() const {
   json prompt;
+  // The prompt text is "empty" when it was never set or set to "".
+  const bool prompt_text_empty = !raw_prompt_text_ || raw_prompt_text_->empty();
   if (use_pom_ && !pom_sections_.empty()) {
     json pom = json::array();
     for (const auto& section : pom_sections_) {
       pom.push_back(section.to_json());
     }
     prompt["pom"] = pom;
+  } else if (context_builder_ && context_builder_->has_contexts() && prompt_text_empty) {
+    // #185: when contexts drive the conversation and no prompt text was set,
+    // emit a default fallback rather than an empty string — matching the TS
+    // reference (`text: prompt || "You are ${name}, a helpful AI assistant."`),
+    // which applies the fallback only in the contexts branch. Without contexts,
+    // an empty prompt is passed through as-is.
+    prompt["text"] = "You are " + name() + ", a helpful AI assistant.";
   } else if (raw_prompt_text_) {
     prompt["text"] = *raw_prompt_text_;
   } else {

@@ -122,10 +122,13 @@ TEST(prompt_add_subsection_with_bullets) {
 
 TEST(prompt_add_subsection_to_nonexistent_parent) {
     AgentBase agent;
-    // Adding subsection to non-existent parent should not crash; it just does nothing
+    // #182: adding a subsection to a non-existent parent auto-creates the
+    // parent (matching the TS PomBuilder, where addSubsection calls
+    // addSection(parentTitle) when missing) instead of silently no-opping.
     agent.prompt_add_subsection("MissingParent", "Child", "Body");
+    ASSERT_TRUE(agent.prompt_has_section("MissingParent"));
     std::string prompt = agent.get_prompt();
-    ASSERT_TRUE(prompt.find("Child") == std::string::npos);
+    ASSERT_TRUE(prompt.find("Child") != std::string::npos);
     return true;
 }
 

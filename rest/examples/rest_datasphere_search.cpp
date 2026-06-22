@@ -21,7 +21,7 @@ int main() {
 
         // Search
         std::cout << "\nSearching...\n";
-        auto results = client.datasphere().search({
+        auto results = client.datasphere().documents.search({
             {"query", "How to build AI agents?"},
             {"limit", 5}
         });

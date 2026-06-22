@@ -24,7 +24,7 @@ int main() {
         std::cout << "All rooms: " << rooms.dump(2) << "\n";
 
         // List recordings
-        auto recordings = client.video().recordings.list();
+        auto recordings = client.video().room_recordings.list();
         std::cout << "Recordings: " << recordings.dump(2) << "\n";
 
     } catch (const SignalWireRestError& e) {

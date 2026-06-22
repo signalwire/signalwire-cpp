@@ -97,6 +97,19 @@ target_link_libraries(emit_corpus signalwire)
 add_executable(emit_skills tools/emit_skills.cpp)
 target_link_libraries(emit_skills signalwire)
 
+# route_registry — the SPEC-PARITY Set-B producer for the SPEC-PARITY gate
+# (porting-sdk/scripts/diff_spec_implementation.py --registry-json). C++ has no
+# runtime reflection, so it derives Set B from REAL dispatch: it stands up a
+# loopback httplib server that records every (method, path) it receives, points
+# a RestClient at it, invokes every public namespace method once, and prints the
+# routes the SDK actually sent as {"routes","skipped","errors"} JSON. The route
+# strings come from the SDK's own path-building code in rest_client.hpp — never
+# hand-authored — so Set B cannot drift from what the client really does. Same
+# Option-2 approach as Rust's src/bin/route_registry.rs. Built in the TEST gate
+# alongside emit_corpus/emit_skills so the SPEC-PARITY gate has a ready binary.
+add_executable(route_registry tools/route_registry.cpp)
+target_link_libraries(route_registry signalwire)
+
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that
 # every method referenced in docs and examples resolves to a real symbol; the

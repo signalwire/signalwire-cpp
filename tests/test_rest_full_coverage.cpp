@@ -7374,7 +7374,7 @@ TEST(rest_mock_cov_relay_rest_redial_verification_call) {
 TEST(rest_mock_cov_relay_rest_release_phone_number) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.release_phone_number", 200, json::object());
-  (void)client.phone_numbers().release("pn-1");
+  (void)client.phone_numbers().del("pn-1");
   {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
@@ -7386,7 +7386,7 @@ TEST(rest_mock_cov_relay_rest_release_phone_number) {
   bool threw = false;
   int status = 0;
   try {
-    (void)client.phone_numbers().release("pn-1");
+    (void)client.phone_numbers().del("pn-1");
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

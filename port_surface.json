@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 7ce74a6b0cde0f8d6784674305f4e4774bde4ada",
+  "generated_from": "signalwire-cpp @ 660f87a331033977962d22155aa15dc042021a6b",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -995,11 +995,9 @@
           "ai_message",
           "ai_stop",
           "ai_unhold",
-          "answer",
           "collect",
           "collect_start_input_timers",
           "collect_stop",
-          "connect",
           "denoise",
           "denoise_stop",
           "detect",
@@ -1007,12 +1005,7 @@
           "dial",
           "disconnect",
           "end",
-          "end_call",
           "execute",
-          "get_call",
-          "hangup",
-          "hold",
-          "list_calls",
           "live_transcribe",
           "live_translate",
           "play",
@@ -1026,7 +1019,6 @@
           "record_resume",
           "record_stop",
           "refer",
-          "send_digits",
           "send_fax_stop",
           "stream",
           "stream_stop",
@@ -1035,9 +1027,7 @@
           "transcribe",
           "transcribe_stop",
           "transfer",
-          "unhold",
           "update",
-          "update_call",
           "user_event"
         ]
       },
@@ -1047,9 +1037,7 @@
       "classes": {
         "ChatResource": [
           "__init__",
-          "create_token",
-          "list_messages",
-          "send_message"
+          "create_token"
         ]
       },
       "functions": []
@@ -1116,16 +1104,12 @@
           "applications",
           "calls",
           "conferences",
-          "create_call",
           "faxes",
           "laml_bins",
-          "list_calls",
-          "list_messages",
           "messages",
           "phone_numbers",
           "queues",
           "recordings",
-          "send_message",
           "tokens",
           "transcriptions"
         ],
@@ -1182,8 +1166,7 @@
           "search"
         ],
         "DatasphereNamespace": [
-          "__init__",
-          "search"
+          "__init__"
         ]
       },
       "functions": []
@@ -1214,26 +1197,20 @@
         "FabricNamespace": [
           "__init__",
           "addresses",
-          "agents",
           "ai_agents",
           "call_flows",
           "conference_rooms",
-          "conferences",
           "cxml_applications",
           "cxml_scripts",
           "cxml_webhooks",
-          "domains",
           "freeswitch_connectors",
           "relay_applications",
           "resources",
-          "routing",
           "sip_endpoints",
           "sip_gateways",
           "subscribers",
           "swml_webhooks",
-          "tokens",
-          "topics",
-          "webhooks"
+          "tokens"
         ],
         "FabricResource": [
           "__init__",
@@ -1322,10 +1299,8 @@
         "MfaResource": [
           "__init__",
           "call",
-          "request_code",
           "sms",
-          "verify",
-          "verify_code"
+          "verify"
         ]
       },
       "functions": []
@@ -1347,7 +1322,6 @@
       "classes": {
         "PhoneNumbersResource": [
           "__init__",
-          "buy",
           "make_ai_agent_body",
           "make_call_flow_body",
           "make_cxml_application_body",
@@ -1355,7 +1329,6 @@
           "make_relay_application_body",
           "make_relay_topic_body",
           "make_swml_webhook_body",
-          "release",
           "search",
           "set_ai_agent",
           "set_call_flow",
@@ -1372,9 +1345,7 @@
     "signalwire.rest.namespaces.project": {
       "classes": {
         "ProjectNamespace": [
-          "__init__",
-          "get_project",
-          "update_project"
+          "__init__"
         ],
         "ProjectTokens": [
           "__init__",
@@ -1389,8 +1360,7 @@
       "classes": {
         "PubSubResource": [
           "__init__",
-          "create_token",
-          "publish"
+          "create_token"
         ]
       },
       "functions": []
@@ -1496,7 +1466,6 @@
           "__init__",
           "conference_tokens",
           "conferences",
-          "recordings",
           "room_recordings",
           "room_sessions",
           "room_tokens",

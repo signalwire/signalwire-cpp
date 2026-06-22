@@ -68,7 +68,7 @@ client.phone_numbers().set_cxml_webhook(pn_id, "https://example.com/voice.xml", 
 // Existing cXML application by ID
 client.phone_numbers().set_cxml_application(pn_id, "app-uuid");
 
-// AI Agent by ID (agent created via fabric.agents or AgentBase)
+// AI Agent by ID (agent created via fabric.ai_agents or AgentBase)
 client.phone_numbers().set_ai_agent(pn_id, "agent-uuid");
 
 // Call flow (optionally pin a version — default is current_deployed)

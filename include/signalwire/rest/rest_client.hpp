@@ -222,22 +222,6 @@ class RestClient {
     FabricAddresses addresses;
     FabricTokens tokens;
 
-    // ``conferences`` alias retained -- it's not in Python (Python
-    // uses ``conference_rooms``) but legacy C++ examples reference
-    // ``fabric().conferences.create(...)``. We point it at the same
-    // /conference_rooms path so the wire is consistent.
-    CrudResource conferences;
-
-    // Legacy synonym fields kept for older test_rest_fabric.cpp accessor
-    // checks. Their REST methods aren't expected to be called from any
-    // test that ports a Python file (Python doesn't have these names);
-    // they exist so ``(void)f.routing`` etc keeps compiling.
-    CrudResource routing;
-    CrudResource agents;
-    CrudResource domains;
-    CrudResource topics;
-    CrudResource webhooks;
-
     FabricNamespace(const HttpClient& c)
         : swml_scripts(c, "/api/fabric/resources/swml_scripts"),
           relay_applications(c, "/api/fabric/resources/relay_applications"),
@@ -254,13 +238,7 @@ class RestClient {
           cxml_webhooks(c, "/api/fabric/resources/cxml_webhooks"),
           resources(c),
           addresses(c),
-          tokens(c),
-          conferences(c, "/api/fabric/resources/conference_rooms"),
-          routing(c, "/api/fabric/routing"),
-          agents(c, "/api/fabric/agents"),
-          domains(c, "/api/fabric/domains"),
-          topics(c, "/api/fabric/topics"),
-          webhooks(c, "/api/fabric/webhooks") {}
+          tokens(c) {}
   };
 
   struct CallingNamespace {
@@ -427,42 +405,6 @@ class RestClient {
     [[nodiscard]] json user_event(const std::string& call_id, const json& params) const {
       return execute("calling.user_event", params, call_id);
     }
-
-    // ----------------------------------------------------------------
-    // Legacy convenience accessors (kept for backwards compatibility).
-    // These use direct REST paths rather than the command-dispatch
-    // wire format and are retained so existing tests keep linking.
-    // ----------------------------------------------------------------
-    [[nodiscard]] json list_calls(const std::map<std::string, std::string>& p = {}) const {
-      return client.get("/api/calling/calls", p);
-    }
-    [[nodiscard]] json get_call(const std::string& id) const {
-      return client.get("/api/calling/calls/" + id);
-    }
-    [[nodiscard]] json update_call(const std::string& id, const json& data) const {
-      return client.put("/api/calling/calls/" + id, data);
-    }
-    [[nodiscard]] json end_call(const std::string& id) const {
-      return client.del("/api/calling/calls/" + id);
-    }
-    [[nodiscard]] json connect(const std::string& id, const json& data) const {
-      return client.post("/api/calling/calls/" + id + "/connect", data);
-    }
-    [[nodiscard]] json send_digits(const std::string& id, const json& data) const {
-      return client.post("/api/calling/calls/" + id + "/send_digits", data);
-    }
-    [[nodiscard]] json answer(const std::string& id) const {
-      return client.post("/api/calling/calls/" + id + "/answer");
-    }
-    [[nodiscard]] json hangup(const std::string& id) const {
-      return client.post("/api/calling/calls/" + id + "/hangup");
-    }
-    [[nodiscard]] json hold(const std::string& id) const {
-      return client.post("/api/calling/calls/" + id + "/hold");
-    }
-    [[nodiscard]] json unhold(const std::string& id) const {
-      return client.post("/api/calling/calls/" + id + "/unhold");
-    }
   };
 
   struct PhoneNumbersNamespace : public CrudResource {
@@ -474,12 +416,6 @@ class RestClient {
     }
     [[nodiscard]] json search(const std::map<std::string, std::string>& p) const {
       return client_.get(base_path_ + "/search", p);
-    }
-    [[nodiscard]] json buy(const json& data) const {
-      return client_.post(base_path_ + "/buy", data);
-    }
-    [[nodiscard]] json release(const std::string& id) const {
-      return client_.del(base_path_ + "/" + id);
     }
 
     // ====================================================================
@@ -665,13 +601,6 @@ class RestClient {
     const HttpClient& client;
 
     DatasphereNamespace(const HttpClient& c) : documents(c), client(c) {}
-
-    // Legacy alias retained -- callers can still invoke
-    // ``client.datasphere().search({...})`` instead of going through
-    // ``documents.search``.
-    [[nodiscard]] json search(const json& data) const {
-      return client.post("/api/datasphere/documents/search", data);
-    }
   };
 
   // ---------------------------------------------------------------------
@@ -808,11 +737,6 @@ class RestClient {
     VideoConferenceTokens conference_tokens;
     VideoStreams streams;
 
-    // Legacy alias retained so the older test_rest_namespaces.cpp
-    // (which references ``v.recordings``) keeps compiling. New code
-    // should use ``room_recordings``.
-    CrudResource recordings;
-
     VideoNamespace(const HttpClient& c)
         : rooms(c),
           room_tokens(c),
@@ -820,8 +744,7 @@ class RestClient {
           room_recordings(c),
           conferences(c),
           conference_tokens(c),
-          streams(c),
-          recordings(c, "/api/video/room_recordings") {}
+          streams(c) {}
   };
 
   // ---------------------------------------------------------------------
@@ -1138,23 +1061,6 @@ class RestClient {
           recordings(c, account_base + "/Recordings"),
           transcriptions(c, account_base + "/Transcriptions"),
           tokens(c, account_base + "/tokens") {}
-
-    // Legacy convenience methods retained for backwards compatibility
-    // (the existing rest_compat_laml.cpp example references these).
-    // The paths are intentionally not project-scoped to avoid changing
-    // the wire contract any callers may rely on.
-    [[nodiscard]] json create_call(const json& data) const {
-      return client.post("/api/laml/2010-04-01/Accounts/calls", data);
-    }
-    [[nodiscard]] json send_message(const json& data) const {
-      return client.post("/api/laml/2010-04-01/Accounts/messages", data);
-    }
-    [[nodiscard]] json list_calls(const std::map<std::string, std::string>& p = {}) const {
-      return client.get("/api/laml/2010-04-01/Accounts/calls", p);
-    }
-    [[nodiscard]] json list_messages(const std::map<std::string, std::string>& p = {}) const {
-      return client.get("/api/laml/2010-04-01/Accounts/messages", p);
-    }
   };
 
   // ---------------------------------------------------------------------
@@ -1266,17 +1172,13 @@ class RestClient {
   };
 
   // The Python imported_numbers namespace lives at
-  // /api/relay/rest/imported_phone_numbers and only exposes ``create``.
-  // We retain the legacy /api/relay/rest/imported_numbers path for callers
-  // who hit it via list/get/update/delete and add the Python-parity
-  // ``create`` that posts to the imported_phone_numbers endpoint.
+  // /api/relay/rest/imported_phone_numbers and only exposes ``create``
+  // (POST). The base path is the same so ``create`` posts there.
   struct ImportedNumbersNamespace : public CrudResource {
     ImportedNumbersNamespace(const HttpClient& c)
-        : CrudResource(c, "/api/relay/rest/imported_numbers") {}
+        : CrudResource(c, "/api/relay/rest/imported_phone_numbers") {}
     // Python parity: POST /api/relay/rest/imported_phone_numbers.
-    [[nodiscard]] json create(const json& data) const {
-      return client_.post("/api/relay/rest/imported_phone_numbers", data);
-    }
+    [[nodiscard]] json create(const json& data) const { return client_.post(base_path_, data); }
   };
 
   struct MFANamespace {
@@ -1291,13 +1193,6 @@ class RestClient {
     }
     [[nodiscard]] json verify(const std::string& request_id, const json& data) const {
       return client.post("/api/relay/rest/mfa/" + request_id + "/verify", data);
-    }
-    // Legacy convenience accessors.
-    [[nodiscard]] json request_code(const json& data) const {
-      return client.post("/api/mfa/request", data);
-    }
-    [[nodiscard]] json verify_code(const json& data) const {
-      return client.post("/api/mfa/verify", data);
     }
   };
 
@@ -1458,20 +1353,11 @@ class RestClient {
     const HttpClient& client;
     ProjectTokens tokens;
     ProjectNamespace(const HttpClient& c) : client(c), tokens(c) {}
-    // Legacy direct accessors -- these don't have Python equivalents
-    // and remain for backwards compatibility with existing tests.
-    [[nodiscard]] json get_project() const { return client.get("/api/relay/rest/project"); }
-    [[nodiscard]] json update_project(const json& data) const {
-      return client.put("/api/relay/rest/project", data);
-    }
   };
 
   struct PubSubNamespace {
     const HttpClient& client;
     PubSubNamespace(const HttpClient& c) : client(c) {}
-    [[nodiscard]] json publish(const json& data) const {
-      return client.post("/api/pubsub/publish", data);
-    }
     // Python parity (pubsub.create_token): POST /api/pubsub/tokens.
     [[nodiscard]] json create_token(const json& data) const {
       return client.post("/api/pubsub/tokens", data);
@@ -1481,12 +1367,6 @@ class RestClient {
   struct ChatNamespace {
     const HttpClient& client;
     ChatNamespace(const HttpClient& c) : client(c) {}
-    [[nodiscard]] json send_message(const json& data) const {
-      return client.post("/api/chat/messages", data);
-    }
-    [[nodiscard]] json list_messages(const std::map<std::string, std::string>& p = {}) const {
-      return client.get("/api/chat/messages", p);
-    }
     // Python parity (chat.create_token): POST /api/chat/tokens.
     [[nodiscard]] json create_token(const json& data) const {
       return client.post("/api/chat/tokens", data);

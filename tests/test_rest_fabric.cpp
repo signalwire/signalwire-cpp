@@ -45,9 +45,9 @@ TEST(rest_fabric_has_swml_scripts) {
     return true;
 }
 
-TEST(rest_fabric_has_conferences) {
+TEST(rest_fabric_has_conference_rooms) {
     RestClient client("example.signalwire.com", "proj", "tok");
-    auto& c = client.fabric().conferences;
+    auto& c = client.fabric().conference_rooms;
     (void)c;
     return true;
 }
@@ -57,10 +57,9 @@ TEST(rest_fabric_has_all_sub_resources) {
     auto& f = client.fabric();
     (void)f.resources;
     (void)f.tokens;
-    (void)f.routing;
-    (void)f.agents;
-    (void)f.domains;
-    (void)f.topics;
-    (void)f.webhooks;
+    (void)f.addresses;
+    (void)f.subscribers;
+    (void)f.swml_scripts;
+    (void)f.cxml_applications;
     return true;
 }

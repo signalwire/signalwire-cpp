@@ -363,6 +363,52 @@ rest_coverage_gate() {
         --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md"
 }
 
+# Gate 5c: SPEC-PARITY — the REST surface must match the canonical spec in BOTH
+# directions. REST-COVERAGE (5b) proves every route the SDK *implements* is
+# exercised; this proves the set the SDK implements EQUALS the canonical spec
+# (modulo checked-in gaps): no canonical route left unimplemented (A−B), no
+# implemented route that matches no canonical route (B−A, i.e. invented surface).
+# Set B is produced deterministically by the route_registry binary, which stands
+# up a loopback recording server, points a RestClient at it, invokes every
+# namespace method, and reads back the routes the SDK actually dispatched (no
+# hand-authored route list, no reflection — C++ has none).
+# diff_spec_implementation.py matches that against the spec. Accepted
+# not-implemented gaps live in the shared SPEC_IMPLEMENTATION_GAPS.md; a stale
+# gap (now implemented) or unsanctioned divergence fails the gate. Same shape as
+# go's/java's/rust's gate. The binary was built by the TEST gate; it is resolved
+# per BUILD_MODE exactly like the EMISSION gate (host binary / docker exec /
+# throwaway docker run that rebuilds it).
+spec_parity_gate() {
+    local reg
+    reg="$(mktemp -t cpp_route_registry.XXXXXX.json)"
+    # shellcheck disable=SC2064
+    trap "rm -f '$reg'" RETURN
+    case "$BUILD_MODE" in
+        host)
+            # The TEST gate builds run_tests/emit_corpus/emit_skills but not
+            # route_registry, so build it here before invoking it.
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            docker exec "$c" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
+                && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/diff_spec_implementation.py" \
+        --registry-json "$reg" \
+        --gaps "$PORTING_SDK_DIR/SPEC_IMPLEMENTATION_GAPS.md"
+}
+
 # FMT gate: the C++ format gate (clang-format, config in .clang-format —
 # Google base / 100-col). Source-style only; proven surface/emission-neutral
 # (the libclang SIGNATURES enumerator + the regex SURFACE enumerator are both
@@ -495,6 +541,11 @@ run_gate "NO-CHEAT" "audit_no_cheat_tests" \
 # (parity + allowlist). Runs after NO-CHEAT.
 run_gate "REST-COVERAGE" "every implemented REST route covered success+error (parity + allowlist)" \
     rest_coverage_gate
+
+# Gate 5c: SPEC-PARITY — implemented REST routes == canonical spec (modulo gaps);
+# deterministic Set B from the route_registry binary.
+run_gate "SPEC-PARITY" "implemented REST routes == canonical spec (modulo gaps); deterministic Set B" \
+    spec_parity_gate
 
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \

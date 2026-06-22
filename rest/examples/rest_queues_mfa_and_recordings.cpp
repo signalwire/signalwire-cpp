@@ -21,8 +21,8 @@ int main() {
         auto recordings = client.recordings().list();
         std::cout << "Recordings: " << recordings.dump(2) << "\n";
 
-        // MFA: request a verification code
-        auto mfa = client.mfa().request_code({
+        // MFA: send a verification code via SMS
+        auto mfa = client.mfa().sms({
             {"to", "+15551234567"}, {"from", "+15559876543"},
             {"message", "Your code is {code}"}
         });

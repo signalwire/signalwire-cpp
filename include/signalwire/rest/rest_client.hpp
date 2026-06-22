@@ -1178,9 +1178,7 @@ class RestClient {
     ImportedNumbersNamespace(const HttpClient& c)
         : CrudResource(c, "/api/relay/rest/imported_phone_numbers") {}
     // Python parity: POST /api/relay/rest/imported_phone_numbers.
-    [[nodiscard]] json create(const json& data) const {
-      return client_.post(base_path_, data);
-    }
+    [[nodiscard]] json create(const json& data) const { return client_.post(base_path_, data); }
   };
 
   struct MFANamespace {

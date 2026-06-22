@@ -69,6 +69,26 @@ host_openssl_ge_3() {
     esac
 }
 
+# Pick a free TCP port by binding 127.0.0.1:0 and reading back the OS-assigned
+# port, then closing the socket so the caller can hand the (now-free) port to a
+# child process. Avoids the hardcoded-port collisions that hang the mock gate
+# when something else already holds the fixed port. Echos the port; returns 1
+# (printing nothing) if no port could be obtained.
+pick_free_port() {
+    python3 - <<'PY' || return 1
+import socket, sys
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind(("127.0.0.1", 0))
+    print(s.getsockname()[1])
+except OSError as e:
+    sys.stderr.write("pick_free_port: %s\n" % e)
+    sys.exit(1)
+finally:
+    s.close()
+PY
+}
+
 # Decide how the TEST gate builds + runs run_tests. Echos one of:
 #   host                 — build on host (OpenSSL >= 3.0)
 #   exec:<container>     — docker exec into a running container
@@ -314,21 +334,36 @@ skill_contract_gate() {
 # uses ./build/run_tests; exec/run modes go through the container. The mock runs
 # on the HOST regardless (the container reaches it via --network host).
 rest_coverage_gate() {
-    local port=8773
+    local port
+    port="$(pick_free_port)" || { echo "rest_coverage_gate: could not allocate a free port"; return 1; }
     local mock_pkg_parent="$PORTING_SDK_DIR/test_harness/mock_signalwire"
     export PYTHONPATH="$mock_pkg_parent${PYTHONPATH:+:$PYTHONPATH}"
+    local mock_log="/tmp/rest_cov_mock_cpp.$$.log"
     python3 -m mock_signalwire --host 127.0.0.1 --port "$port" --log-level error \
-        >/tmp/rest_cov_mock_cpp.$$.log 2>&1 &
+        >"$mock_log" 2>&1 &
     local mock_pid=$!
     # shellcheck disable=SC2064
     trap "kill $mock_pid 2>/dev/null" RETURN
-    local i
+    local i healthy=0
     for i in $(seq 1 60); do
+        # Fail loud if the mock process died (e.g. port stolen between
+        # pick_free_port and bind) instead of polling a dead pid for 30s.
+        if ! kill -0 "$mock_pid" 2>/dev/null; then
+            echo "rest_coverage_gate: mock_signalwire (pid $mock_pid) exited before becoming healthy on port $port; log follows:"
+            cat "$mock_log" >&2 || true
+            return 1
+        fi
         if python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$port/__mock__/health',timeout=1)" 2>/dev/null; then
+            healthy=1
             break
         fi
         sleep 0.5
     done
+    if [ "$healthy" -ne 1 ]; then
+        echo "rest_coverage_gate: mock_signalwire never became healthy on port $port within 30s; log follows:"
+        cat "$mock_log" >&2 || true
+        return 1
+    fi
     # Fresh journal + scenarios so only this run's traffic is measured.
     python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/journal/reset',method='POST'),timeout=5).read()"
     python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/scenarios/reset',method='POST'),timeout=5).read()"

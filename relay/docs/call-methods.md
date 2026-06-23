@@ -1,474 +1,385 @@
 # Call Methods Reference
 
-A `Call` object represents a live phone call. You get one from `@client.on_call` (inbound) or `client.dial()` (outbound).
+A `signalwire::relay::Call` represents a live phone call. You get one from the
+`on_call` handler (inbound) or from `client.dial(...)` (outbound). Call objects
+hold shared internal state, so they can be copied or returned by value.
 
-## Properties
+## Accessors
 
-| Property | Type | Description |
+| Accessor | Type | Description |
 |----------|------|-------------|
-| `call_id` | `str` | Unique call identifier |
-| `node_id` | `str` | Server node handling the call |
-| `state` | `str` | Current state: `created`, `ringing`, `answered`, `ending`, `ended` |
-| `direction` | `str` | `inbound` or `outbound` |
-| `tag` | `str` | Correlation tag |
-| `device` | `dict` | Device info (type, params) |
-| `segment_id` | `str` | Segment identifier |
+| `call_id()` | `const std::string&` | Unique call identifier |
+| `node_id()` | `const std::string&` | Server node handling the call |
+| `state()` | `const std::string&` | Current state: `created`, `ringing`, `answered`, `ending`, `ended` |
+| `call_state()` | `std::optional<CallState>` | Typed state enum (`std::nullopt` for an unknown value) |
+| `direction()` | `const std::string&` | `inbound` or `outbound` |
+| `from()` / `to()` | `const std::string&` | Caller / callee numbers |
+| `tag()` | `const std::string&` | Correlation tag |
+| `is_answered()` / `is_ended()` | `bool` | State predicates |
 
 ## Actions: Blocking vs Fire-and-Forget
 
-Methods like `play()`, `record()`, `detect()`, etc. return **Action** objects. The `await call.play(...)` itself only waits for the server to accept the command — the actual operation runs asynchronously on the server. You choose how to handle completion:
+Methods like `play()`, `record()`, `detect()`, etc. return an `Action` object by
+value. The call itself sends the command and returns immediately — the operation
+runs on the server. You choose how to handle completion.
 
 ### Wait inline (blocking)
 
-```python
-action = await call.play([{"type": "tts", "params": {"text": "Hello"}}])
-await action.wait()  # blocks until playback finishes
-# execution continues only after play is done
+```cpp
+auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello"}}}}});
+action.wait();  // blocks until playback finishes (returns bool: completed vs timed out)
+// execution continues only after play is done
 ```
 
 ### Fire and forget (background)
 
-```python
-action = await call.play([{"type": "tts", "params": {"text": "Hello"}}])
-# don't call action.wait() — continue immediately while audio plays
-await call.send_digits("1234")
+```cpp
+auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello"}}}}});
+// don't call action.wait() — continue immediately while audio plays
+call.send_digits("1234");
 
-# check later if needed
-if action.is_done:
-    print(f"Play result: {action.result}")
+// check later if needed
+if (action.completed()) {
+    std::cout << "Play result: " << action.result().dump() << "\n";
+}
 ```
 
 ### Fire with callback
 
-```python
-# Sync callback
-action = await call.play(
-    [{"type": "tts", "params": {"text": "Hello"}}],
-    on_completed=lambda event: print(f"Done: {event.params}"),
-)
-# continues immediately; callback fires when playback finishes
-
-# Async callback
-async def on_recording_done(event):
-    print(f"Recording URL: {event.params.get('url')}")
-    await call.hangup()
-
-action = await call.record(on_completed=on_recording_done)
+```cpp
+auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello"}}}}});
+action.on_completed([](const Action& a) {
+    std::cout << "Done: " << a.result().dump() << "\n";
+});
+// continues immediately; callback fires when playback finishes
 ```
-
-The `on_completed` callback is available on all action-based methods: `play`, `record`, `play_and_collect`, `collect`, `detect`, `pay`, `send_fax`, `receive_fax`, `tap`, `stream`, `transcribe`, and `ai`. It accepts both sync and async functions. Errors in callbacks are caught and logged, never crash the event loop. The callback also fires when the call is gone (404/410).
 
 ### Action methods summary
 
-| Method | Returns |
-|--------|---------|
-| `action.wait(timeout=None)` | Blocks until the action completes, returns the terminal `RelayEvent` |
-| `action.is_done` | `True` if the action has completed |
-| `action.result` | The terminal `RelayEvent` (or `None` if not done) |
-| `action.completed` | `True` if the action reached a terminal state |
-| `action.stop()` | Stop the operation on the server |
-
-Some actions also have `pause()`, `resume()`, and `volume()`.
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `wait(int timeout_ms = 0)` | `bool` | Blocks until the action completes; `true` if completed, `false` on timeout |
+| `completed()` | `bool` | `true` once the action reached a terminal state |
+| `state()` | `const std::string&` | Current action state |
+| `result()` | `const json&` | Terminal result payload |
+| `stop()` | `void` | Stop the operation on the server |
+| `pause(extra_params)` / `resume()` | `void` | Pause / resume (play, record) |
+| `volume(double amount)` | `void` | Adjust playback volume in dB (play only) |
+| `start_input_timers()` | `void` | Start inter-digit / final-digit timers (collect) |
+| `on_completed(cb)` | `void` | Register a completion callback |
 
 ## Lifecycle
 
-### `answer(**kwargs) -> dict`
+### `Action answer()`
 
 Answer an inbound call.
 
-```python
-await call.answer()
+```cpp
+call.answer();
 ```
 
-### `hangup(reason="hangup") -> dict`
+### `Action hangup(const std::string& reason = "hangup")`
 
 End the call.
 
-```python
-await call.hangup()
-await call.hangup(reason="busy")
-```
-
-### `pass_() -> dict`
-
-Decline control, returning the call to routing.
-
-```python
-await call.pass_()
+```cpp
+call.hangup();
+call.hangup("busy");
 ```
 
 ## Audio Playback
 
-### `play(media, *, volume=None, direction=None, loop=None, control_id=None) -> PlayAction`
+### `Action play(const json& media, double volume = 0.0, const std::string& control_id = "")`
 
-Play audio. Returns a `PlayAction` with `stop()`, `pause()`, `resume()`, `volume()`, and `wait()`.
+Play audio, TTS, silence, or ringtone. The returned `Action` supports `stop()`,
+`pause()`, `resume()`, `volume()`, and `wait()`.
 
-```python
-# TTS
-action = await call.play([{"type": "tts", "params": {"text": "Hello!"}}])
-await action.wait()
+```cpp
+// TTS
+auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello!"}}}}});
+action.wait();
 
-# Audio file
-action = await call.play([{"type": "audio", "params": {"url": "https://example.com/sound.mp3"}}])
+// Audio file
+action = call.play({{{"type", "audio"}, {"params", {{"url", "https://example.com/sound.mp3"}}}}});
 
-# Silence
-action = await call.play([{"type": "silence", "params": {"duration": 2}}])
+// Control playback
+action.pause();
+action.resume();
+action.volume(-3.0);
+action.stop();
+```
 
-# Ringtone
-action = await call.play([{"type": "ringtone", "params": {"name": "us"}}])
+Typed convenience wrappers build the media frame for you:
 
-# Control playback
-await action.pause()
-await action.resume()
-await action.volume(-3.0)
-await action.stop()
+```cpp
+call.play_tts("Hello!", "en-US");                 // text, language
+call.play_audio("https://example.com/sound.mp3");
+call.play_silence(2.0);                            // seconds
+call.play_ringtone("us");                          // name
 ```
 
 ## Recording
 
-### `record(audio=None, *, control_id=None) -> RecordAction`
+### `Action record(const json& params = {}, const std::string& control_id = "")`
 
-Record the call. Returns a `RecordAction` with `stop()`, `pause()`, `resume()`, and `wait()`.
+Record the call. The returned `Action` supports `stop()`, `pause()`, `resume()`,
+and `wait()`. `record_call(params)` is a convenience for full-call recording.
 
-```python
-action = await call.record(audio={"format": "wav", "stereo": True, "direction": "both"})
-# ... later ...
-await action.stop()
-event = await action.wait()
-print(f"Recording URL: {event.params.get('url')}")
+```cpp
+auto action = call.record({{"format", "wav"}, {"stereo", true}, {"direction", "both"}});
+// ... later ...
+action.stop();
+action.wait();
+std::cout << "Recording: " << action.result().dump() << "\n";
 ```
 
 ## Input Collection
 
-### `play_and_collect(media, collect, *, volume=None, control_id=None) -> CollectAction`
+### `Action play_and_collect(const json& play_media, const json& collect_params, const std::string& control_id = "")`
 
-Play audio and collect DTMF or speech input. Returns a `CollectAction`.
+Play audio and collect DTMF or speech input.
 
-```python
-action = await call.play_and_collect(
-    [{"type": "tts", "params": {"text": "Press 1 for sales, 2 for support."}}],
-    {"digits": {"max": 1, "digit_timeout": 5.0}},
-)
-event = await action.wait()
-digit = event.params.get("result", {}).get("params", {}).get("digits", "")
+```cpp
+auto action = call.play_and_collect(
+    {{{"type", "tts"}, {"params", {{"text", "Press 1 for sales, 2 for support."}}}}},
+    {{"digits", {{"max", 1}, {"digit_timeout", 5.0}}}});
+action.wait();
 ```
 
-### `collect(*, digits=None, speech=None, ..., control_id=None) -> StandaloneCollectAction`
+`prompt(play_media, collect_params, control_id)` is an alias, and
+`prompt_tts(...)` / `prompt_audio(...)` are typed convenience wrappers.
+
+### `Action collect(const json& params, const std::string& control_id = "")`
 
 Collect input without playing audio.
 
-```python
-action = await call.collect(
-    digits={"max": 4, "terminators": "#"},
-    speech={"language": "en-US"},
-    partial_results=True,
-)
-event = await action.wait()
+```cpp
+auto action = call.collect({
+    {"digits", {{"max", 4}, {"terminators", "#"}}},
+    {"speech", {{"language", "en-US"}}},
+    {"partial_results", true},
+});
+action.wait();
 ```
 
 ## Bridging
 
-### `connect(devices, *, ringback=None, tag=None, max_duration=None, max_price_per_minute=None, status_url=None) -> dict`
+### `Action connect(const json& devices)`
 
-Bridge the call to another destination.
+Bridge the call to another destination. `devices` is the nested
+serial/parallel device array.
 
-```python
-await call.connect(
-    [[{"type": "phone", "params": {"to_number": "+15551234567", "from_number": "+15559876543"}}]],
-    ringback=[{"type": "ringtone", "params": {"name": "us"}}],
-)
+```cpp
+call.connect({{
+    {{"type", "phone"}, {"params", {{"to_number", "+15551234567"}, {"from_number", "+15559876543"}}}}
+}});
 ```
 
-### `disconnect() -> dict`
+### `Action disconnect()`
 
 Unbridge a connected call.
 
-```python
-await call.disconnect()
+```cpp
+call.disconnect();
 ```
 
 ## DTMF
 
-### `send_digits(digits, *, control_id=None) -> dict`
+### `Action send_digits(const std::string& digits)`
 
 Send DTMF tones.
 
-```python
-await call.send_digits("1234#")
+```cpp
+call.send_digits("1234#");
 ```
 
 ## Detection
 
-### `detect(detect, *, timeout=None, control_id=None) -> DetectAction`
+### `Action detect(const json& params, const std::string& control_id = "")`
 
 Detect machine, fax, or digits.
 
-```python
-action = await call.detect({"type": "machine"}, timeout=30.0)
-event = await action.wait()
+```cpp
+auto action = call.detect({{"type", "machine"}, {"params", {{"initial_timeout", 4.5}}}});
+action.wait();
+```
+
+Typed wrappers build the detect descriptor for you:
+
+```cpp
+call.detect_digit("123", 10.0);              // digits, timeout (seconds)
+call.detect_answering_machine({}, 30.0);     // amd params, timeout
+call.detect_fax();
 ```
 
 ## SIP Refer
 
-### `refer(device, *, status_url=None) -> dict`
+### `Action sip_refer(const std::string& to_uri)`
 
 Transfer via SIP REFER.
 
-```python
-await call.refer({"type": "sip", "params": {"to": "sip:user@example.com"}})
+```cpp
+call.sip_refer("sip:user@example.com");
 ```
 
 ## Transfer
 
-### `transfer(dest) -> dict`
+### `Action transfer(const json& params)`
 
 Transfer call control to another RELAY app or SWML script.
 
-```python
-await call.transfer("https://example.com/swml-endpoint")
+```cpp
+call.transfer({{"dest", "https://example.com/swml-endpoint"}});
 ```
 
 ## Fax
 
-### `send_fax(document, *, identity=None, header_info=None, control_id=None) -> FaxAction`
+### `Action send_fax(const std::string& document_url, const std::string& header = "", const std::string& identity = "", const std::string& control_id = "")`
 
-```python
-action = await call.send_fax("https://example.com/document.pdf", identity="+15551234567")
-event = await action.wait()
+```cpp
+auto action = call.send_fax("https://example.com/document.pdf", "", "+15551234567");
+action.wait();
 ```
 
-### `receive_fax(*, control_id=None) -> FaxAction`
+### `Action receive_fax(const std::string& control_id = "")`
 
-```python
-action = await call.receive_fax()
-event = await action.wait()
+```cpp
+auto action = call.receive_fax();
+action.wait();
 ```
 
 ## Tap (Media Interception)
 
-### `tap(tap, device, *, control_id=None) -> TapAction`
+### `Action tap(const json& params, const std::string& control_id = "")`
 
-Intercept call media and stream to an RTP endpoint.
+Intercept call media and stream to an RTP endpoint. `tap_audio(params, control_id)`
+and `stop_tap(control_id)` are also available.
 
-```python
-action = await call.tap(
-    {"type": "audio", "params": {"direction": "both"}},
-    {"type": "rtp", "params": {"addr": "192.168.1.100", "port": 5000}},
-)
+```cpp
+auto action = call.tap({
+    {"tap", {{"type", "audio"}, {"params", {{"direction", "both"}}}}},
+    {"device", {{"type", "rtp"}, {"params", {{"addr", "192.168.1.100"}, {"port", 5000}}}}},
+});
 ```
 
 ## Streaming
 
-### `stream(url, *, name=None, codec=None, track=None, control_id=None, ...) -> StreamAction`
+### `Action stream(const json& params, const std::string& control_id = "")`
 
-Stream call audio to a WebSocket endpoint.
+Stream call audio to a WebSocket endpoint. `stream(...).stop()` ends the stream.
 
-```python
-action = await call.stream(
-    "wss://example.com/audio",
-    name="my_stream",
-    codec="PCMU",
-    track="inbound_track",
-)
-# Stop streaming
-await action.stop()
+```cpp
+auto action = call.stream({
+    {"url", "wss://example.com/audio"},
+    {"codec", "PCMU"},
+    {"track", "inbound_track"},
+});
+action.stop();
 ```
 
 ## Payment
 
-### `pay(payment_connector_url, *, control_id=None, charge_amount=None, currency=None, ...) -> PayAction`
+### `Action pay(const json& params, const std::string& control_id = "")`
 
 Collect a payment via DTMF.
 
-```python
-action = await call.pay(
-    "https://pay.example.com",
-    charge_amount="25.99",
-    currency="usd",
-    input_method="dtmf",
-)
-event = await action.wait()
+```cpp
+auto action = call.pay({
+    {"payment_connector_url", "https://pay.example.com"},
+    {"charge_amount", "25.99"},
+    {"currency", "usd"},
+    {"input_method", "dtmf"},
+});
+action.wait();
 ```
 
-## Conference
+## Conference & Rooms
 
-### `join_conference(name, *, muted=None, beep=None, max_participants=None, record=None, ...) -> dict`
+### `Action join_conference(const std::string& name, const json& params = {})`
 
-```python
-await call.join_conference("my_conference", muted=False, beep="onEnter")
+```cpp
+call.join_conference("my_conference", {{"muted", false}, {"beep", "onEnter"}});
 ```
 
-### `leave_conference(conference_id) -> dict`
+### `Action join_room(const std::string& name)`
 
-```python
-await call.leave_conference("conf-123")
+```cpp
+call.join_room("my_room");
 ```
 
 ## Hold
 
-### `hold() -> dict` / `unhold() -> dict`
+### `Action hold()` / `Action unhold()`
 
-```python
-await call.hold()
-# ... later ...
-await call.unhold()
-```
-
-## Denoise
-
-### `denoise() -> dict` / `denoise_stop() -> dict`
-
-```python
-await call.denoise()
-# ... later ...
-await call.denoise_stop()
+```cpp
+call.hold();
+// ... later ...
+call.unhold();
 ```
 
 ## Transcription
 
-### `transcribe(*, control_id=None, status_url=None) -> TranscribeAction`
+### `Action transcribe(const json& params = {}, const std::string& control_id = "")`
 
-```python
-action = await call.transcribe(status_url="https://example.com/transcription")
-# ... later ...
-await action.stop()
+```cpp
+auto action = call.transcribe({{"status_url", "https://example.com/transcription"}});
+// ... later ...
+action.stop();
 ```
 
-## Live Transcribe / Translate
+### `Action live_transcribe(const json& params = {})` / `Action live_translate(const json& params = {})`
 
-### `live_transcribe(action_obj) -> dict`
-
-```python
-await call.live_transcribe({"start": {"language": "en-US"}})
-```
-
-### `live_translate(action_obj, *, status_url=None) -> dict`
-
-```python
-await call.live_translate({"start": {"source": "en-US", "target": "es"}})
-```
-
-## Echo
-
-### `echo(*, timeout=None, status_url=None) -> dict`
-
-Echo audio back to the caller (useful for testing).
-
-```python
-await call.echo(timeout=30.0)
+```cpp
+call.live_transcribe({{"start", {{"language", "en-US"}}}});
+call.live_translate({{"start", {{"source", "en-US"}, {"target", "es"}}}});
 ```
 
 ## AI Agent
 
-### `ai(*, control_id=None, prompt=None, SWAIG=None, ai_params=None, ...) -> AIAction`
+### `Action ai(const json& params, const std::string& control_id = "")`
 
 Start an AI agent session on the call.
 
-```python
-action = await call.ai(
-    prompt={"text": "You are a helpful support agent."},
-    SWAIG={"functions": [...]},
-    ai_params={"end_of_speech_timeout": 3000},
-)
-event = await action.wait()
+```cpp
+auto action = call.ai({
+    {"prompt", {{"text", "You are a helpful support agent."}}},
+    {"SWAIG", {{"functions", json::array()}}},
+    {"ai_params", {{"end_of_speech_timeout", 3000}}},
+});
+action.wait();
 ```
 
-### `amazon_bedrock(*, prompt=None, SWAIG=None, ...) -> dict`
+## Execute SWML
 
-Connect to an Amazon Bedrock AI agent.
+### `Action execute_swml(const json& swml)`
 
-### `ai_message(*, message_text=None, role=None, ...) -> dict`
+Execute an inline SWML document on the call.
 
-Send a message to an active AI session.
-
-### `ai_hold(*, timeout=None, prompt=None) -> dict` / `ai_unhold(*, prompt=None) -> dict`
-
-Put an AI session on/off hold.
-
-## Rooms
-
-### `join_room(name, *, status_url=None) -> dict`
-
-```python
-await call.join_room("my_room")
-```
-
-### `leave_room() -> dict`
-
-```python
-await call.leave_room()
-```
-
-## Queue
-
-### `queue_enter(queue_name, *, control_id=None, status_url=None) -> dict`
-
-```python
-await call.queue_enter("support")
-```
-
-### `queue_leave(queue_name, *, control_id=None, queue_id=None, status_url=None) -> dict`
-
-```python
-await call.queue_leave("support", queue_id="q-123")
-```
-
-## Digit Bindings
-
-### `bind_digit(digits, bind_method, *, bind_params=None, realm=None, max_triggers=None) -> dict`
-
-Bind a DTMF sequence to trigger a RELAY method.
-
-```python
-await call.bind_digit(
-    "*1",
-    "calling.play",
-    bind_params={"play": [{"type": "tts", "params": {"text": "You pressed star-1"}}]},
-)
-```
-
-### `clear_digit_bindings(*, realm=None) -> dict`
-
-```python
-await call.clear_digit_bindings()
-```
-
-## User Events
-
-### `user_event(*, event=None, **kwargs) -> dict`
-
-Send a custom event.
-
-```python
-await call.user_event(event="order_placed", order_id="12345")
+```cpp
+call.execute_swml({{"version", "1.0.0"}, {"sections", {/* ... */}}});
 ```
 
 ## Event Handling
 
-### `on(event_type, handler)`
+### `void on_event(CallEventHandler handler)`
 
-Register an event listener on this call.
+Register an observer for every event on this call.
+`CallEventHandler = std::function<void(const CallEvent&)>`.
 
-```python
-def on_play(event):
-    print(f"Play state: {event.params.get('state')}")
-
-call.on("calling.call.play", on_play)
+```cpp
+call.on_event([](const CallEvent& ev) {
+    std::cout << "Event: " << ev.event_type << " state=" << ev.call_state << "\n";
+});
 ```
 
-### `wait_for(event_type, predicate=None, timeout=None) -> RelayEvent`
+### State waits
 
-Wait for a specific event.
+Each returns `bool` (`true` on reaching the state, `false` on timeout);
+`timeout_ms <= 0` waits indefinitely.
 
-```python
-event = await call.wait_for("calling.call.play", timeout=30.0)
-```
-
-### `wait_for_ended(timeout=None) -> RelayEvent`
-
-Wait for the call to end.
-
-```python
-event = await call.wait_for_ended()
-print(f"End reason: {event.params.get('end_reason')}")
+```cpp
+call.wait_for_answered(30000);
+call.wait_for_ringing();
+call.wait_for_ending();
+call.wait_for_ended();
 ```

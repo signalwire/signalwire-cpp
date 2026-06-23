@@ -1,107 +1,110 @@
 # Events
 
-RELAY events are server-pushed notifications about call state changes and operation results. Events arrive over the WebSocket as `signalwire.event` JSON-RPC messages and are automatically routed to the correct `Call` object.
+RELAY events are server-pushed notifications about call state changes and
+operation results. Events arrive over the WebSocket as `signalwire.event`
+JSON-RPC messages and are automatically routed to the correct `Call` object and
+to any registered handlers.
 
 ## Listening for Events
 
 ### On a Call
 
-```python
-@client.on_call
-async def handle(call):
-    # Register a listener
-    call.on("calling.call.play", lambda event: print(f"Play: {event.params}"))
+Register an observer with `on_event`. The handler receives a `CallEvent`:
 
-    # Or wait for a specific event
-    event = await call.wait_for("calling.call.state",
-        predicate=lambda e: e.params.get("call_state") == "ended",
-        timeout=60.0,
-    )
+```cpp
+client.on_call([](Call& call) {
+    call.on_event([](const CallEvent& ev) {
+        std::cout << "Event: " << ev.event_type << " state=" << ev.call_state << "\n";
+    });
+});
+```
+
+To block until the call reaches a lifecycle state, use the typed waits (each
+returns `bool` — `true` on reaching the state, `false` on timeout):
+
+```cpp
+call.wait_for_answered(30000);
+call.wait_for_ended();
+```
+
+### On the Client
+
+A generic observer fires for every dispatched event after typed routing:
+
+```cpp
+client.on_event([](const RelayEvent& ev) {
+    std::cout << "raw event: " << ev.event_type << "\n";
+});
 ```
 
 ### Via Actions
 
-Actions returned by `play()`, `record()`, etc. have a `wait()` method that resolves when the operation completes:
+Actions returned by `play()`, `record()`, etc. expose `wait()` (blocks until the
+operation completes) and `result()` (the terminal payload):
 
-```python
-action = await call.play([{"type": "tts", "params": {"text": "Hello"}}])
-event = await action.wait(timeout=30.0)
-# event is a RelayEvent with the terminal state
+```cpp
+auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello"}}}}});
+action.wait(30000);
+std::cout << action.result().dump() << "\n";
 ```
 
-## Event Types
+## Event Type Constants
 
-All event type constants are importable from `signalwire.relay`:
+Declared in `signalwire/relay/constants.hpp`:
 
 | Constant | Value | Description |
 |----------|-------|-------------|
+| `EVENT_CALL_RECEIVED` | `calling.call.received` | Inbound call notification |
 | `EVENT_CALL_STATE` | `calling.call.state` | Call state changes (created, ringing, answered, ending, ended) |
-| `EVENT_CALL_RECEIVE` | `calling.call.receive` | Inbound call notification |
 | `EVENT_CALL_PLAY` | `calling.call.play` | Play operation state changes |
 | `EVENT_CALL_RECORD` | `calling.call.record` | Record operation state changes |
 | `EVENT_CALL_COLLECT` | `calling.call.collect` | Input collection results |
-| `EVENT_CALL_CONNECT` | `calling.call.connect` | Bridge/connect state changes |
-| `EVENT_CALL_DETECT` | `calling.call.detect` | Detection results |
-| `EVENT_CALL_FAX` | `calling.call.fax` | Fax operation state changes |
 | `EVENT_CALL_TAP` | `calling.call.tap` | Tap operation state changes |
-| `EVENT_CALL_STREAM` | `calling.call.stream` | Stream operation state changes |
+| `EVENT_CALL_DETECT` | `calling.call.detect` | Detection results |
+| `EVENT_CALL_CONNECT` | `calling.call.connect` | Bridge/connect state changes |
+| `EVENT_CALL_FAX` | `calling.call.fax` | Fax operation state changes |
 | `EVENT_CALL_SEND_DIGITS` | `calling.call.send_digits` | DTMF send completion |
-| `EVENT_CALL_DIAL` | `calling.call.dial` | Outbound dial progress |
-| `EVENT_CALL_REFER` | `calling.call.refer` | SIP REFER results |
-| `EVENT_CALL_DENOISE` | `calling.call.denoise` | Denoise state changes |
-| `EVENT_CALL_PAY` | `calling.call.pay` | Payment state changes |
-| `EVENT_CALL_QUEUE` | `calling.call.queue` | Queue state changes |
-| `EVENT_CALL_ECHO` | `calling.call.echo` | Echo state changes |
-| `EVENT_CALL_TRANSCRIBE` | `calling.call.transcribe` | Transcription state changes |
-| `EVENT_CONFERENCE` | `calling.conference` | Conference state changes |
-| `EVENT_CALLING_ERROR` | `calling.error` | Error events |
 | `EVENT_MESSAGING_RECEIVE` | `messaging.receive` | Inbound message received |
 | `EVENT_MESSAGING_STATE` | `messaging.state` | Outbound message state change |
 
-## Typed Event Classes
+## Event Structs
 
-Raw events are always `RelayEvent` with a `params` dict. For convenience, typed event classes provide named properties:
+Events parse from the JSON-RPC params via static `from_relay_event` /
+`from_json` factories. The base `RelayEvent` carries `event_type`, `params`
+(the inner JSON), `event_channel`, and `timestamp`. The typed structs add named
+fields:
 
-```python
-from signalwire.relay import CallStateEvent, PlayEvent, RecordEvent, parse_event
+| Struct | Key Fields |
+|--------|-----------|
+| `RelayEvent` | `event_type`, `params`, `event_channel`, `timestamp` |
+| `CallEvent` | `call_id`, `node_id`, `call_state`, `peer_call_id`, `tag` |
+| `ComponentEvent` | `call_id`, `control_id`, `state` (play / record / collect / etc.) |
+| `MessageEvent` | `message_id`, `message_state`, `from`, `to`, `body` |
+| `DialEvent` | `tag`, `dial_state`, `call_info` |
 
-# Automatic parsing
-event = parse_event(raw_payload)
-
-# Or construct directly
-if event.event_type == "calling.call.state":
-    state_event = CallStateEvent.from_payload(raw_payload)
-    print(state_event.call_state)   # "answered"
-    print(state_event.end_reason)   # "hangup" (only on ended)
+```cpp
+void on_event(const RelayEvent& ev) {
+    if (ev.event_type == "calling.call.state") {
+        auto ce = CallEvent::from_relay_event(ev);
+        std::cout << "call_state: " << ce.call_state << "\n";
+    }
+}
 ```
 
-### Available Typed Events
+## Typed State Enums
 
-| Class | Key Properties |
-|-------|---------------|
-| `CallStateEvent` | `call_state`, `end_reason`, `direction`, `device` |
-| `CallReceiveEvent` | `call_state`, `direction`, `device`, `node_id`, `context`, `tag` |
-| `PlayEvent` | `control_id`, `state` |
-| `RecordEvent` | `control_id`, `state`, `url`, `duration`, `size` |
-| `CollectEvent` | `control_id`, `state`, `result`, `final` |
-| `ConnectEvent` | `connect_state`, `peer` |
-| `DetectEvent` | `control_id`, `detect` |
-| `FaxEvent` | `control_id`, `fax` |
-| `TapEvent` | `control_id`, `state`, `tap`, `device` |
-| `StreamEvent` | `control_id`, `state`, `url`, `name` |
-| `SendDigitsEvent` | `control_id`, `state` |
-| `DialEvent` | `tag`, `dial_state`, `call` |
-| `ReferEvent` | `state`, `sip_refer_to`, `sip_refer_response_code` |
-| `DenoiseEvent` | `denoised` |
-| `PayEvent` | `control_id`, `state` |
-| `QueueEvent` | `control_id`, `status`, `queue_id`, `queue_name`, `position`, `size` |
-| `EchoEvent` | `state` |
-| `TranscribeEvent` | `control_id`, `state`, `url`, `duration`, `size` |
-| `HoldEvent` | `state` |
-| `ConferenceEvent` | `conference_id`, `name`, `status` |
-| `CallingErrorEvent` | `code`, `message` |
-| `MessageReceiveEvent` | `message_id`, `context`, `direction`, `from_number`, `to_number`, `body`, `media`, `segments`, `message_state`, `tags` |
-| `MessageStateEvent` | `message_id`, `context`, `direction`, `from_number`, `to_number`, `body`, `media`, `segments`, `message_state`, `reason`, `tags` |
+Alongside the bare-string fields, `signalwire/relay/states.hpp` provides typed
+enums and `*_from_string` parsers that return `std::optional` (so an unknown
+server value never throws):
+
+- `CallState` — `Created`, `Ringing`, `Answered`, `Ending`, `Ended`
+  (`Call::call_state()` returns `std::optional<CallState>`).
+- `DialState` — `Dialing`, `Answered`, `Failed` (`DialEvent::dial_state_enum()`).
+- `MessageState` — `Queued`, `Initiated`, `Sent`, `Delivered`, `Undelivered`,
+  `Failed`, `Received` (`Message::message_state()`).
+
+Each has a free `to_string(...)`, a `*_value(...)`, and an `is_terminal(...)`
+overload.
 
 ## Call States
 
@@ -109,26 +112,15 @@ if event.event_type == "calling.call.state":
 created -> ringing -> answered -> ending -> ended
 ```
 
-Constants: `CALL_STATE_CREATED`, `CALL_STATE_RINGING`, `CALL_STATE_ANSWERED`, `CALL_STATE_ENDING`, `CALL_STATE_ENDED`
-
-## End Reasons
-
-When a call reaches the `ended` state, the `end_reason` field indicates why:
-
-| Reason | Description |
-|--------|-------------|
-| `hangup` | Normal hangup |
-| `cancel` | Caller cancelled |
-| `busy` | Destination busy |
-| `noAnswer` | No answer |
-| `decline` | Call declined |
-| `error` | Error occurred |
-| `abandoned` | Call abandoned |
-| `max_duration` | Max duration reached |
-| `not_found` | Destination not found |
+Constants: `CALL_STATE_CREATED`, `CALL_STATE_RINGING`, `CALL_STATE_ANSWERED`,
+`CALL_STATE_ENDING`, `CALL_STATE_ENDED`.
 
 ## Message States
 
-Outbound messages progress through: `queued` → `initiated` → `sent` → `delivered` (or `undelivered`/`failed`).
+Outbound messages progress through: `queued` -> `initiated` -> `sent` ->
+`delivered` (or `undelivered` / `failed`). Inbound messages arrive with state
+`received`.
 
-Constants: `MESSAGE_STATE_QUEUED`, `MESSAGE_STATE_INITIATED`, `MESSAGE_STATE_SENT`, `MESSAGE_STATE_DELIVERED`, `MESSAGE_STATE_UNDELIVERED`, `MESSAGE_STATE_FAILED`, `MESSAGE_STATE_RECEIVED`
+Constants: `MESSAGE_STATE_QUEUED`, `MESSAGE_STATE_INITIATED`,
+`MESSAGE_STATE_SENT`, `MESSAGE_STATE_DELIVERED`, `MESSAGE_STATE_UNDELIVERED`,
+`MESSAGE_STATE_FAILED`, `MESSAGE_STATE_RECEIVED`.

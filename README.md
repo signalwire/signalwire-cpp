@@ -90,7 +90,7 @@ bin/swaig-test http://localhost:3000/agent --exec get_time
 - **DataMap tools** -- tools that execute on SignalWire's servers, calling REST APIs without your own webhook
 - **Dynamic configuration** -- per-request agent customization for multi-tenant deployments
 - **Call flow control** -- pre-answer, post-answer, and post-AI verb insertion
-- **Prefab agents** -- ready-to-use archetypes (InfoGatherer, Survey, FAQ, Receptionist, Concierge)
+- **Prefab agents** -- ready-to-use archetypes (`InfoGathererAgent`, `SurveyAgent`, `FAQBotAgent`, `ReceptionistAgent`, `ConciergeAgent`)
 - **Multi-agent hosting** -- serve multiple agents on a single server with `AgentServer`
 - **SIP routing** -- route SIP calls to agents based on usernames
 - **Session state** -- persistent conversation state with global data and post-prompt summaries
@@ -99,7 +99,7 @@ bin/swaig-test http://localhost:3000/agent --exec get_time
 
 ### Agent Examples
 
-The [`examples/`](examples/) directory contains 37+ working examples:
+The [`examples/`](examples/) directory contains 55+ working examples:
 
 | Example | What it demonstrates |
 |---------|---------------------|
@@ -107,10 +107,10 @@ The [`examples/`](examples/) directory contains 37+ working examples:
 | [contexts_demo.cpp](examples/contexts_demo.cpp) | Multi-persona workflow with context switching and step navigation |
 | [datamap_demo.cpp](examples/datamap_demo.cpp) | Server-side API tools without webhooks |
 | [skills_demo.cpp](examples/skills_demo.cpp) | Loading built-in skills (datetime, math, web_search) |
-| [call_flow.cpp](examples/call_flow.cpp) | 5-phase verb pipeline: pre-answer, answer, post-answer, post-AI |
-| [session_state.cpp](examples/session_state.cpp) | Global data, session tokens, callbacks |
+| [call_flow_and_actions_demo.cpp](examples/call_flow_and_actions_demo.cpp) | 5-phase verb pipeline: pre-answer, answer, post-answer, post-AI |
+| [session_and_state_demo.cpp](examples/session_and_state_demo.cpp) | Global data, session tokens, callbacks |
 | [multi_agent_server.cpp](examples/multi_agent_server.cpp) | Multiple agents on one server |
-| [comprehensive_dynamic.cpp](examples/comprehensive_dynamic.cpp) | Per-request dynamic configuration, multi-tenant routing |
+| [comprehensive_dynamic_agent.cpp](examples/comprehensive_dynamic_agent.cpp) | Per-request dynamic configuration, multi-tenant routing |
 
 See [examples/README.md](examples/README.md) for the full list organized by category.
 
@@ -163,7 +163,7 @@ using json = nlohmann::json;
 int main() {
     auto client = RestClient::from_env();
 
-    auto agents = client.fabric().agents.list();
+    auto agents = client.fabric().ai_agents.list();
     auto call   = client.calling().dial({
         {"to", "+15551234567"}, {"from", "+15559876543"},
         {"url", "https://example.com/handler"}
@@ -187,8 +187,9 @@ See the **[REST documentation](rest/README.md)** for the full guide, API referen
 
 - C++17 compiler (GCC 8+, Clang 7+, MSVC 2019+)
 - CMake 3.16+
-- OpenSSL development libraries
+- OpenSSL 3.0+ development libraries
 - pthreads
+- Network access at configure time (CMake fetches the IXWebSocket dependency used by the RELAY transport)
 
 ### Build from Source
 
@@ -200,9 +201,14 @@ cmake ..
 make -j$(nproc)
 ```
 
+This produces the static library `libsignalwire.a` and the `run_tests` binary.
+
 ### Link to Your Project
 
-Add to your `CMakeLists.txt`:
+Use CMake -- `add_subdirectory` (or `FetchContent`) wires up the static library
+plus all of its transitive dependencies (OpenSSL, pthreads, IXWebSocket, and the
+Apple `CoreFoundation`/`Security` frameworks on macOS) automatically. Add to your
+`CMakeLists.txt`:
 
 ```cmake
 add_subdirectory(signalwire-cpp)
@@ -210,12 +216,27 @@ add_executable(my_agent my_agent.cpp)
 target_link_libraries(my_agent signalwire)
 ```
 
-Or compile directly:
+Or pull it in directly with `FetchContent`:
 
-```bash
-g++ -std=c++17 -I include -I deps my_agent.cpp \
-    -L build -lsignalwire -lssl -lcrypto -lpthread -o my_agent
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    signalwire
+    GIT_REPOSITORY https://github.com/signalwire/signalwire-cpp.git
+    GIT_TAG        main
+)
+FetchContent_MakeAvailable(signalwire)
+
+add_executable(my_agent my_agent.cpp)
+target_link_libraries(my_agent signalwire)
 ```
+
+The public headers live under [`include/`](include/) and the vendored
+header-only dependencies (nlohmann/json, cpp-httplib) under [`deps/`](deps/);
+both are added to the `signalwire` target's public include path, so consumers do
+not need to set them manually. Compiling against the static archive by hand
+(raw `g++`) also requires linking IXWebSocket and, on macOS, the
+`CoreFoundation`/`Security` frameworks -- CMake is the supported path.
 
 ## Documentation
 

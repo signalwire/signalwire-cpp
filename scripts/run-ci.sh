@@ -544,8 +544,50 @@ lint_gate() {
     local files
     files="$(find src include -name '*.cpp')"
     [ -n "$files" ] || { echo "no C++ sources found to lint" >&2; return 1; }
-    # shellcheck disable=SC2086
-    "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet $files
+
+    # clang-tidy parallelizes trivially per-TU but the single-invocation form
+    # above runs every TU SERIALLY — historically ~68% of the whole CI gate run.
+    # Fan the SAME checks / config / scope / zero-findings bar across all cores.
+    # IDENTICAL behavior, only the parallelism changes:
+    #   * same compile DB ($tidy_build), same --header-filter, same .clang-tidy
+    #     (WarningsAsErrors:'*' => any finding is a nonzero-exit error),
+    #   * same source set (the `find src include -name '*.cpp'` list); the files
+    #     are passed to run-clang-tidy as path regexes so only those 55 TUs from
+    #     the compile DB are analysed (NOT the test/example TUs it also contains).
+    local jobs
+    jobs="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)"
+
+    # LLVM's official driver reads the same -p compile DB, applies the repo
+    # .clang-tidy, and fans TUs across -j cores. It is a SEPARATE script that
+    # internally shells out to a `clang-tidy` binary; we MUST force it to use the
+    # SAME resolved $ct (-clang-tidy-binary) so the macOS/version handling in
+    # resolve_clang_tidy() still applies and a DIFFERENT system clang-tidy can't
+    # sneak in (which would resurface the libc++ parse problems). Look for it as
+    # a sibling of the resolved $ct FIRST (same toolchain), then on PATH.
+    local rct ctdir
+    ctdir="$(dirname "$ct")"
+    rct=""
+    if [ -x "$ctdir/run-clang-tidy" ]; then rct="$ctdir/run-clang-tidy"
+    elif [ -x "$ctdir/run-clang-tidy.py" ]; then rct="$ctdir/run-clang-tidy.py"
+    elif command -v run-clang-tidy >/dev/null 2>&1; then rct="run-clang-tidy"
+    elif command -v run-clang-tidy.py >/dev/null 2>&1; then rct="run-clang-tidy.py"
+    fi
+
+    if [ -n "$rct" ]; then
+        # shellcheck disable=SC2086
+        "$rct" -p "$tidy_build" -j "$jobs" -quiet \
+            -clang-tidy-binary "$ct" \
+            -header-filter='signalwire-cpp/(src|include)/' \
+            $files
+        return $?
+    fi
+
+    # Robust fallback: parallelize the resolved $ct itself with xargs -P, same
+    # binary / flags / header-filter. xargs returns 123 if ANY child exited
+    # nonzero, so WarningsAsErrors (a finding => clang-tidy nonzero) still fails
+    # the gate. One TU per process (-n1) to match the single-file behavior.
+    echo "$files" | tr '\n' '\0' | xargs -0 -P "$jobs" -n1 \
+        "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)

@@ -1,142 +1,155 @@
 # RelayClient Reference
 
-## Constructor
+## Construction
 
-```python
-RelayClient(
-    project: str = None,          # SIGNALWIRE_PROJECT_ID
-    token: str = None,            # SIGNALWIRE_API_TOKEN
-    jwt_token: str = None,        # SIGNALWIRE_JWT_TOKEN
-    host: str = None,             # SIGNALWIRE_SPACE (default: relay.signalwire.com)
-    contexts: list[str] = None,   # Topics to subscribe to
-    max_active_calls: int = None, # RELAY_MAX_ACTIVE_CALLS (default: 1000)
-)
+`RelayClient` is constructed from explicit parameters, from a `RelayConfig`
+struct, or from the environment:
+
+```cpp
+// From individual parameters (project, token, host, contexts)
+RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+
+// From a config struct
+RelayConfig config;
+config.project = "project-id";
+config.token = "api-token";
+config.host = "example.signalwire.com";
+config.contexts = {"default"};
+config.max_active_calls = 1000;
+config.max_connections = 1;
+RelayClient client2(config);
+
+// From SIGNALWIRE_PROJECT_ID / SIGNALWIRE_API_TOKEN / SIGNALWIRE_SPACE
+auto client3 = RelayClient::from_env();
 ```
 
-Authentication requires either `project` + `token` (legacy) or `jwt_token` (faster, no server roundtrip). All parameters fall back to their corresponding environment variables.
+`RelayConfig` fields: `project`, `token`, `host` (default `relay.signalwire.com`),
+`port` (default 443), `contexts` (default `{"default"}`), `max_active_calls`
+(default 1000), `max_connections` (default 1). Authentication uses
+`project` + `token`.
 
 ## Methods
 
-### `run()`
+### `void run()`
 
-Blocking entry point. Connects, authenticates, and runs the event loop with auto-reconnect until interrupted.
+Blocking entry point. Connects, authenticates, and runs the event loop with
+auto-reconnect until interrupted.
 
-```python
-client.run()
+```cpp
+client.run();
 ```
 
-### `connect()` / `disconnect()`
+### `bool connect()` / `void disconnect()`
 
-Manual lifecycle control for use in async code.
+Manual lifecycle control. `connect()` returns `true` on success;
+`is_connected()` reports the current state.
 
-```python
-await client.connect()
-# ... use client ...
-await client.disconnect()
+```cpp
+client.connect();
+// ... use client ...
+client.disconnect();
 ```
 
-Also supports async context manager:
+### `void on_call(InboundCallHandler handler)`
 
-```python
-async with RelayClient(contexts=["default"]) as client:
-    ...
+Register the inbound call handler.
+`InboundCallHandler = std::function<void(Call&)>`.
+
+```cpp
+client.on_call([](Call& call) {
+    call.answer();
+});
 ```
 
-### `on_call(handler)`
+### `Call dial(const json& devices, const std::string& tag = "", int dial_timeout_ms = 120000, int max_duration = 0)`
 
-Decorator to register the inbound call handler. The handler receives a `Call` object.
+Place an outbound call. Returns a `Call` once the server emits the terminal
+dial event for the tag, or an empty `Call` on timeout/failure (no exception is
+thrown on timeout).
 
-```python
-@client.on_call
-async def handle(call):
-    await call.answer()
+- `devices` -- nested array of device objects (serial/parallel dial)
+- `tag` -- optional correlation tag (a UUID is generated if blank)
+- `dial_timeout_ms` -- milliseconds to wait for the terminal dial event (default 120000)
+- `max_duration` -- max call duration in seconds (omitted when 0)
+
+```cpp
+Call call = client.dial({{
+    {{"type", "phone"}, {"params", {{"to_number", "+15551234567"}, {"from_number", "+15559876543"}}}}
+}});
 ```
 
-### `dial(devices, *, tag=None, max_duration=None, dial_timeout=None) -> Call`
+### `void on_message(InboundMessageHandler handler)`
 
-Place an outbound call. Returns a `Call` once the remote party answers.
+Register the inbound message handler.
+`InboundMessageHandler = std::function<void(const Message&)>`.
 
-- `devices` -- nested list of device objects (serial/parallel dial)
-- `tag` -- optional correlation tag (auto-generated if omitted)
-- `max_duration` -- max call duration in minutes
-- `dial_timeout` -- seconds to wait before raising `TimeoutError` (default: 120)
-
-```python
-call = await client.dial([
-    [{"type": "phone", "params": {"to_number": "+15551234567", "from_number": "+15559876543"}}]
-])
+```cpp
+client.on_message([](const Message& message) {
+    std::cout << "SMS from " << message.from << ": " << message.body << "\n";
+});
 ```
 
-### `on_message(handler)`
+### `Message send_message(const std::string& from, const std::string& to, const std::string& body, const std::vector<std::string>& media = {}, const std::vector<std::string>& tags = {}, const std::string& region = "", const std::string& context = "")`
 
-Decorator to register the inbound message handler. The handler receives a `Message` object.
+Send an outbound SMS/MMS. Note the argument order is **(from, to, body, ...)**.
+Returns a `Message` that tracks delivery state.
 
-```python
-@client.on_message
-async def handle(message):
-    print(f"SMS from {message.from_number}: {message.body}")
-```
-
-### `send_message(*, to_number, from_number, body=None, media=None, ...) -> Message`
-
-Send an outbound SMS/MMS. Returns a `Message` that tracks delivery state.
-
-```python
-message = await client.send_message(
-    to_number="+15552222222",
-    from_number="+15551111111",
-    body="Hello!",
-)
-event = await message.wait()  # block until delivered/failed
+```cpp
+auto message = client.send_message("+15551111111", "+15552222222", "Hello!");
+message.wait();  // block until delivered/failed (returns bool)
 ```
 
 See [Messaging](messaging.md) for full details.
 
-### `execute(method, params) -> dict`
+### `void on_event(EventHandler handler)`
 
-Send a raw JSON-RPC request. Used internally by Call methods, but available for custom commands.
+Register a generic observer fired for every dispatched `signalwire.event` after
+typed routing. `EventHandler = std::function<void(const RelayEvent&)>`. The
+most-recent registration wins.
 
-### `receive(contexts) / unreceive(contexts)`
+### `json execute(const std::string& method, const json& params)`
+
+Send a raw JSON-RPC request. Used internally by Call/Action methods, but
+available for custom commands. `send_raw_request(method, params)` is also public
+for test harnesses.
+
+### `void subscribe(const std::vector<std::string>& contexts)` / `void unsubscribe(...)`
 
 Dynamically subscribe to or unsubscribe from contexts after connecting.
 
-```python
-await client.receive(["new-context"])
-await client.unreceive(["old-context"])
+```cpp
+client.subscribe({"new-context"});
+client.unsubscribe({"old-context"});
 ```
 
-## Properties
+## Accessors
 
-| Property | Type | Description |
+| Accessor | Type | Description |
 |----------|------|-------------|
-| `relay_protocol` | `str` | Server-assigned protocol string from connect response |
-| `project` | `str` | Project ID |
-| `host` | `str` | Relay host |
-| `contexts` | `list[str]` | Initial contexts |
+| `config()` | `const RelayConfig&` | The client's configuration (project, host, contexts, ...) |
+| `relay_protocol()` | `const std::string&` | Server-assigned protocol string from the connect response |
+| `is_connected()` | `bool` | Current connection state |
+| `session_id()` | `const std::string&` | Server-assigned session id (test/audit use; empty until connected) |
 
 ## Connection Behavior
 
-- **Auto-reconnect**: On connection loss, the client reconnects with exponential backoff (1s to 30s).
-- **Ping/pong**: Client sends periodic pings and monitors server pings. After 3 consecutive failures, the connection is force-closed and reconnected.
-- **Request queueing**: Requests made while disconnected are queued and sent after re-authentication.
-- **Authorization state**: The server sends encrypted auth state via events. On reconnect, this is sent back for fast re-authentication without a full auth roundtrip.
-- **Server disconnect**: The server can request a graceful disconnect (e.g. during deployment). The client auto-reconnects afterward.
+- **Auto-reconnect**: On connection loss, the client reconnects with exponential
+  backoff (base 1s, max 30s, factor 2.0, up to 50 attempts).
+- **Authorization state**: The server can send encrypted auth state for fast
+  re-authentication on reconnect.
+- **Server disconnect**: The server can request a graceful disconnect; the
+  client auto-reconnects afterward.
+- Pending requests are rejected on disconnect.
 
 ## Concurrency
 
-Each inbound call handler runs as an independent `asyncio.Task`, so multiple calls are handled concurrently. The `max_active_calls` parameter (default: 1000) caps concurrent calls to prevent unbounded memory growth.
-
-For multiple WebSocket connections in one process, set `RELAY_MAX_CONNECTIONS` (default: 1).
+The client dispatches inbound calls on a background WebSocket thread.
+`max_active_calls` (default 1000) caps concurrent calls; `max_connections`
+(default 1) bounds WebSocket connections per process.
 
 ## Error Handling
 
-```python
-from signalwire.relay import RelayError
-
-try:
-    await call.play([...])
-except RelayError as e:
-    print(f"Error {e.code}: {e.message}")
-```
-
-`RelayError` is raised when the server returns a non-2xx response code. Errors 404 and 410 (call gone) are silently swallowed by Call methods since the call no longer exists.
+Call/Action methods do not throw per-call. Operation outcomes surface through
+the returned `Action`'s `state()` / `result()` and the `wait()` return value
+(`true` = completed, `false` = timed out). Calls that have ended (404/410) cause
+pending actions to resolve rather than raise.

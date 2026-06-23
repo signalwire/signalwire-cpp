@@ -1,510 +1,263 @@
-# SwaigFunctionResult Methods Reference
+# swaig::FunctionResult Methods Reference (C++)
 
-SWAIG (SignalWire AI Gateway) is the platform's AI tool-calling system -- it connects the AI's decisions to actions like call transfers, SMS, recordings, and API calls, with native access to the media stack. This document provides a complete reference for all methods available in the `SwaigFunctionResult` class. These methods provide convenient abstractions for SWAIG actions, eliminating the need to manually construct action JSON objects.
+SWAIG (SignalWire AI Gateway) is the platform's AI tool-calling system -- it connects the AI's decisions to actions like call transfers, SMS, recordings, and API calls, with native access to the media stack. This document is a reference for the `swaig::FunctionResult` class. These methods provide convenient abstractions for SWAIG actions, eliminating the need to manually construct action JSON objects.
+
+Every action method returns `FunctionResult&` (a reference to `*this`), so calls chain fluently. The class is constructed and returned from a `swaig::ToolHandler`:
+
+```cpp
+#include <signalwire/swaig/function_result.hpp>
+
+using namespace signalwire;
+```
 
 ## Core Methods
 
 ### Basic Construction & Control
 
-#### `__init__(response=None, post_process=False)`
+#### `FunctionResult(response = "", post_process = false)`
 Creates a new result object with optional response text and post-processing behavior.
 
-```python
-result = SwaigFunctionResult("Hello, I'll help you with that")
-result = SwaigFunctionResult("Processing request...", post_process=True)
+```cpp
+swaig::FunctionResult r1("Hello, I'll help you with that");
+swaig::FunctionResult r2("Processing request...", /*post_process=*/true);
 ```
 
 #### `set_response(response)`
 Sets or updates the response text that the AI will speak.
 
-```python
-result.set_response("I've updated your information")
+```cpp
+result.set_response("I've updated your information");
 ```
 
 #### `set_post_process(post_process)`
-Controls whether AI gets one more turn before executing actions.
+Controls whether the AI gets one more turn before executing actions.
 
-```python
-result.set_post_process(True)  # AI speaks response before executing actions
-result.set_post_process(False)  # Actions execute immediately
+```cpp
+result.set_post_process(true);   // AI speaks response before executing actions
+result.set_post_process(false);  // Actions execute immediately
 ```
 
 ---
 
 ## Action Methods
 
-### Call Control Actions
+### Call Control
 
-#### `execute_swml(swml_content, transfer=False)`
-Execute SWML content with flexible input support and optional transfer behavior.
+#### `execute_swml(swml_content, transfer = false)`
+Execute SWML content, with optional transfer behavior. `swml_content` is a `json` value.
 
-```python
-# Raw SWML string
-result.execute_swml('{"version":"1.0.0","sections":{"main":[{"say":"Hello"}]}}')
-
-# SWML dictionary
-swml_dict = {"version": "1.0.0", "sections": {"main": [{"say": "Hello"}]}}
-result.execute_swml(swml_dict, transfer=True)
-
-# SWML SDK object
-from signalwire.swml import SWML
-swml_doc = SWML()
-swml_doc.add_application("main", "say", {"text": "Connecting now"})
-result.execute_swml(swml_doc)
+```cpp
+// SWML as a json object
+json swml = {{"version", "1.0.0"}, {"sections", {{"main", {{{"say", "Hello"}}}}}}};
+result.execute_swml(swml, /*transfer=*/true);
 ```
 
-#### **[IMPLEMENTED]** - Transfer/connect call to another destination using SWML.
+#### `connect(destination, final = true, from_addr = "")`
+Transfer/connect the call to another destination using SWML.
 
-```python
-result.connect("+15551234567", final=True)  # Permanent transfer
-result.connect("support@company.com", final=False, from_addr="+15559876543")  # Temporary transfer
+```cpp
+result.connect("+15551234567", /*final=*/true);                       // Permanent transfer
+result.connect("support@company.com", /*final=*/false, "+15559876543"); // Temporary transfer
 ```
 
-#### `send_sms(to_number, from_number, body=None, media=None, tags=None, region=None)`
-**[HELPER METHOD]** - Send SMS message to PSTN phone number using SWML.
+#### `swml_transfer(dest, ai_response, final = true)`
+Transfer the call to a destination and provide the response the AI speaks on return.
 
-```python
-# Simple text message
-result.send_sms(
-    to_number="+15551234567",
-    from_number="+15559876543", 
-    body="Your order has been confirmed!"
-)
+```cpp
+result.swml_transfer("+15551234567", "You are now back with the assistant.", true);
+```
 
-# Media message with images
-result.send_sms(
-    to_number="+15551234567",
-    from_number="+15559876543",
-    media=["https://example.com/receipt.jpg", "https://example.com/map.png"]
-)
+#### `send_sms(to, from, body = "", media = {}, tags = {}, region = "")`
+Send an SMS message to a PSTN phone number using SWML.
 
-# Full featured message with tags and region
-result.send_sms(
-    to_number="+15551234567",
-    from_number="+15559876543",
-    body="Order update with receipt attached",
-    media=["https://example.com/receipt.pdf"],
-    tags=["order", "confirmation", "customer"],
-    region="us"
-)
+```cpp
+// Simple text message
+result.send_sms("+15551234567", "+15559876543", "Your order has been confirmed!");
+
+// Media message with images (body empty, media vector populated)
+result.send_sms("+15551234567", "+15559876543", "",
+                {"https://example.com/receipt.jpg", "https://example.com/map.png"});
+
+// Full featured message with tags and region
+result.send_sms("+15551234567", "+15559876543", "Order update",
+                {"https://example.com/receipt.pdf"},
+                {"order", "confirmation", "customer"},
+                "us");
 ```
 
 **Parameters:**
-- `to_number` (required): Phone number in E.164 format to send to
-- `from_number` (required): Phone number in E.164 format to send from
-- `body` (optional): Message text (required if no media)
-- `media` (optional): Array of URLs to send (required if no body)
-- `tags` (optional): Array of tags for UI searching
-- `region` (optional): Region to originate message from
+- `to` (required): phone number in E.164 format to send to
+- `from` (required): phone number in E.164 format to send from
+- `body` (optional): message text (required if no media)
+- `media` (optional): vector of URLs to send (required if no body)
+- `tags` (optional): vector of tags for UI searching
+- `region` (optional): region to originate the message from
 
-**Variables Set:**
-- `send_sms_result`: "success" or "failed"
+#### `pay(payment_connector_url, ...)`
+Process payments using the SWML pay action. The first argument is the connector URL; the remaining parameters (input method, timeout, amount, currency, prompts, etc.) all have defaults.
 
-#### `pay(payment_connector_url, **options)`
-**[HELPER METHOD]** - Process payments using SWML pay action with extensive customization.
-
-```python
-# Simple payment setup
-result.pay(
-    payment_connector_url="https://api.example.com/accept-payment",
-    charge_amount="10.99",
-    description="Monthly subscription"
-)
-
-# Advanced payment with custom prompts
-from signalwire.core.function_result import SwaigFunctionResult
-
-# Create custom prompts
-welcome_actions = [
-    SwaigFunctionResult.create_payment_action("Say", "Welcome to our payment system"),
-    SwaigFunctionResult.create_payment_action("Say", "Please enter your credit card number")
-]
-card_prompt = SwaigFunctionResult.create_payment_prompt("payment-card-number", welcome_actions)
-
-error_actions = [
-    SwaigFunctionResult.create_payment_action("Say", "Invalid card number, please try again")
-]
-error_prompt = SwaigFunctionResult.create_payment_prompt(
-    "payment-card-number", 
-    error_actions, 
-    error_type="invalid-card-number timeout"
-)
-
-# Create payment parameters
-params = [
-    SwaigFunctionResult.create_payment_parameter("customer_id", "12345"),
-    SwaigFunctionResult.create_payment_parameter("order_id", "ORD-789")
-]
-
-# Full payment configuration
-result.pay(
-    payment_connector_url="https://api.example.com/accept-payment",
-    status_url="https://api.example.com/payment-status",
-    timeout=10,
-    max_attempts=3,
-    security_code=True,
-    postal_code=False,
-    token_type="one-time",
-    charge_amount="25.50",
-    currency="usd",
-    language="en-US",
-    voice="polly.Sally",
-    description="Premium service upgrade",
-    valid_card_types="visa mastercard amex",
-    parameters=params,
-    prompts=[card_prompt, error_prompt]
-)
+```cpp
+// Simple payment setup
+result.pay("https://api.example.com/accept-payment",
+           /*input_method=*/"dtmf", /*status_url=*/"", /*payment_method=*/"credit-card",
+           /*timeout=*/10, /*max_attempts=*/3);
 ```
 
-**Core Parameters:**
-- `payment_connector_url` (required): URL to process payment requests
-- `input_method`: "dtmf" or "voice" (default: "dtmf")
-- `payment_method`: "credit-card" (default: "credit-card")
-- `timeout`: Seconds to wait for input (default: 5)
-- `max_attempts`: Number of retry attempts (default: 1)
+Build custom prompts and parameters with the static helpers:
 
-**Security & Validation:**
-- `security_code`: Prompt for CVV (default: True)
-- `postal_code`: Prompt for postal code or provide known code (default: True)
-- `min_postal_code_length`: Minimum postal code digits (default: 0)
-- `valid_card_types`: Space-separated card types (default: "visa mastercard amex")
+```cpp
+// Create payment actions
+std::vector<json> welcome = {
+    swaig::FunctionResult::create_payment_action("Say", "Welcome to our payment system"),
+    swaig::FunctionResult::create_payment_action("Say", "Please enter your credit card number")
+};
+json card_prompt = swaig::FunctionResult::create_payment_prompt("payment-card-number", welcome);
 
-**Payment Configuration:**
-- `token_type`: "one-time" or "reusable" (default: "reusable")
-- `charge_amount`: Amount as decimal string
-- `currency`: Currency code (default: "usd")
-- `description`: Payment description
-
-**Customization:**
-- `language`: Prompt language (default: "en-US")
-- `voice`: TTS voice (default: "woman")
-- `status_url`: URL for status notifications
-- `parameters`: Additional name/value pairs for connector
-- `prompts`: Custom prompt configurations
-
-**Helper Methods for Payment Setup:**
-```python
-# Create payment action
-action = SwaigFunctionResult.create_payment_action("Say", "Enter card number")
-
-# Create payment prompt
-prompt = SwaigFunctionResult.create_payment_prompt(
-    "payment-card-number", 
-    [action], 
-    error_type="invalid-card-number"
-)
-
-# Create payment parameter
-param = SwaigFunctionResult.create_payment_parameter("customer_id", "12345")
+// Create payment parameters
+std::vector<json> params = {
+    swaig::FunctionResult::create_payment_parameter("customer_id", "12345"),
+    swaig::FunctionResult::create_payment_parameter("order_id", "ORD-789")
+};
 ```
 
-**Variables Set:**
-- `pay_result`: "success", "too-many-failed-attempts", "payment-connector-error", etc.
-- `pay_payment_results`: JSON with payment details including tokens and card info
+**Static helper methods:**
+- `create_payment_action(action_type, phrase)` → `json`
+- `create_payment_prompt(for_situation, actions, card_type = "", error_type = "")` → `json`
+- `create_payment_parameter(name, value)` → `json`
 
-#### `record_call(control_id=None, stereo=False, format="wav", direction="both", **options)`
-**[HELPER METHOD]** - Start background call recording using SWML.
+#### `record_call(control_id = "", stereo = false, format = "wav", direction = "both", ...)`
+Start background call recording using SWML. The script continues executing while recording happens in the background.
 
-Unlike foreground recording, the script continues executing while recording happens in the background.
+```cpp
+// Simple background recording
+result.record_call();
 
-```python
-# Simple background recording
-result.record_call()
-
-# Recording with custom settings
-result.record_call(
-    control_id="support_call_001",
-    stereo=True,
-    format="mp3",
-    direction="both",
-    max_length=300  # 5 minutes max
-)
-
-# Recording with terminator and status webhook
-result.record_call(
-    control_id="customer_voicemail", 
-    format="wav",
-    direction="speak",           # Only record customer voice
-    terminators="#",             # Stop on '#' press
-    beep=True,                   # Play beep before recording
-    initial_timeout=4.0,         # Wait 4 seconds for speech
-    end_silence_timeout=3.0,     # Stop after 3 seconds of silence
-    status_url="https://api.example.com/recording-status"
-)
+// Recording with custom settings
+result.record_call("support_call_001", /*stereo=*/true, "mp3", "both");
 ```
 
-**Core Parameters:**
-- `control_id` (optional): Identifier for this recording (for use with stop_record_call)
-- `stereo`: Record in stereo (default: False)
-- `format`: "wav" or "mp3" (default: "wav")
-- `direction`: "speak", "listen", or "both" (default: "both")
+A typed overload accepts the `RecordFormat` and `RecordDirection` enums in place of the string `format`/`direction`, for call-site typo checking:
 
-**Control Options:**
-- `terminators`: Digits that stop recording when pressed
-- `beep`: Play beep before recording (default: False)
-- `max_length`: Maximum recording length in seconds
-
-**Timing Options:**
-- `input_sensitivity`: Input sensitivity (default: 44.0)
-- `initial_timeout`: Time to wait for speech start (default: 0.0)
-- `end_silence_timeout`: Time to wait in silence before ending (default: 0.0)
-
-**Webhook Options:**
-- `status_url`: URL to send recording status events to
-
-**Variables Set:**
-- `record_call_result`: "success" or "failed"
-- `record_call_url`: URL of recorded file (when recording completes)
-
-#### `stop_record_call(control_id=None)`
-**[HELPER METHOD]** - Stop an active background call recording using SWML.
-
-```python
-# Stop the most recent recording
-result.stop_record_call()
-
-# Stop specific recording by ID
-result.stop_record_call("support_call_001")
-
-# Chain to stop recording and provide feedback
-result.stop_record_call("customer_voicemail") \
-      .say("Thank you, your message has been recorded")
+```cpp
+result.record_call("voicemail", false, swaig::RecordFormat::Wav, swaig::RecordDirection::Speak);
 ```
 
-**Parameters:**
-- `control_id` (optional): Identifier for recording to stop. If not provided, stops the most recent recording.
+**Core parameters:**
+- `control_id` (optional): identifier for this recording (use with `stop_record_call`)
+- `stereo`: record in stereo (default: false)
+- `format`: `"wav"`, `"mp3"`, or `"mp4"` (default: `"wav"`)
+- `direction`: `"speak"`, `"listen"`, or `"both"` (default: `"both"`)
+- additional optional parameters: `terminators`, `beep`, `input_sensitivity`, `initial_timeout`, `end_silence_timeout`, `max_length`, `status_url`
 
-**Variables Set:**
-- `stop_record_call_result`: "success" or "failed"
+#### `stop_record_call(control_id = "")`
+Stop an active background call recording. If `control_id` is empty, stops the most recent recording.
+
+```cpp
+result.stop_record_call();                          // Stop the most recent recording
+result.stop_record_call("support_call_001");        // Stop a specific recording
+
+// Chain to stop recording and provide feedback
+result.stop_record_call("customer_voicemail")
+      .say("Thank you, your message has been recorded");
+```
 
 #### `join_room(name)`
-**[HELPER METHOD]** - Join a RELAY room using SWML.
+Join a RELAY room (for multi-party communication and collaboration).
 
-RELAY rooms enable multi-party communication and collaboration features.
+```cpp
+result.join_room("support_team_room");
 
-```python
-# Join a conference room
-result.join_room("support_team_room")
-
-# Join customer meeting room
-result.join_room("customer_meeting_001") \
-      .say("Welcome to the customer meeting room")
-
-# Join room and set metadata
-result.join_room("sales_conference") \
-      .set_metadata({"participant_role": "moderator", "join_time": "2024-01-01T12:00:00Z"})
+result.join_room("customer_meeting_001")
+      .say("Welcome to the customer meeting room");
 ```
-
-**Parameters:**
-- `name` (required): The name of the room to join
-
-**Variables Set:**
-- `join_room_result`: "success" or "failed"
 
 #### `sip_refer(to_uri)`
-**[HELPER METHOD]** - Send SIP REFER for call transfer using SWML.
+Send a SIP REFER for call transfer in SIP environments.
 
-SIP REFER is used for call transfer in SIP environments, allowing one endpoint to request another to initiate a new connection.
+```cpp
+result.sip_refer("sip:support@company.com");
 
-```python
-# Basic SIP refer to transfer call
-result.sip_refer("sip:support@company.com")
-
-# Transfer to specific SIP address with domain
-result.sip_refer("sip:agent123@pbx.company.com:5060")
-
-# Chain with announcement
-result.say("Transferring your call to our specialist") \
-      .sip_refer("sip:specialist@company.com")
+result.say("Transferring your call to our specialist")
+      .sip_refer("sip:specialist@company.com");
 ```
 
-**Parameters:**
-- `to_uri` (required): The SIP URI to send the REFER to
+#### `join_conference(name, ...)`
+Join an ad-hoc audio conference. There are two overloads: a flat positional overload mirroring the SWML parameters 1:1, and an options-bag overload taking a `swaig::JoinConferenceOptions` struct (the C++-idiomatic way to pass the many optional parameters).
 
-**Variables Set:**
-- `sip_refer_result`: "success" or "failed"
+```cpp
+// Simple conference join
+result.join_conference("my_conference");
 
-#### `join_conference(name, **options)`
-**[HELPER METHOD]** - Join an ad-hoc audio conference with RELAY and CXML calls using SWML.
-
-Provides extensive configuration options for conference call management and recording.
-
-```python
-# Simple conference join
-result.join_conference("my_conference")
-
-# Basic conference with recording
-result.join_conference(
-    name="daily_standup",
-    record="record-from-start",
-    max_participants=10
-)
-
-# Advanced conference with callbacks and coaching
-result.join_conference(
-    name="customer_support_conf", 
-    muted=False,
-    beep="onEnter",
-    start_on_enter=True,
-    end_on_exit=False,
-    max_participants=50,
-    record="record-from-start",
-    region="us-east",
-    trim="trim-silence",
-    status_callback="https://api.company.com/conference-events",
-    status_callback_event="start end join leave",
-    recording_status_callback="https://api.company.com/recording-events"
-)
-
-# Chain with other actions
-result.say("Joining you to the team conference") \
-      .join_conference("team_meeting") \
-      .set_metadata({"meeting_type": "team_sync", "participant_role": "attendee"})
+// Options-bag overload — set only the fields you need
+swaig::JoinConferenceOptions opts;
+opts.record = swaig::ConferenceRecord::RecordFromStart;
+opts.max_participants = 50;
+opts.beep = swaig::ConferenceBeep::OnEnter;
+result.join_conference("customer_support_conf", opts);
 ```
 
-**Core Parameters:**
-- `name` (required): Name of conference to join
-- `muted`: Join muted (default: False)
-- `beep`: Beep configuration - "true", "false", "onEnter", "onExit" (default: "true")
-- `start_on_enter`: Conference starts when this participant enters (default: True)
-- `end_on_exit`: Conference ends when this participant exits (default: False)
+The closed-set fields (`beep`, `record`, `trim`, the callback methods) accept either the typed enum or a bare string; both produce identical SWML.
 
-**Capacity & Region:**
-- `max_participants`: Maximum participants <= 250 (default: 250)
-- `region`: Conference region for optimization
-- `wait_url`: SWML URL for custom hold music
+#### `tap(uri, control_id = "", direction = "both", codec = "PCMU", rtp_ptime = 20, status_url = "")`
+Start a background call tap. Media is streamed over WebSocket or RTP to a customer-controlled URI for real-time monitoring.
 
-**Recording Options:**
-- `record`: "do-not-record" or "record-from-start" (default: "do-not-record")
-- `trim`: "trim-silence" or "do-not-trim" (default: "trim-silence")
-- `recording_status_callback`: URL for recording status events
-- `recording_status_callback_method`: "GET" or "POST" (default: "POST")
-- `recording_status_callback_event`: "in-progress completed absent" (default: "completed")
+```cpp
+// Simple WebSocket tap
+result.tap("wss://example.com/tap");
 
-**Status & Coaching:**
-- `coach`: SWML Call ID or CXML CallSid for coaching features
-- `status_callback`: URL for conference status events
-- `status_callback_method`: "GET" or "POST" (default: "POST")
-- `status_callback_event`: Events to report - "start end join leave mute hold modify speaker announcement"
-
-**Control Flow:**
-- `result`: Switch on return_value (object {} or array [] for conditional logic)
-
-**Variables Set:**
-- `join_conference_result`: "completed", "answered", "no-answer", "failed", or "canceled"
-- `return_value`: Same as `join_conference_result`
-
-#### `tap(uri, **options)`
-**[HELPER METHOD]** - Start background call tap using SWML.
-
-Media is streamed over Websocket or RTP to customer controlled URI for real-time monitoring and analysis.
-
-```python
-# Simple WebSocket tap
-result.tap("wss://example.com/tap")
-
-# RTP tap with custom settings
-result.tap(
-    uri="rtp://192.168.1.100:5004",
-    control_id="monitoring_tap_001",
-    direction="both",
-    codec="PCMA",
-    rtp_ptime=30
-)
-
-# Advanced tap with status callbacks
-result.tap(
-    uri="wss://monitoring.company.com/audio-stream",
-    control_id="compliance_tap",
-    direction="speak",  # Only what the party says
-    status_url="https://api.company.com/tap-status"
-) \
-.set_metadata({"tap_purpose": "compliance", "session_id": "sess_123"})
+// RTP tap with custom settings
+result.tap("rtp://192.168.1.100:5004", "monitoring_tap_001", "both", "PCMA", 30);
 ```
 
-**Core Parameters:**
-- `uri` (required): Destination of tap media stream
-  - WebSocket: `ws://example.com` or `wss://example.com`
-  - RTP: `rtp://IP:port`
-- `control_id`: Identifier for this tap to use with stop_tap (optional, auto-generated if not provided)
+A typed overload accepts the `TapDirection` and `Codec` enums. Note the tap direction set is `{speak, hear, both}` (`hear`, not `record_call`'s `listen`):
 
-**Audio Configuration:**
-- `direction`: Audio direction to tap (default: "both")
-  - `"speak"`: What party says
-  - `"hear"`: What party hears
-  - `"both"`: What party hears and says
-- `codec`: Codec for tap stream - "PCMU" or "PCMA" (default: "PCMU")
-- `rtp_ptime`: RTP packetization time in milliseconds (default: 20)
-
-**Status & Monitoring:**
-- `status_url`: URL for tap status change requests
-
-**Variables Set:**
-- `tap_uri`: Destination URI of the newly started tap
-- `tap_result`: "success" or "failed"
-- `tap_control_id`: Control ID of this tap
-- `tap_rtp_src_addr`: If RTP, source address of the tap stream
-- `tap_rtp_src_port`: If RTP, source port of the tap stream
-- `tap_ptime`: Packetization time of the tap stream
-- `tap_codec`: Codec in the tap stream
-- `tap_rate`: Sample rate in the tap stream
-
-#### `stop_tap(control_id=None)`
-**[HELPER METHOD]** - Stop an active tap stream using SWML.
-
-```python
-# Stop the most recent tap
-result.stop_tap()
-
-# Stop specific tap by ID
-result.stop_tap("monitoring_tap_001")
-
-# Chain to stop tap and provide feedback
-result.stop_tap("compliance_tap") \
-      .say("Audio monitoring has been stopped") \
-      .update_global_data({"tap_active": False})
+```cpp
+result.tap("wss://monitoring.example.com/audio", "compliance_tap",
+           swaig::TapDirection::Speak, swaig::Codec::Pcmu);
 ```
 
-**Parameters:**
-- `control_id` (optional): ID of the tap to stop. If not set, the last tap started will be stopped.
+#### `stop_tap(control_id = "")`
+Stop an active tap stream. If `control_id` is empty, stops the last tap started.
 
-**Variables Set:**
-- `stop_tap_result`: "success" or "failed"
+```cpp
+result.stop_tap();
+result.stop_tap("monitoring_tap_001");
+```
 
 #### `hangup()`
 Terminate the call immediately.
 
-```python
-result.hangup()
+```cpp
+result.hangup();
 ```
 
 ---
 
 ### Call Flow Control
 
-#### `hold(timeout=300)`
-Put call on hold with timeout (max 900 seconds).
+#### `hold(timeout = 300)`
+Put the call on hold with a timeout (in seconds).
 
-```python
-result.hold(60)    # Hold for 1 minute
-result.hold(600)   # Hold for 10 minutes
+```cpp
+result.hold(60);   // Hold for 1 minute
+result.hold(600);  // Hold for 10 minutes
 ```
 
-#### `wait_for_user(enabled=None, timeout=None, answer_first=False)`
-Control how agent waits for user input with flexible parameters.
+#### `wait_for_user(enabled = nullopt, timeout = nullopt, answer_first = false)`
+Control how the agent waits for user input. `enabled` and `timeout` are `std::optional`.
 
-```python
-result.wait_for_user(True)                    # Wait indefinitely
-result.wait_for_user(timeout=30)              # Wait 30 seconds
-result.wait_for_user(answer_first=True)       # Special answer_first mode
-result.wait_for_user(False)                   # Disable waiting
+```cpp
+result.wait_for_user(true);                   // Wait indefinitely
+result.wait_for_user(std::nullopt, 30);       // Wait 30 seconds
+result.wait_for_user(std::nullopt, std::nullopt, /*answer_first=*/true);
+result.wait_for_user(false);                  // Disable waiting
 ```
 
 #### `stop()`
 Stop agent execution completely.
 
-```python
-result.stop()
+```cpp
+result.stop();
 ```
 
 ---
@@ -514,23 +267,23 @@ result.stop()
 #### `say(text)`
 Make the agent speak specific text immediately.
 
-```python
-result.say("Please hold while I look that up for you")
+```cpp
+result.say("Please hold while I look that up for you");
 ```
 
-#### `play_background_file(filename, wait=False)`
-Play audio file in background with attention control.
+#### `play_background_file(filename, wait = false)`
+Play an audio file in the background. With `wait=true`, the AI suppresses attention while it plays.
 
-```python
-result.play_background_file("hold_music.wav")                    # AI tries to get attention
-result.play_background_file("announcement.mp3", wait=True)       # AI suppresses attention
+```cpp
+result.play_background_file("hold_music.wav");                 // AI tries to get attention
+result.play_background_file("announcement.mp3", /*wait=*/true); // AI suppresses attention
 ```
 
 #### `stop_background_file()`
-Stop currently playing background audio.
+Stop the currently playing background audio.
 
-```python
-result.stop_background_file()
+```cpp
+result.stop_background_file();
 ```
 
 ---
@@ -538,17 +291,25 @@ result.stop_background_file()
 ### Speech Recognition Settings
 
 #### `set_end_of_speech_timeout(milliseconds)`
-Set silence timeout after speech detection for finalizing recognition.
+Set the silence timeout after speech detection for finalizing recognition.
 
-```python
-result.set_end_of_speech_timeout(2000)  # 2 seconds of silence
+```cpp
+result.set_end_of_speech_timeout(2000);  // 2 seconds of silence
 ```
 
 #### `set_speech_event_timeout(milliseconds)`
-Set timeout since last speech event - better for noisy environments.
+Set the timeout since the last speech event — better for noisy environments.
 
-```python
-result.set_speech_event_timeout(3000)  # 3 seconds since last speech event
+```cpp
+result.set_speech_event_timeout(3000);  // 3 seconds since last speech event
+```
+
+#### `add_dynamic_hints(hints)` / `clear_dynamic_hints()`
+Add (or clear) speech-recognition hints for this turn.
+
+```cpp
+result.add_dynamic_hints({{"hints", json::array({"SignalWire", "SWML"})}});
+result.clear_dynamic_hints();
 ```
 
 ---
@@ -556,33 +317,40 @@ result.set_speech_event_timeout(3000)  # 3 seconds since last speech event
 ### Data Management
 
 #### `update_global_data(data)`
-**[IMPLEMENTED]** - Update global agent data variables.
+Merge values into the global agent data.
 
-```python
-result.update_global_data({"user_name": "John", "step": 2})
+```cpp
+result.update_global_data({{"user_name", "John"}, {"step", 2}});
 ```
 
 #### `remove_global_data(keys)`
-Remove global data variables by key(s).
+Remove global data variables by key(s). `keys` is a `json` value (a single string or an array of strings).
 
-```python
-result.remove_global_data("temporary_data")           # Single key
-result.remove_global_data(["step", "temp_value"])     # Multiple keys
+```cpp
+result.remove_global_data("temporary_data");          // Single key
+result.remove_global_data({"step", "temp_value"});    // Multiple keys
 ```
 
 #### `set_metadata(data)`
-Set metadata scoped to current function's meta_data_token.
+Set metadata scoped to the current function's meta_data_token.
 
-```python
-result.set_metadata({"session_id": "abc123", "user_tier": "premium"})
+```cpp
+result.set_metadata({{"session_id", "abc123"}, {"user_tier", "premium"}});
 ```
 
 #### `remove_metadata(keys)`
-Remove metadata from current function's scope.
+Remove metadata from the current function's scope.
 
-```python
-result.remove_metadata("temp_session_data")           # Single key  
-result.remove_metadata(["cache_key", "temp_flag"])    # Multiple keys
+```cpp
+result.remove_metadata("temp_session_data");          // Single key
+result.remove_metadata({"cache_key", "temp_flag"});   // Multiple keys
+```
+
+#### `swml_user_event(event_data)`
+Emit a SWML user event.
+
+```cpp
+result.swml_user_event({{"event", "checkout_complete"}});
 ```
 
 ---
@@ -590,112 +358,105 @@ result.remove_metadata(["cache_key", "temp_flag"])    # Multiple keys
 ### Function & Behavior Control
 
 #### `toggle_functions(function_toggles)`
-Enable/disable specific SWAIG functions dynamically.
+Enable/disable specific SWAIG functions dynamically. The argument is a `json` array of toggle objects.
 
-```python
-result.toggle_functions([
-    {"function": "transfer_call", "active": False},
-    {"function": "lookup_info", "active": True}
-])
+```cpp
+result.toggle_functions(json::array({
+    {{"function", "transfer_call"}, {"active", false}},
+    {{"function", "lookup_info"},   {"active", true}}
+}));
 ```
 
-#### `enable_functions_on_timeout(enabled=True)`
+#### `enable_functions_on_timeout(enabled = true)`
 Control whether functions can be called on speaker timeout.
 
-```python
-result.enable_functions_on_timeout(True)
-result.enable_functions_on_timeout(False)
+```cpp
+result.enable_functions_on_timeout(true);
+result.enable_functions_on_timeout(false);
 ```
 
-#### `enable_extensive_data(enabled=True)`
-Send full data to LLM for this turn only, then use smaller replacement.
+#### `enable_extensive_data(enabled = true)`
+Send full data to the LLM for this turn only, then use a smaller replacement.
 
-```python
-result.enable_extensive_data(True)   # Send extensive data this turn
-result.enable_extensive_data(False)  # Use normal data
+```cpp
+result.enable_extensive_data(true);
 ```
 
-#### `replace_in_history(text=True)`
-Remove or replace the tool_call + tool_result pair from the LLM's conversation history after the first send. This is useful when a function call is an implementation detail that would confuse the model if it remained visible in context.
+#### `replace_in_history(text)`
+Remove or replace the tool_call + tool_result pair from the LLM's conversation history after the first send. This is useful when a function call is an implementation detail that would confuse the model if it remained visible in context. The argument is a `json` value: pass `true` to remove the pair entirely, or a string to replace it with an assistant message containing that text.
 
-When called with a string, the tool_call/tool_result pair is replaced with an assistant message containing that text. When called with `True`, the pair is removed entirely — the LLM will never see that the function was called.
+```cpp
+// Remove entirely — LLM won't see this function was called
+swaig::FunctionResult r1("Done.");
+r1.replace_in_history(true);
 
-```python
-# Remove entirely — LLM won't see this function was called
-result = SwaigFunctionResult("Done.")
-result.replace_in_history()
-
-# Replace with a friendly assistant message instead of tool artifacts
-result = SwaigFunctionResult("Profile saved.")
-result.replace_in_history("I've saved your profile information.")
-
-# Practical example: data collection function that shouldn't clutter history
-@agent.tool(name="save_answer", description="Save the user's answer")
-def save_answer(args, raw_data):
-    answer = args.get("answer")
-    result = SwaigFunctionResult(f"Answer recorded: {answer}")
-    result.replace_in_history()  # Keep history clean
-    return result
+// Replace with a friendly assistant message instead of tool artifacts
+swaig::FunctionResult r2("Profile saved.");
+r2.replace_in_history("I've saved your profile information.");
 ```
 
 **When to use:**
 - Functions that are implementation details (saving data, logging, internal state changes)
 - Functions called frequently that would bloat conversation history
-- Situations where tool artifacts confuse the model's reasoning (especially with reasoning models at low effort settings)
-
-**Note:** For structured data collection, consider using [gather_info mode](contexts_guide.md#gather-info-mode) instead, which produces zero tool artifacts by design and doesn't require `replace_in_history`.
+- Situations where tool artifacts confuse the model's reasoning
 
 ---
 
 ### Agent Settings & Configuration
 
 #### `update_settings(settings)`
-Update agent runtime settings with validation.
+Update agent runtime settings with server-side validation. The argument is a `json` object.
 
-```python
-# AI model settings
+```cpp
+// AI model settings
 result.update_settings({
-    "temperature": 0.7,
-    "max-tokens": 2048,
-    "frequency-penalty": -0.5
-})
+    {"temperature", 0.7},
+    {"max-tokens", 2048},
+    {"frequency-penalty", -0.5}
+});
 
-# Speech recognition settings  
+// Speech recognition settings
 result.update_settings({
-    "confidence": 0.8,
-    "barge-confidence": 0.7
-})
+    {"confidence", 0.8},
+    {"barge-confidence", 0.7}
+});
 ```
 
-**Supported Settings:**
-- `frequency-penalty`: Float (-2.0 to 2.0)
-- `presence-penalty`: Float (-2.0 to 2.0) 
-- `max-tokens`: Integer (0 to 4096)
-- `top-p`: Float (0.0 to 1.0)
-- `confidence`: Float (0.0 to 1.0)
-- `barge-confidence`: Float (0.0 to 1.0)
-- `temperature`: Float (0.0 to 2.0, clamped to 1.5)
+**Supported settings:**
+- `frequency-penalty`: float (-2.0 to 2.0)
+- `presence-penalty`: float (-2.0 to 2.0)
+- `max-tokens`: integer (0 to 4096)
+- `top-p`: float (0.0 to 1.0)
+- `confidence`: float (0.0 to 1.0)
+- `barge-confidence`: float (0.0 to 1.0)
+- `temperature`: float (0.0 to 2.0, clamped to 1.5)
 
-#### `switch_context(system_prompt=None, user_prompt=None, consolidate=False, full_reset=False)`
-Change agent context/prompt during conversation.
+#### `switch_context(system_prompt = "", user_prompt = "", consolidate = false, full_reset = false)`
+Change the agent's context/prompt during a conversation.
 
-```python
-# Simple context switch
-result.switch_context("You are now a technical support agent")
+```cpp
+// Simple context switch
+result.switch_context("You are now a technical support agent");
 
-# Advanced context switch
-result.switch_context(
-    system_prompt="You are a billing specialist",
-    user_prompt="The user needs help with their invoice",
-    consolidate=True
-)
+// Advanced context switch
+result.switch_context("You are a billing specialist",
+                      "The user needs help with their invoice",
+                      /*consolidate=*/true);
+```
+
+#### `swml_change_step(step_name)` / `swml_change_context(context_name)`
+Navigate a multi-step / multi-context flow by name.
+
+```cpp
+result.swml_change_step("collect_payment");
+result.swml_change_context("billing");
 ```
 
 #### `simulate_user_input(text)`
 Queue simulated user input for testing or flow control.
 
-```python
-result.simulate_user_input("Yes, I'd like to speak to billing")
+```cpp
+result.simulate_user_input("Yes, I'd like to speak to billing");
 ```
 
 ---
@@ -705,86 +466,82 @@ result.simulate_user_input("Yes, I'd like to speak to billing")
 ### Manual Action Construction
 
 #### `add_action(name, data)`
-Add a single action manually (for custom actions not covered by helper methods).
+Add a single action manually (for custom actions not covered by the helper methods).
 
-```python
-result.add_action("custom_action", {"param": "value"})
+```cpp
+result.add_action("custom_action", {{"param", "value"}});
 ```
 
 #### `add_actions(actions)`
-Add multiple actions at once.
+Add multiple actions at once from a vector of JSON action objects.
 
-```python
-result.add_actions([
-    {"say": "Hello"},
-    {"hold": 300}
-])
+```cpp
+result.add_actions({
+    {{"say", "Hello"}},
+    {{"hold", 300}}
+});
 ```
 
 ### Output Generation
 
-#### `to_dict()`
-Convert result to dictionary format for JSON serialization.
+#### `to_json()` / `to_string(indent = -1)`
+Render the result to JSON, or to a JSON string (optionally indented).
 
-```python
-result_dict = result.to_dict()
-# Returns: {"response": "...", "action": [...], "post_process": true/false}
+```cpp
+json j = result.to_json();
+std::string s = result.to_string(2);  // pretty-printed with 2-space indent
+```
+
+---
+
+## RPC Methods
+
+`FunctionResult` also exposes low-level RELAY RPC helpers for advanced call control:
+
+- `execute_rpc(method, params = {}, call_id = "", node_id = "")`
+- `rpc_dial(to_number, from_number, dest_swml, device_type = "phone")`
+- `rpc_ai_message(call_id, message_text, role = "system")`
+- `rpc_ai_unhold(call_id)`
+
+```cpp
+result.rpc_ai_message("call-abc-123", "A new ticket was created for you.", "system");
 ```
 
 ---
 
 ## Method Chaining
 
-All methods return `self` to enable fluent method chaining:
+All action methods return `*this`, enabling fluent chaining:
 
-```python
-result = SwaigFunctionResult("Processing your request", post_process=True) \
-    .update_global_data({"status": "processing"}) \
-    .play_background_file("processing.wav", wait=True) \
-    .set_end_of_speech_timeout(2500)
+```cpp
+swaig::FunctionResult result =
+    swaig::FunctionResult("Processing your request", /*post_process=*/true)
+        .update_global_data({{"status", "processing"}})
+        .play_background_file("processing.wav", /*wait=*/true)
+        .set_end_of_speech_timeout(2500);
 
-# Complex chaining example
-result = SwaigFunctionResult("Let me transfer you to billing") \
-    .set_metadata({"transfer_reason": "billing_inquiry"}) \
-    .update_global_data({"last_action": "transfer_to_billing"}) \
-    .connect("+15551234567", final=True)
+// Transfer example
+swaig::FunctionResult transfer =
+    swaig::FunctionResult("Let me transfer you to billing")
+        .set_metadata({{"transfer_reason", "billing_inquiry"}})
+        .update_global_data({{"last_action", "transfer_to_billing"}})
+        .connect("+15551234567", /*final=*/true);
 ```
 
 ---
 
-## Implementation Status
-
-- **[IMPLEMENTED]**: `connect()`, `update_global_data()`, and all methods listed above
-- **[HELPER METHODS]**: `send_sms()`, `pay()`, `record_call()`, `stop_record_call()`, `join_room()`, `sip_refer()`, `join_conference()`, `tap()`, `stop_tap()` - Additional convenience methods that generate SWML
-- **[UTILITY METHODS]**: `create_payment_prompt()`, `create_payment_action()`, `create_payment_parameter()`
-- **[EXTENSIBLE]**: Additional convenience methods for common SWML patterns
-
 ## Best Practices
 
-1. **Use post_process=True** when you want the AI to speak before executing actions
-2. **Chain methods** for cleaner, more readable code
-3. **Use specific methods** instead of manual action construction when available
-4. **Handle errors gracefully** - methods may raise TypeError for invalid inputs
-5. **Validate settings** - update_settings() relies on server-side validation 
-
-### Final State
-The framework now includes **10 virtual helpers total**:
-1. connect() - Call transfer/connect
-2. send_sms() - SMS messaging
-3. pay() - Payment processing
-4. record_call() - Start background recording
-5. stop_record_call() - Stop background recording
-6. join_room() - Join RELAY room
-7. sip_refer() - SIP REFER transfer
-8. join_conference() - Join audio conference with extensive options
-9. tap() - Start background call tap for monitoring
-10. stop_tap() - Stop background call tap
+1. **Use `post_process=true`** when you want the AI to speak before executing actions.
+2. **Chain methods** for cleaner, more readable code.
+3. **Use the specific helper methods** instead of manual `add_action` construction when one is available.
+4. **Validate settings** — `update_settings()` relies on server-side validation.
 
 ---
 
 ## Post Data Reference
 
-The `post_data` object is the JSON payload sent to SWAIG function handlers. Its structure differs between webhook functions and DataMap functions.
+The `post_data` object is the JSON payload sent to SWAIG function handlers — it is delivered as the `raw_data` argument of a `swaig::ToolHandler`. Its structure differs between webhook functions and DataMap functions.
 
 ### Base Keys (All Functions)
 
@@ -872,14 +629,6 @@ DataMap processing supports template expansion with access to:
 
 ## Related Documentation
 
-- **[API Reference](api_reference.md)** - Complete AgentBase and SwaigFunctionResult API reference
-- **[Contexts Guide](contexts_guide.md)** - Using `swml_change_context()` and `swml_change_step()`
-- **[DataMap Guide](datamap_guide.md)** - Using SwaigFunctionResult with DataMap outputs
-- **[Agent Guide](agent_guide.md)** - General agent development guide
-
-### Example Files
-
-- `examples/simple_agent.py` - Basic SWAIG function usage
-- `examples/swaig_features_agent.py` - Advanced SWAIG features with fillers
-- `examples/record_call_example.py` - Recording and tapping calls
-- `examples/room_and_sip_example.py` - Room joining and SIP transfer
+- **[Agent Guide](agent_guide.md)** — general agent development guide
+- **`examples/simple_agent.cpp`** — basic SWAIG function usage
+- **`examples/swaig_features_agent.cpp`** — advanced `FunctionResult` action usage (state, media, speech, context, SMS)

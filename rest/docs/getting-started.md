@@ -4,41 +4,45 @@ The REST client provides synchronous access to all SignalWire APIs using standar
 
 ## Installation
 
-The REST client is included in the `signalwire-agents` package:
+The REST client is part of the `signalwire` C++ static library (`libsignalwire.a`),
+built from this repository — there is no separate package to install. Add the
+`include/` directory to your include path and link the library:
 
 ```bash
-pip install signalwire-agents
+g++ -std=c++17 -I include -I deps your_app.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o your_app
 ```
 
-The only additional dependency is `requests`, which is installed automatically.
+The REST client uses the vendored cpp-httplib (header-only) plus OpenSSL 3.0+ for
+TLS. See the root README for full build instructions.
 
 ## Configuration
 
 You need three things to connect:
 
-| Parameter | Env Var | Description |
-|-----------|---------|-------------|
-| `project` | `SIGNALWIRE_PROJECT_ID` | Your SignalWire project ID |
-| `token` | `SIGNALWIRE_API_TOKEN` | Your SignalWire API token |
-| `host` | `SIGNALWIRE_SPACE` | Your space hostname (e.g. `example.signalwire.com`) |
+| Parameter    | Env Var                 | Description |
+|--------------|-------------------------|-------------|
+| `space`      | `SIGNALWIRE_SPACE`      | Your space hostname (e.g. `example.signalwire.com`) |
+| `project_id` | `SIGNALWIRE_PROJECT_ID` | Your SignalWire project ID |
+| `token`      | `SIGNALWIRE_API_TOKEN`  | Your SignalWire API token |
 
 ## Minimal Example
 
-```python
-from signalwire.rest import RestClient
+```cpp
+#include <signalwire/rest/rest_client.hpp>
+#include <iostream>
 
-client = RestClient(
-    project="your-project-id",
-    token="your-api-token",
-    host="example.signalwire.com",
-)
+using namespace signalwire::rest;
 
-# List your AI agents
-agents = client.fabric.ai_agents.list()
-print(agents)
+int main() {
+    RestClient client("example.signalwire.com", "your-project-id", "your-api-token");
+
+    // List your AI agents
+    auto agents = client.fabric().ai_agents.list();
+    std::cout << agents.dump(2) << "\n";
+}
 ```
 
-Or use environment variables and skip the constructor args:
+Or build from environment variables with `RestClient::from_env()`:
 
 ```bash
 export SIGNALWIRE_PROJECT_ID=your-project-id
@@ -46,52 +50,61 @@ export SIGNALWIRE_API_TOKEN=your-api-token
 export SIGNALWIRE_SPACE=example.signalwire.com
 ```
 
-```python
-from signalwire.rest import RestClient
-
-client = RestClient()
-agents = client.fabric.ai_agents.list()
+```cpp
+auto client = RestClient::from_env();
+auto agents = client.fabric().ai_agents.list();
 ```
 
 ## CRUD Pattern
 
-Most resources follow the same CRUD pattern:
+Most resources follow the same CRUD pattern. Request bodies are `nlohmann::json`
+objects; query params are a `std::map<std::string, std::string>`. The delete
+method is named `del` (because `delete` is a C++ keyword):
 
-```python
-# List
-items = client.fabric.ai_agents.list()
+```cpp
+// List
+auto items = client.fabric().ai_agents.list();
 
-# Create
-agent = client.fabric.ai_agents.create(name="Support", prompt={"text": "Be helpful"})
+// Create
+auto agent = client.fabric().ai_agents.create({{"name", "Support"}, {"prompt", {{"text", "Be helpful"}}}});
 
-# Get by ID
-agent = client.fabric.ai_agents.get("agent-uuid")
+// Get by ID
+agent = client.fabric().ai_agents.get("agent-uuid");
 
-# Update
-client.fabric.ai_agents.update("agent-uuid", name="Updated Name")
+// Update
+client.fabric().ai_agents.update("agent-uuid", {{"name", "Updated Name"}});
 
-# Delete
-client.fabric.ai_agents.delete("agent-uuid")
+// Delete
+client.fabric().ai_agents.del("agent-uuid");
 ```
 
 Fabric resources also support listing addresses:
 
-```python
-addresses = client.fabric.ai_agents.list_addresses("agent-uuid")
+```cpp
+auto addresses = client.fabric().ai_agents.list_addresses("agent-uuid");
 ```
 
 ## Error Handling
 
-```python
-from signalwire.rest import RestClient, SignalWireRestError
+Non-2xx responses throw `SignalWireRestError`, which carries the HTTP status
+(`status()`), the response body (`body()`), and the message (`what()`):
 
-client = RestClient()
+```cpp
+#include <signalwire/rest/rest_client.hpp>
+#include <iostream>
 
-try:
-    agent = client.fabric.ai_agents.get("nonexistent-id")
-except SignalWireRestError as e:
-    print(f"HTTP {e.status_code}: {e.body}")
-    # HTTP 404: {'error': 'not found'}
+using namespace signalwire::rest;
+
+int main() {
+    auto client = RestClient::from_env();
+    try {
+        auto agent = client.fabric().ai_agents.get("nonexistent-id");
+    } catch (const SignalWireRestError& e) {
+        std::cerr << "HTTP " << e.status() << ": " << e.what() << "\n";
+        std::cerr << "Body: " << e.body() << "\n";
+        // HTTP 404: ...
+    }
+}
 ```
 
 ## Debug Logging

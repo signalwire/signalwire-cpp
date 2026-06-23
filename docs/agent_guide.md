@@ -1,34 +1,25 @@
-# SignalWire AI Agent Guide
+# SignalWire AI Agent Guide (C++)
 
 ## Table of Contents
 - [Introduction](#introduction)
 - [Architecture Overview](#architecture-overview)
 - [Creating an Agent](#creating-an-agent)
+- [Running Your Agent](#running-your-agent)
 - [Prompt Building](#prompt-building)
 - [SWAIG Functions (SignalWire AI Gateway)](#swaig-functions)
 - [Skills System](#skills-system)
 - [Multilingual Support](#multilingual-support)
 - [Agent Configuration](#agent-configuration)
 - [Dynamic Agent Configuration](#dynamic-agent-configuration)
-  - [Overview](#overview)
-  - [Setting Up Dynamic Configuration](#setting-up-dynamic-configuration)
-  - [Dynamic Configuration Methods](#dynamic-configuration-methods)
-  - [Request Data Access](#request-data-access)
-  - [Configuration Examples](#configuration-examples)
-  - [Use Cases](#use-cases)
-  - [Migration Guide](#migration-guide)
-  - [Best Practices](#best-practices)
 - [Advanced Features](#advanced-features)
-  - [State Management](#state-management)
-  - [SIP Routing](#sip-routing)
-  - [Custom Routing](#custom-routing)
 - [Prefab Agents](#prefab-agents)
+- [Multi-Agent Hosting](#multi-agent-hosting)
 - [API Reference](#api-reference)
 - [Examples](#examples)
 
 ## Introduction
 
-The `AgentBase` class provides the foundation for creating AI-powered agents using the SignalWire AI Agent SDK. It extends the `SWMLService` class, inheriting all its SWML (SignalWire Markup Language) document creation and serving capabilities, while adding AI-specific functionality. SWML is the JSON document format that tells the SignalWire platform how an agent should behave during a call.
+The `agent::AgentBase` class provides the foundation for creating AI-powered agents in the C++ SDK. It extends `swml::Service`, inheriting all of its SWML (SignalWire Markup Language) document creation and serving capabilities, while adding AI-specific functionality. SWML is the JSON document format that tells the SignalWire platform how an agent should behave during a call.
 
 Key features of `AgentBase` include:
 
@@ -36,17 +27,26 @@ Key features of `AgentBase` include:
 - SWAIG (SignalWire AI Gateway) function definitions -- SWAIG is the platform's AI tool-calling system with native access to the media stack
 - Multilingual support
 - Agent configuration (hint handling, pronunciation rules, etc.)
-- State management for conversations
+- Multi-step / multi-context conversation flows
 
-This guide explains how to create and customize your own AI agents, with examples based on the SDK's sample implementations.
+This guide explains how to create and customize your own AI agents, with examples based on the SDK's sample implementations under `examples/`.
+
+The header to include is:
+
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+
+using namespace signalwire;
+using json = nlohmann::json;
+```
 
 ## Architecture Overview
 
 The Agent SDK architecture consists of several layers:
 
-1. **SWMLService**: The base layer for SWML document creation and serving
-2. **AgentBase**: Extends SWMLService with AI agent functionality
-3. **Custom Agents**: Your specific agent implementations that extend AgentBase
+1. **`swml::Service`**: The base layer for SWML document creation and serving
+2. **`agent::AgentBase`**: Extends `swml::Service` with AI agent functionality
+3. **Custom Agents**: Your specific agent implementations that extend `AgentBase`
 
 Here's how these components relate to each other:
 
@@ -56,194 +56,123 @@ Here's how these components relate to each other:
 └─────▲───────┘
       │
 ┌─────┴───────┐
-│  AgentBase  │ (Adds AI functionality to SWMLService)
+│  AgentBase  │ (Adds AI functionality to swml::Service)
 └─────▲───────┘
       │
 ┌─────┴───────┐
-│ SWMLService │ (Provides SWML document creation and web service)
+│ swml::Service │ (Provides SWML document creation and web service)
 └─────────────┘
 ```
 
 ## Creating an Agent
 
-To create an agent, extend the `AgentBase` class and define your agent's behavior:
+To create an agent, subclass `agent::AgentBase` and configure it in the constructor. The constructor signature is `AgentBase(name = "agent", route = "/", host = "0.0.0.0", port = 3000)`:
 
-```python
-from signalwire import AgentBase
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(
-            name="my-agent",
-            route="/agent",
-            host="0.0.0.0",
-            port=3000,
-            use_pom=True  # Enable Prompt Object Model
-        )
-        
-        # Define agent personality and behavior
-        self.prompt_add_section("Personality", body="You are a helpful and friendly assistant.")
-        self.prompt_add_section("Goal", body="Help users with their questions and tasks.")
-        self.prompt_add_section("Instructions", bullets=[
+using namespace signalwire;
+using json = nlohmann::json;
+
+class MyAgent : public agent::AgentBase {
+public:
+    MyAgent() : AgentBase("my-agent", "/agent", "0.0.0.0", 3000) {
+        // Define agent personality and behavior
+        prompt_add_section("Personality", "You are a helpful and friendly assistant.");
+        prompt_add_section("Goal", "Help users with their questions and tasks.");
+        prompt_add_section("Instructions", "", {
             "Answer questions clearly and concisely",
             "If you don't know, say so",
             "Use the provided tools when appropriate"
-        ])
-        
-        # Add a post-prompt for summary
-        self.set_post_prompt("Please summarize the key points of this conversation.")
+        });
+
+        // Add a post-prompt for summary
+        set_post_prompt("Please summarize the key points of this conversation.");
+    }
+};
 ```
+
+POM (the Prompt Object Model) is enabled by default. You can toggle it with `set_use_pom(false)` if you prefer to set the prompt as raw text.
 
 ## Running Your Agent
 
-The SignalWire AI Agent SDK provides a `run()` method that automatically detects the execution environment and configures the agent appropriately. This method works across all deployment modes:
+`AgentBase` provides three lifecycle methods:
 
-### Deployment with `run()`
+- `run()` — start the HTTP server (auto-detects a serverless environment when present, otherwise serves over HTTP)
+- `serve()` — start the HTTP server directly
+- `stop()` — stop the running server
 
-```python
-def main():
-    agent = MyAgent()
-    
-    print("Starting agent server...")
-    print("Note: Works in any deployment mode (server/CGI/Lambda)")
-    agent.run()  # Auto-detects environment
-
-if __name__ == "__main__":
-    main()
+```cpp
+int main() {
+    MyAgent agent;
+    std::cout << "Starting agent server at http://0.0.0.0:3000/agent\n";
+    agent.run();
+}
 ```
 
-The `run()` method automatically detects and configures for:
-
-- **HTTP Server**: When run directly, starts an HTTP server
-- **CGI**: When CGI environment variables are detected, operates in CGI mode  
-- **AWS Lambda**: When Lambda environment is detected, configures for serverless execution
-
-### Deployment Modes
-
-#### HTTP Server Mode
-When run directly (e.g., `python my_agent.py`), the agent starts an HTTP server:
-
-```python
-# Automatically starts HTTP server when run directly
-agent.run()
-```
-
-#### CGI Mode  
-When CGI environment variables are present, operates in CGI mode with clean HTTP output:
-
-```python
-# Same code - automatically detects CGI environment
-agent.run()
-```
-
-#### AWS Lambda Mode
-When AWS Lambda environment is detected, configures for serverless execution:
-
-```python
-# Same code - automatically detects Lambda environment  
-agent.run()
-```
-
-### Environment Detection
-
-The SDK automatically detects the execution environment:
-
-| Environment | Detection Method | Behavior |
-|-------------|------------------|----------|
-| **HTTP Server** | Default when no serverless environment detected | Starts FastAPI server on specified host/port |
-| **CGI** | `GATEWAY_INTERFACE` environment variable present | Processes single CGI request and exits |
-| **AWS Lambda** | `AWS_LAMBDA_FUNCTION_NAME` environment variable | Handles Lambda event/context |
-| **Google Cloud** | `FUNCTION_NAME` or `K_SERVICE` variables | Processes Cloud Function request |
-| **Azure Functions** | `AZURE_FUNCTIONS_*` variables | Handles Azure Function request |
-
-### Logging Configuration
-
-The SDK includes a central logging system that automatically configures based on the deployment environment:
-
-```python
-# Logging is automatically configured based on environment
-# No manual setup required in most cases
-
-# Optional: Override logging mode via environment variable
-# SIGNALWIRE_LOG_MODE=off      # Disable all logging
-# SIGNALWIRE_LOG_MODE=stderr   # Log to stderr
-# SIGNALWIRE_LOG_MODE=default  # Use default logging
-# SIGNALWIRE_LOG_MODE=auto     # Auto-detect (default)
-```
-
-The logging system automatically:
-- **CGI Mode**: Sets logging to 'off' to avoid interfering with HTTP headers
-- **Lambda Mode**: Configures appropriate logging for serverless environment
-- **Server Mode**: Uses structured logging with timestamps and levels
-- **Debug Mode**: Enhanced logging when debug flags are set
+The agent exposes its SWML document at its route and handles SWAIG function calls and post-prompt delivery on the corresponding endpoints automatically.
 
 ## Prompt Building
 
-There are several ways to build prompts for your agent:
+There are several ways to build prompts for your agent.
 
 ### 1. Using Prompt Sections (POM)
 
-The Prompt Object Model (POM) provides a structured way to build prompts:
+The Prompt Object Model (POM) provides a structured way to build prompts. `prompt_add_section(title, body, bullets)` takes a title, an optional body string, and an optional vector of bullet strings:
 
-```python
-# Add a section with just body text
-self.prompt_add_section("Personality", body="You are a friendly assistant.")
+```cpp
+// Add a section with just body text
+prompt_add_section("Personality", "You are a friendly assistant.");
 
-# Add a section with bullet points
-self.prompt_add_section("Instructions", bullets=[
+// Add a section with bullet points (empty body, then the bullets vector)
+prompt_add_section("Instructions", "", {
     "Answer questions clearly",
     "Be helpful and polite",
     "Use functions when appropriate"
-])
+});
 
-# Add a section with both body and bullets
-self.prompt_add_section("Context", 
-                       body="The user is calling about technical support.",
-                       bullets=["They may need help with their account", 
-                               "Check for existing tickets"])
+// Add a section with both body and bullets
+prompt_add_section("Context",
+    "The user is calling about technical support.",
+    {"They may need help with their account", "Check for existing tickets"});
 ```
 
-For convenience, the SDK also provides wrapper methods that some users may prefer:
+You can also nest a subsection under an existing section, or append to a section you have already created:
 
-```python
-# Convenience methods
-self.setPersonality("You are a friendly assistant.") 
-self.setGoal("Help users with their questions.")
-self.setInstructions([
-    "Answer questions clearly",
-    "Be helpful and polite"
-])
+```cpp
+prompt_add_subsection("Instructions", "Escalation",
+    "When to escalate to a human agent.",
+    {"After two failed attempts", "On explicit request"});
+
+prompt_add_to_section("Instructions", "Always confirm the caller's identity first.");
 ```
-
-These convenience methods call `prompt_add_section()` internally with the appropriate section titles.
 
 ### 2. Using Raw Text Prompts
 
-For simpler agents, you can set the prompt directly as text:
+For simpler agents, you can set the prompt directly as text. This switches the agent out of POM mode:
 
-```python
-self.set_prompt_text("""
-You are a helpful assistant. Your goal is to provide clear and concise information
-to the user. Answer their questions to the best of your ability.
-""")
+```cpp
+set_use_pom(false);
+set_prompt_text(
+    "You are a helpful assistant. Your goal is to provide clear and concise "
+    "information to the user. Answer their questions to the best of your ability.");
 ```
 
 ### 3. Setting a Post-Prompt
 
 The post-prompt is sent to the AI after the conversation for summary or analysis:
 
-```python
-self.set_post_prompt("""
-Analyze the conversation and extract:
-1. Main topics discussed
-2. Action items or follow-ups needed
-3. Whether the user's questions were answered satisfactorily
-""")
+```cpp
+set_post_prompt(
+    "Analyze the conversation and extract:\n"
+    "1. Main topics discussed\n"
+    "2. Action items or follow-ups needed\n"
+    "3. Whether the user's questions were answered satisfactorily");
 ```
 
 ## SWAIG Functions
 
-SWAIG (SignalWire AI Gateway) functions allow the AI agent to perform actions and access external systems during a call. The AI decides when to call a function based on the conversation; SWAIG handles invocation, parameter passing, and delivering the result back to the AI. There are two types of SWAIG functions you can define:
+SWAIG (SignalWire AI Gateway) functions allow the AI agent to perform actions and access external systems during a call. The AI decides when to call a function based on the conversation; SWAIG handles invocation, parameter passing, and delivering the result back to the AI.
 
 ### SWAIG functions ARE LLM tools — descriptions matter
 
@@ -265,7 +194,7 @@ That schema is sent to the model as part of the same API call that produces the 
 - the **function `description`** to decide WHEN to call this tool
 - the **per-parameter `description` strings** inside `parameters` to decide HOW to fill in each argument
 
-This means **descriptions are prompt engineering**, not developer documentation. They are not a comment for the next human reading the code — they are instructions to the LLM that directly determine whether the model picks your tool when the user's request matches it.
+This means **descriptions are prompt engineering**, not developer documentation. They are instructions to the LLM that directly determine whether the model picks your tool when the user's request matches it.
 
 Compare:
 
@@ -274,2785 +203,861 @@ Compare:
 | `description: "Lookup function"` | `description: "Look up a customer's account details by their account number. Use this BEFORE quoting any account-specific information (balance, plan, status, billing date). Don't use it for general product questions."` |
 | `description: "the id"` (parameter) | `description: "The customer's 8-digit account number, no dashes or spaces. Ask the user if they don't provide it."` |
 
-A vague description is the #1 cause of "the model has the right tool but doesn't call it" failures. When you find yourself debugging why the model isn't picking a tool that obviously matches the user's request, the first thing to check is whether the description tells the model — in plain language — when to use it and what makes it the right choice over sibling tools.
+A vague description is the #1 cause of "the model has the right tool but doesn't call it" failures.
 
-**Tool count matters too.** LLM tool selection accuracy degrades noticeably past ~7-8 simultaneously-active tools per call. If you have many tools, partition them across steps using `step.set_functions(...)` so only the relevant subset is active at any moment. See `contexts_guide.md` for the per-step whitelist mechanism.
+**Tool count matters too.** LLM tool selection accuracy degrades noticeably past ~7-8 simultaneously-active tools per call. If you have many tools, partition them across steps using `contexts::Step::set_functions(...)` so only the relevant subset is active at any moment. See the [Contexts](#multi-step-and-multi-context-flows) section.
 
-### 1. Local Webhook Functions (Standard)
+### Defining a Tool
 
-These are the traditional SWAIG functions that are handled locally by your agent:
+Register a tool with `define_tool(name, description, parameters, handler, secure = false)`. The `parameters` argument is a JSON-Schema object. The handler is a `swaig::ToolHandler`, which is `std::function<swaig::FunctionResult(const json& args, const json& raw_data)>`:
 
-```python
-from signalwire.core.function_result import SwaigFunctionResult
-
-@AgentBase.tool(
-    name="get_weather",
-    description="Get the current weather for a location",
-    parameters={
-        "location": {
-            "type": "string",
-            "description": "The city or location to get weather for"
-        }
-    },
-    secure=True  # Optional, defaults to True
-)
-def get_weather(self, args, raw_data):
-    # Extract the location parameter
-    location = args.get("location", "Unknown location")
-    
-    # Here you would typically call a weather API
-    # For this example, we'll return mock data
-    weather_data = f"It's sunny and 72°F in {location}."
-    
-    # Return a SwaigFunctionResult
-    return SwaigFunctionResult(weather_data)
+```cpp
+define_tool("get_weather", "Get the current weather for a location",
+    {{"type", "object"}, {"properties", {
+        {"location", {{"type", "string"}, {"description", "The city or location to get weather for"}}}
+    }}},
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)raw;
+        std::string location = args.value("location", "Unknown location");
+        // Here you would typically call a weather API; we return mock data.
+        return swaig::FunctionResult("It's sunny and 72F in " + location + ".");
+    });
 ```
 
-### 2. External Webhook Functions
+The handler receives the parsed function arguments (`args`) and the full raw request payload (`raw_data`).
 
-External webhook functions allow you to delegate function execution to external services instead of handling them locally. This is useful when you want to:
-- Use existing web services or APIs directly
-- Distribute function processing across multiple servers
-- Integrate with third-party systems that provide their own endpoints
+### Building Parameter Schemas with `ParameterSchema`
 
-To create an external webhook function, add a `webhook_url` parameter to the decorator:
+Writing JSON Schema by hand is error-prone. The `swaig::ParameterSchema` builder produces byte-identical wire JSON via a typed fluent API and converts implicitly to `json`:
 
-```python
-@AgentBase.tool(
-    name="get_weather_external",
-    description="Get weather from external service",
-    parameters={
-        "location": {
-            "type": "string",
-            "description": "The city or location to get weather for"
-        }
-    },
-    webhook_url="https://your-service.com/weather-endpoint"
-)
-def get_weather_external(self, args, raw_data):
-    # This function will never be called locally when webhook_url is provided
-    # The external service at webhook_url will receive the function call instead
-    return SwaigFunctionResult("This should not be reached for external webhooks")
+```cpp
+auto params = swaig::ParameterSchema{}
+    .string("location", "The city or location to get weather for")
+    .enum_of("units", {"celsius", "fahrenheit"}, "Temperature units")
+    .required({"location"});
+
+define_tool("get_weather", "Get the current weather for a location", params,
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)raw;
+        return swaig::FunctionResult("It's sunny in " + args.value("location", ""));
+    });
 ```
 
-#### How External Webhooks Work
-
-When you specify a `webhook_url`:
-
-1. **Function Registration**: The function is registered with your agent as usual
-2. **SWML Generation**: The generated SWML includes the external webhook URL instead of your local endpoint
-3. **SignalWire Processing**: When the AI calls the function, SignalWire makes an HTTP POST request directly to your external URL
-4. **Payload Format**: The external service receives a JSON payload with the function call data:
-
-```json
-{
-    "function": "get_weather_external",
-    "argument": {
-        "parsed": [{"location": "New York"}],
-        "raw": "{\"location\": \"New York\"}"
-    },
-    "call_id": "abc123-def456-ghi789",
-    "call": { /* call information */ },
-    "vars": { /* call variables */ }
-}
-```
-
-5. **Response Handling**: Your external service should return a JSON response that SignalWire will process.
-
-#### Mixing Local and External Functions
-
-You can mix both types of functions in the same agent:
-
-```python
-class HybridAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="hybrid-agent", route="/hybrid")
-    
-    # Local function - handled by this agent
-    @AgentBase.tool(
-        name="get_help",
-        description="Get help information",
-        parameters={}
-    )
-    def get_help(self, args, raw_data):
-        return SwaigFunctionResult("I can help you with weather and news!")
-    
-    # External function - handled by external service
-    @AgentBase.tool(
-        name="get_weather",
-        description="Get current weather",
-        parameters={
-            "location": {"type": "string", "description": "City name"}
-        },
-        webhook_url="https://weather-service.com/api/weather"
-    )
-    def get_weather_external(self, args, raw_data):
-        # This won't be called for external webhooks
-        pass
-    
-    # Another external function - different service
-    @AgentBase.tool(
-        name="get_news",
-        description="Get latest news",
-        parameters={
-            "topic": {"type": "string", "description": "News topic"}
-        },
-        webhook_url="https://news-service.com/api/news"
-    )
-    def get_news_external(self, args, raw_data):
-        # This won't be called for external webhooks
-        pass
-```
-
-#### Testing External Webhooks
-
-You can test external webhook functions using the CLI tool:
-
-```bash
-# Test local function
-swaig-test examples/my_agent.py --exec get_help
-
-# Test external webhook function
-swaig-test examples/my_agent.py --verbose --exec get_weather --location "New York"
-
-# List all functions with their types
-swaig-test examples/my_agent.py --list-tools
-```
-
-The CLI tool will automatically detect external webhook functions and make HTTP requests to the external services, simulating what SignalWire does in production.
-
-### 3. Type-Hinted Functions
-
-Instead of writing JSON Schema by hand, you can use Python type hints and the SDK will infer the schema automatically:
-
-```python
-from typing import Optional, Literal
-
-@AgentBase.tool(name="get_weather")
-def get_weather(self, city: str, units: Literal["celsius", "fahrenheit"] = "celsius"):
-    """Get the weather forecast.
-
-    Args:
-        city: Name of the city to look up
-        units: Temperature units to use
-    """
-    return SwaigFunctionResult(f"It's sunny in {city} (showing {units})")
-```
-
-The SDK automatically:
-- Infers parameter types from type hints (`str` → `"string"`, `int` → `"integer"`, etc.)
-- Marks parameters without defaults as required
-- Extracts the tool description from the docstring's first line
-- Extracts per-parameter descriptions from the `Args:` block
-- Handles `Optional[X]` as a non-required parameter
-- Converts `Literal["a", "b"]` to `enum` values
-
-**Supported types:**
-
-| Python Type | JSON Schema Type |
-|---|---|
-| `str` | `"string"` |
-| `int` | `"integer"` |
-| `float` | `"number"` |
-| `bool` | `"boolean"` |
-| `list` / `List[X]` | `"array"` (with `items` if parameterized) |
-| `dict` | `"object"` |
-| `Literal["a", "b"]` | `"string"` with `enum` |
-| `Optional[X]` | type of `X`, not required |
-
-**Rules:**
-- If `parameters=` is provided explicitly, it always takes precedence over inference
-- The `raw_data` parameter is special: if included in the signature, it receives the raw request data but is excluded from the schema
-- Old-style `(self, args, raw_data)` handlers continue to work exactly as before
-
-**Accessing raw_data in typed handlers:**
-
-```python
-@AgentBase.tool(name="check_call")
-def check_call(self, query: str, raw_data: dict = None):
-    """Check the current call."""
-    call_id = raw_data.get("call_id", "unknown") if raw_data else "unknown"
-    return SwaigFunctionResult(f"Call {call_id}: query={query}")
-```
+`ParameterSchema` supports `string`, `integer`, `number`, `boolean`, `enum_of`, `array_of`, `object_of`, a raw `property(name, json)` escape hatch, and `required(...)` / `require(...)`.
 
 ### Function Parameters
 
-The parameters for a SWAIG function are defined using JSON Schema:
+The parameters for a SWAIG function are a JSON-Schema object. Each property can carry validation attributes:
 
-```python
-parameters={
-    "parameter_name": {
-        "type": "string", # Can be string, number, integer, boolean, array, object
-        "description": "Description of the parameter",
-        # Optional attributes:
-        "enum": ["option1", "option2"],  # For enumerated values
-        "minimum": 0,  # For numeric types
-        "maximum": 100,  # For numeric types
-        "pattern": "^[A-Z]+$"  # For string validation
-    }
-}
+```cpp
+json parameters = {
+    {"type", "object"},
+    {"properties", {
+        {"parameter_name", {
+            {"type", "string"},          // string, number, integer, boolean, array, object
+            {"description", "Description of the parameter"},
+            {"enum", {"option1", "option2"}},  // for enumerated values
+            {"pattern", "^[A-Z]+$"}            // for string validation
+        }}
+    }}
+};
 ```
 
 ### Function Results
 
-To return results from a SWAIG function, use the `SwaigFunctionResult` class:
+To return results from a SWAIG function, build a `swaig::FunctionResult`. Every action method returns `*this`, so calls chain:
 
-```python
-# Basic result with just text
-return SwaigFunctionResult("Here's the result")
+```cpp
+// Basic result with just text
+return swaig::FunctionResult("Here's the result");
 
-# Result with a single action
-return SwaigFunctionResult("Here's the result with an action")
-       .add_action("say", "I found the information you requested.")
+// Result with a single manual action
+return swaig::FunctionResult("Here's the result with an action")
+    .add_action("say", "I found the information you requested.");
 
-# Result with multiple actions using add_actions
-return SwaigFunctionResult("Multiple actions example")
-       .add_actions([
-           {"playback_bg": {"file": "https://example.com/music.mp3"}},
-           {"set_global_data": {"key": "value"}}
-       ])
-
-# Alternative way to add multiple actions sequentially
-return (
-    SwaigFunctionResult("Sequential actions example")
-    .add_action("say", "I found the information you requested.")
-    .add_action("playback_bg", {"file": "https://example.com/music.mp3"})
-)
+// Result with multiple manual actions
+return swaig::FunctionResult("Multiple actions example")
+    .add_actions({
+        {{"playback_bg", {{"file", "https://example.com/music.mp3"}}}},
+        {{"set_global_data", {{"key", "value"}}}}
+    });
 ```
 
-In the examples above:
-- `add_action(name, data)` adds a single action with the given name and data
-- `add_actions(actions)` adds multiple actions at once from a list of action objects
+`add_action(name, data)` adds a single action with the given name and data; `add_actions(actions)` adds several at once from a vector of JSON action objects. The full list of typed action helpers (`connect`, `send_sms`, `say`, `record_call`, and more) is documented in [swaig_reference.md](swaig_reference.md).
 
 ### Native Functions
 
-The agent can use SignalWire's built-in functions:
+The agent can enable SignalWire's built-in (native) functions:
 
-```python
-# Enable native functions
-self.set_native_functions([
-    "check_time",
-    "wait_seconds"
-])
+```cpp
+set_native_functions({"check_time", "wait_seconds"});
 ```
 
 ### Function Includes
 
-You can include functions from remote sources:
+You can include functions from remote sources with `add_function_include(json)`:
 
-```python
-# Include remote functions
-self.add_function_include(
-    url="https://api.example.com/functions",
-    functions=["get_weather", "get_news"],
-    meta_data={"session_id": "unique-session-123"}  # Use for session tracking, NOT credentials
-)
+```cpp
+add_function_include({
+    {"url", "https://api.example.com/functions"},
+    {"functions", {"get_weather", "get_news"}},
+    {"meta_data", {{"session_id", "unique-session-123"}}}  // session tracking, NOT credentials
+});
 ```
 
 ### SWAIG Function Security
 
-The SDK implements an automated security mechanism for SWAIG functions to ensure that only authorized calls can be made to your functions. This is important because SWAIG functions often provide access to sensitive operations or data.
+SWAIG functions can be secured with a per-call token mechanism. Pass `secure = true` as the final argument to `define_tool(...)` for functions that should require a valid token:
 
-#### Token-Based Security
-
-By default, all SWAIG functions are marked as `secure=True`, which enables token-based security:
-
-```python
-@agent.tool(
-    name="get_account_details",
-    description="Get customer account details",
-    parameters={"account_id": {"type": "string"}},
-    secure=True  # This is the default, can be omitted
-)
-def get_account_details(self, args, raw_data):
-    # Implementation
+```cpp
+define_tool("get_account_details", "Get customer account details",
+    swaig::ParameterSchema{}.string("account_id", "The customer's account ID").required({"account_id"}),
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)raw;
+        return swaig::FunctionResult("Account " + args.value("account_id", "") + " is in good standing.");
+    },
+    /*secure=*/true);
 ```
 
-When a function is marked as secure:
+When a function is marked secure, a token is generated and embedded in the function's URL when the SWML document is rendered, then validated before the function executes. These tokens are:
 
-1. The SDK automatically generates a secure token for each function when rendering the SWML document
-2. The token is added to the function's URL as a query parameter: `?token=X2FiY2RlZmcuZ2V0X3RpbWUuMTcxOTMxNDI1...`
-3. When the function is called, the token is validated before executing the function
+- **Stateless and self-contained**: the system does not store tokens or track sessions
+- **Function-specific**: a token for one function cannot be used for another
+- **Session-bound**: tied to a specific call/session ID
+- **Cryptographically signed**: they cannot be tampered with or forged
 
-These security tokens have important properties:
-- **Completely stateless**: The system doesn't need to store tokens or track sessions
-- **Self-contained**: Each token contains all information needed for validation
-- **Function-specific**: A token for one function can't be used for another
-- **Session-bound**: Tokens are tied to a specific call/session ID
-- **Time-limited**: Tokens expire after a configurable duration (default: 60 minutes)
-- **Cryptographically signed**: Tokens can't be tampered with or forged
+The token system is backed by an HMAC-SHA256 `security::SessionManager`. You can mint and validate tokens directly:
 
-This stateless design provides several benefits:
-- **Server resilience**: Tokens remain valid even if the server restarts
-- **No memory consumption**: No need to track sessions or store tokens in memory
-- **High scalability**: Multiple servers can validate tokens without shared state
-- **Load balancing**: Requests can be distributed across multiple servers freely
-
-The token system secures both SWAIG functions and post-prompt endpoints:
-- SWAIG function calls for interactive AI capabilities
-- Post-prompt requests for receiving conversation summaries
-
-You can disable token security for specific functions when appropriate:
-
-```python
-@agent.tool(
-    name="get_public_information",
-    description="Get public information that doesn't require security",
-    parameters={},
-    secure=False  # Disable token security for this function
-)
-def get_public_information(self, args, raw_data):
-    # Implementation
+```cpp
+std::string token = create_tool_token("get_account_details", call_id);
+bool ok = validate_tool_token("get_account_details", token, call_id);
 ```
 
-#### Token Expiration
-
-The default token expiration is 60 minutes (3600 seconds), but you can configure this when initializing your agent:
-
-```python
-agent = MyAgent(
-    name="my_agent",
-    token_expiry_secs=1800  # Set token expiration to 30 minutes
-)
-```
-
-The expiration timer resets each time a function is successfully called, so as long as there is activity at least once within the expiration period, the tokens will remain valid throughout the entire conversation.
-
-#### Custom Token Validation
-
-You can override the default token validation by implementing your own `validate_tool_token` method in your custom agent class.
+This stateless design lets tokens remain valid across server restarts and allows requests to be load-balanced across multiple servers without shared state.
 
 ## Skills System
 
-The Skills System allows you to extend your agents with reusable capabilities via one-liner calls. Skills are modular, reusable components that can be easily added to any agent and configured with parameters.
+The Skills System lets you extend agents with reusable capabilities via one-liner calls. Add a skill with `add_skill(name, params)`, where `params` is an optional JSON object:
 
-### Quick Start
+```cpp
+class SkillfulAgent : public agent::AgentBase {
+public:
+    SkillfulAgent() : AgentBase("skillful-agent", "/skillful") {
+        // Add skills with one-liners
+        add_skill("web_search");   // Web search capability
+        add_skill("datetime");     // Current date/time info
+        add_skill("math");         // Mathematical calculations
 
-```python
-from signalwire import AgentBase
-
-class SkillfulAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="skillful-agent", route="/skillful")
-        
-        # Add skills with one-liners
-        self.add_skill("web_search")    # Web search capability
-        self.add_skill("datetime")      # Current date/time info
-        self.add_skill("math")          # Mathematical calculations
-        
-        # Configure skills with parameters
-        self.add_skill("web_search", {
-            "num_results": 3,  # Get 3 search results instead of default 1
-            "delay": 0.5       # Add delay between requests
-        })
+        // Configure a skill with parameters
+        add_skill("web_search", {
+            {"num_results", 3},  // Get 3 search results instead of the default
+            {"delay", 0.5}       // Add delay between requests
+        });
+    }
+};
 ```
 
-### Available Built-in Skills
+### Typed Skill Names
 
-#### Web Search Skill (`web_search`)
-Provides web search capabilities using Google Custom Search API with web scraping.
+For built-in skills you can use the `skills::SkillName` enum instead of a bare string. The enum gives editor autocompletion and catches typos at the call site; it loads the identical skill as the string form:
 
-**Requirements:**
-- Packages: `beautifulsoup4`, `requests`
-
-**Parameters:**
-- `api_key` (required): Google Custom Search API key
-- `search_engine_id` (required): Google Custom Search Engine ID
-- `num_results` (default: 1): Number of search results to return
-- `delay` (default: 0): Delay in seconds between requests
-- `tool_name` (default: "web_search"): Custom name for the search tool
-- `no_results_message` (default: "I couldn't find any results for '{query}'. This might be due to a very specific query or temporary issues. Try rephrasing your search or asking about a different topic."): Custom message to return when no search results are found. Use `{query}` as a placeholder for the search query.
-
-**Multiple Instance Support:**
-The web_search skill supports multiple instances with different search engines and tool names, allowing you to search different data sources:
-
-**Example:**
-```python
-# Basic single instance
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id"
-})
-# Creates tool: web_search
-
-# Fast single result (previous default)
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id",
-    "num_results": 1,
-    "delay": 0
-})
-
-# Multiple results with delay
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id",
-    "num_results": 5,
-    "delay": 1.0
-})
-
-# Multiple instances with different search engines
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "general-search-engine-id",
-    "tool_name": "search_general",
-    "num_results": 1
-})
-# Creates tool: search_general
-
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "news-search-engine-id",
-    "tool_name": "search_news",
-    "num_results": 3,
-    "delay": 0.5
-})
-# Creates tool: search_news
-
-# Custom no results message
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id",
-    "no_results_message": "Sorry, I couldn't find information about '{query}'. Please try a different search term."
-})
+```cpp
+add_skill(skills::SkillName::Datetime);   // typed, autocompleted
+add_skill("datetime");                    // string still works
+add_skill("my_custom_skill");             // open set: custom skills are fine
 ```
-
-#### DateTime Skill (`datetime`)
-Provides current date and time information with timezone support.
-
-**Requirements:**
-- Packages: `pytz`
-
-**Tools Added:**
-- `get_current_time`: Get current time with optional timezone
-- `get_current_date`: Get current date with optional timezone
-
-**Example:**
-```python
-agent.add_skill("datetime")
-# Agent can now tell users the current time and date
-```
-
-#### Math Skill (`math`)
-Provides safe mathematical expression evaluation.
-
-**Requirements:**
-- None (uses built-in Python functionality)
-
-**Tools Added:**
-- `calculate`: Evaluate mathematical expressions safely
-
-**Example:**
-```python
-agent.add_skill("math")
-# Agent can now perform calculations like "2 + 3 * 4"
-```
-
-#### DataSphere Skill (`datasphere`)
-Provides knowledge search capabilities using SignalWire DataSphere, a cloud-hosted document search and retrieval-augmented generation (RAG) service.
-
-**Requirements:**
-- Packages: `requests`
-
-**Parameters:**
-- `space_name` (required): SignalWire space name
-- `project_id` (required): SignalWire project ID 
-- `token` (required): SignalWire authentication token
-- `document_id` (required): DataSphere document ID to search
-- `count` (default: 1): Number of search results to return
-- `distance` (default: 3.0): Distance threshold for search matching
-- `tags` (optional): List of tags to filter search results
-- `language` (optional): Language code to limit search
-- `pos_to_expand` (optional): List of parts of speech for synonym expansion (e.g., ["NOUN", "VERB"])
-- `max_synonyms` (optional): Maximum number of synonyms to use for each word
-- `tool_name` (default: "search_knowledge"): Custom name for the search tool
-- `no_results_message` (default: "I couldn't find any relevant information for '{query}' in the knowledge base. Try rephrasing your question or asking about a different topic."): Custom message when no results found
-
-**Multiple Instance Support:**
-The DataSphere skill supports multiple instances with different tool names, allowing you to search multiple knowledge bases:
-
-**Example:**
-```python
-# Basic single instance
-agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project",
-    "token": "my-token",
-    "document_id": "general-knowledge"
-})
-# Creates tool: search_knowledge
-
-# Multiple instances for different knowledge bases
-agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project", 
-    "token": "my-token",
-    "document_id": "product-docs",
-    "tool_name": "search_products",
-    "tags": ["Products", "Features"],
-    "count": 3
-})
-# Creates tool: search_products
-
-agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project",
-    "token": "my-token", 
-    "document_id": "support-kb",
-    "tool_name": "search_support",
-    "no_results_message": "I couldn't find support information about '{query}'. Try contacting our support team.",
-    "distance": 5.0
-})
-# Creates tool: search_support
-```
-
-#### Native Vector Search Skill (`native_vector_search`)
-Provides local document search capabilities using vector similarity and keyword search. This skill works entirely offline with local `.swsearch` index files or can connect to remote search servers.
-
-**Requirements:**
-- Packages: `sentence-transformers`, `scikit-learn`, `numpy` (install with `pip install signalwire-agents[search]`)
-
-**Parameters:**
-- `tool_name` (default: "search_knowledge"): Custom name for the search tool
-- `description` (default: "Search the local knowledge base for information"): Tool description
-- `index_file` (optional): Path to local `.swsearch` index file
-- `remote_url` (optional): URL of remote search server (e.g., "http://localhost:8001")
-- `index_name` (default: "default"): Index name on remote server (for remote mode)
-- `build_index` (default: False): Auto-build index if missing
-- `source_dir` (optional): Source directory for auto-building index
-- `file_types` (default: ["md", "txt"]): File types to include when building index
-- `count` (default: 3): Number of search results to return
-- `distance_threshold` (default: 0.0): Minimum similarity score for results
-- `tags` (optional): List of tags to filter search results
-- `response_prefix` (optional): Text to prepend to all search responses
-- `response_postfix` (optional): Text to append to all search responses
-- `no_results_message` (default: "No information found for '{query}'"): Custom message when no results found
-
-**Multiple Instance Support:**
-The native vector search skill supports multiple instances with different indexes and tool names:
-
-**Example:**
-```python
-# Local mode with auto-build
-agent.add_skill("native_vector_search", {
-    "tool_name": "search_docs",
-    "description": "Search SDK concepts guide",
-    "build_index": True,
-    "source_dir": "./docs",
-    "index_file": "concepts.swsearch",
-    "count": 5
-})
-# Creates tool: search_docs
-
-# Remote mode connecting to search server
-agent.add_skill("native_vector_search", {
-    "tool_name": "search_knowledge",
-    "description": "Search the knowledge base",
-    "remote_url": "http://localhost:8001",
-    "index_name": "concepts",
-    "count": 3
-})
-# Creates tool: search_knowledge
-
-# Multiple local indexes
-agent.add_skill("native_vector_search", {
-    "tool_name": "search_examples",
-    "description": "Search code examples",
-    "index_file": "examples.swsearch",
-    "response_prefix": "From the examples:"
-})
-# Creates tool: search_examples
-
-# Voice-optimized responses using concepts guide
-agent.add_skill("native_vector_search", {
-    "tool_name": "search_docs",
-    "index_file": "concepts.swsearch",
-    "response_prefix": "Based on the comprehensive SDK guide:",
-    "response_postfix": "Would you like more specific information?",
-    "no_results_message": "I couldn't find information about '{query}' in the concepts guide."
-})
-```
-
-**Building Search Indexes:**
-Before using local mode, you need to build search indexes:
-
-```bash
-# Build index from documentation
-python -m signalwire.cli.build_search docs --output docs.swsearch
-
-# Build with custom settings
-python -m signalwire.cli.build_search ./knowledge \
-    --output knowledge.swsearch \
-    --file-types md,txt,pdf \
-    --chunk-size 500 \
-    --verbose
-```
-
-For complete documentation on the search system, see [Search Overview](search_overview.md).
 
 ### Skill Management
 
-```python
-# Check what skills are loaded
-loaded_skills = agent.list_skills()
-print(f"Loaded skills: {', '.join(loaded_skills)}")
+```cpp
+// Check what skills are loaded
+std::vector<std::string> loaded = list_skills();
 
-# Check if a specific skill is loaded
-if agent.has_skill("web_search"):
-    print("Web search is available")
+// Check if a specific skill is loaded
+if (has_skill("web_search")) {
+    // Web search is available
+}
 
-# Remove a skill (if needed)
-agent.remove_skill("math")
+// Remove a skill
+remove_skill("math");
 ```
 
-### Advanced Skill Configuration with swaig_fields
+### Configuring Skills with Parameters
 
-Skills support a special `swaig_fields` parameter that allows you to customize how SWAIG functions are registered. When you pass `swaig_fields` to a skill, they are automatically merged into all tool definitions created by that skill through the `SkillBase.define_tool()` wrapper method.
+Skill parameters are passed as a JSON object. For example, the web-search skill accepts an API key, a search-engine ID, a result count, a delay, and a custom tool name:
 
-```python
-# Add a skill with swaig_fields to customize SWAIG function properties
-agent.add_skill("math", {
-    "precision": 2,  # Regular skill parameter
-    "swaig_fields": {  # Special fields merged into SWAIG function automatically
-        "secure": False,  # Override default security requirement
-        "fillers": {
-            "en-US": ["Let me calculate that...", "Computing the result..."],
-            "es-ES": ["Déjame calcular eso...", "Calculando el resultado..."]
-        }
-    }
-})
-
-# Add web search with custom security and fillers
-agent.add_skill("web_search", {
-    "num_results": 3,
-    "delay": 0.5,
-    "swaig_fields": {
-        "secure": True,  # Require authentication
-        "fillers": {
-            "en-US": ["Searching the web...", "Looking that up...", "Finding information..."]
-        }
-    }
-})
+```cpp
+add_skill("web_search", {
+    {"api_key", "your-google-api-key"},
+    {"search_engine_id", "your-search-engine-id"},
+    {"num_results", 3},
+    {"delay", 0.5},
+    {"tool_name", "search_news"}  // custom name for the registered tool
+});
 ```
 
-The `swaig_fields` can include any parameter accepted by `AgentBase.define_tool()`:
-- `secure`: Boolean indicating if the function requires authentication
-- `fillers`: Dictionary mapping language codes to arrays of filler phrases
-- Any other fields supported by the SWAIG function system
+Choose parameters for your use case — a single fast result for customer service, or several results with a delay for research:
 
-**Implementation Note**: The `SkillBase` class provides a `define_tool()` wrapper method that automatically injects `swaig_fields` into all tool definitions. Skills should use `self.define_tool()` instead of `self.agent.define_tool()` to get automatic swaig_fields support without manual handling.
-
-### Error Handling
-
-The skills system provides detailed error messages for common issues:
-
-```python
-try:
-    agent.add_skill("web_search")
-except ValueError as e:
-    print(f"Failed to load skill: {e}")
-    # Output: "Failed to load skill 'web_search': Missing required environment variables: ['GOOGLE_SEARCH_API_KEY']"
+```cpp
+add_skill("web_search", {{"num_results", 1}, {"delay", 0}});    // for speed
+add_skill("web_search", {{"num_results", 5}, {"delay", 1.0}});  // for research
 ```
-
-### Creating Custom Skills
-
-You can create your own skills by extending the `SkillBase` class:
-
-```python
-from signalwire.core.skill_base import SkillBase
-from signalwire.core.function_result import SwaigFunctionResult
-
-class WeatherSkill(SkillBase):
-    """A custom skill for weather information"""
-    
-    SKILL_NAME = "weather"
-    SKILL_DESCRIPTION = "Get weather information for locations"
-    SKILL_VERSION = "1.0.0"
-    REQUIRED_PACKAGES = ["requests"]
-    REQUIRED_ENV_VARS = ["WEATHER_API_KEY"]
-    
-    def setup(self) -> bool:
-        """Setup the skill - validate dependencies and initialize"""
-        if not self.validate_env_vars() or not self.validate_packages():
-            return False
-        
-        # Get configuration parameters
-        self.default_units = self.params.get('units', 'fahrenheit')
-        self.timeout = self.params.get('timeout', 10)
-        
-        return True
-    
-    def register_tools(self) -> None:
-        """Register tools with the agent"""
-        self.define_tool(
-            name="get_weather",
-            description="Get current weather for a location",
-            parameters={
-                "location": {
-                    "type": "string",
-                    "description": "City or location name"
-                },
-                "units": {
-                    "type": "string",
-                    "description": "Temperature units (fahrenheit or celsius)",
-                    "enum": ["fahrenheit", "celsius"]
-                }
-            },
-            handler=self._get_weather_handler
-        )
-    
-    def _get_weather_handler(self, args, raw_data):
-        """Handle weather requests"""
-        location = args.get("location", "")
-        units = args.get("units", self.default_units)
-        
-        if not location:
-            return SwaigFunctionResult("Please provide a location")
-        
-        # Your weather API integration here
-        weather_data = f"Weather for {location}: 72°F and sunny"
-        return SwaigFunctionResult(weather_data)
-    
-    def get_hints(self) -> List[str]:
-        """Return speech recognition hints"""
-        return ["weather", "temperature", "forecast", "conditions"]
-    
-    def get_prompt_sections(self) -> List[Dict[str, Any]]:
-        """Return prompt sections to add to agent"""
-        return [
-            {
-                "title": "Weather Information",
-                "body": "You can provide current weather information for any location.",
-                "bullets": [
-                    "Use get_weather tool when users ask about weather",
-                    "Always specify the location clearly",
-                    "Include temperature and conditions in your response"
-                ]
-            }
-        ]
-```
-
-**Using the custom skill:**
-```python
-# Place the skill in signalwire/skills/weather/skill.py
-# Then use it in your agent:
-
-agent.add_skill("weather", {
-    "units": "celsius",
-    "timeout": 15
-})
-```
-
-### Skills with Dynamic Configuration
-
-Skills work with dynamic configuration:
-
-```python
-class DynamicSkillAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="dynamic-skill-agent")
-        self.set_dynamic_config_callback(self.configure_per_request)
-    
-    def configure_per_request(self, query_params, body_params, headers, agent):
-        # Add different skills based on request parameters
-        tier = query_params.get('tier', 'basic')
-        
-        # Basic skills for all users
-        agent.add_skill("datetime")
-        agent.add_skill("math")
-        
-        # Premium skills for premium users
-        if tier == 'premium':
-            agent.add_skill("web_search", {
-                "num_results": 5,
-                "delay": 0.5
-            })
-        elif tier == 'basic':
-            agent.add_skill("web_search", {
-                "num_results": 1,
-                "delay": 0
-            })
-```
-
-### Best Practices
-
-1. **Choose appropriate parameters**: Configure skills for your use case
-   ```python
-   # For speed (customer service)
-   agent.add_skill("web_search", {"num_results": 1, "delay": 0})
-   
-   # For research (detailed analysis)
-   agent.add_skill("web_search", {"num_results": 5, "delay": 1.0})
-   ```
-
-2. **Handle missing dependencies gracefully**:
-   ```python
-   try:
-       agent.add_skill("web_search")
-   except ValueError as e:
-       self.logger.warning(f"Web search unavailable: {e}")
-       # Continue without web search capability
-   ```
-
-3. **Document your custom skills**: Include clear descriptions and parameter documentation
-
-4. **Test skills in isolation**: Create simple test scripts to verify skill functionality
-
-For more detailed information about the skills system architecture and advanced customization, see the [Skills System README](SKILLS_SYSTEM_README.md).
 
 ## Multilingual Support
 
-Agents can support multiple languages:
+Agents can support multiple languages. `add_language(LanguageConfig)` takes a brace-initialized `agent::LanguageConfig` whose fields are `{name, code, voice, engine, fillers, params}`. Only `name`, `code`, and `voice` are required:
 
-```python
-# Add English language
-self.add_language(
-    name="English",
-    code="en-US",
-    voice="en-US-Neural2-F",
-    speech_fillers=["Let me think...", "One moment please..."],
-    function_fillers=["I'm looking that up...", "Let me check that..."]
-)
+```cpp
+// Simple form: name, code, voice
+add_language({"English", "en-US", "inworld.Mark"});
+add_language({"Spanish", "es", "rime.spore:multilingual"});
 
-# Add Spanish language
-self.add_language(
-    name="Spanish",
-    code="es",
-    voice="rime.spore:multilingual",
-    speech_fillers=["Un momento por favor...", "Estoy pensando..."]
-)
+// With an explicit engine and per-language params
+add_language({"British English", "en-GB", "spore", "rime"});
 ```
 
-### Voice Formats
+You can replace the whole list with `set_languages(...)`, and set engine-specific tuning on an already-added language with `set_language_params(code, params)`:
 
-There are different ways to specify voices:
+```cpp
+set_languages({
+    {"English", "en-US", "inworld.Mark"},
+    {"Spanish", "es", "inworld.Sarah"}
+});
 
-```python
-# Simple format
-self.add_language(name="English", code="en-US", voice="en-US-Neural2-F")
-
-# Explicit parameters with engine and model
-self.add_language(
-    name="British English",
-    code="en-GB",
-    voice="spore",
-    engine="rime",
-    model="multilingual"
-)
-
-# Combined string format
-self.add_language(
-    name="Spanish",
-    code="es",
-    voice="rime.spore:multilingual"
-)
+set_language_params("en-US", {{"speed", 1.1}});
 ```
 
 ## Agent Configuration
 
 ### Adding Hints
 
-Hints help the AI understand certain terms better:
+Hints help the AI recognize specific terms:
 
-```python
-# Simple hints (list of words)
-self.add_hints(["SignalWire", "SWML", "SWAIG"])
+```cpp
+// Simple hints
+add_hints({"SignalWire", "SWML", "SWAIG"});
 
-# Pattern hint with replacement
-self.add_pattern_hint(
-    hint="AI Agent", 
-    pattern="AI\\s+Agent", 
-    replace="A.I. Agent", 
-    ignore_case=True
-)
+// A single hint
+add_hint("DataSphere");
+
+// A pattern hint (regular expression)
+add_pattern_hint("AI\\s+Agent");
 ```
 
 ### Adding Pronunciation Rules
 
-Pronunciation rules help the AI speak certain terms correctly:
+Pronunciation rules help the AI speak certain terms correctly. `add_pronunciation(replace, with, ignore_case)`:
 
-```python
-# Add pronunciation rule
-self.add_pronunciation("API", "A P I", ignore_case=False)
-self.add_pronunciation("SIP", "sip", ignore_case=True)
+```cpp
+add_pronunciation("API", "A P I", false);
+add_pronunciation("SIP", "sip", true);
 ```
 
 ### Setting AI Parameters
 
-Configure various AI behavior parameters:
+Configure AI behavior parameters with `set_params(json)` (or `set_param(key, value)` for one at a time):
 
-```python
-# Set AI parameters
-self.set_params({
-    "wait_for_user": False,
-    "end_of_speech_timeout": 1000,
-    "ai_volume": 5,
-    "languages_enabled": True,
-    "local_tz": "America/Los_Angeles"
-})
+```cpp
+set_params({
+    {"wait_for_user", false},
+    {"end_of_speech_timeout", 1000},
+    {"ai_volume", 5},
+    {"languages_enabled", true},
+    {"local_tz", "America/Los_Angeles"}
+});
 ```
 
 ### Setting Global Data
 
-Provide global data for the AI to reference:
+Provide global data for the AI to reference. `set_global_data(json)` replaces the data; `update_global_data(json)` merges into it:
 
-```python
-# Set global data
-self.set_global_data({
-    "company_name": "SignalWire",
-    "product": "AI Agent SDK",
-    "supported_features": [
-        "Voice AI",
-        "Telephone integration",
-        "SWAIG functions"
-    ]
-})
+```cpp
+set_global_data({
+    {"company_name", "SignalWire"},
+    {"product", "AI Agent SDK"},
+    {"supported_features", {"Voice AI", "Telephone integration", "SWAIG functions"}}
+});
+
+update_global_data({{"service_level", "premium"}});
 ```
 
 ### Customizing LLM Parameters
 
-The SDK provides methods to fine-tune the Language Model parameters for both the main prompt and post-prompt, giving you precise control over the AI's behavior:
+`set_prompt_llm_params(json)` and `set_post_prompt_llm_params(json)` fine-tune the language model for the main prompt and the post-prompt respectively. The parameters are passed to the server, which validates them based on the model:
 
-```python
-# Set LLM parameters for the main prompt
-# These parameters are passed to the server which validates them based on the model
-self.set_prompt_llm_params(
-    temperature=0.7,        # Controls randomness
-    top_p=0.9,             # Nucleus sampling threshold
-    barge_confidence=0.6,  # ASR confidence to interrupt
-    presence_penalty=0.0,  # Penalizes token repetition
-    frequency_penalty=0.0  # Penalizes frequent word usage
-)
+```cpp
+// Main prompt
+set_prompt_llm_params({
+    {"temperature", 0.7},        // Controls randomness
+    {"top_p", 0.9},              // Nucleus sampling threshold
+    {"barge_confidence", 0.6},   // ASR confidence to interrupt
+    {"presence_penalty", 0.0},
+    {"frequency_penalty", 0.0}
+});
 
-# Set different parameters for the post-prompt
-self.set_post_prompt_llm_params(
-    temperature=0.3,       # Lower temperature for consistent summaries
-    top_p=0.95            # Slightly wider token selection
-)
+// Post-prompt (lower temperature for consistent summaries)
+set_post_prompt_llm_params({
+    {"temperature", 0.3},
+    {"top_p", 0.95}
+});
 ```
 
-**Common Use Cases:**
+**Common use cases:**
 
-- **Customer Service**: Low temperature (0.2-0.4) for consistent, professional responses
-- **Creative Tasks**: Higher temperature (0.7-0.9) for varied, creative outputs
-- **Technical Support**: Very low temperature (0.1-0.3) with high confidence for accuracy
-- **General Assistant**: Medium temperature (0.5-0.7) for balanced interaction
+- **Customer Service**: low temperature (0.2-0.4) for consistent, professional responses
+- **Creative Tasks**: higher temperature (0.7-0.9) for varied outputs
+- **Technical Support**: very low temperature (0.1-0.3) for accuracy
+- **General Assistant**: medium temperature (0.5-0.7) for balanced interaction
 
-For detailed information about each parameter and advanced tuning strategies, see [LLM Parameters Guide](llm_parameters.md).
+### Internal Fillers
+
+Internal fillers are short phrases the AI speaks while a native function is running, so the caller does not hear dead air. Set them per native function and language with `add_internal_filler(function_name, language_code, phrases)` or in bulk with `set_internal_fillers(json)`:
+
+```cpp
+add_internal_filler("check_time", "en-US", {"Let me check the time...", "One moment..."});
+
+set_internal_fillers({
+    {"wait_seconds", {{"en-US", {"Hold on a second..."}}}}
+});
+```
+
+Only the runtime's supported internal function names accept fillers (e.g. `hangup`, `check_time`, `wait_for_user`, `wait_seconds`, `next_step`, `change_context`); unknown names log a warning at registration time.
 
 ## Dynamic Agent Configuration
 
-Dynamic agent configuration allows you to configure agents per-request based on parameters from the HTTP request (query parameters, body data, headers). This enables patterns like multi-tenant applications, A/B testing, personalization, and localization.
+Dynamic agent configuration lets you configure an agent per-request based on the incoming HTTP request (query parameters, body data, headers). This enables multi-tenant applications, A/B testing, personalization, and localization.
 
-### Overview
+### Static vs. Dynamic
 
-There are two main approaches to agent configuration:
+With **static** configuration, everything is set once in the constructor and is identical for every caller.
 
-#### Static Configuration (Traditional)
-```python
-class StaticAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="static-agent")
-        
-        # Configuration happens once at startup
-        self.add_language("English", "en-US", "rime.spore:mistv2")
-        self.set_params({"end_of_speech_timeout": 500})
-        self.prompt_add_section("Role", "You are a customer service agent.")
-        self.set_global_data({"service_level": "standard"})
+With **dynamic** configuration, you register a callback that runs fresh for each request and configures a per-request copy of the agent. Register it with `set_dynamic_config_callback(cb)`, where `cb` is an `agent::DynamicConfigCallback`:
+
+```cpp
+using agent::DynamicConfigCallback = std::function<void(
+    const std::map<std::string, std::string>& query_params,
+    const json& body_params,
+    const std::map<std::string, std::string>& headers,
+    agent::AgentBase& agent_copy)>;
 ```
-
-**Pros**: Simple, fast, predictable
-**Cons**: Same behavior for all users, requires separate agents for different configurations
-
-#### Dynamic Configuration (New)
-```python
-class DynamicAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="dynamic-agent")
-        
-        # No static configuration - set up dynamic callback instead
-        self.set_dynamic_config_callback(self.configure_per_request)
-    
-    def configure_per_request(self, query_params, body_params, headers, agent):
-        # Configuration happens fresh for each request
-        tier = query_params.get('tier', 'standard')
-        
-        if tier == 'premium':
-            agent.add_language("English", "en-US", "rime.spore:mistv2")
-            agent.set_params({"end_of_speech_timeout": 300})  # Faster
-            agent.prompt_add_section("Role", "You are a premium customer service agent.")
-            agent.set_global_data({"service_level": "premium"})
-        else:
-            agent.add_language("English", "en-US", "rime.spore:mistv2")
-            agent.set_params({"end_of_speech_timeout": 500})  # Standard
-            agent.prompt_add_section("Role", "You are a customer service agent.")
-            agent.set_global_data({"service_level": "standard"})
-```
-
-**Pros**: Highly flexible, single agent serves multiple configurations, enables advanced use cases
-**Cons**: Slightly more complex, configuration overhead per request
 
 ### Setting Up Dynamic Configuration
 
-Use the `set_dynamic_config_callback()` method to register a callback function that will be called for each request:
+```cpp
+class DynamicAgent : public agent::AgentBase {
+public:
+    DynamicAgent() : AgentBase("dynamic-agent", "/agent") {
+        set_dynamic_config_callback(
+            [](const std::map<std::string, std::string>& query_params,
+               const json& body_params,
+               const std::map<std::string, std::string>& headers,
+               agent::AgentBase& agent) {
+                (void)body_params; (void)headers;
 
-```python
-class MyDynamicAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="my-agent", route="/agent")
-        
-        # Register the dynamic configuration callback
-        self.set_dynamic_config_callback(self.configure_agent_dynamically)
-    
-    def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-        """
-        This method is called for every request to configure the agent
-        
-        Args:
-            query_params (dict): Query string parameters from the URL
-            body_params (dict): Parsed JSON body from POST requests
-            headers (dict): HTTP headers from the request
-            agent (AgentBase): The agent instance to configure
-        """
-        # Your dynamic configuration logic here
-        pass
+                // Look up a query parameter with a safe default
+                std::string tier = "standard";
+                if (auto it = query_params.find("tier"); it != query_params.end()) {
+                    tier = it->second;
+                }
+
+                if (tier == "premium") {
+                    agent.add_language({"English", "en-US", "rime.spore:mistv2"});
+                    agent.set_params({{"end_of_speech_timeout", 300}});
+                    agent.prompt_add_section("Role", "You are a premium customer service agent.");
+                    agent.set_global_data({{"service_level", "premium"}});
+                } else {
+                    agent.add_language({"English", "en-US", "rime.spore:mistv2"});
+                    agent.set_params({{"end_of_speech_timeout", 500}});
+                    agent.prompt_add_section("Role", "You are a customer service agent.");
+                    agent.set_global_data({{"service_level", "standard"}});
+                }
+            });
+    }
+};
 ```
 
-The callback function receives four parameters:
-- **query_params**: Dictionary of URL query parameters
-- **body_params**: Dictionary of parsed JSON body (empty for GET requests)
-- **headers**: Dictionary of HTTP headers
-- **agent**: The agent instance to configure dynamically
+The callback receives four arguments:
+- **`query_params`**: a `std::map<std::string,std::string>` of URL query parameters
+- **`body_params`**: the parsed JSON body (empty for GET requests)
+- **`headers`**: a `std::map<std::string,std::string>` of HTTP headers
+- **`agent`**: the per-request `AgentBase` copy to configure
 
-### Dynamic Configuration Methods
-
-The `agent` parameter in your callback is the actual agent instance, allowing you to use all the same configuration methods you would use during initialization:
-
-#### Language Configuration
-```python
-# Add languages with voice configuration
-agent.add_language("English", "en-US", "rime.spore:mistv2")
-agent.add_language("Spanish", "es-ES", "rime.spore:mistv2")
-```
-
-#### Prompt Building
-```python
-# Add prompt sections
-agent.prompt_add_section("Role", "You are a helpful assistant.")
-agent.prompt_add_section("Guidelines", bullets=[
-    "Be professional and courteous",
-    "Provide accurate information",
-    "Ask clarifying questions when needed"
-])
-
-# Set raw prompt text
-agent.set_prompt_text("You are a specialized AI assistant...")
-
-# Set post-prompt for summary
-agent.set_post_prompt("Summarize the key points of this conversation.")
-```
-
-#### AI Parameters
-```python
-# Configure AI behavior
-agent.set_params({
-    "end_of_speech_timeout": 300,
-    "attention_timeout": 20000,
-    "background_file_volume": -30
-})
-```
-
-#### Global Data
-```python
-# Set data available to the AI
-agent.set_global_data({
-    "customer_tier": "premium",
-    "features_enabled": ["advanced_support", "priority_queue"],
-    "session_info": {"start_time": "2024-01-01T00:00:00Z"}
-})
-
-# Update existing global data
-agent.update_global_data({"additional_info": "value"})
-```
-
-#### Speech Recognition Hints
-```python
-# Add hints for better speech recognition
-agent.add_hints(["SignalWire", "SWML", "API", "technical"])
-agent.add_pronunciation("API", "A P I")
-```
-
-#### Function Configuration
-```python
-# Set native functions
-agent.set_native_functions(["transfer", "hangup"])
-
-# Add function includes
-agent.add_function_include(
-    url="https://api.example.com/functions",
-    functions=["get_account_info", "update_profile"]
-)
-```
+Inside the callback you can call any of the same configuration methods you would use in the constructor: `add_language`, `prompt_add_section`, `set_params`, `set_global_data`, `update_global_data`, `add_hints`, `add_pronunciation`, `set_native_functions`, `add_function_include`, `add_skill`, and so on.
 
 ### Request Data Access
 
-Your callback function receives detailed information about the incoming request:
+Because `query_params` and `headers` are `std::map`, read them with `find` and provide defaults:
 
-#### Query Parameters
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    # Extract query parameters
-    tier = query_params.get('tier', 'standard')
-    language = query_params.get('language', 'en')
-    customer_id = query_params.get('customer_id')
-    debug = query_params.get('debug', '').lower() == 'true'
-    
-    # Use parameters for configuration
-    if tier == 'premium':
-        agent.set_params({"end_of_speech_timeout": 300})
-    
-    if customer_id:
-        agent.set_global_data({"customer_id": customer_id})
+```cpp
+std::string tier = "standard";
+if (auto it = query_params.find("tier"); it != query_params.end()) {
+    tier = it->second;
+}
 
-# Request: GET /agent?tier=premium&language=es&customer_id=12345&debug=true
-```
-
-#### POST Body Parameters
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    # Extract from POST body
-    user_profile = body_params.get('user_profile', {})
-    preferences = body_params.get('preferences', {})
-    
-    # Configure based on profile
-    if user_profile.get('language') == 'es':
-        agent.add_language("Spanish", "es-ES", "rime.spore:mistv2")
-    
-    if preferences.get('voice_speed') == 'fast':
-        agent.set_params({"end_of_speech_timeout": 200})
-
-# Request: POST /agent with JSON body:
-# {
-#   "user_profile": {"language": "es", "region": "mx"},
-#   "preferences": {"voice_speed": "fast", "tone": "formal"}
-# }
-```
-
-#### HTTP Headers
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    # Extract headers
-    user_agent = headers.get('user-agent', '')
-    auth_token = headers.get('authorization', '')
-    locale = headers.get('accept-language', 'en-US')
-    
-    # Configure based on headers
-    if 'mobile' in user_agent.lower():
-        agent.set_params({"end_of_speech_timeout": 400})  # Longer for mobile
-    
-    if locale.startswith('es'):
-        agent.add_language("Spanish", "es-ES", "rime.spore:mistv2")
-```
-
-### Configuration Examples
-
-#### Simple Multi-Tenant Configuration
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    tenant = query_params.get('tenant', 'default')
-    
-    # Tenant-specific configuration
-    if tenant == 'healthcare':
-        agent.add_language("English", "en-US", "rime.spore:mistv2")
-        agent.prompt_add_section("Compliance", 
-            "Follow HIPAA guidelines and maintain patient confidentiality.")
-        agent.set_global_data({
-            "industry": "healthcare",
-            "compliance_level": "hipaa"
-        })
-    elif tenant == 'finance':
-        agent.add_language("English", "en-US", "rime.spore:mistv2")
-        agent.prompt_add_section("Compliance",
-            "Follow financial regulations and protect sensitive data.")
-        agent.set_global_data({
-            "industry": "finance", 
-            "compliance_level": "pci"
-        })
-```
-
-#### Language and Localization
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    language = query_params.get('language', 'en')
-    region = query_params.get('region', 'us')
-    
-    # Configure language and voice
-    if language == 'es':
-        if region == 'mx':
-            agent.add_language("Spanish (Mexico)", "es-MX", "rime.spore:mistv2")
-        else:
-            agent.add_language("Spanish", "es-ES", "rime.spore:mistv2")
-        
-        agent.prompt_add_section("Language", "Respond in Spanish.")
-    elif language == 'fr':
-        agent.add_language("French", "fr-FR", "rime.alois")
-        agent.prompt_add_section("Language", "Respond in French.")
-    else:
-        agent.add_language("English", "en-US", "rime.spore:mistv2")
-    
-    # Regional customization
-    agent.set_global_data({
-        "language": language,
-        "region": region,
-        "currency": "USD" if region == "us" else "EUR" if region == "eu" else "MXN"
-    })
-```
-
-#### A/B Testing Configuration
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    # Determine test group (could be from query param, user ID hash, etc.)
-    test_group = query_params.get('test_group', 'A')
-    
-    if test_group == 'A':
-        # Control group - standard configuration
-        agent.set_params({"end_of_speech_timeout": 500})
-        agent.prompt_add_section("Style", "Use a standard conversational approach.")
-        agent.set_global_data({"test_group": "A", "features": ["basic"]})
-    else:
-        # Test group B - experimental features
-        agent.set_params({"end_of_speech_timeout": 300})
-        agent.prompt_add_section("Style", 
-            "Use an enhanced, more interactive conversational approach.")
-        agent.set_global_data({"test_group": "B", "features": ["basic", "enhanced"]})
-```
-
-#### Customer Tier-Based Configuration
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    customer_id = query_params.get('customer_id')
-    tier = query_params.get('tier', 'standard')
-    
-    # Base configuration
-    agent.add_language("English", "en-US", "rime.spore:mistv2")
-    
-    # Tier-specific configuration
-    if tier == 'enterprise':
-        agent.set_params({
-            "end_of_speech_timeout": 200,  # Fastest response
-            "attention_timeout": 30000     # Longest attention span
-        })
-        agent.prompt_add_section("Service Level",
-            "You provide white-glove enterprise support with priority handling.")
-        features = ["all_features", "dedicated_support", "custom_integration"]
-    elif tier == 'premium':
-        agent.set_params({
-            "end_of_speech_timeout": 300,
-            "attention_timeout": 20000
-        })
-        agent.prompt_add_section("Service Level",
-            "You provide premium support with enhanced features.")
-        features = ["premium_features", "priority_support"]
-    else:
-        agent.set_params({
-            "end_of_speech_timeout": 500,
-            "attention_timeout": 15000
-        })
-        agent.prompt_add_section("Service Level",
-            "You provide standard customer support.")
-        features = ["basic_features"]
-    
-    # Set global data
-    global_data = {"tier": tier, "features": features}
-    if customer_id:
-        global_data["customer_id"] = customer_id
-    agent.set_global_data(global_data)
-```
-
-### Use Cases
-
-#### Multi-Tenant SaaS Applications
-Perfect for SaaS platforms where each customer needs different agent behavior:
-
-```python
-# Different tenants get different capabilities
-# /agent?tenant=acme&industry=healthcare
-# /agent?tenant=globex&industry=finance
-```
-
-Benefits:
-- Single agent deployment serves all customers
-- Tenant-specific branding and behavior
-- Industry-specific compliance and terminology
-- Custom feature sets per subscription level
-
-#### A/B Testing and Experimentation
-Test different agent configurations with real users:
-
-```python
-# Split traffic between different configurations
-# /agent?test_group=A  (control)
-# /agent?test_group=B  (experimental)
-```
-
-Benefits:
-- Compare agent performance metrics
-- Test new features with subset of users
-- Gradual rollout of improvements
-- Data-driven optimization
-
-#### Personalization and User Preferences
-Adapt agent behavior to individual user preferences:
-
-```python
-# Personalized based on user profile
-# /agent?user_id=123&voice_speed=fast&formality=casual
-```
-
-Benefits:
-- Improved user experience
-- Accessibility support (voice speed, etc.)
-- Cultural and linguistic adaptation
-- Learning from user interactions
-
-#### Geographic and Cultural Localization
-Adapt to different regions and cultures:
-
-```python
-# Location-based configuration
-# /agent?country=mx&language=es&timezone=America/Mexico_City
-```
-
-Benefits:
-- Local language and dialect support
-- Cultural appropriateness
-- Regional business practices
-- Time zone aware responses
-
-### Migration Guide
-
-#### Converting Static Agents to Dynamic
-
-**Step 1: Move Configuration to Callback**
-
-Before (Static):
-```python
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="my-agent")
-        
-        # Static configuration
-        self.add_language("English", "en-US", "rime.spore:mistv2")
-        self.set_params({"end_of_speech_timeout": 500})
-        self.prompt_add_section("Role", "You are a helpful assistant.")
-        self.set_global_data({"version": "1.0"})
-```
-
-After (Dynamic):
-```python
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="my-agent")
-        
-        # Set up dynamic configuration
-        self.set_dynamic_config_callback(self.configure_agent)
-    
-    def configure_agent(self, query_params, body_params, headers, agent):
-        # Same configuration, but now dynamic
-        agent.add_language("English", "en-US", "rime.spore:mistv2")
-        agent.set_params({"end_of_speech_timeout": 500})
-        agent.prompt_add_section("Role", "You are a helpful assistant.")
-        agent.set_global_data({"version": "1.0"})
-```
-
-**Step 2: Add Parameter-Based Logic**
-
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Start with base configuration
-    agent.add_language("English", "en-US", "rime.spore:mistv2")
-    agent.prompt_add_section("Role", "You are a helpful assistant.")
-    
-    # Add parameter-based customization
-    timeout = int(query_params.get('timeout', '500'))
-    agent.set_params({"end_of_speech_timeout": timeout})
-    
-    version = query_params.get('version', '1.0')
-    agent.set_global_data({"version": version})
-```
-
-**Step 3: Test Both Approaches**
-
-You can support both static and dynamic patterns during migration:
-
-```python
-class MyAgent(AgentBase):
-    def __init__(self, use_dynamic=False):
-        super().__init__(name="my-agent")
-        
-        if use_dynamic:
-            self.set_dynamic_config_callback(self.configure_agent)
-        else:
-            # Keep static configuration for backward compatibility
-            self._setup_static_config()
-    
-    def _setup_static_config(self):
-        # Original static configuration
-        self.add_language("English", "en-US", "rime.spore:mistv2")
-        # ... rest of static config
-    
-    def configure_agent(self, query_params, body_params, headers, agent):
-        # New dynamic configuration
-        # ... dynamic config logic
+// Body params are JSON
+std::string voice_speed = body_params.value("/preferences/voice_speed"_json_pointer, "normal");
 ```
 
 ### Best Practices
 
-#### Performance Considerations
-
-1. **Keep Callbacks Lightweight**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Good: Simple parameter extraction and configuration
-    tier = query_params.get('tier', 'standard')
-    agent.set_params(TIER_CONFIGS[tier])
-    
-    # Avoid: Heavy computation or external API calls
-    # customer_data = expensive_api_call(customer_id)  # Don't do this
-```
-
-2. **Cache Configuration Data**
-```python
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="my-agent")
-        
-        # Pre-compute configuration templates
-        self.tier_configs = {
-            'basic': {'end_of_speech_timeout': 500},
-            'premium': {'end_of_speech_timeout': 300},
-            'enterprise': {'end_of_speech_timeout': 200}
-        }
-        
-        self.set_dynamic_config_callback(self.configure_agent)
-    
-    def configure_agent(self, query_params, body_params, headers, agent):
-        tier = query_params.get('tier', 'basic')
-        agent.set_params(self.tier_configs[tier])
-```
-
-3. **Use Default Values**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Always provide defaults
-    language = query_params.get('language', 'en')
-    tier = query_params.get('tier', 'standard')
-    
-    # Handle invalid values gracefully
-    if language not in ['en', 'es', 'fr']:
-        language = 'en'
-```
-
-#### Security Considerations
-
-1. **Validate Input Parameters**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Validate and sanitize inputs
-    tier = query_params.get('tier', 'standard')
-    if tier not in ['basic', 'premium', 'enterprise']:
-        tier = 'basic'  # Safe default
-    
-    # Validate numeric parameters
-    try:
-        timeout = int(query_params.get('timeout', '500'))
-        timeout = max(100, min(timeout, 2000))  # Clamp to reasonable range
-    except ValueError:
-        timeout = 500  # Safe default
-```
-
-2. **Protect Sensitive Configuration**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Don't expose internal configuration via parameters
-    # Bad: agent.set_global_data({"api_key": query_params.get('api_key')})
-    
-    # Good: Use internal mapping for call-related data only
-    customer_id = query_params.get('customer_id')
-    if customer_id and self.is_valid_customer(customer_id):
-        # Store call-related customer info, NOT sensitive credentials
-        agent.set_global_data({
-            "customer_id": customer_id,
-            "customer_tier": self.get_customer_tier(customer_id),
-            "account_type": "premium"
-        })
-```
-
-3. **Rate Limiting for Complex Configurations**
-```python
-from functools import lru_cache
-
-class MyAgent(AgentBase):
-    @lru_cache(maxsize=100)
-    def get_customer_config(self, customer_id):
-        # Cache expensive lookups
-        return self.database.get_customer_settings(customer_id)
-    
-    def configure_agent(self, query_params, body_params, headers, agent):
-        customer_id = query_params.get('customer_id')
-        if customer_id:
-            config = self.get_customer_config(customer_id)
-            agent.set_global_data(config)
-```
-
-#### Error Handling
-
-1. **Graceful Degradation**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    try:
-        # Try custom configuration
-        self.apply_custom_config(query_params, agent)
-    except Exception as e:
-        # Log error but don't fail the request
-        self.log.error("config_error", error=str(e))
-        
-        # Fall back to default configuration
-        self.apply_default_config(agent)
-```
-
-2. **Configuration Validation**
-```python
-def configure_agent(self, query_params, body_params, headers, agent):
-    # Validate required parameters
-    if not query_params.get('tenant'):
-        agent.set_global_data({"error": "Missing tenant parameter"})
-        return
-    
-    # Validate configuration makes sense
-    language = query_params.get('language', 'en')
-    region = query_params.get('region', 'us')
-    
-    if language == 'es' and region == 'us':
-        # Adjust for Spanish speakers in US
-        agent.add_language("Spanish (US)", "es-US", "rime.spore:mistv2")
-```
-
-Dynamic agent configuration enables sophisticated, multi-tenant AI applications while maintaining the familiar AgentBase API. Start with simple parameter-based configuration and gradually add more complex logic as your use cases evolve.
+1. **Keep callbacks lightweight** — extract parameters and apply pre-computed configuration; avoid heavy work or blocking external calls in the hot path.
+2. **Always provide defaults** — coerce unknown values to a safe default (e.g. an unknown `tier` becomes `"standard"`).
+3. **Validate input** — clamp numeric parameters to a sensible range and reject unexpected values.
+4. **Do not expose sensitive configuration via parameters** — never copy credentials from query parameters into global data.
 
 ## Advanced Features
 
 ### Debug Events
 
-The debug events system provides real-time visibility into what the AI module is doing during a call. When enabled, the module POSTs structured JSON events to your agent throughout the call lifecycle — session start/end, barge interruptions, LLM errors, step changes, and more.
+The debug events system POSTs structured JSON events to your agent throughout the call lifecycle — session start/end, barge interruptions, LLM errors, step changes, and more. Enable it with `enable_debug_events()`:
 
-#### Basic Setup
-
-```python
-agent = AgentBase("my_agent")
-agent.enable_debug_events()  # That's it — events are auto-logged
-agent.serve()
+```cpp
+agent::AgentBase agent("my_agent");
+agent.enable_debug_events();  // events are auto-logged
+agent.serve();
 ```
 
-With just `enable_debug_events()`, every debug event is logged through the agent's structured logger. No other configuration is needed — the SDK automatically:
-- Registers a `/debug_events` endpoint on the agent
-- Sets `debug_webhook_url` and `debug_webhook_level` in the SWML params
-- Logs each incoming event with its type and payload
+To act on specific events, register a handler with `on_debug_event(cb)`, where `cb` is a `agent::DebugEventCallback` (`std::function<void(const json& event)>`):
 
-#### Custom Event Handler
+```cpp
+agent.enable_debug_events();
+agent.on_debug_event([](const json& event) {
+    std::string type = event.value("type", "");
+    std::string call_id = event.value("call_id", "");
 
-To act on specific events (alerting, metrics, custom logging), register a handler:
-
-```python
-agent = AgentBase("my_agent")
-agent.enable_debug_events()
-
-@agent.on_debug_event
-def handle(event_type, data):
-    call_id = data.get("call_id")
-
-    if event_type == "barge":
-        print(f"[{call_id}] Caller interrupted after {data.get('barge_elapsed_ms')}ms")
-
-    elif event_type == "llm_error":
-        print(f"[{call_id}] LLM error: {data.get('event')}")
-        alert_ops_team(data)
-
-    elif event_type == "session_end":
-        duration = data.get("duration_ms", 0) / 1000
-        print(f"[{call_id}] Call ended after {duration:.1f}s — reason: {data.get('reason')}")
-
-agent.serve()
+    if (type == "barge") {
+        std::cout << "[" << call_id << "] Caller interrupted after "
+                  << event.value("barge_elapsed_ms", 0) << "ms\n";
+    } else if (type == "llm_error") {
+        std::cout << "[" << call_id << "] LLM error\n";
+    } else if (type == "session_end") {
+        std::cout << "[" << call_id << "] Call ended\n";
+    }
+});
+agent.serve();
 ```
 
 The handler is called for every event in addition to the default structured logging.
 
-#### Verbosity Levels
-
-- **Level 1** (default): High-level events — session start/end, barge, errors, step changes, hold, filler, gather flow, action processing
-- **Level 2+**: Adds high-volume events — every LLM request/response, conversation history additions
-
-```python
-agent.enable_debug_events(level=2)  # Include LLM request/response events
-```
-
-For the complete list of event types and their payloads, see the [API Reference](api_reference.md#debug-events).
-
 ### Session Lifecycle Hooks
 
-SignalWire provides special SWAIG functions that are automatically called at specific points during a voice session's lifecycle. These hooks enable you to perform initialization tasks when a call starts and cleanup tasks when a call ends.
+SignalWire calls two specially-named SWAIG functions automatically at the start and end of a voice session:
+- `startup_hook`: called immediately when a new voice session begins
+- `hangup_hook`: called when a voice session ends
 
-#### Overview
+Implement them as ordinary tools whose names are exactly `startup_hook` and `hangup_hook`:
 
-Session lifecycle hooks are special SWAIG functions that SignalWire calls automatically:
-- `startup_hook`: Called immediately when a new voice session begins
-- `hangup_hook`: Called when a voice session ends (regardless of how it ended)
+```cpp
+define_tool("startup_hook", "Called when the voice session starts",
+    {{"type", "object"}, {"properties", json::object()}},
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)args;
+        std::string call_id = raw.value("call_id", "");
+        std::cout << "Session started: " << call_id << "\n";
+        return swaig::FunctionResult("Session initialized successfully");
+    });
 
-These hooks are particularly useful for:
-- Initializing session state or resources
-- Loading user preferences or history
-- Logging session start/end events
-- Cleaning up temporary resources
-- Saving session data for analytics
-
-#### Implementation
-
-To implement lifecycle hooks, define them as regular SWAIG functions with these specific names:
-
-```python
-from signalwire import AgentBase, SwaigFunctionResult
-
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="my-agent")
-    
-    @AgentBase.tool(
-        name="startup_hook",
-        description="Called when the voice session starts"
-    )
-    def startup_hook(self, args, raw_data):
-        # Extract session information
-        call_id = raw_data.get("call_id")
-        from_number = raw_data.get("from_number")
-        to_number = raw_data.get("to_number")
-        
-        # Initialize session state
-        self.update_state(call_id, {
-            "session_start": datetime.now().isoformat(),
-            "from": from_number,
-            "to": to_number,
-            "interaction_count": 0
-        })
-        
-        # Log session start
-        print(f"Session started: {call_id} from {from_number}")
-        
-        # Return success (SignalWire expects a response)
-        return SwaigFunctionResult("Session initialized successfully")
-    
-    @AgentBase.tool(
-        name="hangup_hook",
-        description="Called when the voice session ends"
-    )
-    def hangup_hook(self, args, raw_data):
-        # Extract session information
-        call_id = raw_data.get("call_id")
-        
-        # Retrieve session state
-        state = self.get_state(call_id)
-        
-        if state:
-            # Calculate session duration
-            start_time = datetime.fromisoformat(state.get("session_start"))
-            duration = (datetime.now() - start_time).total_seconds()
-            
-            # Log session metrics
-            print(f"Session ended: {call_id}")
-            print(f"Duration: {duration} seconds")
-            print(f"Interactions: {state.get('interaction_count', 0)}")
-            
-            # Clean up state (optional - SignalWire will clean up automatically)
-            self.delete_state(call_id)
-        
-        return SwaigFunctionResult("Session cleanup completed")
+define_tool("hangup_hook", "Called when the voice session ends",
+    {{"type", "object"}, {"properties", json::object()}},
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)args;
+        std::string call_id = raw.value("call_id", "");
+        std::cout << "Session ended: " << call_id << "\n";
+        return swaig::FunctionResult("Session cleanup completed");
+    });
 ```
 
-#### Common Use Cases
+Both hooks must return a `swaig::FunctionResult`. `startup_hook` is called before the AI starts speaking to the caller.
 
-##### 1. User Preference Loading
-```python
-@AgentBase.tool(name="startup_hook", description="Called when the voice session starts", parameters={})
-def startup_hook(self, args, raw_data):
-    caller_id = raw_data.get("from_number")
-    
-    # Load user preferences from database
-    preferences = self.load_user_preferences(caller_id)
-    
-    # Store in session state for quick access
-    self.update_state(raw_data.get("call_id"), {
-        "user_preferences": preferences,
-        "language": preferences.get("language", "en-US"),
-        "previous_orders": preferences.get("recent_orders", [])
-    })
-    
-    return SwaigFunctionResult("User preferences loaded")
+### Multi-Step and Multi-Context Flows
+
+For workflows that move through distinct phases, use the contexts API. `define_contexts()` returns a `contexts::ContextBuilder`; add a context, then add ordered steps to it. Each step carries its own task prompt, completion criteria, and (optionally) a whitelist of which functions are callable while it is active:
+
+```cpp
+auto& ctx = define_contexts().add_context("default");
+
+ctx.add_step("greeting")
+   .add_section("Task", "Greet the caller and ask how you can help.")
+   .set_step_criteria("The caller has stated their need.")
+   .set_valid_steps({"resolve"});
+
+ctx.add_step("resolve")
+   .add_section("Task", "Resolve the caller's request using the available tools.")
+   .set_functions(std::vector<std::string>{"get_weather"})
+   .set_step_criteria("The request is resolved.");
 ```
 
-##### 2. Analytics and Logging
-```python
-@AgentBase.tool(name="hangup_hook", description="Called when the voice session ends", parameters={})
-def hangup_hook(self, args, raw_data):
-    call_id = raw_data.get("call_id")
-    state = self.get_state(call_id)
-    
-    # Send analytics data
-    analytics_data = {
-        "call_id": call_id,
-        "duration": state.get("duration"),
-        "functions_called": state.get("functions_called", []),
-        "outcome": state.get("outcome", "unknown")
-    }
-    
-    # Post to analytics service
-    self.send_to_analytics(analytics_data)
-    
-    return SwaigFunctionResult("Analytics data sent")
-```
+Keep the per-step active set small — LLM tool selection accuracy degrades past ~7-8 active tools. If a step does not call `set_functions`, it **inherits** the previous step's active set, which is a common source of leaked tools.
 
-#### Important Notes
-
-1. **Function Names**: The hooks must be named exactly `startup_hook` and `hangup_hook` for SignalWire to call them
-2. **Error Handling**: Always implement proper error handling in hooks - failures shouldn't crash the voice session
-3. **Timing**: `startup_hook` is called before the AI starts speaking to the caller
-4. **Session Data**: Any data you need to persist across the session should be stored in external storage (Redis, database, etc.)
-5. **Return Values**: Both hooks must return a `SwaigFunctionResult` object
+`reset_contexts()` removes all contexts and returns the agent to a no-contexts state.
 
 ### SIP Routing
 
-SIP routing allows your agents to receive voice calls via SIP addresses. The SDK supports both individual agent-level routing and centralized server-level routing.
+Enable SIP routing so the agent can receive voice calls via SIP addresses:
 
-#### Individual Agent SIP Routing
+```cpp
+// Enable SIP routing and auto-map usernames from the agent name/route
+enable_sip_routing(true);
+auto_map_sip_usernames(true);
 
-Enable SIP routing on a single agent:
-
-```python
-# Enable SIP routing with automatic username mapping based on agent name
-agent.enable_sip_routing(auto_map=True)
-
-# Register additional SIP usernames for this agent
-agent.register_sip_username("support_agent")
-agent.register_sip_username("help_desk")
+// Register additional SIP usernames for this agent
+register_sip_username("support_agent");
+register_sip_username("help_desk");
 ```
 
-When `auto_map=True`, the agent automatically registers SIP usernames based on:
-- The agent's name (e.g., `support@domain`)
-- The agent's route path (e.g., `/support` becomes `support@domain`)
-- Common variations (e.g., removing vowels for shorter dialing)
+### Authentication and Webhook Signing
 
-#### Server-Level SIP Routing (Multi-Agent)
+Protect the agent's endpoints with HTTP basic auth, and validate inbound webhook signatures with a signing key:
 
-For multi-agent setups, centralized routing is more efficient:
+```cpp
+set_auth("admin", "secret");
 
-```python
-# Create an AgentServer
-server = AgentServer(host="0.0.0.0", port=3000)
-
-# Register multiple agents
-server.register(registration_agent)  # Route: /register
-server.register(support_agent)       # Route: /support
-
-# Set up central SIP routing
-server.setup_sip_routing(route="/sip", auto_map=True)
-
-# Register additional SIP username mappings
-server.register_sip_username("signup", "/register")    # signup@domain → registration agent
-server.register_sip_username("help", "/support")       # help@domain → support agent
+// Set the SignalWire Signing Key (Dashboard → API Credentials).
+// When set, the server validates the signature on POST `/`, `/swaig`,
+// and `/post_prompt`; unsigned or wrongly-signed requests get a 403.
+set_signing_key("your-signing-key");
 ```
 
-With server-level routing:
-- Each agent is reachable via its name (when `auto_map=True`)
-- Additional SIP usernames can be mapped to specific agent routes
-- All SIP routing is handled at a single endpoint (`/sip` by default)
-
-#### How SIP Routing Works
-
-1. A SIP call comes in with a username (e.g., `support@yourdomain`)
-2. The SDK extracts the username part (`support`)
-3. The system checks if this username is registered:
-   - In individual routing: The current agent checks its own username list
-   - In server routing: The server checks its central mapping table
-4. If a match is found, the call is routed to the appropriate agent
-
-### Custom Routing
-
-You can dynamically handle requests to different paths using routing callbacks:
-
-```python
-# Enable custom routing in the constructor or anytime after initialization
-self.register_routing_callback(self.handle_customer_route, path="/customer")
-self.register_routing_callback(self.handle_product_route, path="/product")
-
-# Define the routing handlers
-def handle_customer_route(self, request, body):
-    """
-    Process customer-related requests
-    
-    Args:
-        request: FastAPI Request object
-        body: Parsed JSON body as dictionary
-        
-    Returns:
-        Optional[str]: A URL to redirect to, or None to process normally
-    """
-    # Extract any relevant data
-    customer_id = body.get("customer_id")
-    
-    # You can redirect to another agent/service if needed
-    if customer_id and customer_id.startswith("vip-"):
-        return f"/vip-handler/{customer_id}"
-        
-    # Or return None to process the request with on_swml_request
-    return None
-    
-# Customize SWML based on the route in on_swml_request
-def on_swml_request(self, request_data=None, callback_path=None):
-    """
-    Customize SWML based on the request and path
-    
-    Args:
-        request_data: The request body data
-        callback_path: The path that triggered the routing callback
-    """
-    if callback_path == "/customer":
-        # Serve customer-specific content
-        return {
-            "sections": {
-                "main": [
-                    {"answer": {}},
-                    {"play": {"url": "say:Welcome to customer service!"}}
-                ]
-            }
-        }
-    # Other path handling...
-    return None
-```
-
-### Customizing SWML Requests
-
-You can modify the SWML document based on request data by overriding the `on_swml_request` method:
-
-```python
-def on_swml_request(self, request_data=None, callback_path=None):
-    """
-    Customize the SWML document based on request data
-    
-    Args:
-        request_data: The request data (body for POST or query params for GET)
-        callback_path: The path that triggered the routing callback
-        
-    Returns:
-        Optional dict with modifications to apply to the document
-    """
-    if request_data and "caller_type" in request_data:
-        # Example: Return modifications to change the AI behavior based on caller type
-        if request_data["caller_type"] == "vip":
-            return {
-                "sections": {
-                    "main": [
-                        # Keep the first verb (answer)
-                        # Modify the AI verb parameters
-                        {
-                            "ai": {
-                                "params": {
-                                    "wait_for_user": False,
-                                    "end_of_speech_timeout": 500  # More responsive
-                                }
-                            }
-                        }
-                    ]
-                }
-            }
-            
-    # You can also use the callback_path to serve different content based on the route
-    if callback_path == "/customer":
-        return {
-            "sections": {
-                "main": [
-                    {"answer": {}},
-                    {"play": {"url": "say:Welcome to our customer service line."}}
-                ]
-            }
-        }
-    
-    # Return None to use the default document
-    return None
-```
-
-### Conversation Summary Handling
-
-Process conversation summaries:
-
-```python
-def on_summary(self, summary, raw_data=None):
-    """
-    Handle the conversation summary
-    
-    Args:
-        summary: The summary object or None if no summary was found
-        raw_data: The complete raw POST data from the request
-    """
-    if summary:
-        # Log the summary
-        self.log.info("conversation_summary", summary=summary)
-        
-        # Save the summary to a database, send notifications, etc.
-        # ...
-```
+If no signing key is set explicitly, the agent falls back to the `SIGNALWIRE_SIGNING_KEY` environment variable.
 
 ### Custom Webhook URLs
 
-You can override the default webhook URLs for SWAIG functions and post-prompt delivery:
+Override the default URLs for SWAIG function delivery and post-prompt delivery:
 
-```python
-# In your agent initialization or setup code:
+```cpp
+// Send function calls to an external service instead of handling them locally
+set_webhook_url("https://external-service.example.com/handle-swaig");
 
-# Override the webhook URL for all SWAIG functions
-agent.set_web_hook_url("https://external-service.example.com/handle-swaig")
-
-# Override the post-prompt delivery URL
-agent.set_post_prompt_url("https://analytics.example.com/conversation-summaries")
-
-# These methods allow you to:
-# 1. Send function calls to external services instead of handling them locally
-# 2. Send conversation summaries to analytics services or other systems
-# 3. Use special URLs with pre-configured authentication
+// Send conversation summaries to an analytics service
+set_post_prompt_url("https://analytics.example.com/conversation-summaries");
 ```
 
-### External Input Checking
+You can also append extra query parameters to every SWAIG URL with `add_swaig_query_param(key, value)` (and clear them with `clear_swaig_query_params()`).
 
-The SDK provides a check-for-input endpoint that allows agents to check for new input from external systems:
+### Conversation Summary Handling
 
-```python
-# Example client code that checks for new input
-import requests
-import json
+Register a callback to process conversation summaries posted to the agent. `on_summary(cb)` takes a `agent::SummaryCallback` (`std::function<void(const json& summary, const json& raw_data)>`):
 
-def check_for_new_input(agent_url, conversation_id, auth):
-    """
-    Check if there's any new input for a conversation
-    
-    Args:
-        agent_url: Base URL for the agent
-        conversation_id: ID of the conversation to check
-        auth: (username, password) tuple for basic auth
-    
-    Returns:
-        New messages if any, None otherwise
-    """
-    url = f"{agent_url}/check_for_input"
-    response = requests.post(
-        url,
-        json={"conversation_id": conversation_id},
-        auth=auth
-    )
-    
-    if response.status_code == 200:
-        data = response.json()
-        if data.get("new_input", False):
-            return data.get("messages", [])
-    
-    return None
-```
-
-By default, the check_for_input endpoint returns an empty response. To implement custom behavior, override the `_handle_check_for_input_request` method in your agent:
-
-```python
-async def _handle_check_for_input_request(self, request):
-    # First do basic authentication check
-    if not self._check_basic_auth(request):
-        return Response(
-            content=json.dumps({"error": "Unauthorized"}),
-            status_code=401,
-            headers={"WWW-Authenticate": "Basic"},
-            media_type="application/json"
-        )
-    
-    # Get conversation_id from request
-    conversation_id = None
-    if request.method == "POST":
-        body = await request.json()
-        conversation_id = body.get("conversation_id")
-    else:
-        conversation_id = request.query_params.get("conversation_id")
-    
-    if not conversation_id:
-        return Response(
-            content=json.dumps({"error": "Missing conversation_id"}),
-            status_code=400,
-            media_type="application/json"
-        )
-    
-    # Custom logic to check for new input
-    # For example, checking a database or external API
-    messages = self._get_new_messages(conversation_id)
-    
-    return {
-        "status": "success",
-        "conversation_id": conversation_id,
-        "new_input": len(messages) > 0,
-        "messages": messages
+```cpp
+agent.on_summary([](const json& summary, const json& raw_data) {
+    (void)raw_data;
+    if (summary != nullptr) {
+        std::cout << "Conversation summary: " << summary.dump() << "\n";
+        // Save to a database, send notifications, etc.
     }
+});
 ```
 
-This endpoint is useful for implementing asynchronous conversations where users might send messages through different channels that need to be incorporated into the agent conversation.
+### MCP Integration
+
+The agent can connect to Model Context Protocol (MCP) servers. Register a server with `add_mcp_server(url, ...)` and enable the integration with `enable_mcp_server()`:
+
+```cpp
+add_mcp_server("https://mcp.example.com");
+enable_mcp_server(true);
+```
 
 ## Prefab Agents
 
-Prefab agents are pre-configured agent implementations designed for specific use cases. They provide ready-to-use functionality with customization options, saving development time and ensuring consistent patterns.
+Prefab agents are pre-configured implementations for common use cases. They live in `signalwire::prefabs` and subclass `AgentBase`, so they accept the same `(name, route, host, port)` constructor and expose fluent setters.
 
-### Built-in Prefabs
+```cpp
+#include <signalwire/prefabs/prefabs.hpp>
 
-The SDK includes several built-in prefab agents:
+using namespace signalwire;
+```
 
 #### InfoGathererAgent
 
 Collects structured information from users:
 
-```python
-from signalwire.prefabs import InfoGathererAgent
-
-agent = InfoGathererAgent(
-    fields=[
-        {"name": "full_name", "prompt": "What is your full name?"},
-        {"name": "email", "prompt": "What is your email address?", 
-         "validation": r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"},
-        {"name": "reason", "prompt": "How can I help you today?"}
-    ],
-    confirmation_template="Thanks {full_name}, I'll help you with {reason}. I'll send a confirmation to {email}.",
-    name="info-gatherer",
-    route="/info-gatherer"
-)
-
-agent.serve(host="0.0.0.0", port=8000)
-```
-
-#### FAQBotAgent
-
-Answers questions based on a knowledge base:
-
-```python
-from signalwire.prefabs import FAQBotAgent
-
-agent = FAQBotAgent(
-    knowledge_base_path="./docs",
-    personality="I'm a product documentation assistant.",
-    citation_style="inline",
-    name="knowledge-base",
-    route="/knowledge-base"
-)
-
-agent.serve(host="0.0.0.0", port=8000)
-```
-
-#### ConciergeAgent
-
-Routes users to specialized agents:
-
-```python
-from signalwire.prefabs import ConciergeAgent
-
-agent = ConciergeAgent(
-    routing_map={
-        "technical_support": {
-            "url": "http://tech-support-agent:8001",
-            "criteria": ["error", "broken", "not working"]
-        },
-        "sales": {
-            "url": "http://sales-agent:8002",
-            "criteria": ["pricing", "purchase", "subscribe"]
-        }
-    },
-    greeting="Welcome to SignalWire. How can I help you today?",
-    name="concierge",
-    route="/concierge"
-)
-
-agent.serve(host="0.0.0.0", port=8000)
+```cpp
+prefabs::InfoGathererAgent agent("info-gatherer", "/info-gatherer");
+agent.set_questions({
+    {{"name", "full_name"}, {"prompt", "What is your full name?"}},
+    {{"name", "email"}, {"prompt", "What is your email address?"}},
+    {{"name", "reason"}, {"prompt", "How can I help you today?"}}
+});
+agent.set_completion_message("Thanks! I'll help you with your request.");
+agent.run();
 ```
 
 #### SurveyAgent
 
 Conducts structured surveys with different question types:
 
-```python
-from signalwire.prefabs import SurveyAgent
-
-agent = SurveyAgent(
-    survey_name="Customer Satisfaction",
-    introduction="We'd like to know about your recent experience with our product.",
-    questions=[
-        {
-            "id": "satisfaction",
-            "text": "How satisfied are you with our product?",
-            "type": "rating",
-            "scale": 5,
-            "labels": {
-                "1": "Very dissatisfied",
-                "5": "Very satisfied"
-            }
-        },
-        {
-            "id": "feedback",
-            "text": "Do you have any specific feedback about how we can improve?",
-            "type": "text"
-        }
-    ],
-    name="satisfaction-survey",
-    route="/survey"
-)
-
-agent.serve(host="0.0.0.0", port=8000)
+```cpp
+prefabs::SurveyAgent agent("satisfaction-survey", "/survey");
+agent.set_intro_message("We'd like to know about your recent experience.");
+agent.set_questions({
+    {{"id", "satisfaction"}, {"text", "How satisfied are you?"}, {"type", "rating"}, {"scale", 5}},
+    {{"id", "feedback"}, {"text", "Any specific feedback?"}, {"type", "text"}}
+});
+agent.run();
 ```
 
 #### ReceptionistAgent
 
 Handles call routing and department transfers:
 
-```python
-from signalwire.prefabs import ReceptionistAgent
+```cpp
+prefabs::ReceptionistAgent agent("acme-receptionist", "/reception");
+agent.set_greeting("Thank you for calling ACME Corp. How may I direct your call?");
+agent.set_departments({
+    {{"name", "sales"}, {"description", "Product inquiries and pricing"}, {"number", "+15551235555"}},
+    {{"name", "support"}, {"description", "Technical assistance"}, {"number", "+15551236666"}}
+});
+agent.run();
+```
 
-agent = ReceptionistAgent(
-    departments=[
-        {"name": "sales", "description": "For product inquiries and pricing", "number": "+15551235555"},
-        {"name": "support", "description": "For technical assistance", "number": "+15551236666"},
-        {"name": "billing", "description": "For payment and invoice questions", "number": "+15551237777"}
-    ],
-    greeting="Thank you for calling ACME Corp. How may I direct your call?",
-    voice="rime.spore:mistv2",
-    name="acme-receptionist",
-    route="/reception"
-)
+#### FAQBotAgent
 
-agent.serve(host="0.0.0.0", port=8000)
+Answers questions using keyword-matched FAQ entries:
+
+```cpp
+prefabs::FAQBotAgent agent("knowledge-base", "/knowledge-base");
+agent.set_faqs({
+    {{"question", "What are your hours?"}, {"answer", "We are open 9am-5pm ET."}}
+});
+agent.set_no_match_message("I'm not sure about that one — let me connect you to a person.");
+agent.run();
+```
+
+#### ConciergeAgent
+
+Provides venue and amenity information:
+
+```cpp
+prefabs::ConciergeAgent agent("concierge", "/concierge");
+agent.set_venue_name("Grand Hotel");
+agent.set_amenities({
+    {{"name", "Pool"}, {"description", "Open 6am-10pm on the roof deck."}}
+});
+agent.run();
 ```
 
 ### Creating Your Own Prefabs
 
-You can create your own prefab agents by extending `AgentBase` or any existing prefab. Custom prefabs can be created directly within your project or packaged as reusable libraries.
+You can create your own prefab by subclassing `AgentBase` (or any existing prefab) and applying configuration in the constructor:
 
-#### Basic Prefab Structure
-
-A well-designed prefab should:
-
-1. Extend `AgentBase` or another prefab
-2. Take configuration parameters in the constructor
-3. Apply configuration to set up the agent
-4. Provide appropriate default values
-5. Include domain-specific tools
-
-Example of a custom support agent prefab:
-
-```python
-from signalwire import AgentBase
-from signalwire.core.function_result import SwaigFunctionResult
-
-class CustomerSupportAgent(AgentBase):
-    def __init__(
-        self,
-        product_name,
-        knowledge_base_path=None,
-        support_email=None,
-        escalation_path=None,
-        **kwargs
-    ):
-        # Pass standard params to parent
-        super().__init__(**kwargs)
-        
-        # Store custom configuration
-        self._product_name = product_name
-        self._knowledge_base_path = knowledge_base_path
-        self._support_email = support_email
-        self._escalation_path = escalation_path
-        
-        # Configure prompt
-        self.prompt_add_section("Personality", 
-                               body=f"I am a customer support agent for {product_name}.")
-        self.prompt_add_section("Goal", 
-                               body="Help customers solve their problems effectively.")
-        
-        # Add standard instructions
-        self._configure_instructions()
-        
-        # Register default tools
-        self._register_default_tools()
-    
-    def _configure_instructions(self):
-        """Configure standard instructions based on settings"""
-        instructions = [
+```cpp
+class CustomerSupportAgent : public agent::AgentBase {
+public:
+    explicit CustomerSupportAgent(const std::string& product_name)
+        : AgentBase("voice-support", "/voice-support") {
+        prompt_add_section("Personality", "I am a customer support agent for " + product_name + ".");
+        prompt_add_section("Goal", "Help customers solve their problems effectively.");
+        prompt_add_section("Instructions", "", {
             "Be professional but friendly.",
             "Verify the customer's identity before sharing account details."
-        ]
-        
-        if self._escalation_path:
-            instructions.append(
-                f"For complex issues, offer to escalate to {self._escalation_path}."
-            )
-            
-        self.prompt_add_section("Instructions", bullets=instructions)
-    
-    def _register_default_tools(self):
-        """Register default tools if appropriate paths are configured"""
-        if self._knowledge_base_path:
-            self.register_knowledge_base_tool()
-    
-    def register_knowledge_base_tool(self):
-        """Register the knowledge base search tool if configured"""
-        # Implementation...
-        pass
-    
-    @AgentBase.tool(
-        name="escalate_issue",
-        description="Escalate a customer issue to a human agent",
-        parameters={
-            "issue_summary": {"type": "string", "description": "Brief summary of the issue"},
-            "customer_email": {"type": "string", "description": "Customer's email address"}
-        }
-    )
-    def escalate_issue(self, args, raw_data):
-        # Implementation...
-        return SwaigFunctionResult("Issue escalated successfully.")
-    
-    @AgentBase.tool(
-        name="send_support_email",
-        description="Send a follow-up email to the customer",
-        parameters={
-            "customer_email": {"type": "string"},
-            "issue_summary": {"type": "string"},
-            "resolution_steps": {"type": "string"}
-        }
-    )
-    def send_support_email(self, args, raw_data):
-        # Implementation...
-        return SwaigFunctionResult("Follow-up email sent successfully.")
+        });
+
+        define_tool("escalate_issue", "Escalate a customer issue to a human agent",
+            swaig::ParameterSchema{}
+                .string("issue_summary", "Brief summary of the issue")
+                .string("customer_email", "Customer's email address")
+                .required({"issue_summary"}),
+            [](const json& args, const json& raw) -> swaig::FunctionResult {
+                (void)args; (void)raw;
+                return swaig::FunctionResult("Issue escalated successfully.");
+            });
+    }
+};
 ```
 
-#### Using the Custom Prefab
+## Multi-Agent Hosting
 
-```python
-# Create an instance of the custom prefab
-support_agent = CustomerSupportAgent(
-    product_name="SignalWire Voice API",
-    knowledge_base_path="./product_docs",
-    support_email="support@example.com",
-    escalation_path="tier 2 support",
-    name="voice-support",
-    route="/voice-support"
-)
+To host several agents in one process, use `server::AgentServer`. Register each agent on its own route and serve them all from a single port:
 
-# Start the agent
-support_agent.serve(host="0.0.0.0", port=8000)
+```cpp
+#include <signalwire/server/agent_server.hpp>
+
+using namespace signalwire;
+
+server::AgentServer srv("0.0.0.0", 3000);
+
+srv.register_agent(registration_agent, "/register");
+srv.register_agent(support_agent, "/support");
+
+// Central SIP routing across all hosted agents
+srv.enable_sip_routing();
+srv.map_sip_username("signup", "/register");  // signup@domain → registration agent
+srv.map_sip_username("help", "/support");     // help@domain → support agent
+
+srv.run();
 ```
 
-#### Customizing Existing Prefabs
-
-You can also extend and customize the built-in prefabs:
-
-```python
-from signalwire.prefabs import InfoGathererAgent
-
-class EnhancedGatherer(InfoGathererAgent):
-    def __init__(self, fields, **kwargs):
-        super().__init__(fields=fields, **kwargs)
-        
-        # Add an additional instruction
-        self.prompt_add_section("Instructions", bullets=[
-            "Verify all information carefully."
-        ])
-        
-        # Add an additional custom tool
-        
-    @AgentBase.tool(
-        name="check_customer", 
-        description="Check customer status in database",
-        parameters={"email": {"type": "string"}}
-    )
-    def check_customer(self, args, raw_data):
-        # Implementation...
-        return SwaigFunctionResult("Customer status: Active")
-```
-
-### Best Practices for Prefab Design
-
-1. **Clear Documentation**: Document the purpose, parameters, and extension points
-2. **Sensible Defaults**: Provide working defaults that make sense for the use case
-3. **Error Handling**: Implement robust error handling with helpful messages
-4. **Modular Design**: Keep prefabs focused on a specific use case
-5. **Consistent Interface**: Maintain consistent patterns across related prefabs
-6. **Extension Points**: Provide clear ways for others to extend your prefab
-7. **Configuration Options**: Make all key behaviors configurable
-
-### Making Prefabs Distributable
-
-To create distributable prefabs that can be used across multiple projects:
-
-1. **Package Structure**: Create a proper Python package
-2. **Documentation**: Include clear usage examples 
-3. **Configuration**: Support both code and file-based configuration
-4. **Testing**: Include tests for your prefab
-5. **Publishing**: Publish to PyPI or share via GitHub
-
-Example package structure:
-
-```
-my-prefab-agents/
-├── README.md
-├── setup.py
-├── examples/
-│   └── support_agent_example.py
-└── my_prefab_agents/
-    ├── __init__.py
-    ├── support.py
-    ├── retail.py
-    └── utils/
-        ├── __init__.py
-        └── knowledge_base.py
-```
+`AgentServer` also exposes `list_routes()`, `unregister_agent(...)`, `set_static_dir(...)`, and `stop()`.
 
 ## API Reference
 
-### Constructor Parameters
+### Constructor
 
-- `name`: Agent name/identifier (required)
-- `route`: HTTP route path (default: "/")
-- `host`: Host to bind to (default: "0.0.0.0")
-- `port`: Port to bind to (default: 3000)
-- `basic_auth`: Optional (username, password) tuple
-- `use_pom`: Whether to use POM for prompts (default: True)
-- `token_expiry_secs`: Security token expiry time (default: 3600)
-- `auto_answer`: Auto-answer calls (default: True)
-- `record_call`: Record calls (default: False)
-- `schema_path`: Optional path to schema.json file
-- `suppress_logs`: Whether to suppress structured logs (default: False)
+```cpp
+AgentBase(const std::string& name = "agent",
+          const std::string& route = "/",
+          const std::string& host = "0.0.0.0",
+          int port = 3000);
+```
 
 ### Prompt Methods
 
-- `prompt_add_section(title, body=None, bullets=None, numbered=False, numbered_bullets=False)`
-- `prompt_add_subsection(parent_title, title, body=None, bullets=None)`
-- `prompt_add_to_section(title, body=None, bullet=None, bullets=None)`
-- `set_prompt_text(prompt_text)` or `set_prompt(prompt_text)`
-- `set_post_prompt(prompt_text)`
-- `setPersonality(text)` - Convenience method that calls prompt_add_section
-- `setGoal(text)` - Convenience method that calls prompt_add_section
-- `setInstructions(bullets)` - Convenience method that calls prompt_add_section
+- `set_prompt_text(text)` / `set_use_pom(bool)` / `set_prompt_pom(vector<json>)`
+- `set_post_prompt(text)` / `set_post_prompt_url(url)`
+- `prompt_add_section(title, body = "", bullets = {})`
+- `prompt_add_subsection(parent_title, title, body = "", bullets = {})`
+- `prompt_add_to_section(title, body = "", bullets = {})`
 
-### SWAIG Methods
+### SWAIG / Tool Methods
 
-- `@AgentBase.tool(name, description, parameters={}, secure=True, fillers=None)`
-- `define_tool(name, description, parameters, handler, secure=True, fillers=None)`
-- `set_native_functions(function_names)`
-- `add_native_function(function_name)`
-- `remove_native_function(function_name)`
-- `add_function_include(url, functions, meta_data=None)`
+- `define_tool(name, description, parameters, handler, secure = false)`
+- `define_tool(const swaig::ToolDefinition&)`
+- `register_swaig_function(json)`
+- `list_tools()`
+- `set_native_functions(funcs)` / `add_function_include(json)` / `set_function_includes(vector<json>)`
+- `create_tool_token(tool_name, call_id)` / `validate_tool_token(function_name, token, call_id)`
 
-### Configuration Methods
+### AI Configuration Methods
 
-- `add_hint(hint)` and `add_hints(hints)`
-- `add_pattern_hint(hint, pattern, replace, ignore_case=False)`
-- `add_pronunciation(replace, with_text, ignore_case=False)`
-- `add_language(name, code, voice, speech_fillers=None, function_fillers=None, engine=None, model=None)`
-- `set_param(key, value)` and `set_params(params_dict)`
-- `set_global_data(data_dict)` and `update_global_data(data_dict)`
+- `add_hint(hint)` / `add_hints(hints)` / `add_pattern_hint(pattern)`
+- `add_pronunciation(replace, with, ignore_case = false)` / `set_pronunciations(vector)`
+- `add_language(LanguageConfig)` / `set_languages(vector)` / `set_language_params(code, json)`
+- `set_param(key, value)` / `set_params(json)`
+- `set_global_data(json)` / `update_global_data(json)`
+- `set_prompt_llm_params(json)` / `set_post_prompt_llm_params(json)`
+- `set_internal_fillers(json)` / `add_internal_filler(function_name, language_code, fillers)`
 
-### State Methods
+### Skill Methods
 
-- `get_state(call_id)`
-- `set_state(call_id, data)` 
-- `update_state(call_id, data)`
-- `clear_state(call_id)`
-- `cleanup_expired_state()`
+- `add_skill(name, params = {})` / `add_skill(skills::SkillName, params = {})`
+- `remove_skill(name)` / `has_skill(name)` / `list_skills()`
 
-### SIP Routing Methods
+### Context Methods
 
-- `enable_sip_routing(auto_map=True, path="/sip")`: Enable SIP routing for an agent
-- `register_sip_username(sip_username)`: Register a SIP username for an agent
-- `auto_map_sip_usernames()`: Automatically register SIP usernames based on agent attributes
+- `define_contexts()` → `contexts::ContextBuilder&`
+- `add_context(name)` / `has_contexts()` / `reset_contexts()`
 
-#### AgentServer SIP Methods
+### Verb Methods (5-phase pipeline)
 
-- `setup_sip_routing(route="/sip", auto_map=True)`: Set up central SIP routing for a server
-- `register_sip_username(username, route)`: Map a SIP username to an agent route
+- `add_pre_answer_verb(name, json)` / `add_answer_verb(name, json)`
+- `add_post_answer_verb(name, json)` / `add_post_ai_verb(name, json)`
+- `clear_pre_answer_verbs()` / `clear_post_answer_verbs()` / `clear_post_ai_verbs()`
 
-### Service Methods
+### Web / SIP / Auth Methods
 
-- `serve(host=None, port=None)`: Start the web server
-- `as_router()`: Return a FastAPI router for this agent
-- `on_swml_request(request_data=None, callback_path=None)`: Customize SWML based on request data and path
-- `on_summary(summary, raw_data=None)`: Handle post-prompt summaries
-- `on_function_call(name, args, raw_data=None)`: Process SWAIG function calls
-- `register_routing_callback(callback_fn, path="/sip")`: Register a callback for custom path routing
-- `set_web_hook_url(url)`: Override the default web_hook_url with a supplied URL string
-- `set_post_prompt_url(url)`: Override the default post_prompt_url with a supplied URL string
+- `set_dynamic_config_callback(cb)`
+- `set_webhook_url(url)` / `set_post_prompt_url_direct(url)`
+- `add_swaig_query_param(key, value)` / `clear_swaig_query_params()`
+- `enable_debug_routes(bool)` / `enable_debug_events(bool)`
+- `enable_sip_routing(bool)` / `register_sip_username(name)` / `auto_map_sip_usernames(bool)`
+- `set_auth(user, pass)` / `set_signing_key(key)`
+- `add_mcp_server(url, ...)` / `enable_mcp_server(bool)`
 
-### Endpoint Methods
+### Lifecycle / Callbacks
 
-The SDK provides several endpoints for different purposes:
-
-- Root endpoint (`/`): Serves the main SWML document
-- SWAIG endpoint (`/swaig`): Handles SWAIG function calls
-- Post-prompt endpoint (`/post_prompt`): Processes conversation summaries
-- Check-for-input endpoint (`/check_for_input`): Supports checking for new input from external systems
-- Debug endpoint (`/debug`): Serves the SWML document with debug headers
-- Debug events endpoint (`/debug_events`): Receives real-time debug events from the AI module (see [Debug Events](#debug-events))
-- SIP routing endpoint (configurable, default `/sip`): Handles SIP routing requests
-
-## Testing
-
-The SignalWire AI Agent SDK provides comprehensive testing capabilities through the `swaig-test` CLI tool, which allows you to test agents locally and simulate serverless environments without deployment.
-
-### Local Agent Testing
-
-Test your agents locally before deployment:
-
-```bash
-# Discover agents in a file
-swaig-test examples/my_agent.py
-
-# List available functions
-swaig-test examples/my_agent.py --list-tools
-
-# Test SWAIG functions
-swaig-test examples/my_agent.py --exec get_weather --location "New York"
-
-# Generate SWML documents
-swaig-test examples/my_agent.py --dump-swml
-```
-
-### Serverless Environment Simulation
-
-Test your agents in simulated serverless environments to ensure they work correctly when deployed:
-
-#### AWS Lambda Testing
-
-```bash
-# Basic Lambda environment simulation
-swaig-test examples/my_agent.py --simulate-serverless lambda --dump-swml
-
-# Test with custom Lambda configuration
-swaig-test examples/my_agent.py --simulate-serverless lambda \
-  --aws-function-name my-production-function \
-  --aws-region us-west-2 \
-  --exec my_function --param value
-
-# Test function execution in Lambda context
-swaig-test examples/my_agent.py --simulate-serverless lambda \
-  --exec get_weather --location "Miami" \
-  --full-request
-```
-
-#### CGI Environment Testing
-
-```bash
-# Test CGI environment
-swaig-test examples/my_agent.py --simulate-serverless cgi \
-  --cgi-host my-server.com \
-  --cgi-https \
-  --dump-swml
-
-# Test function in CGI context
-swaig-test examples/my_agent.py --simulate-serverless cgi \
-  --cgi-host example.com \
-  --exec my_function --param value
-```
-
-#### Google Cloud Functions Testing
-
-```bash
-# Test Cloud Functions environment
-swaig-test examples/my_agent.py --simulate-serverless cloud_function \
-  --gcp-project my-project \
-  --gcp-function-url https://my-function.cloudfunctions.net \
-  --dump-swml
-```
-
-#### Azure Functions Testing
-
-```bash
-# Test Azure Functions environment
-swaig-test examples/my_agent.py --simulate-serverless azure_function \
-  --azure-env production \
-  --azure-function-url https://my-function.azurewebsites.net \
-  --exec my_function
-```
-
-### Environment Variable Management
-
-Use environment files for consistent testing across different platforms:
-
-```bash
-# Create environment file for production testing
-cat > production.env << EOF
-AWS_LAMBDA_FUNCTION_NAME=prod-my-agent
-AWS_REGION=us-east-1
-API_KEY=prod_api_key_123
-DEBUG=false
-TIMEOUT=60
-EOF
-
-# Test with environment file
-swaig-test examples/my_agent.py --simulate-serverless lambda \
-  --env-file production.env \
-  --exec critical_function --input "test"
-
-# Override specific variables
-swaig-test examples/my_agent.py --simulate-serverless lambda \
-  --env-file production.env \
-  --env DEBUG=true \
-  --dump-swml
-```
-
-### Cross-Platform Testing
-
-Test the same agent across multiple platforms to ensure compatibility:
-
-```bash
-# Test across all platforms
-for platform in lambda cgi cloud_function azure_function; do
-  echo "Testing $platform..."
-  swaig-test examples/my_agent.py --simulate-serverless $platform \
-    --exec my_function --param value
-done
-
-# Compare SWML generation across platforms
-swaig-test examples/my_agent.py --simulate-serverless lambda --dump-swml > lambda.swml
-swaig-test examples/my_agent.py --simulate-serverless cgi --cgi-host example.com --dump-swml > cgi.swml
-diff lambda.swml cgi.swml
-```
-
-### Webhook URL Verification
-
-The serverless simulation automatically generates platform-appropriate webhook URLs:
-
-| Platform | Example Webhook URL |
-|----------|-------------------|
-| Lambda (Function URL) | `https://abc123.lambda-url.us-east-1.on.aws/swaig/` |
-| Lambda (API Gateway) | `https://api123.execute-api.us-east-1.amazonaws.com/prod/swaig/` |
-| CGI | `https://example.com/cgi-bin/agent.cgi/swaig/` |
-| Cloud Functions | `https://my-function-abc123.cloudfunctions.net/swaig/` |
-| Azure Functions | `https://my-function.azurewebsites.net/swaig/` |
-
-Verify webhook URLs are generated correctly:
-
-```bash
-# Check Lambda webhook URL
-swaig-test examples/my_agent.py --simulate-serverless lambda \
-  --dump-swml --format-json | jq '.sections.main[1].ai.SWAIG.defaults.web_hook_url'
-
-# Check CGI webhook URL
-swaig-test examples/my_agent.py --simulate-serverless cgi \
-  --cgi-host my-production-server.com \
-  --dump-swml --format-json | jq '.sections.main[1].ai.SWAIG.defaults.web_hook_url'
-```
-
-### Testing Best Practices
-
-1. **Test locally first**: Always test your agent in local mode before serverless simulation
-2. **Test target platforms**: Test on all platforms where you plan to deploy
-3. **Use environment files**: Create reusable environment configurations for different stages
-4. **Verify webhook URLs**: Ensure URLs are generated correctly for your target platform
-5. **Test function execution**: Verify that functions work correctly in serverless context
-6. **Use verbose mode**: Enable `--verbose` for debugging environment setup and execution
-
-### Multi-Agent Testing
-
-For files with multiple agents, specify which agent to test:
-
-```bash
-# Discover available agents
-swaig-test multi_agent_file.py --list-agents
-
-# Test specific agent
-swaig-test multi_agent_file.py --agent-class MyAgent --simulate-serverless lambda --dump-swml
-
-# Test different agents across platforms
-swaig-test multi_agent_file.py --agent-class AgentA --simulate-serverless lambda --exec function1
-swaig-test multi_agent_file.py --agent-class AgentB --simulate-serverless cgi --cgi-host example.com --exec function2
-```
-
-For more detailed testing documentation, see the [CLI Guide](cli_guide.md).
+- `run()` / `serve()` / `stop()`
+- `on_summary(SummaryCallback)` / `on_debug_event(DebugEventCallback)`
+- `render_swml()` / `render_swml_for_request(query_params, body_params, headers)`
 
 ## Examples
 
 ### Simple Question-Answering Agent
 
-```python
-from signalwire import AgentBase
-from signalwire.core.function_result import SwaigFunctionResult
-from datetime import datetime
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <ctime>
 
-class SimpleAgent(AgentBase):
-    def __init__(self):
-        super().__init__(
-            name="simple",
-            route="/simple",
-            use_pom=True
-        )
-        
-        # Configure agent personality
-        self.prompt_add_section("Personality", body="You are a friendly and helpful assistant.")
-        self.prompt_add_section("Goal", body="Help users with basic tasks and answer questions.")
-        self.prompt_add_section("Instructions", bullets=[
+using namespace signalwire;
+using json = nlohmann::json;
+
+class SimpleAgent : public agent::AgentBase {
+public:
+    SimpleAgent() : AgentBase("simple", "/simple") {
+        prompt_add_section("Personality", "You are a friendly and helpful assistant.");
+        prompt_add_section("Goal", "Help users with basic tasks and answer questions.");
+        prompt_add_section("Instructions", "", {
             "Be concise and direct in your responses.",
             "If you don't know something, say so clearly.",
             "Use the get_time function when asked about the current time."
-        ])
-        
-    @AgentBase.tool(
-        name="get_time",
-        description="Get the current time",
-        parameters={}
-    )
-    def get_time(self, args, raw_data):
-        """Get the current time"""
-        now = datetime.now()
-        formatted_time = now.strftime("%H:%M:%S")
-        return SwaigFunctionResult(f"The current time is {formatted_time}")
+        });
 
-def main():
-    agent = SimpleAgent()
-    print("Starting agent server...")
-    print("Note: Works in any deployment mode (server/CGI/Lambda)")
-    agent.run()
+        define_tool("get_time", "Get the current time",
+            {{"type", "object"}, {"properties", json::object()}},
+            [](const json& args, const json& raw) -> swaig::FunctionResult {
+                (void)args; (void)raw;
+                auto t = std::time(nullptr);
+                char buf[32];
+                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&t));
+                return swaig::FunctionResult(std::string("The current time is ") + buf);
+            });
+    }
+};
 
-if __name__ == "__main__":
-    main()
+int main() {
+    SimpleAgent agent;
+    std::cout << "Starting agent server at http://0.0.0.0:3000/simple\n";
+    agent.run();
+}
 ```
 
 ### Multi-Language Customer Service Agent
 
-```python
-class CustomerServiceAgent(AgentBase):
-    def __init__(self):
-        super().__init__(
-            name="customer-service",
-            route="/support",
-            use_pom=True
-        )
-        
-        # Configure agent personality
-        self.prompt_add_section("Personality", 
-                               body="You are a helpful customer service representative for SignalWire.")
-        self.prompt_add_section("Knowledge", 
-                               body="You can answer questions about SignalWire products and services.")
-        self.prompt_add_section("Instructions", bullets=[
+```cpp
+class CustomerServiceAgent : public agent::AgentBase {
+public:
+    CustomerServiceAgent() : AgentBase("customer-service", "/support") {
+        prompt_add_section("Personality",
+            "You are a helpful customer service representative for SignalWire.");
+        prompt_add_section("Knowledge",
+            "You can answer questions about SignalWire products and services.");
+        prompt_add_section("Instructions", "", {
             "Greet customers politely",
-            "Answer questions about SignalWire products",
-            "Use check_account_status when customer asks about their account",
+            "Use check_account_status when the customer asks about their account",
             "Use create_support_ticket for unresolved issues"
-        ])
-        
-        # Add language support
-        self.add_language(
-            name="English",
-            code="en-US",
-            voice="en-US-Neural2-F",
-            speech_fillers=["Let me think...", "One moment please..."],
-            function_fillers=["I'm looking that up...", "Let me check that..."]
-        )
-        
-        self.add_language(
-            name="Spanish",
-            code="es",
-            voice="rime.spore:multilingual",
-            speech_fillers=["Un momento por favor...", "Estoy pensando..."]
-        )
-        
-        # Enable languages
-        self.set_params({"languages_enabled": True})
-        
-        # Add company information
-        self.set_global_data({
-            "company_name": "SignalWire",
-            "support_hours": "9am-5pm ET, Monday through Friday",
-            "support_email": "support@signalwire.com"
-        })
-    
-    @AgentBase.tool(
-        name="check_account_status",
-        description="Check the status of a customer's account",
-        parameters={
-            "account_id": {
-                "type": "string",
-                "description": "The customer's account ID"
-            }
-        }
-    )
-    def check_account_status(self, args, raw_data):
-        account_id = args.get("account_id")
-        # In a real implementation, this would query a database
-        return SwaigFunctionResult(f"Account {account_id} is in good standing.")
-    
-    @AgentBase.tool(
-        name="create_support_ticket",
-        description="Create a support ticket for an unresolved issue",
-        parameters={
-            "issue": {
-                "type": "string",
-                "description": "Brief description of the issue"
-            },
-            "priority": {
-                "type": "string",
-                "description": "Ticket priority",
-                "enum": ["low", "medium", "high", "critical"]
-            }
-        }
-    )
-    def create_support_ticket(self, args, raw_data):
-        issue = args.get("issue", "")
-        priority = args.get("priority", "medium")
-        
-        # Generate a ticket ID (in a real system, this would create a database entry)
-        ticket_id = f"TICKET-{hash(issue) % 10000:04d}"
-        
-        return SwaigFunctionResult(
-            f"Support ticket {ticket_id} has been created with {priority} priority. " +
-            "A support representative will contact you shortly."
-        )
+        });
 
-def main():
-    agent = CustomerServiceAgent()
-    print("Starting customer service agent...")
-    print("Note: Works in any deployment mode (server/CGI/Lambda)")
-    agent.run()
+        // Language support
+        add_language({"English", "en-US", "en-US-Neural2-F"});
+        add_language({"Spanish", "es", "rime.spore:multilingual"});
+        set_params({{"languages_enabled", true}});
 
-if __name__ == "__main__":
-    main()
+        // Company information
+        set_global_data({
+            {"company_name", "SignalWire"},
+            {"support_hours", "9am-5pm ET, Monday through Friday"},
+            {"support_email", "support@signalwire.com"}
+        });
+
+        define_tool("check_account_status", "Check the status of a customer's account",
+            swaig::ParameterSchema{}
+                .string("account_id", "The customer's account ID")
+                .required({"account_id"}),
+            [](const json& args, const json& raw) -> swaig::FunctionResult {
+                (void)raw;
+                std::string id = args.value("account_id", "");
+                return swaig::FunctionResult("Account " + id + " is in good standing.");
+            });
+
+        define_tool("create_support_ticket", "Create a support ticket for an unresolved issue",
+            swaig::ParameterSchema{}
+                .string("issue", "Brief description of the issue")
+                .enum_of("priority", {"low", "medium", "high", "critical"}, "Ticket priority")
+                .required({"issue"}),
+            [](const json& args, const json& raw) -> swaig::FunctionResult {
+                (void)raw;
+                std::string priority = args.value("priority", "medium");
+                return swaig::FunctionResult(
+                    "Support ticket created with " + priority + " priority. "
+                    "A representative will contact you shortly.");
+            });
+    }
+};
+
+int main() {
+    CustomerServiceAgent agent;
+    std::cout << "Starting customer service agent...\n";
+    agent.run();
+}
 ```
 
-### Dynamic Agent Configuration Examples
-
-For working examples of dynamic agent configuration, see these files in the `examples` directory:
-
-- **`simple_static_agent.py`**: Traditional static configuration approach
-- **`simple_dynamic_agent.py`**: Same agent but using dynamic configuration
-- **`simple_dynamic_enhanced.py`**: Enhanced version that actually uses request parameters
-- **`comprehensive_dynamic_agent.py`**: Advanced multi-tier, multi-industry dynamic agent
-- **`custom_path_agent.py`**: Dynamic agent with custom routing path
-- **`multi_agent_server.py`**: Multiple specialized dynamic agents on one server
-
-These examples demonstrate the progression from static to dynamic configuration and show real-world use cases like multi-tenant applications, A/B testing, and personalization.
-
-For more examples, see the `examples` directory in the SignalWire AI Agent SDK repository. 
-
-# Build index from the comprehensive concepts guide
-sw-search docs/agent_guide.md --output concepts.swsearch
-
-# Build from multiple sources
-sw-search docs/agent_guide.md examples README.md --output comprehensive.swsearch
-
-# Traditional directory approach with custom settings
-sw-search ./knowledge \
-    --output knowledge.swsearch \
-    --file-types md,txt,pdf \
-    --chunking-strategy sentence \
-    --max-sentences-per-chunk 8 \
-    --verbose
+For more examples, see the `examples/` directory in the SDK repository — in particular `examples/simple_agent.cpp` and `examples/swaig_features_agent.cpp`.

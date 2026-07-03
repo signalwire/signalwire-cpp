@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
     raise
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _cpp_fmt import clang_format_source  # noqa: E402
+from _cpp_fmt import format_generated_cpp  # noqa: E402
 
 
 # The 12 real REST spec directories (registry has no own dir — its resources
@@ -465,15 +465,15 @@ def gen_header(desc: str, extra_includes: list[str] | None = None) -> str:
         "#pragma once",
         "",
         "#include <map>",
+        "#include <nlohmann/json.hpp>",
         "#include <optional>",
         "#include <string>",
         "",
-        "#include <nlohmann/json.hpp>",
-        "",
-        '#include "signalwire/rest/base_resource.hpp"',
     ]
-    for inc in (extra_includes or []):
-        lines.append(inc)
+    # Quoted (local project) includes form a single clang-format group, sorted
+    # alphabetically — emit them pre-sorted so the formatter is a no-op.
+    quoted = ['#include "signalwire/rest/base_resource.hpp"'] + list(extra_includes or [])
+    lines += sorted(quoted)
     lines += [
         "",
         "namespace signalwire {",
@@ -496,6 +496,10 @@ def _params_struct(struct_name: str, fields: list[tuple[str, dict, bool]], spec:
     """Emit a named options-struct with a member per ordered spec field
     (required → plain member, optional → std::optional<T>) + a trailing
     ``json extras`` map. Returns (struct_src, body_build_lines, records)."""
+    # Struct members at 2-space base indent; the struct is nested one more level
+    # (inside the resource class) by _indent(s, "  ") at the call site, so the final
+    # member indent is 4 — matching clang-format (IndentWidth 2). Method-body build
+    # lines likewise at 4-space base (they sit directly in the method body).
     lines = [f"struct {struct_name} {{"]
     build: list[str] = ["    json body = json::object();"]
     records: list[dict] = list(leading_records)
@@ -510,18 +514,22 @@ def _params_struct(struct_name: str, fields: list[tuple[str, dict, bool]], spec:
         records.append({"name": wire_name, "kind": "keyword",
                         "type": _canon_type(spec, schema, required), "required": required})
         if required:
-            lines.append(f"    {base_t} {ident};")
+            lines.append(f"  {base_t} {ident};")
             build.append(f"    body[{cpp_str(wire_name)}] = p.{ident};")
         else:
-            lines.append(f"    std::optional<{base_t}> {ident};")
-            build.append(f"    if (p.{ident}.has_value()) {{ body[{cpp_str(wire_name)}] = *p.{ident}; }}")
+            lines.append(f"  std::optional<{base_t}> {ident};")
+            build.append(f"    if (p.{ident}.has_value()) {{")
+            build.append(f"      body[{cpp_str(wire_name)}] = *p.{ident};")
+            build.append("    }")
     # forward-compat door + kwargs sidecar record (kwargs has no distinct member).
-    lines.append("    json extras = json::object();")
+    lines.append("  json extras = json::object();")
     records.append({"name": "extras", "kind": "keyword",
                     "type": "optional<dict<string,any>>", "required": False, "default": None})
     records.append({"name": "kwargs", "kind": "var_keyword", "type": "any",
                     "required": False, "default": {}})
-    build.append("    if (!p.extras.is_null()) { body.update(p.extras); }")
+    build.append("    if (!p.extras.is_null()) {")
+    build.append("      body.update(p.extras);")
+    build.append("    }")
     lines.append("};")
     _register_sidecar(cls, method, records)
     return "\n".join(lines), build, records
@@ -860,11 +868,11 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
     lines.extend(methods)
     lines.append("")
     lines.append(" private:")
-    lines.append("  [[nodiscard]] json execute(const std::string& command, const json& params,")
-    lines.append("                             const std::optional<std::string>& call_id = std::nullopt) const {")
+    lines.append("  [[nodiscard]] json execute(const std::string& command, const json& params, "
+                 "const std::optional<std::string>& call_id = std::nullopt) const {")
     lines.append("    json body = {{\"command\", command}, {\"params\", params}};")
     lines.append("    if (call_id.has_value()) { body[\"id\"] = *call_id; }")
-    lines.append(f"    return http_.post(kBasePath, body);")
+    lines.append("    return http_.post(kBasePath, body);")
     lines.append("  }")
     lines.append("")
     lines.append("  const HttpClient& http_;")
@@ -1235,11 +1243,10 @@ def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
         "#pragma once",
         "",
         "#include <map>",
+        "#include <nlohmann/json.hpp>",
         "#include <optional>",
         "#include <string>",
         "#include <vector>",
-        "",
-        "#include <nlohmann/json.hpp>",
         "",
     ]
     for seg in ns_segments:
@@ -1252,6 +1259,9 @@ def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
     lines.append("///")
     lines.append("/// Method-less DTO: one typed member per snake wire key + open `extras`.")
     lines.append(f"struct {name} {{")
+    # Members emitted raw (single space before any trailing `// wire key:` comment);
+    # the shared format_generated_cpp pass aligns trailing comments + reflows the doc
+    # comments + wraps long lines exactly as clang-format, so this stays layout-agnostic.
     used: set[str] = set()
     for wire_key, psc in (properties or {}).items():
         ident = snake_ident(wire_key)
@@ -1478,7 +1488,9 @@ def main(argv: list[str]) -> int:
         return 0
 
     outs = build_outputs(psdk)
-    outs = {fn: clang_format_source(src) for fn, src in outs.items()}
+    # Only C++ headers are formatted; any .json sidecars are emitted verbatim.
+    outs = {fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
+            for fn, src in outs.items()}
 
     if args.out:
         out_dir = Path(args.out)

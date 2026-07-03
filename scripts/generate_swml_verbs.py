@@ -54,7 +54,7 @@ def _load_rest_generator():
 GR = _load_rest_generator()
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _cpp_fmt import clang_format_source  # noqa: E402
+from _cpp_fmt import format_generated_cpp  # noqa: E402
 
 SWML_VERBS_NS = ["signalwire", "core", "swml_verbs_generated"]
 SWML_VERBS_SUBDIR = ["core", "swml_verbs_generated"]
@@ -172,7 +172,9 @@ def main(argv: list) -> int:
 
     psdk = resolve_porting_sdk()
     outs = build_outputs(psdk)
-    outs = {fn: clang_format_source(src) for fn, src in outs.items()}
+    # Only C++ headers are formatted; any .json sidecars are emitted verbatim.
+    outs = {fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
+            for fn, src in outs.items()}
 
     out_dir = Path(args.out) if args.out else repo_root() / "include" / "signalwire"
 

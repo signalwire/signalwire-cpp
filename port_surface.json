@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 660f87a331033977962d22155aa15dc042021a6b",
+  "generated_from": "signalwire-cpp @ 7faedb24f7adeec0a06a05d5fe90d0f99b4b24d0",
   "modules": {
     "signalwire.agent.language_config": {
       "classes": {
@@ -952,7 +952,6 @@
           "addresses",
           "calling",
           "chat",
-          "compat",
           "datasphere",
           "fabric",
           "from_env",
@@ -974,6 +973,388 @@
           "verified_callers",
           "video",
           "with_base_url"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.addresses": {
+      "classes": {
+        "Addresses": [
+          "__init__",
+          "create",
+          "delete",
+          "get",
+          "list"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.ai_agents": {
+      "classes": {
+        "AiAgents": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.call_flows": {
+      "classes": {
+        "CallFlows": [
+          "__init__",
+          "deployVersion",
+          "listAddresses",
+          "listVersions"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.calling": {
+      "classes": {
+        "Calling": [
+          "__init__",
+          "ai_hold",
+          "ai_message",
+          "ai_stop",
+          "ai_unhold",
+          "collect",
+          "collect_start_input_timers",
+          "collect_stop",
+          "denoise",
+          "denoise_stop",
+          "detect",
+          "detect_stop",
+          "dial",
+          "disconnect",
+          "end",
+          "live_transcribe",
+          "live_translate",
+          "play",
+          "play_pause",
+          "play_resume",
+          "play_stop",
+          "play_volume",
+          "receive_fax_stop",
+          "record",
+          "record_pause",
+          "record_resume",
+          "record_stop",
+          "refer",
+          "send_fax_stop",
+          "stream",
+          "stream_stop",
+          "tap",
+          "tap_stop",
+          "transcribe",
+          "transcribe_stop",
+          "transfer",
+          "update",
+          "user_event"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.chat": {
+      "classes": {
+        "Chat": [
+          "__init__",
+          "createToken"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.conference_logs": {
+      "classes": {
+        "ConferenceLogs": [
+          "__init__",
+          "list"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.conference_rooms": {
+      "classes": {
+        "ConferenceRooms": [
+          "__init__",
+          "listAddresses"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.cxml_applications": {
+      "classes": {
+        "CxmlApplications": [
+          "__init__",
+          "delete",
+          "get",
+          "list",
+          "listAddresses",
+          "update"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.cxml_scripts": {
+      "classes": {
+        "CxmlScripts": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.cxml_webhooks": {
+      "classes": {
+        "CxmlWebhooks": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.datasphere_documents": {
+      "classes": {
+        "DatasphereDocuments": [
+          "__init__",
+          "deleteChunk",
+          "getChunk",
+          "listChunks",
+          "search"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.fax_logs": {
+      "classes": {
+        "FaxLogs": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.freeswitch_connectors": {
+      "classes": {
+        "FreeswitchConnectors": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.generic_resources": {
+      "classes": {
+        "GenericResources": [
+          "__init__",
+          "assignDomainApplication",
+          "assignPhoneRoute",
+          "delete",
+          "get",
+          "list",
+          "listAddresses"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.imported_numbers": {
+      "classes": {
+        "ImportedNumbers": [
+          "__init__",
+          "create"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.lookup": {
+      "classes": {
+        "Lookup": [
+          "__init__",
+          "phoneNumber"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.message_logs": {
+      "classes": {
+        "MessageLogs": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.mfa": {
+      "classes": {
+        "Mfa": [
+          "__init__",
+          "call",
+          "sms",
+          "verify"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.number_groups": {
+      "classes": {
+        "NumberGroups": [
+          "__init__",
+          "addMembership",
+          "deleteMembership",
+          "getMembership",
+          "listMemberships"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.phone_numbers": {
+      "classes": {
+        "PhoneNumbers": [
+          "__init__",
+          "search",
+          "setAiAgent",
+          "setCallFlow",
+          "setCxmlApplication",
+          "setCxmlWebhook",
+          "setRelayApplication",
+          "setRelayTopic",
+          "setSwmlWebhook"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.project_tokens": {
+      "classes": {
+        "ProjectTokens": [
+          "__init__",
+          "create",
+          "delete",
+          "update"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.pub_sub": {
+      "classes": {
+        "PubSub": [
+          "__init__",
+          "createToken"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.queues": {
+      "classes": {
+        "Queues": [
+          "__init__",
+          "getMember",
+          "getNextMember",
+          "listMembers"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.recordings": {
+      "classes": {
+        "Recordings": [
+          "__init__",
+          "delete",
+          "get",
+          "list"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.relay_applications": {
+      "classes": {
+        "RelayApplications": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.resource_tree": {
+      "classes": {
+        "ResourceTree": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.short_codes": {
+      "classes": {
+        "ShortCodes": [
+          "__init__",
+          "get",
+          "list",
+          "update"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.sip_endpoints": {
+      "classes": {
+        "SipEndpoints": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.sip_gateways": {
+      "classes": {
+        "SipGateways": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.sip_profile": {
+      "classes": {
+        "SipProfile": [
+          "__init__",
+          "get",
+          "update"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.subscribers": {
+      "classes": {
+        "Subscribers": [
+          "__init__",
+          "createSipEndpoint",
+          "deleteSipEndpoint",
+          "getSipEndpoint",
+          "listSipEndpoints",
+          "updateSipEndpoint"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.swml_scripts": {
+      "classes": {
+        "SwmlScripts": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.swml_webhooks": {
+      "classes": {
+        "SwmlWebhooks": [
+          "__init__"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.verified_callers": {
+      "classes": {
+        "VerifiedCallers": [
+          "__init__",
+          "redialVerification",
+          "submitVerification"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.generated.voice_logs": {
+      "classes": {
+        "VoiceLogs": [
+          "__init__",
+          "listEvents"
         ]
       },
       "functions": []
@@ -1038,120 +1419,6 @@
         "ChatResource": [
           "__init__",
           "create_token"
-        ]
-      },
-      "functions": []
-    },
-    "signalwire.rest.namespaces.compat": {
-      "classes": {
-        "CompatAccounts": [
-          "__init__",
-          "create",
-          "get",
-          "list",
-          "update"
-        ],
-        "CompatApplications": [
-          "__init__",
-          "update"
-        ],
-        "CompatCalls": [
-          "__init__",
-          "start_recording",
-          "start_stream",
-          "stop_stream",
-          "update",
-          "update_recording"
-        ],
-        "CompatConferences": [
-          "__init__",
-          "delete_recording",
-          "get",
-          "get_participant",
-          "get_recording",
-          "list",
-          "list_participants",
-          "list_recordings",
-          "remove_participant",
-          "start_stream",
-          "stop_stream",
-          "update",
-          "update_participant",
-          "update_recording"
-        ],
-        "CompatFaxes": [
-          "__init__",
-          "delete_media",
-          "get_media",
-          "list_media",
-          "update"
-        ],
-        "CompatLamlBins": [
-          "__init__",
-          "update"
-        ],
-        "CompatMessages": [
-          "__init__",
-          "delete_media",
-          "get_media",
-          "list_media",
-          "update"
-        ],
-        "CompatNamespace": [
-          "__init__",
-          "account_base",
-          "accounts",
-          "applications",
-          "calls",
-          "conferences",
-          "faxes",
-          "laml_bins",
-          "messages",
-          "phone_numbers",
-          "queues",
-          "recordings",
-          "tokens",
-          "transcriptions"
-        ],
-        "CompatPhoneNumbers": [
-          "__init__",
-          "available_base",
-          "base_path",
-          "delete",
-          "get",
-          "import_number",
-          "imported_base",
-          "list",
-          "list_available_countries",
-          "purchase",
-          "search_local",
-          "search_toll_free",
-          "update"
-        ],
-        "CompatQueues": [
-          "__init__",
-          "dequeue_member",
-          "get_member",
-          "list_members",
-          "update"
-        ],
-        "CompatRecordings": [
-          "__init__",
-          "delete",
-          "get",
-          "list"
-        ],
-        "CompatTokens": [
-          "__init__",
-          "create",
-          "delete",
-          "update"
-        ],
-        "CompatTranscriptions": [
-          "__init__",
-          "delete",
-          "get",
-          "list"
         ]
       },
       "functions": []
@@ -1222,10 +1489,15 @@
         ],
         "FabricTokens": [
           "__init__",
+          "createEmbedToken",
+          "createGuestToken",
+          "createInviteToken",
+          "createSubscriberToken",
           "create_embed_token",
           "create_guest_token",
           "create_invite_token",
           "create_subscriber_token",
+          "refreshSubscriberToken",
           "refresh_subscriber_token"
         ],
         "GenericResources": [
@@ -1391,15 +1663,20 @@
         "RegistryBrands": [
           "__init__",
           "create",
+          "createCampaign",
           "create_campaign",
           "get",
           "list",
+          "listCampaigns",
           "list_campaigns"
         ],
         "RegistryCampaigns": [
           "__init__",
+          "createOrder",
           "create_order",
           "get",
+          "listNumbers",
+          "listOrders",
           "list_numbers",
           "list_orders",
           "update"
@@ -1457,7 +1734,10 @@
         ],
         "VideoConferences": [
           "__init__",
+          "createStream",
           "create_stream",
+          "listConferenceTokens",
+          "listStreams",
           "list_conference_tokens",
           "list_streams",
           "update"
@@ -1476,12 +1756,16 @@
           "delete",
           "get",
           "list",
+          "listEvents",
           "list_events"
         ],
         "VideoRoomSessions": [
           "__init__",
           "get",
           "list",
+          "listEvents",
+          "listMembers",
+          "listRecordings",
           "list_events",
           "list_members",
           "list_recordings"
@@ -1492,7 +1776,9 @@
         ],
         "VideoRooms": [
           "__init__",
+          "createStream",
           "create_stream",
+          "listStreams",
           "list_streams",
           "update"
         ],

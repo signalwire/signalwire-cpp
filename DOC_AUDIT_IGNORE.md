@@ -148,7 +148,7 @@ wait_for: relay action.wait_for()
 The `rest/docs/*.md` pages were ported from upstream Python docs and still
 document the Python REST surface. The C++ port exposes a narrower, typed
 subset (see `signalwire.rest.*` entries in port_surface.json, especially
-`RestClient`, `CallingNamespace`, `CompatNamespace`, `PhoneNumbersNamespace`,
+`RestClient`, `CallingNamespace`, `PhoneNumbersNamespace`,
 `FabricNamespace`, `VideoNamespace`).
 
 ### rest/docs/calling.md — Python CallingNamespace extras
@@ -170,30 +170,6 @@ send_fax_stop: not in C++ CallingNamespace
 stream_stop: not in C++ CallingNamespace
 tap_stop: not in C++ CallingNamespace
 transcribe_stop: not in C++ CallingNamespace
-
-### rest/docs/compat.md — Python CompatNamespace extras
-delete_media: compat.messages/faxes.delete_media — not in C++ CompatNamespace
-delete_recording: compat.conferences.delete_recording — not in C++
-dequeue_member: compat.queues.dequeue_member — not in C++
-get_media: compat.messages/faxes.get_media — not in C++
-get_member: compat.queues.get_member — not in C++
-get_participant: compat.conferences.get_participant — not in C++
-get_recording: compat.conferences.get_recording — not in C++
-import_number: compat.phone_numbers.import_number — not in C++
-list_available_countries: compat.phone_numbers.list_available_countries — not in C++
-list_media: compat.messages/faxes.list_media — not in C++
-list_members: compat.queues.list_members — not in C++
-list_participants: compat.conferences.list_participants — not in C++
-list_recordings: compat.recordings.list_recordings — not in C++
-purchase: compat.phone_numbers.purchase — not in C++
-remove_participant: compat.conferences.remove_participant — not in C++
-search_local: compat.phone_numbers.search_local — not in C++
-search_toll_free: compat.phone_numbers.search_toll_free — not in C++
-start_recording: compat.calls.start_recording — not in C++
-start_stream: compat.calls/compat.conferences.start_stream — not in C++
-stop_stream: compat.calls/compat.conferences.stop_stream — not in C++
-update_participant: compat.conferences.update_participant — not in C++
-update_recording: compat.recordings/compat.conferences.update_recording — not in C++
 
 ### rest/docs/namespaces.md — Python-only namespace methods
 add_membership: number_groups.add_membership — not in C++

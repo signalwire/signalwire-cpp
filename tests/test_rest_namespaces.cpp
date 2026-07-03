@@ -19,13 +19,6 @@ TEST(rest_ns_video) {
     return true;
 }
 
-TEST(rest_ns_compat) {
-    RestClient client("example.signalwire.com", "proj", "tok");
-    auto& c = client.compat();
-    (void)c;
-    return true;
-}
-
 TEST(rest_ns_addresses) {
     RestClient client("example.signalwire.com", "proj", "tok");
     auto& a = client.addresses();
@@ -117,16 +110,15 @@ TEST(rest_ns_chat) {
     return true;
 }
 
-TEST(rest_ns_total_count_21) {
+TEST(rest_ns_total_count_20) {
     RestClient client("example.signalwire.com", "proj", "tok");
-    // Access all 21 namespaces
+    // Access all 20 namespaces
     int count = 0;
     (void)client.fabric(); count++;
     (void)client.calling(); count++;
     (void)client.phone_numbers(); count++;
     (void)client.datasphere(); count++;
     (void)client.video(); count++;
-    (void)client.compat(); count++;
     (void)client.addresses(); count++;
     (void)client.queues(); count++;
     (void)client.recordings(); count++;
@@ -142,7 +134,7 @@ TEST(rest_ns_total_count_21) {
     (void)client.project(); count++;
     (void)client.pubsub(); count++;
     (void)client.chat(); count++;
-    ASSERT_EQ(count, 21);
+    ASSERT_EQ(count, 20);
     return true;
 }
 

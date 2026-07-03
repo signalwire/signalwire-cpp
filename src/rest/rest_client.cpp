@@ -46,7 +46,6 @@ void RestClient::init_namespaces() {
   phone_numbers_ = std::make_unique<PhoneNumbersNamespace>(*client_);
   datasphere_ = std::make_unique<DatasphereNamespace>(*client_);
   video_ = std::make_unique<VideoNamespace>(*client_);
-  compat_ = std::make_unique<CompatNamespace>(*client_, project_id_);
   addresses_ = std::make_unique<AddressesNamespace>(*client_);
   queues_ = std::make_unique<QueuesNamespace>(*client_);
   recordings_ = std::make_unique<RecordingsNamespace>(*client_);

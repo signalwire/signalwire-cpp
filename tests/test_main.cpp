@@ -159,17 +159,8 @@ static std::vector<TestCase>& get_tests() {
 // Mock-server-backed REST tests (translated from
 // signalwire-python/tests/unit/rest/*.py). These hit the local
 // mock_signalwire HTTP server on port 8772.
-#include "test_rest_mock_compat_calls_streams.cpp"
-#include "test_rest_mock_compat_messages_faxes.cpp"
-#include "test_rest_mock_compat_phone_numbers.cpp"
 #include "test_rest_mock_calling.cpp"
 #include "test_rest_mock_small.cpp"
-#include "test_rest_mock_compat_accounts.cpp"
-#include "test_rest_mock_compat_misc.cpp"
-#include "test_rest_mock_compat_conferences.cpp"
-#include "test_rest_mock_compat_queues.cpp"
-#include "test_rest_mock_compat_tokens.cpp"
-#include "test_rest_mock_compat_recordings_transcriptions.cpp"
 #include "test_rest_mock_video.cpp"
 #include "test_rest_mock_fabric.cpp"
 #include "test_rest_mock_logs.cpp"

@@ -47,7 +47,6 @@ int main() {
 | `phone_numbers()` | Search, buy, release, manage numbers |
 | `datasphere()` | Document management and semantic search |
 | `video()` | Rooms, sessions, recordings |
-| `compat()` | Twilio-compatible LAML endpoints |
 | `addresses()` | Address management |
 | `queues()` | Queue management |
 | `recordings()` | Recording management |
@@ -73,7 +72,6 @@ int main() {
 - [Client Reference](docs/client-reference.md)
 - [Fabric Resources](docs/fabric.md)
 - [Calling Commands](docs/calling.md)
-- [Compatibility API](docs/compat.md)
 - [All Namespaces](docs/namespaces.md)
 
 ## Examples

@@ -68,22 +68,14 @@ TEST(rest_signalwire_client_has_video) {
     return true;
 }
 
-TEST(rest_signalwire_client_has_compat) {
-    RestClient client("example.signalwire.com", "proj", "tok");
-    auto& c = client.compat();
-    (void)c;
-    return true;
-}
-
 TEST(rest_signalwire_client_has_all_namespaces) {
     RestClient client("example.signalwire.com", "proj", "tok");
-    // Access all 21 namespaces without crash
+    // Access all 20 namespaces without crash
     (void)client.fabric();
     (void)client.calling();
     (void)client.phone_numbers();
     (void)client.datasphere();
     (void)client.video();
-    (void)client.compat();
     (void)client.addresses();
     (void)client.queues();
     (void)client.recordings();

@@ -36,7 +36,7 @@ class RestClient {
   const std::string& project_id() const { return project_id_; }
 
   // ========================================================================
-  // API Namespaces (all 21)
+  // API Namespaces (all 20)
   // ========================================================================
 
   // ---------------------------------------------------------------------
@@ -748,320 +748,9 @@ class RestClient {
   };
 
   // ---------------------------------------------------------------------
-  // Compat sub-resources (Twilio-compatible LAML API). These mirror the
-  // Python ``CompatCalls`` / ``CompatMessages`` / ``CompatFaxes`` /
-  // ``CompatPhoneNumbers`` classes. All paths are scoped by the project
-  // (account_sid) at the LAML root ``/api/laml/2010-04-01/Accounts/{sid}``.
+  // (Twilio-compat LAML surface removed — the reference dropped the
+  // compatibility spec; see item C of the REST rollout.)
   // ---------------------------------------------------------------------
-  struct CompatCalls : public CrudResource {
-    CompatCalls(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-
-    // Override update -- compat uses POST not PUT for resource updates.
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-
-    // Recording sub-resources.
-    [[nodiscard]] json start_recording(const std::string& call_sid, const json& data) const {
-      return client_.post(base_path_ + "/" + call_sid + "/Recordings", data);
-    }
-    [[nodiscard]] json update_recording(const std::string& call_sid,
-                                        const std::string& recording_sid, const json& data) const {
-      return client_.post(base_path_ + "/" + call_sid + "/Recordings/" + recording_sid, data);
-    }
-
-    // Stream sub-resources.
-    [[nodiscard]] json start_stream(const std::string& call_sid, const json& data) const {
-      return client_.post(base_path_ + "/" + call_sid + "/Streams", data);
-    }
-    [[nodiscard]] json stop_stream(const std::string& call_sid, const std::string& stream_sid,
-                                   const json& data) const {
-      return client_.post(base_path_ + "/" + call_sid + "/Streams/" + stream_sid, data);
-    }
-  };
-
-  struct CompatMessages : public CrudResource {
-    CompatMessages(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-
-    [[nodiscard]] json list_media(const std::string& message_sid,
-                                  const std::map<std::string, std::string>& params = {}) const {
-      return client_.get(base_path_ + "/" + message_sid + "/Media", params);
-    }
-    [[nodiscard]] json get_media(const std::string& message_sid,
-                                 const std::string& media_sid) const {
-      return client_.get(base_path_ + "/" + message_sid + "/Media/" + media_sid);
-    }
-    [[nodiscard]] json delete_media(const std::string& message_sid,
-                                    const std::string& media_sid) const {
-      return client_.del(base_path_ + "/" + message_sid + "/Media/" + media_sid);
-    }
-  };
-
-  struct CompatFaxes : public CrudResource {
-    CompatFaxes(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-
-    [[nodiscard]] json list_media(const std::string& fax_sid,
-                                  const std::map<std::string, std::string>& params = {}) const {
-      return client_.get(base_path_ + "/" + fax_sid + "/Media", params);
-    }
-    [[nodiscard]] json get_media(const std::string& fax_sid, const std::string& media_sid) const {
-      return client_.get(base_path_ + "/" + fax_sid + "/Media/" + media_sid);
-    }
-    [[nodiscard]] json delete_media(const std::string& fax_sid,
-                                    const std::string& media_sid) const {
-      return client_.del(base_path_ + "/" + fax_sid + "/Media/" + media_sid);
-    }
-  };
-
-  struct CompatPhoneNumbers {
-    const HttpClient& client;
-    std::string base_path;       // /api/laml/.../IncomingPhoneNumbers
-    std::string available_base;  // /api/laml/.../AvailablePhoneNumbers
-    std::string imported_base;   // /api/laml/.../ImportedPhoneNumbers
-
-    CompatPhoneNumbers(const HttpClient& c, const std::string& account_base)
-        : client(c),
-          base_path(account_base + "/IncomingPhoneNumbers"),
-          available_base(account_base + "/AvailablePhoneNumbers"),
-          imported_base(account_base + "/ImportedPhoneNumbers") {}
-
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path, params);
-    }
-    [[nodiscard]] json get(const std::string& sid) const {
-      return client.get(base_path + "/" + sid);
-    }
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client.post(base_path + "/" + sid, data);
-    }
-    [[nodiscard]] json delete_(const std::string& sid) const {
-      return client.del(base_path + "/" + sid);
-    }
-    [[nodiscard]] json purchase(const json& data) const { return client.post(base_path, data); }
-    [[nodiscard]] json import_number(const json& data) const {
-      return client.post(imported_base, data);
-    }
-    [[nodiscard]] json list_available_countries(
-        const std::map<std::string, std::string>& params = {}) const {
-      return client.get(available_base, params);
-    }
-    [[nodiscard]] json search_local(const std::string& country,
-                                    const std::map<std::string, std::string>& params = {}) const {
-      return client.get(available_base + "/" + country + "/Local", params);
-    }
-    [[nodiscard]] json search_toll_free(
-        const std::string& country, const std::map<std::string, std::string>& params = {}) const {
-      return client.get(available_base + "/" + country + "/TollFree", params);
-    }
-  };
-
-  // ---------------------------------------------------------------------
-  // Additional Compat sub-resources (Python parity).
-  //
-  // Most extend CrudResource and override update with POST (Twilio-compat
-  // semantics). CompatTokens uses BaseResource semantics with PATCH update.
-  // CompatAccounts lives at the unscoped /api/laml/.../Accounts path.
-  // CompatConferences hangs participants/recordings/streams off itself.
-  // ---------------------------------------------------------------------
-  struct CompatAccounts {
-    const HttpClient& client;
-    std::string base_path = "/api/laml/2010-04-01/Accounts";
-    CompatAccounts(const HttpClient& c) : client(c) {}
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path, params);
-    }
-    [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
-    [[nodiscard]] json get(const std::string& sid) const {
-      return client.get(base_path + "/" + sid);
-    }
-    // Python: POST (Twilio-compat).
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client.post(base_path + "/" + sid, data);
-    }
-  };
-
-  struct CompatApplications : public CrudResource {
-    CompatApplications(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-  };
-
-  struct CompatLamlBins : public CrudResource {
-    CompatLamlBins(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-  };
-
-  struct CompatConferences {
-    const HttpClient& client;
-    std::string base_path;
-    CompatConferences(const HttpClient& c, const std::string& base) : client(c), base_path(base) {}
-
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path, params);
-    }
-    [[nodiscard]] json get(const std::string& sid) const {
-      return client.get(base_path + "/" + sid);
-    }
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client.post(base_path + "/" + sid, data);
-    }
-
-    // Participants
-    [[nodiscard]] json list_participants(
-        const std::string& conference_sid,
-        const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path + "/" + conference_sid + "/Participants", params);
-    }
-    [[nodiscard]] json get_participant(const std::string& conference_sid,
-                                       const std::string& call_sid) const {
-      return client.get(base_path + "/" + conference_sid + "/Participants/" + call_sid);
-    }
-    [[nodiscard]] json update_participant(const std::string& conference_sid,
-                                          const std::string& call_sid, const json& data) const {
-      return client.post(base_path + "/" + conference_sid + "/Participants/" + call_sid, data);
-    }
-    [[nodiscard]] json remove_participant(const std::string& conference_sid,
-                                          const std::string& call_sid) const {
-      return client.del(base_path + "/" + conference_sid + "/Participants/" + call_sid);
-    }
-
-    // Conference recordings
-    [[nodiscard]] json list_recordings(
-        const std::string& conference_sid,
-        const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path + "/" + conference_sid + "/Recordings", params);
-    }
-    [[nodiscard]] json get_recording(const std::string& conference_sid,
-                                     const std::string& recording_sid) const {
-      return client.get(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
-    }
-    [[nodiscard]] json update_recording(const std::string& conference_sid,
-                                        const std::string& recording_sid, const json& data) const {
-      return client.post(base_path + "/" + conference_sid + "/Recordings/" + recording_sid, data);
-    }
-    [[nodiscard]] json delete_recording(const std::string& conference_sid,
-                                        const std::string& recording_sid) const {
-      return client.del(base_path + "/" + conference_sid + "/Recordings/" + recording_sid);
-    }
-
-    // Conference streams
-    [[nodiscard]] json start_stream(const std::string& conference_sid, const json& data) const {
-      return client.post(base_path + "/" + conference_sid + "/Streams", data);
-    }
-    [[nodiscard]] json stop_stream(const std::string& conference_sid, const std::string& stream_sid,
-                                   const json& data) const {
-      return client.post(base_path + "/" + conference_sid + "/Streams/" + stream_sid, data);
-    }
-  };
-
-  struct CompatQueues : public CrudResource {
-    CompatQueues(const HttpClient& c, const std::string& base) : CrudResource(c, base) {}
-    [[nodiscard]] json update(const std::string& sid, const json& data) const {
-      return client_.post(base_path_ + "/" + sid, data);
-    }
-    [[nodiscard]] json list_members(const std::string& queue_sid,
-                                    const std::map<std::string, std::string>& params = {}) const {
-      return client_.get(base_path_ + "/" + queue_sid + "/Members", params);
-    }
-    [[nodiscard]] json get_member(const std::string& queue_sid, const std::string& call_sid) const {
-      return client_.get(base_path_ + "/" + queue_sid + "/Members/" + call_sid);
-    }
-    [[nodiscard]] json dequeue_member(const std::string& queue_sid, const std::string& call_sid,
-                                      const json& data) const {
-      return client_.post(base_path_ + "/" + queue_sid + "/Members/" + call_sid, data);
-    }
-  };
-
-  struct CompatRecordings {
-    const HttpClient& client;
-    std::string base_path;
-    CompatRecordings(const HttpClient& c, const std::string& base) : client(c), base_path(base) {}
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path, params);
-    }
-    [[nodiscard]] json get(const std::string& sid) const {
-      return client.get(base_path + "/" + sid);
-    }
-    [[nodiscard]] json delete_(const std::string& sid) const {
-      return client.del(base_path + "/" + sid);
-    }
-  };
-
-  struct CompatTranscriptions {
-    const HttpClient& client;
-    std::string base_path;
-    CompatTranscriptions(const HttpClient& c, const std::string& base)
-        : client(c), base_path(base) {}
-    [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-      return client.get(base_path, params);
-    }
-    [[nodiscard]] json get(const std::string& sid) const {
-      return client.get(base_path + "/" + sid);
-    }
-    [[nodiscard]] json delete_(const std::string& sid) const {
-      return client.del(base_path + "/" + sid);
-    }
-  };
-
-  struct CompatTokens {
-    const HttpClient& client;
-    std::string base_path;
-    CompatTokens(const HttpClient& c, const std::string& base) : client(c), base_path(base) {}
-    [[nodiscard]] json create(const json& data) const { return client.post(base_path, data); }
-    // Python parity: PATCH for update (BaseResource default).
-    [[nodiscard]] json update(const std::string& token_id, const json& data) const {
-      return client.patch(base_path + "/" + token_id, data);
-    }
-    [[nodiscard]] json delete_(const std::string& token_id) const {
-      return client.del(base_path + "/" + token_id);
-    }
-  };
-
-  struct CompatNamespace {
-    const HttpClient& client;
-    std::string account_base;
-
-    // Sub-resources (Python parity).
-    CompatAccounts accounts;
-    CompatCalls calls;
-    CompatMessages messages;
-    CompatFaxes faxes;
-    CompatConferences conferences;
-    CompatPhoneNumbers phone_numbers;
-    CompatApplications applications;
-    CompatLamlBins laml_bins;
-    CompatQueues queues;
-    CompatRecordings recordings;
-    CompatTranscriptions transcriptions;
-    CompatTokens tokens;
-
-    CompatNamespace(const HttpClient& c, const std::string& account_sid)
-        : client(c),
-          account_base("/api/laml/2010-04-01/Accounts/" + account_sid),
-          accounts(c),
-          calls(c, account_base + "/Calls"),
-          messages(c, account_base + "/Messages"),
-          faxes(c, account_base + "/Faxes"),
-          conferences(c, account_base + "/Conferences"),
-          phone_numbers(c, account_base),
-          applications(c, account_base + "/Applications"),
-          laml_bins(c, account_base + "/LamlBins"),
-          queues(c, account_base + "/Queues"),
-          recordings(c, account_base + "/Recordings"),
-          transcriptions(c, account_base + "/Transcriptions"),
-          tokens(c, account_base + "/tokens") {}
-  };
 
   // ---------------------------------------------------------------------
   // Simple CRUD namespaces (Python parity additions). The existing CRUD
@@ -1382,7 +1071,6 @@ class RestClient {
   PhoneNumbersNamespace& phone_numbers() { return *phone_numbers_; }
   DatasphereNamespace& datasphere() { return *datasphere_; }
   VideoNamespace& video() { return *video_; }
-  CompatNamespace& compat() { return *compat_; }
   AddressesNamespace& addresses() { return *addresses_; }
   QueuesNamespace& queues() { return *queues_; }
   RecordingsNamespace& recordings() { return *recordings_; }
@@ -1403,7 +1091,7 @@ class RestClient {
   const HttpClient& http_client() const { return *client_; }
 
  private:
-  /// Helper used by both constructors to wire all 21 namespaces against
+  /// Helper used by both constructors to wire all 20 namespaces against
   /// the (already-built) HttpClient.
   void init_namespaces();
 
@@ -1416,7 +1104,6 @@ class RestClient {
   std::unique_ptr<PhoneNumbersNamespace> phone_numbers_;
   std::unique_ptr<DatasphereNamespace> datasphere_;
   std::unique_ptr<VideoNamespace> video_;
-  std::unique_ptr<CompatNamespace> compat_;
   std::unique_ptr<AddressesNamespace> addresses_;
   std::unique_ptr<QueuesNamespace> queues_;
   std::unique_ptr<RecordingsNamespace> recordings_;

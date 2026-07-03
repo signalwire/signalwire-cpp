@@ -125,7 +125,6 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "AddressesNamespace": "signalwire.rest.namespaces.addresses",
     "CallingNamespace": "signalwire.rest.namespaces.calling",
     "ChatNamespace": "signalwire.rest.namespaces.chat",
-    "CompatNamespace": "signalwire.rest.namespaces.compat",
     "DatasphereNamespace": "signalwire.rest.namespaces.datasphere",
     "FabricNamespace": "signalwire.rest.namespaces.fabric",
     "ImportedNumbersNamespace": "signalwire.rest.namespaces.imported_numbers",
@@ -145,20 +144,6 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "VideoNamespace": "signalwire.rest.namespaces.video",
 
     # -- rest sub-resources (Python parity) -------------------------------
-    # Compat sub-resources -- all live in compat module.
-    "CompatAccounts": "signalwire.rest.namespaces.compat",
-    "CompatApplications": "signalwire.rest.namespaces.compat",
-    "CompatCalls": "signalwire.rest.namespaces.compat",
-    "CompatConferences": "signalwire.rest.namespaces.compat",
-    "CompatFaxes": "signalwire.rest.namespaces.compat",
-    "CompatLamlBins": "signalwire.rest.namespaces.compat",
-    "CompatMessages": "signalwire.rest.namespaces.compat",
-    "CompatPhoneNumbers": "signalwire.rest.namespaces.compat",
-    "CompatQueues": "signalwire.rest.namespaces.compat",
-    "CompatRecordings": "signalwire.rest.namespaces.compat",
-    "CompatTokens": "signalwire.rest.namespaces.compat",
-    "CompatTranscriptions": "signalwire.rest.namespaces.compat",
-
     # Fabric sub-resources.
     "FabricAddresses": "signalwire.rest.namespaces.fabric",
     "FabricCallFlows": "signalwire.rest.namespaces.fabric",
@@ -272,20 +257,6 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     ),
     ("signalwire::rest", "VerifiedCallersNamespace"): (
         "signalwire.rest.namespaces.verified_callers", "VerifiedCallersResource",
-    ),
-    # The Compat namespace exposes nested sub-resource structs in C++; the
-    # Python equivalents live as classes inside namespaces/compat.py.
-    ("signalwire::rest", "CompatCalls"): (
-        "signalwire.rest.namespaces.compat", "CompatCalls",
-    ),
-    ("signalwire::rest", "CompatMessages"): (
-        "signalwire.rest.namespaces.compat", "CompatMessages",
-    ),
-    ("signalwire::rest", "CompatFaxes"): (
-        "signalwire.rest.namespaces.compat", "CompatFaxes",
-    ),
-    ("signalwire::rest", "CompatPhoneNumbers"): (
-        "signalwire.rest.namespaces.compat", "CompatPhoneNumbers",
     ),
     # ProjectTokens is exposed as a nested class on the project namespace.
     ("signalwire::rest", "ProjectTokens"): (

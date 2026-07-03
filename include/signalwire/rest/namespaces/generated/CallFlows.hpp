@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,23 +22,24 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// CallFlows — generated from x-sdk-resource 'CallFlows' (fabric spec, base FabricResource).
 class CallFlows : public FabricResource {
  public:
   explicit CallFlows(const HttpClient& client)
       : FabricResource(client, "/api/fabric/resources/call_flows", "PUT") {}
 
-  [[nodiscard]] json listAddresses(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/addresses", params);
+  [[nodiscard]] json listAddresses(const std::string& id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/addresses", params);
   }
 
-  [[nodiscard]] json listVersions(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/versions", params);
+  [[nodiscard]] json listVersions(const std::string& id,
+                                  const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/versions", params);
   }
 
   [[nodiscard]] json deployVersion(const std::string& id, const json& body) const {
-  return client_.post(std::string("/api/fabric/resources/call_flow/") + id + "/versions", body);
+    return client_.post(std::string("/api/fabric/resources/call_flow/") + id + "/versions", body);
   }
 };
 

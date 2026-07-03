@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,7 +22,6 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// ConferenceLogs — generated from x-sdk-resource 'ConferenceLogs' (logs spec, base BaseResource).
 class ConferenceLogs : public BaseResource {
  public:
@@ -31,7 +29,7 @@ class ConferenceLogs : public BaseResource {
       : BaseResource(client, "/api/logs/conferences") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 };
 

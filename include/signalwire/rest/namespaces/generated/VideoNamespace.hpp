@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/VideoConferenceTokens.hpp"
@@ -30,12 +29,17 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// VideoNamespace — generated container grouping the video namespace resources (§8).
 class VideoNamespace {
  public:
   explicit VideoNamespace(const HttpClient& http)
-      : conference_tokens(http), conferences(http), room_recordings(http), room_sessions(http), room_tokens(http), rooms(http), streams(http) {}
+      : conference_tokens(http),
+        conferences(http),
+        room_recordings(http),
+        room_sessions(http),
+        room_tokens(http),
+        rooms(http),
+        streams(http) {}
 
   VideoConferenceTokens conference_tokens;
   VideoConferences conferences;

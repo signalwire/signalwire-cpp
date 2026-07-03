@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,35 +22,42 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// NumberGroups — generated from x-sdk-resource 'NumberGroups' (relay-rest spec, base CrudResource).
+/// NumberGroups — generated from x-sdk-resource 'NumberGroups' (relay-rest spec, base
+/// CrudResource).
 class NumberGroups : public CrudResource {
  public:
   struct AddMembershipParams {
-      std::string phone_number_id;
-      json extras = json::object();
+    std::string phone_number_id;
+    json extras = json::object();
   };
 
   explicit NumberGroups(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/number_groups", "PUT") {}
 
-  [[nodiscard]] json listMemberships(const std::string& NumberGroupId, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), params);
+  [[nodiscard]] json listMemberships(const std::string& NumberGroupId,
+                                     const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(
+        base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), params);
   }
 
-  [[nodiscard]] json addMembership(const std::string& NumberGroupId, const AddMembershipParams& p) const {
-      json body = json::object();
-      body["phone_number_id"] = p.phone_number_id;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), body);
+  [[nodiscard]] json addMembership(const std::string& NumberGroupId,
+                                   const AddMembershipParams& p) const {
+    json body = json::object();
+    body["phone_number_id"] = p.phone_number_id;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(
+        base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), body);
   }
 
-  [[nodiscard]] json getMembership(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(std::string("/api/relay/rest/number_group_memberships/") + id, params);
+  [[nodiscard]] json getMembership(const std::string& id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(std::string("/api/relay/rest/number_group_memberships/") + id, params);
   }
 
   [[nodiscard]] json deleteMembership(const std::string& id) const {
-  return client_.del(std::string("/api/relay/rest/number_group_memberships/") + id);
+    return client_.del(std::string("/api/relay/rest/number_group_memberships/") + id);
   }
 };
 

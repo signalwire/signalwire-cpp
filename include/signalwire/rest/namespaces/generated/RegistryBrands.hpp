@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,31 +22,31 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// RegistryBrands — generated from x-sdk-resource 'RegistryBrands' (relay-rest spec, base BaseResource).
+/// RegistryBrands — generated from x-sdk-resource 'RegistryBrands' (relay-rest spec, base
+/// BaseResource).
 class RegistryBrands : public BaseResource {
  public:
   explicit RegistryBrands(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/brands") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
-  [[nodiscard]] json create(const json& body) const {
-  return client_.post(base_path_, body);
+  [[nodiscard]] json create(const json& body) const { return client_.post(base_path_, body); }
+
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
-  }
-
-  [[nodiscard]] json listCampaigns(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("campaigns"), params);
+  [[nodiscard]] json listCampaigns(const std::string& id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("campaigns"), params);
   }
 
   [[nodiscard]] json createCampaign(const std::string& id, const json& body) const {
-  return client_.post(base_path_ + "/" + id + "/" + std::string("campaigns"), body);
+    return client_.post(base_path_ + "/" + id + "/" + std::string("campaigns"), body);
   }
 };
 

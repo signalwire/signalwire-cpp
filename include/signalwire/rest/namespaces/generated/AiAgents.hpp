@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -22,7 +21,6 @@ namespace rest {
 namespace generated {
 
 using json = nlohmann::json;
-
 
 /// AiAgents — generated from x-sdk-resource 'AiAgents' (fabric spec, base FabricResource).
 class AiAgents : public FabricResource {

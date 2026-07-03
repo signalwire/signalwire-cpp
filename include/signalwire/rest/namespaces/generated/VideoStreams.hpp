@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,31 +22,32 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// VideoStreams — generated from x-sdk-resource 'VideoStreams' (video spec, base BaseResource).
 class VideoStreams : public BaseResource {
  public:
   struct UpdateParams {
-      std::string url;
-      json extras = json::object();
+    std::string url;
+    json extras = json::object();
   };
 
-  explicit VideoStreams(const HttpClient& client)
-      : BaseResource(client, "/api/video/streams") {}
+  explicit VideoStreams(const HttpClient& client) : BaseResource(client, "/api/video/streams") {}
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p) const {
-      json body = json::object();
-      body["url"] = p.url;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.put(base_path_ + "/" + id, body);
+    json body = json::object();
+    body["url"] = p.url;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id, body);
   }
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 };
 

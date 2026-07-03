@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -22,7 +21,6 @@ namespace rest {
 namespace generated {
 
 using json = nlohmann::json;
-
 
 /// SwmlWebhooks — generated from x-sdk-resource 'SwmlWebhooks' (fabric spec, base FabricResource).
 class SwmlWebhooks : public FabricResource {

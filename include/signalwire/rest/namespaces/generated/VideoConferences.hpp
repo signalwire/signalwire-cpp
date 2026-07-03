@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,31 +22,35 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// VideoConferences — generated from x-sdk-resource 'VideoConferences' (video spec, base CrudResource).
+/// VideoConferences — generated from x-sdk-resource 'VideoConferences' (video spec, base
+/// CrudResource).
 class VideoConferences : public CrudResource {
  public:
   struct CreateStreamParams {
-      std::string url;
-      json extras = json::object();
+    std::string url;
+    json extras = json::object();
   };
 
   explicit VideoConferences(const HttpClient& client)
       : CrudResource(client, "/api/video/conferences", "PUT") {}
 
-  [[nodiscard]] json listConferenceTokens(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("conference_tokens"), params);
+  [[nodiscard]] json listConferenceTokens(
+      const std::string& id, const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("conference_tokens"), params);
   }
 
-  [[nodiscard]] json listStreams(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params);
+  [[nodiscard]] json listStreams(const std::string& id,
+                                 const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params);
   }
 
   [[nodiscard]] json createStream(const std::string& id, const CreateStreamParams& p) const {
-      json body = json::object();
-      body["url"] = p.url;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_ + "/" + id + "/" + std::string("streams"), body);
+    json body = json::object();
+    body["url"] = p.url;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("streams"), body);
   }
 };
 

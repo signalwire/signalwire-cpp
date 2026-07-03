@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/ProjectTokens.hpp"
@@ -24,12 +23,10 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// ProjectNamespace — generated container grouping the project namespace resources (§8).
 class ProjectNamespace {
  public:
-  explicit ProjectNamespace(const HttpClient& http)
-      : tokens(http) {}
+  explicit ProjectNamespace(const HttpClient& http) : tokens(http) {}
 
   ProjectTokens tokens;
 };

@@ -10,32 +10,31 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 
-#include <nlohmann/json.hpp>
-
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/Addresses.hpp"
+#include "signalwire/rest/namespaces/generated/Calling.hpp"
+#include "signalwire/rest/namespaces/generated/Chat.hpp"
+#include "signalwire/rest/namespaces/generated/DatasphereNamespace.hpp"
+#include "signalwire/rest/namespaces/generated/FabricNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/ImportedNumbers.hpp"
+#include "signalwire/rest/namespaces/generated/LogsNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/Lookup.hpp"
 #include "signalwire/rest/namespaces/generated/Mfa.hpp"
 #include "signalwire/rest/namespaces/generated/NumberGroups.hpp"
 #include "signalwire/rest/namespaces/generated/PhoneNumbers.hpp"
+#include "signalwire/rest/namespaces/generated/ProjectNamespace.hpp"
+#include "signalwire/rest/namespaces/generated/PubSub.hpp"
 #include "signalwire/rest/namespaces/generated/Queues.hpp"
 #include "signalwire/rest/namespaces/generated/Recordings.hpp"
+#include "signalwire/rest/namespaces/generated/RegistryNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/ShortCodes.hpp"
 #include "signalwire/rest/namespaces/generated/SipProfile.hpp"
 #include "signalwire/rest/namespaces/generated/VerifiedCallers.hpp"
-#include "signalwire/rest/namespaces/generated/Calling.hpp"
-#include "signalwire/rest/namespaces/generated/Chat.hpp"
-#include "signalwire/rest/namespaces/generated/PubSub.hpp"
-#include "signalwire/rest/namespaces/generated/RegistryNamespace.hpp"
-#include "signalwire/rest/namespaces/generated/FabricNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/VideoNamespace.hpp"
-#include "signalwire/rest/namespaces/generated/DatasphereNamespace.hpp"
-#include "signalwire/rest/namespaces/generated/LogsNamespace.hpp"
-#include "signalwire/rest/namespaces/generated/ProjectNamespace.hpp"
 
 namespace signalwire {
 namespace rest {
@@ -43,13 +42,31 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// ResourceTree — generated flat resources + namespace containers (§8).
 /// Placement resolved from x-sdk-namespace.attr + per-resource
 /// x-sdk-resource.namespace/attr; base paths per §4.
 struct ResourceTree {
   explicit ResourceTree(const HttpClient& http)
-      : addresses(http), imported_numbers(http), lookup(http), mfa(http), number_groups(http), phone_numbers(http), queues(http), recordings(http), short_codes(http), sip_profile(http), verified_callers(http), calling(http), chat(http), pubsub(http), registry(http), fabric(http), video(http), datasphere(http), logs(http), project(http) {}
+      : addresses(http),
+        imported_numbers(http),
+        lookup(http),
+        mfa(http),
+        number_groups(http),
+        phone_numbers(http),
+        queues(http),
+        recordings(http),
+        short_codes(http),
+        sip_profile(http),
+        verified_callers(http),
+        calling(http),
+        chat(http),
+        pubsub(http),
+        registry(http),
+        fabric(http),
+        video(http),
+        datasphere(http),
+        logs(http),
+        project(http) {}
 
   Addresses addresses;
   ImportedNumbers imported_numbers;

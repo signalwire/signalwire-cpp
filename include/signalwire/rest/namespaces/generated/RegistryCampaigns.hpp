@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,49 +22,62 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// RegistryCampaigns — generated from x-sdk-resource 'RegistryCampaigns' (relay-rest spec, base BaseResource).
+/// RegistryCampaigns — generated from x-sdk-resource 'RegistryCampaigns' (relay-rest spec, base
+/// BaseResource).
 class RegistryCampaigns : public BaseResource {
  public:
   struct UpdateParams {
-      std::optional<std::string> name;
-      json extras = json::object();
+    std::optional<std::string> name;
+    json extras = json::object();
   };
 
   struct CreateOrderParams {
-      std::optional<json> phone_numbers;
-      std::optional<std::string> status_callback_url;
-      json extras = json::object();
+    std::optional<json> phone_numbers;
+    std::optional<std::string> status_callback_url;
+    json extras = json::object();
   };
 
   explicit RegistryCampaigns(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/campaigns") {}
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p) const {
-      json body = json::object();
-      if (p.name.has_value()) { body["name"] = *p.name; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.put(base_path_ + "/" + id, body);
+    json body = json::object();
+    if (p.name.has_value()) {
+      body["name"] = *p.name;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id, body);
   }
 
-  [[nodiscard]] json listNumbers(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("numbers"), params);
+  [[nodiscard]] json listNumbers(const std::string& id,
+                                 const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("numbers"), params);
   }
 
-  [[nodiscard]] json listOrders(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("orders"), params);
+  [[nodiscard]] json listOrders(const std::string& id,
+                                const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("orders"), params);
   }
 
   [[nodiscard]] json createOrder(const std::string& id, const CreateOrderParams& p) const {
-      json body = json::object();
-      if (p.phone_numbers.has_value()) { body["phone_numbers"] = *p.phone_numbers; }
-      if (p.status_callback_url.has_value()) { body["status_callback_url"] = *p.status_callback_url; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_ + "/" + id + "/" + std::string("orders"), body);
+    json body = json::object();
+    if (p.phone_numbers.has_value()) {
+      body["phone_numbers"] = *p.phone_numbers;
+    }
+    if (p.status_callback_url.has_value()) {
+      body["status_callback_url"] = *p.status_callback_url;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("orders"), body);
   }
 };
 

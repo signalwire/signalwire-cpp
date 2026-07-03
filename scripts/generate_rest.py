@@ -52,6 +52,9 @@ except ImportError:  # pragma: no cover
     sys.stderr.write("generate_rest.py requires PyYAML (pip install pyyaml)\n")
     raise
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _cpp_fmt import clang_format_source  # noqa: E402
+
 
 # The 12 real REST spec directories (registry has no own dir — its resources
 # live inside relay-rest via namespace: registry; swml-webhooks is types-only).
@@ -1127,6 +1130,238 @@ def emit_resource_tree(placed) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Generated wire-TYPE surface (item D/H — <ns>_types_generated).
+# ---------------------------------------------------------------------------
+#
+# A method-less C++ data struct per components/schemas OBJECT schema, plus a
+# closed-set struct per x-sdk-enum. Mirrors ruby's emit_type_class / emit_type_enum
+# and the shared emit_methodless_struct (reused by the SWML-verbs / relay-protocol
+# / SWAIG payload generators). The Python SURFACE oracle records these method-less
+# (a bare class name); the diff tool folds the cross-module duplicates by leaf name
+# (``gen-type``). Object schema -> struct; x-sdk-enum -> closed-set; scalar / array
+# / union / plain-inline-enum aliases are NOT surfaced by the reference, so nothing
+# is emitted for them. Read-side open shapes: typed members (snake wire key, keyword
+# escaped) with a trailing ``json extras`` — no methods, no accessors.
+
+# (spec-dir, C++ namespace segment, oracle <ns>_types_generated leaf).
+TYPE_NS = [
+    ("relay-rest", "RelayRest", "relay_rest"),
+    ("fabric", "Fabric", "fabric"),
+    ("calling", "Calling", "calling"),
+    ("video", "Video", "video"),
+    ("datasphere", "Datasphere", "datasphere"),
+    ("logs", "Logs", "logs"),
+    ("message", "Message", "message"),
+    ("voice", "Voice", "voice"),
+    ("fax", "Fax", "fax"),
+    ("project", "Project", "project"),
+    ("chat", "Chat", "chat"),
+    ("pubsub", "PubSub", "pubsub"),
+    ("swml-webhooks", "SwmlWebhooks", "swml_webhooks"),
+]
+
+
+def snake(name: str) -> str:
+    """PascalCase/camelCase -> snake_case for a file name. Handles acronym runs
+    (AIObject -> ai_object, StatusCode400 -> status_code400)."""
+    s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
+    s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
+    return re.sub(r"[^A-Za-z0-9]+", "_", s2).strip("_").lower()
+
+
+def type_name(raw: str) -> str:
+    """Sanitise a components/schemas key to a valid C++ struct name, folding every
+    non-identifier rune to ``_`` (matches ruby/go/php/python ref_name so the LEAF
+    the surface diff compares is the identical token cross-port). A leading digit is
+    prefixed; the first letter is upper-cased (schema names already are)."""
+    s = re.sub(r"[^A-Za-z0-9_]", "_", raw).lstrip("_")
+    if not s:
+        return "Schema"
+    if s[0].isdigit():
+        return "Schema_" + s
+    if not s[0].isupper():
+        s = s[0].upper() + s[1:]
+    return s
+
+
+def _type_schema_type(node: dict):
+    t = node.get("type")
+    if isinstance(t, list):
+        return next((x for x in t if x != "null"), None)
+    return t
+
+
+def is_object_schema(node: dict) -> bool:
+    """Mirror the reference is_object test: type:object (or no type but non-empty
+    properties) AND not a oneOf/anyOf/allOf combinator AND properties non-empty."""
+    if any(k in node for k in ("oneOf", "anyOf", "allOf")):
+        return False
+    props = node.get("properties")
+    t = _type_schema_type(node)
+    return (t == "object" or (t is None and props)) and isinstance(props, dict) and len(props) > 0
+
+
+def _methodless_field_type(psc: dict) -> str:
+    """The C++ member type for a wire field on a read-side method-less struct.
+    Scalars map to their distinct C++ type; array/object/$ref/combinator/unknown ->
+    the open ``json`` value (read-side, forward-compatible). No spec context is
+    needed — a $ref/combinator resolves to a nested object/union we surface as
+    ``json``, matching the loose read shape."""
+    if not isinstance(psc, dict):
+        return "json"
+    if any(k in psc for k in ("$ref", "allOf", "oneOf", "anyOf")):
+        return "json"
+    t = _type_schema_type(psc)
+    return _SCALAR_CPP.get(t, "json")
+
+
+def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
+                           source_desc: str, regen_cmd: str) -> str:
+    """Emit one method-less C++ data struct under an arbitrary nested namespace
+    path, carrying one typed member per snake wire key + a trailing ``json extras``.
+    Shared by the REST wire-type emitter and the SWML-verbs / relay-protocol / SWAIG
+    payload generators so they never diverge. NO methods / accessors — the reference
+    records these method-less on the SURFACE (and its signature oracle records a
+    method-less class only for its class-typed fields, handled by the enumerator).
+    A wire key that is a C++ keyword / non-identifier is escaped (wire key preserved
+    only in the doc comment; a read struct has no serialiser here)."""
+    lines: list[str] = [
+        "// Copyright (c) 2025 SignalWire",
+        "// SPDX-License-Identifier: MIT",
+        "//",
+        f"// Code generated by scripts/{regen_cmd}; DO NOT EDIT.",
+        "//",
+        f"// {source_desc}",
+        "#pragma once",
+        "",
+        "#include <map>",
+        "#include <optional>",
+        "#include <string>",
+        "#include <vector>",
+        "",
+        "#include <nlohmann/json.hpp>",
+        "",
+    ]
+    for seg in ns_segments:
+        lines.append(f"namespace {seg} {{")
+    lines.append("")
+    lines.append("using json = nlohmann::json;")
+    lines.append("")
+    lines.append(f"/// {name} — generated read-side data type.")
+    lines.append(f"/// {source_desc}")
+    lines.append("///")
+    lines.append("/// Method-less DTO: one typed member per snake wire key + open `extras`.")
+    lines.append(f"struct {name} {{")
+    used: set[str] = set()
+    for wire_key, psc in (properties or {}).items():
+        ident = snake_ident(wire_key)
+        while ident in used or ident == "extras":
+            ident += "_"
+        used.add(ident)
+        cpp_t = _methodless_field_type(psc if isinstance(psc, dict) else {})
+        note = "" if ident == wire_key else f"  // wire key: {wire_key}"
+        lines.append(f"  std::optional<{cpp_t}> {ident};{note}")
+    lines.append("  json extras = json::object();")
+    lines.append("};")
+    lines.append("")
+    for seg in reversed(ns_segments):
+        lines.append(f"}}  // namespace {seg}")
+    return "\n".join(lines) + "\n"
+
+
+def _load_types_schemas(psdk: Path, spec_dir: str) -> dict:
+    """Load a spec's components/schemas WITHOUT the full Spec model (swml-webhooks
+    has no servers block, so Spec() would reject it). Ordered by yaml declaration."""
+    doc = yaml.safe_load((psdk / "rest-apis" / spec_dir / "openapi.yaml").read_text())
+    return ((doc.get("components") or {}).get("schemas")) or {}
+
+
+def _enum_const_name(value: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9]+", "_", value).strip("_").upper()
+    if not s:
+        s = "VALUE"
+    if s[0].isdigit():
+        s = "V_" + s
+    return s
+
+
+def emit_type_enum(ns_seg: str, enum_name: str, values: list, ns_key: str, raw_name: str) -> str:
+    """Emit a method-less C++ struct carrying static string constants (value == wire
+    string) grouped into an ``all()`` list — the port's closed-set idiom for an
+    x-sdk-enum public enum. The reference records it method-less; ``all()`` is a
+    private-ish static helper the surface enumerator does not surface (it is a static
+    free function returning the set, not a member the oracle records)."""
+    lines: list[str] = [
+        "// Copyright (c) 2025 SignalWire",
+        "// SPDX-License-Identifier: MIT",
+        "//",
+        "// Code generated by scripts/generate_rest.py; DO NOT EDIT.",
+        "//",
+        f"// {enum_name} — generated closed-set (x-sdk-enum on components/schemas "
+        f"{raw_name!r}, {ns_key!r} spec).",
+        "#pragma once",
+        "",
+        "#include <string>",
+        "",
+        "namespace signalwire {",
+        "namespace rest {",
+        "namespace generated {",
+        "namespace types {",
+        f"namespace {ns_seg} {{",
+        "",
+        f"/// {enum_name} — generated public closed-set (value IS the wire string).",
+        f"struct {enum_name} {{",
+    ]
+    used: set[str] = set()
+    for v in values:
+        if v == "" or not isinstance(v, str):
+            continue
+        cname = _enum_const_name(v)
+        while cname in used:
+            cname += "_"
+        used.add(cname)
+        lines.append(f"  static constexpr const char* {cname} = {cpp_str(v)};")
+    lines.append("};")
+    lines.append("")
+    lines.append(f"}}  // namespace {ns_seg}")
+    lines.append("}  // namespace types")
+    lines.append("}  // namespace generated")
+    lines.append("}  // namespace rest")
+    lines.append("}  // namespace signalwire")
+    return "\n".join(lines) + "\n"
+
+
+def emit_types(psdk: Path, outs: dict) -> None:
+    """Emit every <ns>_types_generated data struct / closed-set into
+    ``types/<ns>/<snake_name>.hpp`` keys of ``outs`` (relative to the generated
+    dir)."""
+    for spec_dir, ns_seg, ns_key in TYPE_NS:
+        schemas = _load_types_schemas(psdk, spec_dir)
+        for raw_name, node in schemas.items():
+            if not isinstance(node, dict):
+                continue
+            xe = node.get("x-sdk-enum")
+            if xe:
+                enum_name = type_name(xe)
+                fn = f"types/{ns_key}/{snake(enum_name)}.hpp"
+                if fn not in outs:
+                    outs[fn] = emit_type_enum(
+                        ns_seg, enum_name, list(node.get("enum") or []), ns_key, raw_name)
+                continue
+            if is_object_schema(node):
+                struct = type_name(raw_name)
+                fn = f"types/{ns_key}/{snake(struct)}.hpp"
+                if fn not in outs:
+                    ns_segments = ["signalwire", "rest", "generated", "types", ns_seg]
+                    outs[fn] = emit_methodless_struct(
+                        ns_segments, struct, node.get("properties") or {},
+                        f"Generated REST wire type for the {ns_key!r} namespace "
+                        f"(components/schemas {raw_name!r}).",
+                        "generate_rest.py",
+                    )
+
+
+# ---------------------------------------------------------------------------
 # Driver.
 # ---------------------------------------------------------------------------
 
@@ -1158,6 +1393,10 @@ def build_outputs(psdk: Path) -> dict[str, str]:
         outs[cls + ".hpp"] = emit_container(container, by_container[container])
 
     outs["ResourceTree.hpp"] = emit_resource_tree(placed)
+
+    # Item D/H: the <ns>_types_generated wire-type surface (method-less DTOs +
+    # closed-sets from each spec's components/schemas).
+    emit_types(psdk, outs)
 
     # Committed class -> canonical module map (idiom-blind projection the
     # signature/surface enumerators consume, single source of truth — never
@@ -1239,6 +1478,7 @@ def main(argv: list[str]) -> int:
         return 0
 
     outs = build_outputs(psdk)
+    outs = {fn: clang_format_source(src) for fn, src in outs.items()}
 
     if args.out:
         out_dir = Path(args.out)

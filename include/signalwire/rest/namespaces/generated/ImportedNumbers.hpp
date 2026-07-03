@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,27 +22,31 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// ImportedNumbers — generated from x-sdk-resource 'ImportedNumbers' (relay-rest spec, base BaseResource).
+/// ImportedNumbers — generated from x-sdk-resource 'ImportedNumbers' (relay-rest spec, base
+/// BaseResource).
 class ImportedNumbers : public BaseResource {
  public:
   struct CreateParams {
-      std::string number;
-      std::string number_type;
-      std::optional<json> capabilities;
-      json extras = json::object();
+    std::string number;
+    std::string number_type;
+    std::optional<json> capabilities;
+    json extras = json::object();
   };
 
   explicit ImportedNumbers(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/imported_phone_numbers") {}
 
   [[nodiscard]] json create(const CreateParams& p) const {
-      json body = json::object();
-      body["number"] = p.number;
-      body["number_type"] = p.number_type;
-      if (p.capabilities.has_value()) { body["capabilities"] = *p.capabilities; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_, body);
+    json body = json::object();
+    body["number"] = p.number;
+    body["number_type"] = p.number_type;
+    if (p.capabilities.has_value()) {
+      body["capabilities"] = *p.capabilities;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_, body);
   }
 };
 

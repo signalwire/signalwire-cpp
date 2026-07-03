@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,53 +22,61 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// GenericResources — generated from x-sdk-resource 'GenericResources' (fabric spec, base BaseResource).
+/// GenericResources — generated from x-sdk-resource 'GenericResources' (fabric spec, base
+/// BaseResource).
 class GenericResources : public BaseResource {
  public:
   struct AssignPhoneRouteParams {
-      std::string phone_route_id;
-      std::string handler;
-      json extras = json::object();
+    std::string phone_route_id;
+    std::string handler;
+    json extras = json::object();
   };
 
   struct AssignDomainApplicationParams {
-      std::string domain_application_id;
-      json extras = json::object();
+    std::string domain_application_id;
+    json extras = json::object();
   };
 
   explicit GenericResources(const HttpClient& client)
       : BaseResource(client, "/api/fabric/resources") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 
-  [[nodiscard]] json listAddresses(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params);
+  [[nodiscard]] json listAddresses(const std::string& id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params);
   }
 
-  [[nodiscard]] json assignPhoneRoute(const std::string& id, const AssignPhoneRouteParams& p) const {
-      json body = json::object();
-      body["phone_route_id"] = p.phone_route_id;
-      body["handler"] = p.handler;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_ + "/" + id + "/" + std::string("phone_routes"), body);
+  [[nodiscard]] json assignPhoneRoute(const std::string& id,
+                                      const AssignPhoneRouteParams& p) const {
+    json body = json::object();
+    body["phone_route_id"] = p.phone_route_id;
+    body["handler"] = p.handler;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("phone_routes"), body);
   }
 
-  [[nodiscard]] json assignDomainApplication(const std::string& id, const AssignDomainApplicationParams& p) const {
-      json body = json::object();
-      body["domain_application_id"] = p.domain_application_id;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_ + "/" + id + "/" + std::string("domain_applications"), body);
+  [[nodiscard]] json assignDomainApplication(const std::string& id,
+                                             const AssignDomainApplicationParams& p) const {
+    json body = json::object();
+    body["domain_application_id"] = p.domain_application_id;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("domain_applications"), body);
   }
 };
 

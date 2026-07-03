@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,57 +22,93 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// VideoRoomTokens — generated from x-sdk-resource 'VideoRoomTokens' (video spec, base BaseResource).
+/// VideoRoomTokens — generated from x-sdk-resource 'VideoRoomTokens' (video spec, base
+/// BaseResource).
 class VideoRoomTokens : public BaseResource {
  public:
   struct CreateParams {
-      std::string room_name;
-      std::optional<std::string> user_name;
-      std::optional<json> permissions;
-      std::optional<std::string> join_from;
-      std::optional<std::string> join_until;
-      std::optional<std::string> remove_at;
-      std::optional<int> remove_after_seconds_elapsed;
-      std::optional<bool> join_audio_muted;
-      std::optional<bool> join_video_muted;
-      std::optional<bool> auto_create_room;
-      std::optional<bool> enable_room_previews;
-      std::optional<std::string> room_display_name;
-      std::optional<bool> end_room_session_on_leave;
-      std::optional<std::string> join_as;
-      std::optional<std::string> media_allowed;
-      std::optional<json> room_meta;
-      std::optional<json> meta;
-      std::optional<bool> sync_audio_video;
-      json extras = json::object();
+    std::string room_name;
+    std::optional<std::string> user_name;
+    std::optional<json> permissions;
+    std::optional<std::string> join_from;
+    std::optional<std::string> join_until;
+    std::optional<std::string> remove_at;
+    std::optional<int> remove_after_seconds_elapsed;
+    std::optional<bool> join_audio_muted;
+    std::optional<bool> join_video_muted;
+    std::optional<bool> auto_create_room;
+    std::optional<bool> enable_room_previews;
+    std::optional<std::string> room_display_name;
+    std::optional<bool> end_room_session_on_leave;
+    std::optional<std::string> join_as;
+    std::optional<std::string> media_allowed;
+    std::optional<json> room_meta;
+    std::optional<json> meta;
+    std::optional<bool> sync_audio_video;
+    json extras = json::object();
   };
 
   explicit VideoRoomTokens(const HttpClient& client)
       : BaseResource(client, "/api/video/room_tokens") {}
 
   [[nodiscard]] json create(const CreateParams& p) const {
-      json body = json::object();
-      body["room_name"] = p.room_name;
-      if (p.user_name.has_value()) { body["user_name"] = *p.user_name; }
-      if (p.permissions.has_value()) { body["permissions"] = *p.permissions; }
-      if (p.join_from.has_value()) { body["join_from"] = *p.join_from; }
-      if (p.join_until.has_value()) { body["join_until"] = *p.join_until; }
-      if (p.remove_at.has_value()) { body["remove_at"] = *p.remove_at; }
-      if (p.remove_after_seconds_elapsed.has_value()) { body["remove_after_seconds_elapsed"] = *p.remove_after_seconds_elapsed; }
-      if (p.join_audio_muted.has_value()) { body["join_audio_muted"] = *p.join_audio_muted; }
-      if (p.join_video_muted.has_value()) { body["join_video_muted"] = *p.join_video_muted; }
-      if (p.auto_create_room.has_value()) { body["auto_create_room"] = *p.auto_create_room; }
-      if (p.enable_room_previews.has_value()) { body["enable_room_previews"] = *p.enable_room_previews; }
-      if (p.room_display_name.has_value()) { body["room_display_name"] = *p.room_display_name; }
-      if (p.end_room_session_on_leave.has_value()) { body["end_room_session_on_leave"] = *p.end_room_session_on_leave; }
-      if (p.join_as.has_value()) { body["join_as"] = *p.join_as; }
-      if (p.media_allowed.has_value()) { body["media_allowed"] = *p.media_allowed; }
-      if (p.room_meta.has_value()) { body["room_meta"] = *p.room_meta; }
-      if (p.meta.has_value()) { body["meta"] = *p.meta; }
-      if (p.sync_audio_video.has_value()) { body["sync_audio_video"] = *p.sync_audio_video; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_, body);
+    json body = json::object();
+    body["room_name"] = p.room_name;
+    if (p.user_name.has_value()) {
+      body["user_name"] = *p.user_name;
+    }
+    if (p.permissions.has_value()) {
+      body["permissions"] = *p.permissions;
+    }
+    if (p.join_from.has_value()) {
+      body["join_from"] = *p.join_from;
+    }
+    if (p.join_until.has_value()) {
+      body["join_until"] = *p.join_until;
+    }
+    if (p.remove_at.has_value()) {
+      body["remove_at"] = *p.remove_at;
+    }
+    if (p.remove_after_seconds_elapsed.has_value()) {
+      body["remove_after_seconds_elapsed"] = *p.remove_after_seconds_elapsed;
+    }
+    if (p.join_audio_muted.has_value()) {
+      body["join_audio_muted"] = *p.join_audio_muted;
+    }
+    if (p.join_video_muted.has_value()) {
+      body["join_video_muted"] = *p.join_video_muted;
+    }
+    if (p.auto_create_room.has_value()) {
+      body["auto_create_room"] = *p.auto_create_room;
+    }
+    if (p.enable_room_previews.has_value()) {
+      body["enable_room_previews"] = *p.enable_room_previews;
+    }
+    if (p.room_display_name.has_value()) {
+      body["room_display_name"] = *p.room_display_name;
+    }
+    if (p.end_room_session_on_leave.has_value()) {
+      body["end_room_session_on_leave"] = *p.end_room_session_on_leave;
+    }
+    if (p.join_as.has_value()) {
+      body["join_as"] = *p.join_as;
+    }
+    if (p.media_allowed.has_value()) {
+      body["media_allowed"] = *p.media_allowed;
+    }
+    if (p.room_meta.has_value()) {
+      body["room_meta"] = *p.room_meta;
+    }
+    if (p.meta.has_value()) {
+      body["meta"] = *p.meta;
+    }
+    if (p.sync_audio_video.has_value()) {
+      body["sync_audio_video"] = *p.sync_audio_video;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_, body);
   }
 };
 

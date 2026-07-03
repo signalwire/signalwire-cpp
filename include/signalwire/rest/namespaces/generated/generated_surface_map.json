@@ -1,55 +1,77 @@
 {
-  "Addresses": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "AiAgents": "signalwire.rest.namespaces.fabric_resources_generated",
-  "CallFlows": "signalwire.rest.namespaces.fabric_resources_generated",
-  "Calling": "signalwire.rest.namespaces.calling_resources_generated",
-  "Chat": "signalwire.rest.namespaces.chat_resources_generated",
-  "ConferenceLogs": "signalwire.rest.namespaces.logs_resources_generated",
-  "ConferenceRooms": "signalwire.rest.namespaces.fabric_resources_generated",
-  "CxmlApplications": "signalwire.rest.namespaces.fabric_resources_generated",
-  "CxmlScripts": "signalwire.rest.namespaces.fabric_resources_generated",
-  "CxmlWebhooks": "signalwire.rest.namespaces.fabric_resources_generated",
-  "DatasphereDocuments": "signalwire.rest.namespaces.datasphere_resources_generated",
-  "DatasphereNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "FabricAddresses": "signalwire.rest.namespaces.fabric_resources_generated",
-  "FabricNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "FabricTokens": "signalwire.rest.namespaces.fabric_resources_generated",
-  "FaxLogs": "signalwire.rest.namespaces.fax_resources_generated",
-  "FreeswitchConnectors": "signalwire.rest.namespaces.fabric_resources_generated",
-  "GenericResources": "signalwire.rest.namespaces.fabric_resources_generated",
-  "ImportedNumbers": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "LogsNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "Lookup": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "MessageLogs": "signalwire.rest.namespaces.message_resources_generated",
-  "Mfa": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "NumberGroups": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "PhoneNumbers": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "ProjectNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "ProjectTokens": "signalwire.rest.namespaces.project_resources_generated",
-  "PubSub": "signalwire.rest.namespaces.pubsub_resources_generated",
-  "Queues": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "Recordings": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "RegistryBrands": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "RegistryCampaigns": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "RegistryNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "RegistryNumbers": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "RegistryOrders": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "RelayApplications": "signalwire.rest.namespaces.fabric_resources_generated",
-  "ShortCodes": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "SipEndpoints": "signalwire.rest.namespaces.fabric_resources_generated",
-  "SipGateways": "signalwire.rest.namespaces.fabric_resources_generated",
-  "SipProfile": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "Subscribers": "signalwire.rest.namespaces.fabric_resources_generated",
-  "SwmlScripts": "signalwire.rest.namespaces.fabric_resources_generated",
-  "SwmlWebhooks": "signalwire.rest.namespaces.fabric_resources_generated",
-  "VerifiedCallers": "signalwire.rest.namespaces.relay_rest_resources_generated",
-  "VideoConferenceTokens": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoConferences": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoNamespace": "signalwire.rest.namespaces._client_tree_generated",
-  "VideoRoomRecordings": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoRoomSessions": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoRoomTokens": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoRooms": "signalwire.rest.namespaces.video_resources_generated",
-  "VideoStreams": "signalwire.rest.namespaces.video_resources_generated",
-  "VoiceLogs": "signalwire.rest.namespaces.voice_resources_generated"
+  "Addresses" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                "AiAgents" : "signalwire.rest.namespaces.fabric_resources_generated",
+                             "CallFlows" : "signalwire.rest.namespaces.fabric_resources_generated",
+                                           "Calling"
+      : "signalwire.rest.namespaces.calling_resources_generated",
+        "Chat" : "signalwire.rest.namespaces.chat_resources_generated",
+                 "ConferenceLogs" : "signalwire.rest.namespaces.logs_resources_generated",
+                                    "ConferenceRooms"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "CxmlApplications" : "signalwire.rest.namespaces.fabric_resources_generated",
+                             "CxmlScripts"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "CxmlWebhooks" : "signalwire.rest.namespaces.fabric_resources_generated",
+                         "DatasphereDocuments"
+      : "signalwire.rest.namespaces.datasphere_resources_generated",
+        "DatasphereNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                                "FabricAddresses"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "FabricNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                            "FabricTokens"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "FaxLogs" : "signalwire.rest.namespaces.fax_resources_generated",
+                    "FreeswitchConnectors"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "GenericResources" : "signalwire.rest.namespaces.fabric_resources_generated",
+                             "ImportedNumbers"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "LogsNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                          "Lookup" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                                     "MessageLogs"
+      : "signalwire.rest.namespaces.message_resources_generated",
+        "Mfa" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                "NumberGroups" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                                 "PhoneNumbers"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "ProjectNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                             "ProjectTokens"
+      : "signalwire.rest.namespaces.project_resources_generated",
+        "PubSub" : "signalwire.rest.namespaces.pubsub_resources_generated",
+                   "Queues" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                              "Recordings"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "RegistryBrands" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                           "RegistryCampaigns"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "RegistryNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                              "RegistryNumbers"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "RegistryOrders" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                           "RelayApplications"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "ShortCodes" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                       "SipEndpoints" : "signalwire.rest.namespaces.fabric_resources_generated",
+                                        "SipGateways"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "SipProfile" : "signalwire.rest.namespaces.relay_rest_resources_generated",
+                       "Subscribers" : "signalwire.rest.namespaces.fabric_resources_generated",
+                                       "SwmlScripts"
+      : "signalwire.rest.namespaces.fabric_resources_generated",
+        "SwmlWebhooks" : "signalwire.rest.namespaces.fabric_resources_generated",
+                         "VerifiedCallers"
+      : "signalwire.rest.namespaces.relay_rest_resources_generated",
+        "VideoConferenceTokens" : "signalwire.rest.namespaces.video_resources_generated",
+                                  "VideoConferences"
+      : "signalwire.rest.namespaces.video_resources_generated",
+        "VideoNamespace" : "signalwire.rest.namespaces._client_tree_generated",
+                           "VideoRoomRecordings"
+      : "signalwire.rest.namespaces.video_resources_generated",
+        "VideoRoomSessions" : "signalwire.rest.namespaces.video_resources_generated",
+                              "VideoRoomTokens"
+      : "signalwire.rest.namespaces.video_resources_generated",
+        "VideoRooms" : "signalwire.rest.namespaces.video_resources_generated",
+                       "VideoStreams" : "signalwire.rest.namespaces.video_resources_generated",
+                                        "VoiceLogs"
+      : "signalwire.rest.namespaces.voice_resources_generated"
 }

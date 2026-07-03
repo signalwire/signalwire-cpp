@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,35 +22,46 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// SipProfile — generated from x-sdk-resource 'SipProfile' (relay-rest spec, base BaseResource).
 class SipProfile : public BaseResource {
  public:
   struct UpdateParams {
-      std::optional<std::string> domain_identifier;
-      std::optional<json> default_codecs;
-      std::optional<json> default_ciphers;
-      std::optional<std::string> default_encryption;
-      std::optional<std::string> default_send_as;
-      json extras = json::object();
+    std::optional<std::string> domain_identifier;
+    std::optional<json> default_codecs;
+    std::optional<json> default_ciphers;
+    std::optional<std::string> default_encryption;
+    std::optional<std::string> default_send_as;
+    json extras = json::object();
   };
 
   explicit SipProfile(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/sip_profile") {}
 
   [[nodiscard]] json get(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
   [[nodiscard]] json update(const UpdateParams& p) const {
-      json body = json::object();
-      if (p.domain_identifier.has_value()) { body["domain_identifier"] = *p.domain_identifier; }
-      if (p.default_codecs.has_value()) { body["default_codecs"] = *p.default_codecs; }
-      if (p.default_ciphers.has_value()) { body["default_ciphers"] = *p.default_ciphers; }
-      if (p.default_encryption.has_value()) { body["default_encryption"] = *p.default_encryption; }
-      if (p.default_send_as.has_value()) { body["default_send_as"] = *p.default_send_as; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.put(base_path_, body);
+    json body = json::object();
+    if (p.domain_identifier.has_value()) {
+      body["domain_identifier"] = *p.domain_identifier;
+    }
+    if (p.default_codecs.has_value()) {
+      body["default_codecs"] = *p.default_codecs;
+    }
+    if (p.default_ciphers.has_value()) {
+      body["default_ciphers"] = *p.default_ciphers;
+    }
+    if (p.default_encryption.has_value()) {
+      body["default_encryption"] = *p.default_encryption;
+    }
+    if (p.default_send_as.has_value()) {
+      body["default_send_as"] = *p.default_send_as;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_, body);
   }
 };
 

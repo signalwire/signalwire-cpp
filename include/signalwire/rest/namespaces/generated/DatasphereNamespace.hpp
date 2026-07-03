@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/DatasphereDocuments.hpp"
@@ -24,12 +23,10 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// DatasphereNamespace — generated container grouping the datasphere namespace resources (§8).
 class DatasphereNamespace {
  public:
-  explicit DatasphereNamespace(const HttpClient& http)
-      : documents(http) {}
+  explicit DatasphereNamespace(const HttpClient& http) : documents(http) {}
 
   DatasphereDocuments documents;
 };

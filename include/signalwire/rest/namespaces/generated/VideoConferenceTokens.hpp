@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,19 +22,20 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// VideoConferenceTokens — generated from x-sdk-resource 'VideoConferenceTokens' (video spec, base BaseResource).
+/// VideoConferenceTokens — generated from x-sdk-resource 'VideoConferenceTokens' (video spec, base
+/// BaseResource).
 class VideoConferenceTokens : public BaseResource {
  public:
   explicit VideoConferenceTokens(const HttpClient& client)
       : BaseResource(client, "/api/video/conference_tokens") {}
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json reset(const std::string& id) const {
-  return client_.post(base_path_ + "/" + id + "/" + std::string("reset"), json::object());
+    return client_.post(base_path_ + "/" + id + "/" + std::string("reset"), json::object());
   }
 };
 

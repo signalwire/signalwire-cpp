@@ -10,28 +10,27 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 
-#include <nlohmann/json.hpp>
-
 #include "signalwire/rest/base_resource.hpp"
-#include "signalwire/rest/namespaces/generated/FabricAddresses.hpp"
-#include "signalwire/rest/namespaces/generated/GenericResources.hpp"
 #include "signalwire/rest/namespaces/generated/AiAgents.hpp"
 #include "signalwire/rest/namespaces/generated/CallFlows.hpp"
 #include "signalwire/rest/namespaces/generated/ConferenceRooms.hpp"
 #include "signalwire/rest/namespaces/generated/CxmlApplications.hpp"
 #include "signalwire/rest/namespaces/generated/CxmlScripts.hpp"
 #include "signalwire/rest/namespaces/generated/CxmlWebhooks.hpp"
+#include "signalwire/rest/namespaces/generated/FabricAddresses.hpp"
+#include "signalwire/rest/namespaces/generated/FabricTokens.hpp"
 #include "signalwire/rest/namespaces/generated/FreeswitchConnectors.hpp"
+#include "signalwire/rest/namespaces/generated/GenericResources.hpp"
 #include "signalwire/rest/namespaces/generated/RelayApplications.hpp"
 #include "signalwire/rest/namespaces/generated/SipEndpoints.hpp"
 #include "signalwire/rest/namespaces/generated/SipGateways.hpp"
 #include "signalwire/rest/namespaces/generated/Subscribers.hpp"
 #include "signalwire/rest/namespaces/generated/SwmlScripts.hpp"
 #include "signalwire/rest/namespaces/generated/SwmlWebhooks.hpp"
-#include "signalwire/rest/namespaces/generated/FabricTokens.hpp"
 
 namespace signalwire {
 namespace rest {
@@ -39,12 +38,26 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// FabricNamespace — generated container grouping the fabric namespace resources (§8).
 class FabricNamespace {
  public:
   explicit FabricNamespace(const HttpClient& http)
-      : addresses(http), resources(http), ai_agents(http), call_flows(http), conference_rooms(http), cxml_applications(http), cxml_scripts(http), cxml_webhooks(http), freeswitch_connectors(http), relay_applications(http), sip_endpoints(http), sip_gateways(http), subscribers(http), swml_scripts(http), swml_webhooks(http), tokens(http) {}
+      : addresses(http),
+        resources(http),
+        ai_agents(http),
+        call_flows(http),
+        conference_rooms(http),
+        cxml_applications(http),
+        cxml_scripts(http),
+        cxml_webhooks(http),
+        freeswitch_connectors(http),
+        relay_applications(http),
+        sip_endpoints(http),
+        sip_gateways(http),
+        subscribers(http),
+        swml_scripts(http),
+        swml_webhooks(http),
+        tokens(http) {}
 
   FabricAddresses addresses;
   GenericResources resources;

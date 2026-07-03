@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,7 +22,6 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// Recordings — generated from x-sdk-resource 'Recordings' (relay-rest spec, base BaseResource).
 class Recordings : public BaseResource {
  public:
@@ -31,15 +29,16 @@ class Recordings : public BaseResource {
       : BaseResource(client, "/api/relay/rest/recordings") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 };
 

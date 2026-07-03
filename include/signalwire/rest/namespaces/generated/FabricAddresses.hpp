@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,8 +22,8 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// FabricAddresses — generated from x-sdk-resource 'FabricAddresses' (fabric spec, base ReadResource).
+/// FabricAddresses — generated from x-sdk-resource 'FabricAddresses' (fabric spec, base
+/// ReadResource).
 class FabricAddresses : public ReadResource {
  public:
   explicit FabricAddresses(const HttpClient& client)

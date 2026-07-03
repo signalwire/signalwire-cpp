@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,29 +22,33 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// Chat — generated from x-sdk-resource 'Chat' (chat spec, base BaseResource).
 class Chat : public BaseResource {
  public:
   struct CreateTokenParams {
-      int ttl;
-      json channels;
-      std::optional<std::string> member_id;
-      std::optional<json> state;
-      json extras = json::object();
+    int ttl;
+    json channels;
+    std::optional<std::string> member_id;
+    std::optional<json> state;
+    json extras = json::object();
   };
 
-  explicit Chat(const HttpClient& client)
-      : BaseResource(client, "/api/chat/tokens") {}
+  explicit Chat(const HttpClient& client) : BaseResource(client, "/api/chat/tokens") {}
 
   [[nodiscard]] json createToken(const CreateTokenParams& p) const {
-      json body = json::object();
-      body["ttl"] = p.ttl;
-      body["channels"] = p.channels;
-      if (p.member_id.has_value()) { body["member_id"] = *p.member_id; }
-      if (p.state.has_value()) { body["state"] = *p.state; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_, body);
+    json body = json::object();
+    body["ttl"] = p.ttl;
+    body["channels"] = p.channels;
+    if (p.member_id.has_value()) {
+      body["member_id"] = *p.member_id;
+    }
+    if (p.state.has_value()) {
+      body["state"] = *p.state;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_, body);
   }
 };
 

@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,27 +22,30 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// VerifiedCallers — generated from x-sdk-resource 'VerifiedCallers' (relay-rest spec, base CrudResource).
+/// VerifiedCallers — generated from x-sdk-resource 'VerifiedCallers' (relay-rest spec, base
+/// CrudResource).
 class VerifiedCallers : public CrudResource {
  public:
   struct SubmitVerificationParams {
-      std::string verification_code;
-      json extras = json::object();
+    std::string verification_code;
+    json extras = json::object();
   };
 
   explicit VerifiedCallers(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/verified_caller_ids", "PUT") {}
 
   [[nodiscard]] json redialVerification(const std::string& id) const {
-  return client_.post(base_path_ + "/" + id + "/" + std::string("verification"), json::object());
+    return client_.post(base_path_ + "/" + id + "/" + std::string("verification"), json::object());
   }
 
-  [[nodiscard]] json submitVerification(const std::string& id, const SubmitVerificationParams& p) const {
-      json body = json::object();
-      body["verification_code"] = p.verification_code;
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.put(base_path_ + "/" + id + "/" + std::string("verification"), body);
+  [[nodiscard]] json submitVerification(const std::string& id,
+                                        const SubmitVerificationParams& p) const {
+    json body = json::object();
+    body["verification_code"] = p.verification_code;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id + "/" + std::string("verification"), body);
   }
 };
 

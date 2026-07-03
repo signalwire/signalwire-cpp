@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,15 +22,17 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// ConferenceRooms — generated from x-sdk-resource 'ConferenceRooms' (fabric spec, base FabricResource).
+/// ConferenceRooms — generated from x-sdk-resource 'ConferenceRooms' (fabric spec, base
+/// FabricResource).
 class ConferenceRooms : public FabricResource {
  public:
   explicit ConferenceRooms(const HttpClient& client)
       : FabricResource(client, "/api/fabric/resources/conference_rooms", "PUT") {}
 
-  [[nodiscard]] json listAddresses(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(std::string("/api/fabric/resources/conference_room/") + id + "/addresses", params);
+  [[nodiscard]] json listAddresses(const std::string& id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(std::string("/api/fabric/resources/conference_room/") + id + "/addresses",
+                       params);
   }
 };
 

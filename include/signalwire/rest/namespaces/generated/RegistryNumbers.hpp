@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,15 +22,15 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// RegistryNumbers — generated from x-sdk-resource 'RegistryNumbers' (relay-rest spec, base BaseResource).
+/// RegistryNumbers — generated from x-sdk-resource 'RegistryNumbers' (relay-rest spec, base
+/// BaseResource).
 class RegistryNumbers : public BaseResource {
  public:
   explicit RegistryNumbers(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/numbers") {}
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 };
 

@@ -630,6 +630,19 @@ run_gate "SPEC-PARITY" "implemented REST routes == canonical spec (modulo gaps);
 run_gate "GEN-FRESH" "generated REST layer byte-identical to a fresh regen" \
     python3 scripts/generate_rest.py --check
 
+# Gate 5d-2: GEN-FRESH-TYPES — the generated read-side TYPE surface (item D/H)
+# must match a fresh regeneration. Three generators feed distinct modules:
+#   generate_swml_verbs.py     -> core/swml_verbs_generated (schema.json $defs)
+#   generate_relay_protocol.py -> relay/protocol_types_generated (relay-protocol/)
+#   generate_swaig_payloads.py -> core/{post_prompt,swaig_request,swaig_actions}_generated
+# (The <ns>_types_generated REST wire types are covered by generate_rest.py --check.)
+run_gate "GEN-FRESH-SWML-VERBS" "generated SWML-verb type surface byte-identical to a fresh regen" \
+    python3 scripts/generate_swml_verbs.py --check
+run_gate "GEN-FRESH-RELAY-PROTO" "generated RELAY-protocol type surface byte-identical to a fresh regen" \
+    python3 scripts/generate_relay_protocol.py --check
+run_gate "GEN-FRESH-SWAIG-PAYLOADS" "generated SWAIG read-side payload surface byte-identical to a fresh regen" \
+    python3 scripts/generate_swaig_payloads.py --check
+
 # Gate 5e: GEN-FRESH-TESTS — the generated full-mock REST wire-test suite
 # (item E) must match a fresh regen from the route_registry plan. route_registry
 # was built by the SPEC-PARITY gate above; build it here too for host mode so the
@@ -711,6 +724,18 @@ run_gate "SWAIG-CLI" "swaig-test shared mini-contract (verbs/serverless-reject/d
         --require-url-model \
         --default-action-argv='http://user:pass@127.0.0.1:1/' \
         --no-serverless-argv='http://user:pass@127.0.0.1:1/|--simulate-serverless|lambda|--list-tools'
+
+# Gate 13: SWAIG-COVERAGE — the C++ FunctionResult must expose every engine
+# response action (swaig-specs/swaig-response.yaml) or allowlist it with sign-off
+# (SWAIG_PIPELINE §5). The shared checker's C++ scraper (_sdk_emits_cpp, keyed on
+# the .cpp suffix) captures ONLY top-level action keys — the fluent add_action(),
+# direct single-action object-literal pushes, and subscript-set keys of a var
+# pushed onto actions_ — NOT nested payload keys. 2 gaps are signed-off
+# allowlisted (back_to_back_functions, user_event).
+run_gate "SWAIG-COVERAGE" "FunctionResult exposes every engine response action" \
+    python3 "$PORTING_SDK_DIR/scripts/swaig_coverage.py" \
+        --check \
+        --emission "$PORT_ROOT/src/swaig/function_result.cpp"
 
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"

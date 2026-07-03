@@ -9102,20 +9102,6 @@
               ],
               "returns": "any"
             },
-            "del": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "id",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "any"
-            },
             "delete": {
               "params": [
                 {
@@ -9270,7 +9256,7 @@
               ],
               "returns": "string"
             },
-            "del": {
+            "delete": {
               "params": [
                 {
                   "name": "self",

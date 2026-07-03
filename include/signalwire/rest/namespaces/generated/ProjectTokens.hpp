@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,45 +22,53 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// ProjectTokens — generated from x-sdk-resource 'ProjectTokens' (project spec, base BaseResource).
 class ProjectTokens : public BaseResource {
  public:
   struct CreateParams {
-      std::string name;
-      json permissions;
-      std::optional<std::string> subproject_id;
-      json extras = json::object();
+    std::string name;
+    json permissions;
+    std::optional<std::string> subproject_id;
+    json extras = json::object();
   };
 
   struct UpdateParams {
-      std::optional<std::string> name;
-      std::optional<json> permissions;
-      json extras = json::object();
+    std::optional<std::string> name;
+    std::optional<json> permissions;
+    json extras = json::object();
   };
 
-  explicit ProjectTokens(const HttpClient& client)
-      : BaseResource(client, "/api/project/tokens") {}
+  explicit ProjectTokens(const HttpClient& client) : BaseResource(client, "/api/project/tokens") {}
 
   [[nodiscard]] json create(const CreateParams& p) const {
-      json body = json::object();
-      body["name"] = p.name;
-      body["permissions"] = p.permissions;
-      if (p.subproject_id.has_value()) { body["subproject_id"] = *p.subproject_id; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_, body);
+    json body = json::object();
+    body["name"] = p.name;
+    body["permissions"] = p.permissions;
+    if (p.subproject_id.has_value()) {
+      body["subproject_id"] = *p.subproject_id;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_, body);
   }
 
   [[nodiscard]] json update(const std::string& token_id, const UpdateParams& p) const {
-      json body = json::object();
-      if (p.name.has_value()) { body["name"] = *p.name; }
-      if (p.permissions.has_value()) { body["permissions"] = *p.permissions; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.patch(base_path_ + "/" + token_id, body);
+    json body = json::object();
+    if (p.name.has_value()) {
+      body["name"] = *p.name;
+    }
+    if (p.permissions.has_value()) {
+      body["permissions"] = *p.permissions;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.patch(base_path_ + "/" + token_id, body);
   }
 
   [[nodiscard]] json delete_(const std::string& token_id) const {
-  return client_.del(base_path_ + "/" + token_id);
+    return client_.del(base_path_ + "/" + token_id);
   }
 };
 

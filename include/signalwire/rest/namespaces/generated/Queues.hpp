@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,23 +22,28 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// Queues — generated from x-sdk-resource 'Queues' (relay-rest spec, base CrudResource).
 class Queues : public CrudResource {
  public:
   explicit Queues(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/queues", "PUT") {}
 
-  [[nodiscard]] json listMembers(const std::string& queue_id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members"), params);
+  [[nodiscard]] json listMembers(const std::string& queue_id,
+                                 const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members"), params);
   }
 
-  [[nodiscard]] json getNextMember(const std::string& queue_id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + std::string("next"), params);
+  [[nodiscard]] json getNextMember(const std::string& queue_id,
+                                   const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(
+        base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + std::string("next"),
+        params);
   }
 
-  [[nodiscard]] json getMember(const std::string& queue_id, const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + id, params);
+  [[nodiscard]] json getMember(const std::string& queue_id, const std::string& id,
+                               const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + id,
+                       params);
   }
 };
 

@@ -10,23 +10,21 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 
-#include <nlohmann/json.hpp>
-
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/ConferenceLogs.hpp"
+#include "signalwire/rest/namespaces/generated/FaxLogs.hpp"
 #include "signalwire/rest/namespaces/generated/MessageLogs.hpp"
 #include "signalwire/rest/namespaces/generated/VoiceLogs.hpp"
-#include "signalwire/rest/namespaces/generated/FaxLogs.hpp"
 
 namespace signalwire {
 namespace rest {
 namespace generated {
 
 using json = nlohmann::json;
-
 
 /// LogsNamespace — generated container grouping the logs namespace resources (§8).
 class LogsNamespace {

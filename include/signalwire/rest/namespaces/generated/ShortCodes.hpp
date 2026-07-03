@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,45 +22,59 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// ShortCodes — generated from x-sdk-resource 'ShortCodes' (relay-rest spec, base BaseResource).
 class ShortCodes : public BaseResource {
  public:
   struct UpdateParams {
-      std::string name;
-      std::string message_handler;
-      std::optional<std::string> message_request_url;
-      std::optional<std::string> message_request_method;
-      std::optional<std::string> message_fallback_url;
-      std::optional<std::string> message_fallback_method;
-      std::optional<std::string> message_laml_application_id;
-      std::optional<std::string> message_relay_context;
-      json extras = json::object();
+    std::string name;
+    std::string message_handler;
+    std::optional<std::string> message_request_url;
+    std::optional<std::string> message_request_method;
+    std::optional<std::string> message_fallback_url;
+    std::optional<std::string> message_fallback_method;
+    std::optional<std::string> message_laml_application_id;
+    std::optional<std::string> message_relay_context;
+    json extras = json::object();
   };
 
   explicit ShortCodes(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/short_codes") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p) const {
-      json body = json::object();
-      body["name"] = p.name;
-      body["message_handler"] = p.message_handler;
-      if (p.message_request_url.has_value()) { body["message_request_url"] = *p.message_request_url; }
-      if (p.message_request_method.has_value()) { body["message_request_method"] = *p.message_request_method; }
-      if (p.message_fallback_url.has_value()) { body["message_fallback_url"] = *p.message_fallback_url; }
-      if (p.message_fallback_method.has_value()) { body["message_fallback_method"] = *p.message_fallback_method; }
-      if (p.message_laml_application_id.has_value()) { body["message_laml_application_id"] = *p.message_laml_application_id; }
-      if (p.message_relay_context.has_value()) { body["message_relay_context"] = *p.message_relay_context; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.put(base_path_ + "/" + id, body);
+    json body = json::object();
+    body["name"] = p.name;
+    body["message_handler"] = p.message_handler;
+    if (p.message_request_url.has_value()) {
+      body["message_request_url"] = *p.message_request_url;
+    }
+    if (p.message_request_method.has_value()) {
+      body["message_request_method"] = *p.message_request_method;
+    }
+    if (p.message_fallback_url.has_value()) {
+      body["message_fallback_url"] = *p.message_fallback_url;
+    }
+    if (p.message_fallback_method.has_value()) {
+      body["message_fallback_method"] = *p.message_fallback_method;
+    }
+    if (p.message_laml_application_id.has_value()) {
+      body["message_laml_application_id"] = *p.message_laml_application_id;
+    }
+    if (p.message_relay_context.has_value()) {
+      body["message_relay_context"] = *p.message_relay_context;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id, body);
   }
 };
 

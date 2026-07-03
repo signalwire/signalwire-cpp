@@ -365,6 +365,61 @@ for _bc_cpp, _bc_py in (
     CLASS_RENAME_MAP[(_GENERATED_NS, _bc_cpp)] = ("signalwire.rest._base", _bc_py)
 
 
+# -- Generated wire-TYPE / read-side-payload surface (item D/H) ----------------
+# The <ns>_types_generated wire types (generate_rest.py), SWML-verbs
+# (generate_swml_verbs.py), relay-protocol (generate_relay_protocol.py), and
+# SWAIG payload/action (generate_swaig_payloads.py) modules are method-less C++
+# data structs, each in its OWN namespace so it routes by PATH (not by class
+# name — these names recur across modules and collide with SDK class names, so a
+# name-keyed lookup would misroute them). The reference records each as a bare
+# method-less class on the SURFACE; the diff tool folds the cross-module
+# duplicates by leaf name (``gen-type``). A struct with zero methods is normally
+# never registered by the regex walker (it only emits classes that have a public
+# method), so ``parse_header`` also registers a class the moment its opener is
+# seen inside one of these namespaces (see GENERATED_TYPE_NS_PREFIXES use there).
+#
+# REST types nest under signalwire::rest::generated::types::<Ns>; the per-Ns leaf
+# maps to signalwire.rest.namespaces.<ns_key>_types_generated. The other four
+# groups map their whole namespace prefix to the flat reference module.
+_TYPES_NS_PREFIX = "signalwire::rest::generated::types::"
+_TYPES_NS_KEY = {
+    "RelayRest": "relay_rest", "Fabric": "fabric", "Calling": "calling",
+    "Video": "video", "Datasphere": "datasphere", "Logs": "logs",
+    "Message": "message", "Voice": "voice", "Fax": "fax", "Project": "project",
+    "Chat": "chat", "PubSub": "pubsub", "SwmlWebhooks": "swml_webhooks",
+}
+GENERATED_PAYLOAD_NS = {
+    "signalwire::core::swml_verbs_generated": "signalwire.core.swml_verbs_generated",
+    "signalwire::relay::protocol_types_generated": "signalwire.relay.protocol_types_generated",
+    "signalwire::core::post_prompt_generated": "signalwire.core.post_prompt_generated",
+    "signalwire::core::swaig_request_generated": "signalwire.core.swaig_request_generated",
+    "signalwire::core::swaig_actions_generated": "signalwire.core.swaig_actions_generated",
+}
+# Namespace-path prefixes whose classes are generated method-less types (used by
+# parse_header to force-register a zero-method struct so it surfaces).
+GENERATED_TYPE_NS_PREFIXES = (_TYPES_NS_PREFIX.rstrip(":"),) + tuple(GENERATED_PAYLOAD_NS)
+
+
+def generated_type_module(ns_path: str) -> str | None:
+    """If ``ns_path`` is one of the generated wire-type / payload namespaces,
+    return the canonical Python reference module (routed by PATH). Else None."""
+    if ns_path in GENERATED_PAYLOAD_NS:
+        return GENERATED_PAYLOAD_NS[ns_path]
+    if ns_path.startswith(_TYPES_NS_PREFIX):
+        seg = ns_path[len(_TYPES_NS_PREFIX):].split("::", 1)[0]
+        key = _TYPES_NS_KEY.get(seg)
+        if key is None:
+            raise SystemExit(
+                f"enumerate_surface.py: generated types namespace {ns_path!r} has "
+                f"unknown segment {seg!r} (add to _TYPES_NS_KEY)")
+        return f"signalwire.rest.namespaces.{key}_types_generated"
+    return None
+
+
+def _is_generated_type_ns(ns_path: str) -> bool:
+    return ns_path in GENERATED_PAYLOAD_NS or ns_path.startswith(_TYPES_NS_PREFIX)
+
+
 # C++ typedef aliases for std::function callables that have no class
 # counterpart on the Python side — Python uses the bare ``typing.Callable``
 # for these. Translate the C++ typedef name to the canonical
@@ -739,6 +794,8 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
                 is_struct = code_line.lstrip().startswith("struct")
                 opens = code_line.count("{")
                 closes = code_line.count("}")
+                # The enclosing namespace path at the point this class opens.
+                _ns_here = "::".join(s.name for s in scopes if s.kind == "namespace")
                 scopes.append(Scope(
                     "struct" if is_struct else "class",
                     class_name,
@@ -746,6 +803,13 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
                     visibility="public" if is_struct else "private",
                 ))
                 brace_depth += opens - closes
+                # Generated wire-type / payload structs are METHOD-LESS; the
+                # method-detection path below never registers a class with zero
+                # public methods. Force-register it here (empty method list) so the
+                # reference's bare method-less type surfaces. Scoped strictly to the
+                # generated-type namespaces so no ordinary empty struct leaks in.
+                if _is_generated_type_ns(_ns_here):
+                    collected.setdefault((_ns_here, class_name), [])
                 continue
 
         # --- Visibility specifier
@@ -1008,7 +1072,13 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             # Apply class rename (e.g. swml::Service -> SWMLService)
             emit_class = class_name
             emit_mod = None
-            if (ns_path, class_name) in CLASS_RENAME_MAP:
+            # Generated wire-type / read-side-payload structs route by PATH — the
+            # namespace-prefix router wins over the name-keyed lookups (the names
+            # recur cross-module / collide with SDK classes). Emitted method-less.
+            gen_mod = generated_type_module(ns_path)
+            if gen_mod is not None:
+                emit_mod = gen_mod
+            elif (ns_path, class_name) in CLASS_RENAME_MAP:
                 emit_mod, emit_class = CLASS_RENAME_MAP[(ns_path, class_name)]
             if emit_mod is None:
                 emit_mod = module_for_class(emit_class, ns_path)

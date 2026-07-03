@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,8 +22,8 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// RelayApplications — generated from x-sdk-resource 'RelayApplications' (fabric spec, base FabricResource).
+/// RelayApplications — generated from x-sdk-resource 'RelayApplications' (fabric spec, base
+/// FabricResource).
 class RelayApplications : public FabricResource {
  public:
   explicit RelayApplications(const HttpClient& client)

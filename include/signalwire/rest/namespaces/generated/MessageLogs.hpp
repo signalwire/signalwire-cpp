@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,12 +22,10 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// MessageLogs — generated from x-sdk-resource 'MessageLogs' (message spec, base ReadResource).
 class MessageLogs : public ReadResource {
  public:
-  explicit MessageLogs(const HttpClient& client)
-      : ReadResource(client, "/api/messaging/logs") {}
+  explicit MessageLogs(const HttpClient& client) : ReadResource(client, "/api/messaging/logs") {}
 };
 
 }  // namespace generated

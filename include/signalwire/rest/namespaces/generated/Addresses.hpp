@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,55 +22,61 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
 /// Addresses — generated from x-sdk-resource 'Addresses' (relay-rest spec, base BaseResource).
 class Addresses : public BaseResource {
  public:
   struct CreateParams {
-      std::string label;
-      std::string country;
-      std::string first_name;
-      std::string last_name;
-      std::string street_number;
-      std::string street_name;
-      std::string city;
-      std::string state;
-      std::string postal_code;
-      std::optional<std::string> address_type;
-      std::optional<std::string> address_number;
-      json extras = json::object();
+    std::string label;
+    std::string country;
+    std::string first_name;
+    std::string last_name;
+    std::string street_number;
+    std::string street_name;
+    std::string city;
+    std::string state;
+    std::string postal_code;
+    std::optional<std::string> address_type;
+    std::optional<std::string> address_number;
+    json extras = json::object();
   };
 
   explicit Addresses(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/addresses") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
   [[nodiscard]] json create(const CreateParams& p) const {
-      json body = json::object();
-      body["label"] = p.label;
-      body["country"] = p.country;
-      body["first_name"] = p.first_name;
-      body["last_name"] = p.last_name;
-      body["street_number"] = p.street_number;
-      body["street_name"] = p.street_name;
-      body["city"] = p.city;
-      body["state"] = p.state;
-      body["postal_code"] = p.postal_code;
-      if (p.address_type.has_value()) { body["address_type"] = *p.address_type; }
-      if (p.address_number.has_value()) { body["address_number"] = *p.address_number; }
-      if (!p.extras.is_null()) { body.update(p.extras); }
-  return client_.post(base_path_, body);
+    json body = json::object();
+    body["label"] = p.label;
+    body["country"] = p.country;
+    body["first_name"] = p.first_name;
+    body["last_name"] = p.last_name;
+    body["street_number"] = p.street_number;
+    body["street_name"] = p.street_name;
+    body["city"] = p.city;
+    body["state"] = p.state;
+    body["postal_code"] = p.postal_code;
+    if (p.address_type.has_value()) {
+      body["address_type"] = *p.address_type;
+    }
+    if (p.address_number.has_value()) {
+      body["address_number"] = *p.address_number;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_, body);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 };
 

@@ -10,10 +10,9 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/base_resource.hpp"
 
@@ -23,27 +22,29 @@ namespace generated {
 
 using json = nlohmann::json;
 
-
-/// VideoRoomRecordings — generated from x-sdk-resource 'VideoRoomRecordings' (video spec, base BaseResource).
+/// VideoRoomRecordings — generated from x-sdk-resource 'VideoRoomRecordings' (video spec, base
+/// BaseResource).
 class VideoRoomRecordings : public BaseResource {
  public:
   explicit VideoRoomRecordings(const HttpClient& client)
       : BaseResource(client, "/api/video/room_recordings") {}
 
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_, params);
+    return client_.get(base_path_, params);
   }
 
-  [[nodiscard]] json get(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id, params);
+  [[nodiscard]] json get(const std::string& id,
+                         const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id, params);
   }
 
   [[nodiscard]] json delete_(const std::string& id) const {
-  return client_.del(base_path_ + "/" + id);
+    return client_.del(base_path_ + "/" + id);
   }
 
-  [[nodiscard]] json listEvents(const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-  return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params);
+  [[nodiscard]] json listEvents(const std::string& id,
+                                const std::map<std::string, std::string>& params = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params);
   }
 };
 

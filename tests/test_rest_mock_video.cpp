@@ -21,7 +21,7 @@ using nlohmann::json;
 
 TEST(rest_mock_video_rooms_list_streams_returns_data_collection) {
     auto client = mocktest::make_client();
-    auto body = client.video().rooms.list_streams("room-1");
+    auto body = client.video().rooms.listStreams("room-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -34,8 +34,8 @@ TEST(rest_mock_video_rooms_list_streams_returns_data_collection) {
 
 TEST(rest_mock_video_rooms_create_stream_posts_kwargs_in_body) {
     auto client = mocktest::make_client();
-    auto body = client.video().rooms.create_stream(
-        "room-1", {{"url", "rtmp://example.com/live"}});
+    auto body = client.video().rooms.createStream(
+        "room-1", {.url = "rtmp://example.com/live"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -74,7 +74,7 @@ TEST(rest_mock_video_room_sessions_get_returns_session_object) {
 
 TEST(rest_mock_video_room_sessions_list_events_uses_events_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.video().room_sessions.list_events("sess-1");
+    auto body = client.video().room_sessions.listEvents("sess-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -86,7 +86,7 @@ TEST(rest_mock_video_room_sessions_list_events_uses_events_subpath) {
 
 TEST(rest_mock_video_room_sessions_list_recordings_uses_recordings_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.video().room_sessions.list_recordings("sess-2");
+    auto body = client.video().room_sessions.listRecordings("sess-2");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     auto j = mocktest::journal_last();
@@ -134,7 +134,7 @@ TEST(rest_mock_video_room_recordings_delete_returns_dict_for_204) {
 
 TEST(rest_mock_video_room_recordings_list_events_uses_events_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.video().room_recordings.list_events("rec-1");
+    auto body = client.video().room_recordings.listEvents("rec-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     auto j = mocktest::journal_last();
@@ -149,7 +149,7 @@ TEST(rest_mock_video_room_recordings_list_events_uses_events_subpath) {
 
 TEST(rest_mock_video_conferences_list_conference_tokens) {
     auto client = mocktest::make_client();
-    auto body = client.video().conferences.list_conference_tokens("conf-1");
+    auto body = client.video().conferences.listConferenceTokens("conf-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -161,7 +161,7 @@ TEST(rest_mock_video_conferences_list_conference_tokens) {
 
 TEST(rest_mock_video_conferences_list_streams) {
     auto client = mocktest::make_client();
-    auto body = client.video().conferences.list_streams("conf-2");
+    auto body = client.video().conferences.listStreams("conf-2");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -219,7 +219,7 @@ TEST(rest_mock_video_streams_get_returns_stream_resource) {
 TEST(rest_mock_video_streams_update_uses_put_with_kwargs) {
     auto client = mocktest::make_client();
     auto body = client.video().streams.update(
-        "stream-2", {{"url", "rtmp://example.com/new"}});
+        "stream-2", {.url = "rtmp://example.com/new"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PUT"));

@@ -115,6 +115,36 @@
         "default": {}
       }
     ],
+    "AiAgents::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "AiAgents::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "CallFlows::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "CallFlows::deployVersion": [
       {
         "name": "id",
@@ -157,6 +187,20 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "CallFlows::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "Calling::ai_hold": [
@@ -1213,6 +1257,14 @@
         "default": {}
       }
     ],
+    "ConferenceRooms::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "ConferenceRooms::listAddresses": [
       {
         "name": "id",
@@ -1226,6 +1278,20 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "ConferenceRooms::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "CxmlApplications::delete_": [
@@ -1381,6 +1447,66 @@
         "default": {}
       }
     ],
+    "CxmlScripts::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "CxmlScripts::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "CxmlWebhooks::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "CxmlWebhooks::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "DatasphereDocuments::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "DatasphereDocuments::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "DatasphereDocuments::deleteChunk": [
       {
         "name": "documentId",
@@ -1489,6 +1615,44 @@
       },
       {
         "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "DatasphereDocuments::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "FabricAddresses::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "FabricAddresses::list": [
+      {
+        "name": "params",
         "kind": "var_keyword",
         "type": "any",
         "required": false,
@@ -1683,6 +1847,52 @@
         "default": {}
       }
     ],
+    "FaxLogs::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "FaxLogs::list": [
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "FreeswitchConnectors::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "FreeswitchConnectors::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "GenericResources::assignDomainApplication": [
       {
         "name": "id",
@@ -1833,6 +2043,30 @@
         "type": "string",
         "required": true
       },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "MessageLogs::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "MessageLogs::list": [
       {
         "name": "params",
         "kind": "var_keyword",
@@ -2013,6 +2247,22 @@
         "default": {}
       }
     ],
+    "NumberGroups::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "NumberGroups::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "NumberGroups::deleteMembership": [
       {
         "name": "id",
@@ -2049,6 +2299,36 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "NumberGroups::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "PhoneNumbers::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "PhoneNumbers::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
       }
     ],
     "PhoneNumbers::search": [
@@ -2231,6 +2511,20 @@
         "default": {}
       }
     ],
+    "PhoneNumbers::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "ProjectTokens::create": [
       {
         "name": "name",
@@ -2347,6 +2641,22 @@
         "default": {}
       }
     ],
+    "Queues::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "Queues::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "Queues::getMember": [
       {
         "name": "queue_id",
@@ -2396,6 +2706,20 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "Queues::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "Recordings::delete_": [
@@ -2621,6 +2945,28 @@
         "default": {}
       }
     ],
+    "RelayApplications::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "RelayApplications::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "ShortCodes::get": [
       {
         "name": "id",
@@ -2715,6 +3061,50 @@
         "default": {}
       }
     ],
+    "SipEndpoints::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SipEndpoints::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SipGateways::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SipGateways::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "SipProfile::get": [
       {
         "name": "params",
@@ -2768,6 +3158,14 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "Subscribers::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "Subscribers::createSipEndpoint": [
@@ -2884,6 +3282,20 @@
         "default": {}
       }
     ],
+    "Subscribers::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "Subscribers::updateSipEndpoint": [
       {
         "name": "fabric_subscriber_id",
@@ -2954,6 +3366,66 @@
         "default": {}
       }
     ],
+    "SwmlScripts::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SwmlScripts::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SwmlWebhooks::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SwmlWebhooks::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "VerifiedCallers::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "VerifiedCallers::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "VerifiedCallers::redialVerification": [
       {
         "name": "id",
@@ -2990,6 +3462,20 @@
         "default": {}
       }
     ],
+    "VerifiedCallers::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "VideoConferenceTokens::get": [
       {
         "name": "id",
@@ -3010,6 +3496,14 @@
         "name": "id",
         "kind": "positional",
         "type": "string",
+        "required": true
+      }
+    ],
+    "VideoConferences::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
         "required": true
       }
     ],
@@ -3041,6 +3535,14 @@
         "default": {}
       }
     ],
+    "VideoConferences::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "VideoConferences::listConferenceTokens": [
       {
         "name": "id",
@@ -3069,6 +3571,20 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "VideoConferences::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "VideoRoomRecordings::delete_": [
@@ -3110,6 +3626,30 @@
         "type": "string",
         "required": true
       },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "VideoRoomSessions::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "VideoRoomSessions::list": [
       {
         "name": "params",
         "kind": "var_keyword",
@@ -3287,6 +3827,14 @@
         "default": {}
       }
     ],
+    "VideoRooms::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "VideoRooms::createStream": [
       {
         "name": "id",
@@ -3315,6 +3863,14 @@
         "default": {}
       }
     ],
+    "VideoRooms::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
     "VideoRooms::listStreams": [
       {
         "name": "id",
@@ -3328,6 +3884,20 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "VideoRooms::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "VideoStreams::delete_": [
@@ -3375,6 +3945,30 @@
       },
       {
         "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "VoiceLogs::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "VoiceLogs::list": [
+      {
+        "name": "params",
         "kind": "var_keyword",
         "type": "any",
         "required": false,

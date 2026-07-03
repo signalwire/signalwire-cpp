@@ -166,7 +166,21 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_mock_logs.cpp"
 #include "test_rest_mock_registry.cpp"
 #include "test_rest_mock_pagination.cpp"
-#include "test_rest_full_coverage.cpp"
+// Generated full-mock REST wire-test suite (item E) — success+error per
+// canonical route, superseding the hand-written test_rest_full_coverage.cpp.
+// Regenerate with scripts/generate_rest_tests.py; GEN-FRESH-TESTS gated.
+#include "test_rest_generated_calling.cpp"
+#include "test_rest_generated_chat.cpp"
+#include "test_rest_generated_datasphere.cpp"
+#include "test_rest_generated_fabric.cpp"
+#include "test_rest_generated_fax.cpp"
+#include "test_rest_generated_logs.cpp"
+#include "test_rest_generated_message.cpp"
+#include "test_rest_generated_project.cpp"
+#include "test_rest_generated_pubsub.cpp"
+#include "test_rest_generated_relay_rest.cpp"
+#include "test_rest_generated_video.cpp"
+#include "test_rest_generated_voice.cpp"
 
 // TLS capability tests (template: signalwire-go b6b2b6d). Prove the SDK does
 // REAL, certificate-verified TLS: REST https:// + RELAY wss:// against the

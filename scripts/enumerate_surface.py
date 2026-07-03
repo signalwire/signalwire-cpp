@@ -318,6 +318,53 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
 }
 
 
+# -- Generated REST surface-map projection (item A/B adoption) ----------------
+# The REST resource + container surface is now GENERATED
+# (include/signalwire/rest/namespaces/generated/*.hpp), all under the C++
+# namespace ``signalwire::rest::generated``. The generator emits
+# ``generated_surface_map.json`` (ruby-identical) mapping each generated class
+# name to its canonical Python module:
+#   - resource classes  -> signalwire.rest.namespaces.<ns>_resources_generated
+#   - namespace containers -> signalwire.rest.namespaces._client_tree_generated
+# The generated class NAME is kept verbatim (L2: AiAgents/SipEndpoints/... equal
+# the Python class names). We register each as a CLASS_RENAME_MAP entry keyed on
+# (``signalwire::rest::generated``, ClassName) so it takes precedence over the
+# name-only CLASS_MODULE_MAP (which still carries the now-deleted hand REST
+# classes — harmless, never hit for the generated namespace). Abort-loud on a
+# missing map so a new generated resource can't silently fall through to the
+# native-namespace translation (signalwire.rest.generated.<snake>) and drift.
+def _load_generated_surface_map() -> dict[str, str]:
+    here = Path(__file__).resolve().parent
+    smap = (here.parent / "include" / "signalwire" / "rest" / "namespaces"
+            / "generated" / "generated_surface_map.json")
+    if not smap.is_file():
+        return {}
+    import json as _json
+    return _json.loads(smap.read_text())
+
+
+_GENERATED_NS = "signalwire::rest::generated"
+for _cls, _mod in _load_generated_surface_map().items():
+    CLASS_RENAME_MAP[(_GENERATED_NS, _cls)] = (_mod, _cls)
+
+# The generated resource layer's hand base hierarchy (base_resource.hpp) lives
+# in the same ``signalwire::rest::generated`` namespace but maps to Python's
+# ``signalwire.rest._base`` (BaseResource / ReadResource / CrudResource /
+# CrudWithAddresses). C++ folds CrudWithAddresses into FabricResource (Python's
+# FabricResource == CrudResource + CrudWithAddresses.list_addresses), so route
+# the C++ ``FabricResource`` to the oracle's ``CrudWithAddresses`` (its
+# list_addresses home). ResourceTree is a port-only composition holder (no
+# Python analog — the reference client uses dynamic __getattr__), documented in
+# PORT_ADDITIONS.
+for _bc_cpp, _bc_py in (
+    ("BaseResource", "BaseResource"),
+    ("ReadResource", "ReadResource"),
+    ("CrudResource", "CrudResource"),
+    ("FabricResource", "CrudWithAddresses"),
+):
+    CLASS_RENAME_MAP[(_GENERATED_NS, _bc_cpp)] = ("signalwire.rest._base", _bc_py)
+
+
 # C++ typedef aliases for std::function callables that have no class
 # counterpart on the Python side — Python uses the bare ``typing.Callable``
 # for these. Translate the C++ typedef name to the canonical
@@ -341,6 +388,9 @@ CALLBACK_TYPEDEFS_AS_CALLABLE: set[str] = {
 # back so the diff lines up.
 _METHOD_RENAMES: dict[str, str] = {
     "delete_": "delete",
+    # HttpClient (and the legacy CrudResource) spell the DELETE verb ``del`` —
+    # ``delete`` is a C++ keyword; the Python reference records ``delete``.
+    "del": "delete",
 }
 
 
@@ -723,6 +773,15 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
                 # but for this SDK that's rare; we only emit the immediate
                 # class's methods under its own name.
                 class_name = scopes[-1].name
+                # The GENERATED REST resources (signalwire::rest::generated) use
+                # camelCase operation-method names (listAddresses / createEmbedToken)
+                # per the C++ emit idiom; the Python oracle records them snake_case.
+                # Canonicalise there exactly as the signature enumerator does
+                # (camel_to_snake). Elsewhere the SDK is already snake_case, so
+                # this idempotent transform is scoped to the generated namespace to
+                # avoid perturbing acronym-bearing hand names.
+                if ns_path == "signalwire::rest::generated":
+                    method_name = camel_to_snake(method_name)
                 # Map ``delete_`` (C++ keyword-avoidance) -> Python ``delete``.
                 emit_method = _METHOD_RENAMES.get(method_name, method_name)
                 collected.setdefault((ns_path, class_name), []).append(emit_method)
@@ -888,6 +947,47 @@ def git_sha(repo: Path) -> str:
         return "N/A"
 
 
+def _project_generated_rest_methods(modules: dict) -> None:
+    """Union each generated REST resource's full oracle-declared method set
+    (from the generator's rest_signatures.json) into its surface class list,
+    materialising inherited base CRUD verbs the header walker can't see."""
+    here = Path(__file__).resolve().parent
+    gen_dir = (here.parent / "include" / "signalwire" / "rest" / "namespaces"
+               / "generated")
+    smap_path = gen_dir / "generated_surface_map.json"
+    sc_path = gen_dir / "rest_signatures.json"
+    if not smap_path.is_file() or not sc_path.is_file():
+        return
+    class_mod = json.loads(smap_path.read_text())
+    sidecar = json.loads(sc_path.read_text()).get("methods", {})
+    # The surface oracle (griffe) records a generated resource's DECLARED
+    # methods only — it does NOT surface base-INHERITED list/get/delete for the
+    # write-base (CrudResource/FabricResource/ReadResource) classes, but it DOES
+    # record the ``create``/``update`` write overrides. The header walker already
+    # sees every DECLARED method (operation/command/set + the BaseResource
+    # classes' own list/get/delete + typed create/update); the ONLY methods it
+    # misses are the inherited ``create``/``update`` on the write-base classes.
+    # So project ONLY create/update from the sidecar — never the inherited
+    # list/get/delete (griffe drops them here) and never the container members
+    # (griffe records the container as ``__init__``-only in the surface oracle).
+    for key in sidecar:
+        if "::" not in key:
+            continue
+        cls, native = key.split("::", 1)
+        canon = _METHOD_RENAMES.get(camel_to_snake(native), camel_to_snake(native))
+        if canon not in ("create", "update"):
+            continue
+        mod = class_mod.get(cls)
+        if mod is None:
+            raise SystemExit(
+                f"enumerate_surface: sidecar class {cls!r} not in "
+                f"generated_surface_map.json (regenerate the REST layer)")
+        mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
+        existing = set(mod_entry["classes"].get(cls, []))
+        existing.add(canon)
+        mod_entry["classes"][cls] = sorted(existing)
+
+
 def build_snapshot(repo: Path, include_dir: Path) -> dict:
     modules: dict[str, dict] = {}
 
@@ -936,6 +1036,40 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
         # Mixin class always exists (even if empty) so the class symbol
         # itself isn't flagged missing.
         mod_entry["classes"][cls] = sorted(present)
+
+    # Generated REST base hierarchy projection. The generated resource bases
+    # live in ``signalwire::rest::generated`` (base_resource.hpp) but the
+    # regex header walker cannot parse their triple-nested / member-init form,
+    # so they never reach the surface; libclang (the SIGNATURES enumerator)
+    # sees them fine. Inject the base classes onto ``signalwire.rest._base``
+    # with the method sets the Python oracle records (BaseResource.__init__,
+    # ReadResource.get/list, CrudResource.create/delete/update,
+    # CrudWithAddresses.list_addresses) so the base surface matches. The C++
+    # FabricResource folds Python's CrudWithAddresses (it carries list_addresses)
+    # and FabricResourcePUT is a Python-only PUT-marker subclass with no members
+    # (recorded empty). The concrete resources still carry their own method
+    # membership; this only reconciles the shared base layer.
+    _base = modules.setdefault("signalwire.rest._base", {"classes": {}, "functions": []})
+    for _bcls, _bmeths in (
+        ("BaseResource", ["__init__"]),
+        ("ReadResource", ["get", "list"]),
+        ("CrudResource", ["create", "delete", "update"]),
+        ("CrudWithAddresses", ["list_addresses"]),
+        ("FabricResource", []),
+        ("FabricResourcePUT", []),
+    ):
+        _base["classes"][_bcls] = sorted(_bmeths)
+
+    # Generated REST resource-method projection (item A/B adoption). The regex
+    # header walker sees only a generated class's DECLARED methods; it misses
+    # the CRUD verbs each resource INHERITS from base_resource.hpp
+    # (list/get/create/update/delete_) — but the Python oracle records those
+    # per-class (griffe records the subclass's own overrides). The generator's
+    # rest_signatures.json lists every method the Python class declares, keyed
+    # ``Class::method`` in the C++ spelling; union those (canonicalised) into
+    # each generated class so the surface membership matches. Idiom via
+    # emit+projection, never omission.
+    _project_generated_rest_methods(modules)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

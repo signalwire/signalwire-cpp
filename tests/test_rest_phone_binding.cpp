@@ -1,9 +1,11 @@
-// REST phone-number binding tests — PhoneCallHandler enum contract and
-// typed set_* helpers on PhoneNumbersNamespace.
+// REST phone-number binding tests — PhoneCallHandler enum contract and the
+// typed set* helpers on the generated PhoneNumbers resource.
 //
 // The typed helpers wrap ``phone_numbers.update`` with the correct
-// ``call_handler`` + companion field for each handler type. A regression
-// test pins the full happy-path binding to exactly one PUT against
+// ``call_handler`` + companion field for each handler type. Each helper is
+// exercised end-to-end against a local capture server so the on-wire body is
+// pinned to the exact contract. A regression test pins the full happy-path
+// binding to exactly one PUT against
 // ``/api/relay/rest/phone_numbers/{sid}`` — no fabric.swml_webhooks.create
 // call, no assign_phone_route call (the two post-mortem anti-patterns).
 
@@ -17,6 +19,7 @@
 #include "signalwire/rest/http_client.hpp"
 #include "signalwire/rest/rest_client.hpp"
 #include "signalwire/rest/phone_call_handler.hpp"
+#include "signalwire/rest/namespaces/generated/PhoneNumbers.hpp"
 #include "httplib.h"
 
 using namespace signalwire::rest;
@@ -41,7 +44,7 @@ TEST(phone_call_handler_all_11_wire_values) {
 
 TEST(phone_call_handler_covers_11_members) {
     // Pins the enum count. If the server adds a value, bumping this also
-    // forces an audit of the ``set_*`` helpers.
+    // forces an audit of the ``set*`` helpers.
     constexpr int expected = 11;
     int seen = 0;
     for (auto h : {
@@ -59,113 +62,11 @@ TEST(phone_call_handler_covers_11_members) {
     return true;
 }
 
-// ---- Body-builder unit tests (wire-body correctness per helper) ------------
-
-TEST(phone_binding_swml_webhook_body) {
-    json body = RestClient::PhoneNumbersNamespace::make_swml_webhook_body(
-        "https://example.com/swml");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_script"));
-    ASSERT_EQ(body["call_relay_script_url"].get<std::string>(), std::string("https://example.com/swml"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_cxml_webhook_body_minimal) {
-    json body = RestClient::PhoneNumbersNamespace::make_cxml_webhook_body(
-        "https://example.com/voice.xml");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_webhooks"));
-    ASSERT_EQ(body["call_request_url"].get<std::string>(), std::string("https://example.com/voice.xml"));
-    ASSERT_FALSE(body.contains("call_fallback_url"));
-    ASSERT_FALSE(body.contains("call_status_callback_url"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_cxml_webhook_body_with_options) {
-    RestClient::PhoneNumbersNamespace::CxmlWebhookOptions opts;
-    opts.fallback_url = "https://example.com/fallback.xml";
-    opts.status_callback_url = "https://example.com/status";
-    json body = RestClient::PhoneNumbersNamespace::make_cxml_webhook_body(
-        "https://example.com/voice.xml", opts);
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_webhooks"));
-    ASSERT_EQ(body["call_request_url"].get<std::string>(), std::string("https://example.com/voice.xml"));
-    ASSERT_EQ(body["call_fallback_url"].get<std::string>(), std::string("https://example.com/fallback.xml"));
-    ASSERT_EQ(body["call_status_callback_url"].get<std::string>(), std::string("https://example.com/status"));
-    return true;
-}
-
-TEST(phone_binding_cxml_application_body) {
-    json body = RestClient::PhoneNumbersNamespace::make_cxml_application_body("app-1");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_application"));
-    ASSERT_EQ(body["call_laml_application_id"].get<std::string>(), std::string("app-1"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_ai_agent_body) {
-    json body = RestClient::PhoneNumbersNamespace::make_ai_agent_body("agent-1");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("ai_agent"));
-    ASSERT_EQ(body["call_ai_agent_id"].get<std::string>(), std::string("agent-1"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_call_flow_body_minimal) {
-    json body = RestClient::PhoneNumbersNamespace::make_call_flow_body("cf-1");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("call_flow"));
-    ASSERT_EQ(body["call_flow_id"].get<std::string>(), std::string("cf-1"));
-    ASSERT_FALSE(body.contains("call_flow_version"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_call_flow_body_with_version) {
-    RestClient::PhoneNumbersNamespace::CallFlowOptions opts;
-    opts.version = "current_deployed";
-    json body = RestClient::PhoneNumbersNamespace::make_call_flow_body("cf-1", opts);
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("call_flow"));
-    ASSERT_EQ(body["call_flow_id"].get<std::string>(), std::string("cf-1"));
-    ASSERT_EQ(body["call_flow_version"].get<std::string>(), std::string("current_deployed"));
-    return true;
-}
-
-TEST(phone_binding_relay_application_body) {
-    json body = RestClient::PhoneNumbersNamespace::make_relay_application_body("my-app");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_application"));
-    ASSERT_EQ(body["call_relay_application"].get<std::string>(), std::string("my-app"));
-    ASSERT_EQ(body.size(), 2u);
-    return true;
-}
-
-TEST(phone_binding_relay_topic_body_minimal) {
-    json body = RestClient::PhoneNumbersNamespace::make_relay_topic_body("office");
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_topic"));
-    ASSERT_EQ(body["call_relay_topic"].get<std::string>(), std::string("office"));
-    ASSERT_FALSE(body.contains("call_relay_topic_status_callback_url"));
-    return true;
-}
-
-TEST(phone_binding_relay_topic_body_with_status_callback) {
-    RestClient::PhoneNumbersNamespace::RelayTopicOptions opts;
-    opts.status_callback_url = "https://example.com/status";
-    json body = RestClient::PhoneNumbersNamespace::make_relay_topic_body("office", opts);
-    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_topic"));
-    ASSERT_EQ(body["call_relay_topic"].get<std::string>(), std::string("office"));
-    ASSERT_EQ(body["call_relay_topic_status_callback_url"].get<std::string>(),
-              std::string("https://example.com/status"));
-    return true;
-}
-
-// ---- Regression: the post-mortem happy path ---------------------------------
+// ---- Local capture server ---------------------------------------------------
 //
-// Spin up a local httplib server, point the RestClient at it, and call
-// ``set_swml_webhook``. Assert:
-//   - exactly ONE HTTP request was made
-//   - method = PUT
-//   - path = /api/relay/rest/phone_numbers/{sid}
-//   - NOT /api/fabric/... (no swml_webhooks create)
-//   - NOT /phone_routes (no assign_phone_route)
-//   - body matches the wire contract exactly
+// Spin up a local httplib server, point the RestClient/PhoneNumbers at it, and
+// invoke each set* helper. We capture the exact request(s) and assert on the
+// on-wire method / path / body.
 
 namespace {
 
@@ -240,12 +141,176 @@ private:
 
 } // namespace
 
+// ---- Body-wire tests (one per set* helper) ----------------------------------
+
+TEST(phone_binding_swml_webhook_body) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setSwmlWebhook("pn-1", {.url = "https://example.com/swml"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_script"));
+    ASSERT_EQ(body["call_relay_script_url"].get<std::string>(), std::string("https://example.com/swml"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_cxml_webhook_body_minimal) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setCxmlWebhook("pn-1", {.url = "https://example.com/voice.xml"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_webhooks"));
+    ASSERT_EQ(body["call_request_url"].get<std::string>(), std::string("https://example.com/voice.xml"));
+    ASSERT_FALSE(body.contains("call_fallback_url"));
+    ASSERT_FALSE(body.contains("call_status_callback_url"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_cxml_webhook_body_with_options) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setCxmlWebhook("pn-1", {
+        .url = "https://example.com/voice.xml",
+        .fallback_url = "https://example.com/fallback.xml",
+        .status_callback_url = "https://example.com/status",
+    });
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_webhooks"));
+    ASSERT_EQ(body["call_request_url"].get<std::string>(), std::string("https://example.com/voice.xml"));
+    ASSERT_EQ(body["call_fallback_url"].get<std::string>(), std::string("https://example.com/fallback.xml"));
+    ASSERT_EQ(body["call_status_callback_url"].get<std::string>(), std::string("https://example.com/status"));
+    return true;
+}
+
+TEST(phone_binding_cxml_application_body) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setCxmlApplication("pn-1", {.application_id = "app-1"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("laml_application"));
+    ASSERT_EQ(body["call_laml_application_id"].get<std::string>(), std::string("app-1"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_ai_agent_body) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setAiAgent("pn-1", {.agent_id = "agent-1"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("ai_agent"));
+    ASSERT_EQ(body["call_ai_agent_id"].get<std::string>(), std::string("agent-1"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_call_flow_body_minimal) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setCallFlow("pn-1", {.flow_id = "cf-1"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("call_flow"));
+    ASSERT_EQ(body["call_flow_id"].get<std::string>(), std::string("cf-1"));
+    ASSERT_FALSE(body.contains("call_flow_version"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_call_flow_body_with_version) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setCallFlow("pn-1", {.flow_id = "cf-1", .version = "current_deployed"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("call_flow"));
+    ASSERT_EQ(body["call_flow_id"].get<std::string>(), std::string("cf-1"));
+    ASSERT_EQ(body["call_flow_version"].get<std::string>(), std::string("current_deployed"));
+    return true;
+}
+
+TEST(phone_binding_relay_application_body) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setRelayApplication("pn-1", {.name = "my-app"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_application"));
+    ASSERT_EQ(body["call_relay_application"].get<std::string>(), std::string("my-app"));
+    ASSERT_EQ(body.size(), 2u);
+    return true;
+}
+
+TEST(phone_binding_relay_topic_body_minimal) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setRelayTopic("pn-1", {.topic = "office"});
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_topic"));
+    ASSERT_EQ(body["call_relay_topic"].get<std::string>(), std::string("office"));
+    ASSERT_FALSE(body.contains("call_relay_topic_status_callback_url"));
+    return true;
+}
+
+TEST(phone_binding_relay_topic_body_with_status_callback) {
+    LocalCaptureServer srv;
+    HttpClient http(srv.base_url(), "proj", "tok");
+    generated::PhoneNumbers pn(http);
+    (void)pn.setRelayTopic("pn-1", {
+        .topic = "office",
+        .status_callback_url = "https://example.com/status",
+    });
+    auto reqs = srv.captured();
+    ASSERT_EQ(reqs.size(), 1u);
+    json body = json::parse(reqs[0].body);
+    ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_topic"));
+    ASSERT_EQ(body["call_relay_topic"].get<std::string>(), std::string("office"));
+    ASSERT_EQ(body["call_relay_topic_status_callback_url"].get<std::string>(),
+              std::string("https://example.com/status"));
+    return true;
+}
+
+// ---- Regression: the post-mortem happy path ---------------------------------
+//
+// Call ``setSwmlWebhook`` and assert:
+//   - exactly ONE HTTP request was made
+//   - method = PUT
+//   - path = /api/relay/rest/phone_numbers/{sid}
+//   - NOT /api/fabric/... (no swml_webhooks create)
+//   - NOT /phone_routes (no assign_phone_route)
+//   - body matches the wire contract exactly
+
 TEST(phone_binding_regression_swml_single_put) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
-    RestClient::PhoneNumbersNamespace pn(http);
+    generated::PhoneNumbers pn(http);
 
-    (void)pn.set_swml_webhook("pn-1", "https://example.com/swml");
+    (void)pn.setSwmlWebhook("pn-1", {.url = "https://example.com/swml"});
 
     auto reqs = srv.captured();
     // Exactly one HTTP request — NOT two (no fabric resource pre-creation)
@@ -269,7 +334,7 @@ TEST(phone_binding_regression_wire_level_form) {
     // directly through ``update`` — identical on-wire.
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
-    RestClient::PhoneNumbersNamespace pn(http);
+    generated::PhoneNumbers pn(http);
 
     (void)pn.update("pn-1", {
         {"call_handler", "relay_script"},
@@ -282,19 +347,5 @@ TEST(phone_binding_regression_wire_level_form) {
     ASSERT_EQ(reqs[0].path, std::string("/api/relay/rest/phone_numbers/pn-1"));
     json body = json::parse(reqs[0].body);
     ASSERT_EQ(body["call_handler"].get<std::string>(), std::string("relay_script"));
-    return true;
-}
-
-TEST(phone_binding_helpers_all_present) {
-    // Compile-time assertion: every set_* helper is addressable. If a helper
-    // is renamed/removed, this file fails to compile.
-    using PN = RestClient::PhoneNumbersNamespace;
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&) const>(&PN::set_swml_webhook);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&, const PN::CxmlWebhookOptions&) const>(&PN::set_cxml_webhook);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&) const>(&PN::set_cxml_application);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&) const>(&PN::set_ai_agent);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&, const PN::CallFlowOptions&) const>(&PN::set_call_flow);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&) const>(&PN::set_relay_application);
-    (void)static_cast<json (PN::*)(const std::string&, const std::string&, const PN::RelayTopicOptions&) const>(&PN::set_relay_topic);
     return true;
 }

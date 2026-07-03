@@ -624,6 +624,49 @@ run_gate "REST-COVERAGE" "every implemented REST route covered success+error (pa
 run_gate "SPEC-PARITY" "implemented REST routes == canonical spec (modulo gaps); deterministic Set B" \
     spec_parity_gate
 
+# Gate 5d: GEN-FRESH — the generated REST resource layer (headers +
+# generated_surface_map.json + rest_signatures.json) must match a fresh
+# regeneration (no hand edits to generated files).
+run_gate "GEN-FRESH" "generated REST layer byte-identical to a fresh regen" \
+    python3 scripts/generate_rest.py --check
+
+# Gate 5e: GEN-FRESH-TESTS — the generated full-mock REST wire-test suite
+# (item E) must match a fresh regen from the route_registry plan. route_registry
+# was built by the SPEC-PARITY gate above; build it here too for host mode so the
+# gate is self-contained, then run it into a temp plan and diff the test files.
+gen_fresh_tests_gate() {
+    case "$BUILD_MODE" in
+        host)
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            local reg
+            reg="$(mktemp -t cpp_rest_test_plan.XXXXXX.json)"
+            # shellcheck disable=SC2064
+            trap "rm -f '$reg'" RETURN
+            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
+            python3 "$PORT_ROOT/scripts/generate_rest_tests.py" --check --registry-json "$reg"
+            ;;
+        *)
+            # Container modes: build + run route_registry in-container, then check.
+            local reg
+            reg="$(mktemp -t cpp_rest_test_plan.XXXXXX.json)"
+            # shellcheck disable=SC2064
+            trap "rm -f '$reg'" RETURN
+            case "$BUILD_MODE" in
+                exec:*)
+                    docker exec "${BUILD_MODE#exec:}" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1 ;;
+                run:*)
+                    docker run --rm -v "$(dirname "$PORT_ROOT")":/src "${BUILD_MODE#run:}" bash -c "
+                        cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                        && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
+                        && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1 ;;
+            esac
+            python3 "$PORT_ROOT/scripts/generate_rest_tests.py" --check --registry-json "$reg"
+            ;;
+    esac
+}
+run_gate "GEN-FRESH-TESTS" "generated REST wire-test suite byte-identical to a fresh regen" \
+    gen_fresh_tests_gate
+
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
     emission_gate

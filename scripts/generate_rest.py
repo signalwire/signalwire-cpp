@@ -932,6 +932,61 @@ def emit_resource(spec: Spec, anchor: str, markup: dict) -> str:
                 all_methods.append("")
             all_methods.extend(mlines)
 
+    # Base CRUD verbs (list/get/create/update/delete_) are INHERITED from the
+    # base_resource.hpp bases, so they're not declared in this header and the
+    # reflection-free enumerators can't see them — but the Python oracle records
+    # create/update/delete as per-class declared overrides. Register sidecar
+    # records for the inherited verbs the oracle expects so both enumerators
+    # surface them (§5 sidecar is the single projection source). list/get/delete
+    # take path-id/query only; create/update carry the write BODY, which for the
+    # fabric/crud resources the generated code passes as a single loose
+    # ``json body`` (item B typed-body not yet emitted for these — honest
+    # ``cpp-idiom-loose-write-body`` residual, PORT_SIGNATURE_OMISSIONS, not a
+    # BACKLOG). Only register a verb the resource's collection/item path actually
+    # exposes, matching the oracle's bespoke per-class set (e.g. Recordings has
+    # no create/update; ImportedNumbers has create only).
+    # Python's REST generator emits the write-verb overrides per base:
+    #   FabricResource -> create + update      (list/get/delete/list_addresses inherited)
+    #   CrudResource   -> create + update + delete   (list/get inherited)
+    # (verified against the oracle's per-class declared set — uniform by base).
+    # The body is passed as a single loose ``json body`` for these resources
+    # (item B typed-body not yet emitted here — honest cpp-idiom-loose-write-body
+    # residual, PORT_SIGNATURE_OMISSIONS, never BACKLOG). Register them in the
+    # sidecar so the reflection-free enumerators surface them (§5).
+    # Python's REST generator, verified against the oracle's declared set:
+    #   ReadResource   -> list + get
+    #   CrudResource   -> list?+get? NO — create + update + delete (list/get inherited, unrecorded)
+    #   FabricResource -> create + update      (list/get/delete/list_addresses inherited)
+    # (ReadResource DOES record list/get; the write bases do NOT record list/get.)
+    _INHERITED_VERBS_BY_BASE = {
+        "ReadResource": ("list", "get"),
+        "FabricResource": ("create", "update"),
+        "CrudResource": ("create", "update", "delete"),
+    }
+
+    def _verb_records(verb: str) -> list[dict]:
+        if verb == "list":
+            return [{"name": "params", "kind": "var_keyword", "type": "any",
+                     "required": False, "default": {}}]
+        if verb == "get":
+            return [{"name": "id", "kind": "positional", "type": "string", "required": True},
+                    {"name": "params", "kind": "var_keyword", "type": "any",
+                     "required": False, "default": {}}]
+        if verb == "delete":
+            return [{"name": "id", "kind": "positional", "type": "string", "required": True}]
+        if verb == "create":
+            return [{"name": "body", "kind": "positional", "type": "dict<string,any>",
+                     "required": True}]
+        # update
+        return [{"name": "id", "kind": "positional", "type": "string", "required": True},
+                {"name": "body", "kind": "positional", "type": "dict<string,any>",
+                 "required": True}]
+
+    for verb in _INHERITED_VERBS_BY_BASE.get(base, ()):
+        if (name, verb) in _SIDECAR:
+            continue  # a typed / declared override already registered — keep it
+        _register_sidecar(name, verb, _verb_records(verb))
+
     # Constructor: bake the §4 base path. For write-capable bases, pass the update
     # method so the base picks PUT/PATCH (mirrors Python/php _update_method).
     lines = [gen_header(f"Generated REST resource for the {spec.name!r} namespace.")]

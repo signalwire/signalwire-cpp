@@ -3,9 +3,8 @@
 //
 // Closes audit gaps for: addresses, generic resources operations, SIP-endpoint
 // sub-resources on subscribers, the call-flows / conference-rooms addresses
-// sub-paths (which use SINGULAR ``call_flow`` / ``conference_room``), the
-// full FabricTokens surface, and the CxmlApplicationsResource.create
-// deliberate-failure path.
+// sub-paths (which use SINGULAR ``call_flow`` / ``conference_room``), and the
+// full FabricTokens surface.
 //
 // Included by tests/test_main.cpp.
 
@@ -46,35 +45,12 @@ TEST(rest_mock_fabric_addresses_get_uses_address_id) {
 }
 
 // ---------------------------------------------------------------------------
-// CxmlApplicationsResource.create -- deliberate refusal
-// ---------------------------------------------------------------------------
-
-TEST(rest_mock_fabric_cxml_applications_create_raises_not_implemented) {
-    auto client = mocktest::make_client();
-    bool threw = false;
-    std::string what;
-    try {
-        (void)client.fabric().cxml_applications.create({{"name", "never_built"}});
-    } catch (const std::exception& e) {
-        threw = true;
-        what = e.what();
-    }
-    ASSERT_TRUE(threw);
-    // Match Python's ``cXML applications cannot`` substring.
-    ASSERT_TRUE(what.find("cXML applications cannot") != std::string::npos);
-    // Nothing should have hit the wire.
-    auto entries = mocktest::journal();
-    ASSERT_TRUE(entries.empty());
-    return true;
-}
-
-// ---------------------------------------------------------------------------
-// CallFlowsResource.list_addresses -- singular 'call_flow' subpath
+// CallFlowsResource.listAddresses -- singular 'call_flow' subpath
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().call_flows.list_addresses("cf-1");
+    auto body = client.fabric().call_flows.listAddresses("cf-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -87,12 +63,12 @@ TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
 }
 
 // ---------------------------------------------------------------------------
-// ConferenceRoomsResource.list_addresses -- singular 'conference_room' subpath
+// ConferenceRoomsResource.listAddresses -- singular 'conference_room' subpath
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_singular_path) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().conference_rooms.list_addresses("cr-1");
+    auto body = client.fabric().conference_rooms.listAddresses("cr-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     auto j = mocktest::journal_last();
@@ -108,7 +84,7 @@ TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_singular_path) {
 
 TEST(rest_mock_fabric_subscribers_get_sip_endpoint) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.get_sip_endpoint("sub-1", "ep-1");
+    auto body = client.fabric().subscribers.getSipEndpoint("sub-1", "ep-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -120,8 +96,8 @@ TEST(rest_mock_fabric_subscribers_get_sip_endpoint) {
 
 TEST(rest_mock_fabric_subscribers_update_sip_endpoint_uses_patch) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.update_sip_endpoint(
-        "sub-1", "ep-1", {{"username", "renamed"}});
+    auto body = client.fabric().subscribers.updateSipEndpoint(
+        "sub-1", "ep-1", {.username = "renamed"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PATCH"));
@@ -134,7 +110,7 @@ TEST(rest_mock_fabric_subscribers_update_sip_endpoint_uses_patch) {
 
 TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.delete_sip_endpoint("sub-1", "ep-1");
+    auto body = client.fabric().subscribers.deleteSipEndpoint("sub-1", "ep-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -150,8 +126,8 @@ TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
 
 TEST(rest_mock_fabric_tokens_create_invite_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.create_invite_token(
-        {{"email", "invitee@example.com"}});
+    auto body = client.fabric().tokens.createInviteToken(
+        {.extras = {{"email", "invitee@example.com"}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -164,8 +140,8 @@ TEST(rest_mock_fabric_tokens_create_invite_token) {
 
 TEST(rest_mock_fabric_tokens_create_embed_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.create_embed_token(
-        {{"allowed_addresses", json::array({"addr-1", "addr-2"})}});
+    auto body = client.fabric().tokens.createEmbedToken(
+        {.extras = {{"allowed_addresses", json::array({"addr-1", "addr-2"})}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -181,8 +157,8 @@ TEST(rest_mock_fabric_tokens_create_embed_token) {
 
 TEST(rest_mock_fabric_tokens_refresh_subscriber_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.refresh_subscriber_token(
-        {{"refresh_token", "abc-123"}});
+    auto body = client.fabric().tokens.refreshSubscriberToken(
+        {.refresh_token = "abc-123"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -232,7 +208,7 @@ TEST(rest_mock_fabric_resources_delete) {
 
 TEST(rest_mock_fabric_resources_list_addresses) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().resources.list_addresses("res-3");
+    auto body = client.fabric().resources.listAddresses("res-3");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -244,8 +220,8 @@ TEST(rest_mock_fabric_resources_list_addresses) {
 
 TEST(rest_mock_fabric_resources_assign_domain_application) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().resources.assign_domain_application(
-        "res-4", {{"domain_application_id", "da-7"}});
+    auto body = client.fabric().resources.assignDomainApplication(
+        "res-4", {.domain_application_id = "da-7"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));

@@ -42,7 +42,7 @@ TEST(rest_mock_registry_brands_get_uses_id_in_path) {
 
 TEST(rest_mock_registry_brands_list_campaigns_uses_brand_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.registry().brands.list_campaigns("brand-1");
+    auto body = client.registry().brands.listCampaigns("brand-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -53,7 +53,7 @@ TEST(rest_mock_registry_brands_list_campaigns_uses_brand_subpath) {
 
 TEST(rest_mock_registry_brands_create_campaign_posts_to_brand_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.registry().brands.create_campaign(
+    auto body = client.registry().brands.createCampaign(
         "brand-2",
         {{"usecase", "LOW_VOLUME"}, {"description", "MFA"}});
     ASSERT_TRUE(body.is_object());
@@ -83,7 +83,7 @@ TEST(rest_mock_registry_campaigns_get_uses_id_in_path) {
 TEST(rest_mock_registry_campaigns_update_uses_put) {
     auto client = mocktest::make_client();
     auto body = client.registry().campaigns.update(
-        "camp-2", {{"description", "Updated"}});
+        "camp-2", {.extras = {{"description", "Updated"}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     // Python parity: PUT, not PATCH.
@@ -96,7 +96,7 @@ TEST(rest_mock_registry_campaigns_update_uses_put) {
 
 TEST(rest_mock_registry_campaigns_list_numbers_uses_numbers_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.registry().campaigns.list_numbers("camp-3");
+    auto body = client.registry().campaigns.listNumbers("camp-3");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -107,9 +107,9 @@ TEST(rest_mock_registry_campaigns_list_numbers_uses_numbers_subpath) {
 
 TEST(rest_mock_registry_campaigns_create_order_posts_to_orders_subpath) {
     auto client = mocktest::make_client();
-    auto body = client.registry().campaigns.create_order(
+    auto body = client.registry().campaigns.createOrder(
         "camp-4",
-        {{"numbers", json::array({"pn-1", "pn-2"})}});
+        {.extras = {{"numbers", json::array({"pn-1", "pn-2"})}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));

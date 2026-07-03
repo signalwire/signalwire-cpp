@@ -818,6 +818,20 @@ def collect(
     # less-precise type representation, not a different one.
     _project_callable_shape(out_modules)
 
+    # REST SIDECAR unfold + base-verb projection (item B adoption). The
+    # generated REST resource methods take an idiomatic options-struct param
+    # (``const CreateParams& p``) that libclang reflects as ONE opaque param,
+    # and INHERIT their base CRUD verbs (list/get/create/update/delete_) from
+    # base_resource.hpp bases — which libclang does NOT surface on the subclass.
+    # The generator emits the canonical per-method param records into
+    # ``rest_signatures.json`` (keyed ``Class::method``), matching the Python
+    # oracle's per-class *declared*-method recording (griffe records only the
+    # subclass's own overrides, not inherited base methods). Projecting every
+    # sidecar record onto its generated class handles BOTH the typed-param
+    # unfold AND the base-verb presence in one pass. Idiom via emit+sidecar,
+    # never omission (RULES §2, L10).
+    _apply_rest_sidecar(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -838,6 +852,120 @@ def collect(
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
     }, failures
+
+
+def _load_rest_sidecar() -> dict:
+    """Load the generator's rest_signatures.json (Class::method -> [records])."""
+    sc = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+          / "generated" / "rest_signatures.json")
+    if not sc.is_file():
+        return {}
+    return json.loads(sc.read_text()).get("methods", {})
+
+
+def _generated_class_modules() -> dict[str, str]:
+    """Map each generated resource/container CLASS -> its python module, from
+    generated_surface_map.json (the same source enumerate_surface projects)."""
+    smap = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+            / "generated" / "generated_surface_map.json")
+    if not smap.is_file():
+        return {}
+    return json.loads(smap.read_text())
+
+
+def _generated_container_members() -> dict[str, list[str]]:
+    """Parse the generated namespace-container headers for their public resource
+    member fields (FabricNamespace { AiAgents ai_agents; ... }) so the client
+    tree's accessor surface can be projected onto the oracle shape."""
+    gen_dir = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+               / "generated")
+    out: dict[str, list[str]] = {}
+    import re as _re
+    for hdr in gen_dir.glob("*Namespace.hpp"):
+        src = hdr.read_text()
+        m = _re.search(r"class (\w+Namespace)\s*\{(.*?)\n\};", src, _re.S)
+        if not m:
+            continue
+        cls, body = m.group(1), m.group(2)
+        # public data members: ``<TypeName> <member>;`` at 2-space indent.
+        members = _re.findall(r"^\s{2}([A-Z]\w+)\s+([a-z_]\w*);", body, _re.M)
+        out[cls] = [mem for _t, mem in members]
+    return out
+
+
+def _apply_rest_sidecar(out_modules: dict) -> None:
+    """Project the generator's per-method param records onto each generated REST
+    resource class, unfolding the reflected options-struct param into the
+    oracle's exploded keyword params AND materialising inherited base CRUD verbs
+    the C++ subclass doesn't declare (list/get/create/update/delete_).
+
+    Each sidecar record is ALREADY in the oracle's param shape
+    (``{name, kind, type, required}``); the method's params become
+    ``[{self}] + records`` and its return is ``any`` (the methods all return
+    ``json``, which the diff treats as compatible with the oracle's typed
+    ``*Response`` classes). The C++ sidecar key uses the native method spelling
+    (``listAddresses``/``delete_``); canonicalise it exactly as ``collect`` does
+    (camel_to_snake + _METHOD_RENAMES) so it lands on the oracle name.
+    """
+    sidecar = _load_rest_sidecar()
+    if not sidecar:
+        return
+    class_mod = _generated_class_modules()
+
+    # Group sidecar entries by class.
+    by_class: dict[str, dict[str, list]] = {}
+    for key, records in sidecar.items():
+        if "::" not in key:
+            continue
+        cls, native = key.split("::", 1)
+        canon = _METHOD_RENAMES.get(camel_to_snake(native), camel_to_snake(native))
+        by_class.setdefault(cls, {})[canon] = records
+
+    for cls, methods in by_class.items():
+        mod = class_mod.get(cls)
+        if mod is None:
+            # A generated resource with a sidecar entry MUST be in the surface
+            # map; a miss means the map is stale — fail loud rather than drift.
+            raise SystemExit(
+                f"enumerate_signatures: sidecar class {cls!r} not in "
+                f"generated_surface_map.json (regenerate the REST layer)")
+        out_modules.setdefault(mod, {"classes": {}})
+        cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
+        for canon, records in methods.items():
+            cls_entry["methods"][canon] = {
+                "params": [{"name": "self", "kind": "self"}] + [dict(r) for r in records],
+                "returns": "any",
+            }
+        # Ensure a constructor is present (POD resource: implicit default ctor).
+        cls_entry["methods"].setdefault("__init__", {
+            "params": [{"name": "self", "kind": "self"}],
+            "returns": "void",
+        })
+
+    # Client-tree container accessors: the Python oracle records each namespace
+    # container's resource members (FabricNamespace.ai_agents, ...) as zero-arg
+    # accessor methods; the C++ containers expose them as public MEMBER FIELDS,
+    # which libclang does not surface. Project each container's fields as
+    # zero-arg methods (returns ``any`` — the diff treats it as compatible with
+    # the oracle's ``class:<Resource>`` return).
+    for cls, members in _generated_container_members().items():
+        mod = class_mod.get(cls)
+        if mod is None:
+            raise SystemExit(
+                f"enumerate_signatures: container {cls!r} not in "
+                f"generated_surface_map.json (regenerate the REST layer)")
+        out_modules.setdefault(mod, {"classes": {}})
+        cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
+        for member in members:
+            cls_entry["methods"].setdefault(member, {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "any",
+            })
+        cls_entry["methods"].setdefault("__init__", {
+            "params": [{"name": "self", "kind": "self"},
+                       {"name": "http", "type": "any", "required": True}],
+            "returns": "void",
+        })
 
 
 def _project_kwargs_shape(out_modules: dict) -> None:

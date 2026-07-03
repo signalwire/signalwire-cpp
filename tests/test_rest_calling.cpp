@@ -13,8 +13,11 @@ TEST(rest_calling_namespace_accessible) {
 TEST(rest_calling_has_client_ref) {
     RestClient client("example.signalwire.com", "proj", "tok");
     auto& calling = client.calling();
-    // The calling namespace has a reference to the underlying HTTP client
-    ASSERT_EQ(calling.client.base_url(), "https://example.signalwire.com");
+    (void)calling;
+    // The calling namespace is wired to the underlying HTTP client at the
+    // expected base URL (the generated Calling holds the HttpClient privately;
+    // the client's base URL is the observable contract).
+    ASSERT_EQ(client.http_client().base_url(), "https://example.signalwire.com");
     return true;
 }
 

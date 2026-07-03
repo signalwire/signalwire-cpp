@@ -12,7 +12,7 @@ RestClient::RestClient(const std::string& space, const std::string& project_id,
     : project_id_(project_id) {
   std::string base_url = "https://" + space;
   client_ = std::make_unique<HttpClient>(base_url, project_id, token);
-  init_namespaces();
+  init_tree();
 }
 
 RestClient RestClient::from_env() {
@@ -36,31 +36,8 @@ RestClient RestClient::with_base_url(const std::string& base_url, const std::str
   RestClient rc("placeholder", project_id, token);
   rc.client_ = std::make_unique<HttpClient>(base_url, project_id, token);
   rc.project_id_ = project_id;
-  rc.init_namespaces();
+  rc.init_tree();
   return rc;
-}
-
-void RestClient::init_namespaces() {
-  fabric_ = std::make_unique<FabricNamespace>(*client_);
-  calling_ = std::make_unique<CallingNamespace>(*client_);
-  phone_numbers_ = std::make_unique<PhoneNumbersNamespace>(*client_);
-  datasphere_ = std::make_unique<DatasphereNamespace>(*client_);
-  video_ = std::make_unique<VideoNamespace>(*client_);
-  addresses_ = std::make_unique<AddressesNamespace>(*client_);
-  queues_ = std::make_unique<QueuesNamespace>(*client_);
-  recordings_ = std::make_unique<RecordingsNamespace>(*client_);
-  number_groups_ = std::make_unique<NumberGroupsNamespace>(*client_);
-  verified_callers_ = std::make_unique<VerifiedCallersNamespace>(*client_);
-  sip_profile_ = std::make_unique<SipProfileNamespace>(*client_);
-  lookup_ = std::make_unique<LookupNamespace>(*client_);
-  short_codes_ = std::make_unique<ShortCodesNamespace>(*client_);
-  imported_numbers_ = std::make_unique<ImportedNumbersNamespace>(*client_);
-  mfa_ = std::make_unique<MFANamespace>(*client_);
-  registry_ = std::make_unique<RegistryNamespace>(*client_);
-  logs_ = std::make_unique<LogsNamespace>(*client_);
-  project_ = std::make_unique<ProjectNamespace>(*client_);
-  pubsub_ = std::make_unique<PubSubNamespace>(*client_);
-  chat_ = std::make_unique<ChatNamespace>(*client_);
 }
 
 }  // namespace rest

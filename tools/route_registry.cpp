@@ -148,15 +148,15 @@ CaptureServer* g_srv = nullptr;
 // the source text of `expr`. A single accessor call almost always dispatches
 // exactly one request; if it dispatches more than one (none do today) each is
 // recorded as a separate plan entry sharing the via/call.
-#define CALL(via_str, expr)                                                      \
-  do {                                                                           \
-    size_t before = g_srv->size();                                               \
-    (void)(expr);                                                                \
-    size_t after = g_srv->size();                                                \
-    for (size_t i = before; i < after; ++i) {                                    \
-      auto mp = g_srv->at(i);                                                     \
+#define CALL(via_str, expr)                                                         \
+  do {                                                                              \
+    size_t before = g_srv->size();                                                  \
+    (void)(expr);                                                                   \
+    size_t after = g_srv->size();                                                   \
+    for (size_t i = before; i < after; ++i) {                                       \
+      auto mp = g_srv->at(i);                                                       \
       g_plan.push_back(PlanEntry{via_str, #expr, mp.first, templatize(mp.second)}); \
-    }                                                                            \
+    }                                                                               \
   } while (0)
 
 // Invoke every public REST method once through the GENERATED client surface so
@@ -181,8 +181,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.fabric().tokens.createInviteToken({.address_id = SENTINEL}));
   CALL("fabric.tokens.createGuestToken",
        c.fabric().tokens.createGuestToken({.allowed_addresses = json::array()}));
-  CALL("fabric.tokens.createEmbedToken",
-       c.fabric().tokens.createEmbedToken({.token = SENTINEL}));
+  CALL("fabric.tokens.createEmbedToken", c.fabric().tokens.createEmbedToken({.token = SENTINEL}));
 
   // ---- fabric CRUD + list_addresses resources (base create(json); explicit
   // per-resource so CALL() captures a usable call literal, not a lambda arg) ----
@@ -197,13 +196,15 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.relay_applications.get", c.fabric().relay_applications.get(id));
   CALL("fabric.relay_applications.update", c.fabric().relay_applications.update(id, body));
   CALL("fabric.relay_applications.delete_", c.fabric().relay_applications.delete_(id));
-  CALL("fabric.relay_applications.list_addresses", c.fabric().relay_applications.list_addresses(id, q));
+  CALL("fabric.relay_applications.list_addresses",
+       c.fabric().relay_applications.list_addresses(id, q));
   CALL("fabric.freeswitch_connectors.list", c.fabric().freeswitch_connectors.list(q));
   CALL("fabric.freeswitch_connectors.create", c.fabric().freeswitch_connectors.create(body));
   CALL("fabric.freeswitch_connectors.get", c.fabric().freeswitch_connectors.get(id));
   CALL("fabric.freeswitch_connectors.update", c.fabric().freeswitch_connectors.update(id, body));
   CALL("fabric.freeswitch_connectors.delete_", c.fabric().freeswitch_connectors.delete_(id));
-  CALL("fabric.freeswitch_connectors.list_addresses", c.fabric().freeswitch_connectors.list_addresses(id, q));
+  CALL("fabric.freeswitch_connectors.list_addresses",
+       c.fabric().freeswitch_connectors.list_addresses(id, q));
   CALL("fabric.sip_endpoints.list", c.fabric().sip_endpoints.list(q));
   CALL("fabric.sip_endpoints.create", c.fabric().sip_endpoints.create(body));
   CALL("fabric.sip_endpoints.get", c.fabric().sip_endpoints.get(id));
@@ -282,8 +283,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.cxml_applications.get", c.fabric().cxml_applications.get(id));
   CALL("fabric.cxml_applications.update", c.fabric().cxml_applications.update(id, {}));
   CALL("fabric.cxml_applications.delete_", c.fabric().cxml_applications.delete_(id));
-  CALL("fabric.cxml_applications.listAddresses",
-       c.fabric().cxml_applications.listAddresses(id, q));
+  CALL("fabric.cxml_applications.listAddresses", c.fabric().cxml_applications.listAddresses(id, q));
   skipped.emplace_back("fabric.cxml_applications.create",
                        "no create route — cXML apps cannot be created via this API (BaseResource)");
 
@@ -294,8 +294,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.resources.listAddresses", c.fabric().resources.listAddresses(id, q));
   CALL("fabric.resources.assignDomainApplication",
        c.fabric().resources.assignDomainApplication(id, {.domain_application_id = SENTINEL}));
-  CALL("fabric.resources.assignPhoneRoute",
-       c.fabric().resources.assignPhoneRoute(id, {.phone_route_id = SENTINEL, .handler = SENTINEL}));
+  CALL(
+      "fabric.resources.assignPhoneRoute",
+      c.fabric().resources.assignPhoneRoute(id, {.phone_route_id = SENTINEL, .handler = SENTINEL}));
 
   // fabric addresses (list/get only).
   CALL("fabric.addresses.list", c.fabric().addresses.list(q));
@@ -355,8 +356,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("datasphere.documents.get", c.datasphere().documents.get(id));
   CALL("datasphere.documents.update", c.datasphere().documents.update(id, body));
   CALL("datasphere.documents.delete_", c.datasphere().documents.delete_(id));
-  CALL("datasphere.documents.search",
-       c.datasphere().documents.search({.query_string = SENTINEL}));
+  CALL("datasphere.documents.search", c.datasphere().documents.search({.query_string = SENTINEL}));
   CALL("datasphere.documents.listChunks", c.datasphere().documents.listChunks(id, q));
   CALL("datasphere.documents.getChunk", c.datasphere().documents.getChunk(id, id));
   CALL("datasphere.documents.deleteChunk", c.datasphere().documents.deleteChunk(id, id));
@@ -437,8 +437,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("registry.campaigns.update", c.registry().campaigns.update(id, {}));
   CALL("registry.campaigns.listNumbers", c.registry().campaigns.listNumbers(id, q));
   CALL("registry.campaigns.listOrders", c.registry().campaigns.listOrders(id, q));
-  CALL("registry.campaigns.createOrder",
-       c.registry().campaigns.createOrder(id, {}));
+  CALL("registry.campaigns.createOrder", c.registry().campaigns.createOrder(id, {}));
   CALL("registry.orders.get", c.registry().orders.get(id));
   CALL("registry.numbers.delete_", c.registry().numbers.delete_(id));
 
@@ -474,10 +473,15 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
 
   // ---- top-level narrow resources ----
   CALL("addresses.list", c.addresses().list(q));
-  CALL("addresses.create", c.addresses().create(
-       {.label = SENTINEL, .country = SENTINEL, .first_name = SENTINEL, .last_name = SENTINEL,
-        .street_number = SENTINEL, .street_name = SENTINEL, .city = SENTINEL, .state = SENTINEL,
-        .postal_code = SENTINEL}));
+  CALL("addresses.create", c.addresses().create({.label = SENTINEL,
+                                                 .country = SENTINEL,
+                                                 .first_name = SENTINEL,
+                                                 .last_name = SENTINEL,
+                                                 .street_number = SENTINEL,
+                                                 .street_name = SENTINEL,
+                                                 .city = SENTINEL,
+                                                 .state = SENTINEL,
+                                                 .postal_code = SENTINEL}));
   CALL("addresses.get", c.addresses().get(id));
   CALL("addresses.delete_", c.addresses().delete_(id));
   CALL("recordings.list", c.recordings().list(q));

@@ -4,6 +4,14 @@
 # Same script invoked locally (`bash scripts/run-ci.sh`) AND by the
 # GitHub Actions workflow. No drift between local and CI behavior.
 #
+# Canonical FMT/LINT/TEST entry points (self-bootstrapping, run from any CWD):
+#   * FMT   -> scripts/run-format.sh  (clang-format -i / --dry-run -Werror)
+#   * LINT  -> scripts/run-lint.sh    (clang-tidy curated set)
+#   * TEST  -> scripts/run-tests.sh   (cmake build + run_tests; host mode)
+# All three (and this run-ci) source scripts/_env.sh for the clang-18 (llvm@18)
+# PATH bootstrap. Do NOT invoke clang-format/clang-tidy/run_tests directly —
+# these scripts are the single documented entry points.
+#
 # Gates (in order, fail-fast):
 #   1. cmake --build build --target run_tests emit_corpus + ./build/run_tests
 #                                         — language test runner
@@ -55,6 +63,20 @@ set -o pipefail
 
 PORT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT_NAME="signalwire-cpp"
+
+# Shared tool-environment bootstrap — the SAME _env.sh the canonical
+# run-format.sh / run-lint.sh / run-tests.sh source. It prepends clang-18
+# (llvm@18) to PATH so the FMT gate's clang-format, the LINT gate's clang-tidy
+# fallback, AND the Python REST/type generators (which shell to clang-format via
+# scripts/_cpp_fmt.py) all resolve clang-18 no matter the caller's shell, and it
+# fails loud if clang-format 18 is unresolvable. _env.sh runs with `set -e`; run-ci
+# manages gate exit codes manually via run_gate, so restore run-ci's own shell
+# options (-u -o pipefail, NO -e) immediately after sourcing.
+# shellcheck source=scripts/_env.sh
+source "$PORT_ROOT/scripts/_env.sh"
+set +e
+set -u
+set -o pipefail
 
 # --- OpenSSL-3.0 build routing ------------------------------------------------
 SWCPP_CONTAINER="${SWCPP_CONTAINER:-swcpp}"
@@ -176,7 +198,14 @@ test_gate() {
                 echo "[BOOTSTRAP] cmake -S . -B build (initial configure)"
                 cmake -S . -B build || return 1
             fi
-            cmake --build build --target run_tests emit_corpus emit_skills -j && ./build/run_tests
+            # Build the two downstream-gate dump binaries (emit_corpus for
+            # EMISSION, emit_skills for SKILL-CONTRACT) here so those gates find
+            # them ready, then delegate the run_tests build+run to the CANONICAL
+            # scripts/run-tests.sh (self-bootstrapping, host mode). run-tests.sh
+            # rebuilds run_tests (a near-no-op since it was just built) and runs
+            # the full suite.
+            cmake --build build --target emit_corpus emit_skills -j || return 1
+            bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
@@ -458,28 +487,12 @@ spec_parity_gate() {
 # json.hpp, nlohmann/) and the FetchContent IXWebSocket tree are never touched.
 # clang-format runs on the host regardless of BUILD_MODE (no compiler/SDK
 # needed — it only parses tokens).
-fmt_sources() {
-    find src include tools -type f \
-        \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' \) \
-        2>/dev/null
-}
+# The FMT gate now delegates to the CANONICAL scripts/run-format.sh (single
+# entry point, self-bootstrapping via _env.sh). LOCAL (CI unset) applies in
+# place; CI ($CI set) passes --check for the read-only dry-run. Same source
+# scope + dual-mode behavior as before, just no longer inlined here.
 fmt_gate() {
-    local files
-    files="$(fmt_sources)"
-    [ -n "$files" ] || { echo "no C++ sources found to format" >&2; return 1; }
-    if [ -n "${CI:-}" ]; then
-        # shellcheck disable=SC2086
-        clang-format --dry-run -Werror $files
-    else
-        # shellcheck disable=SC2086
-        clang-format -i $files
-        if ! git diff --quiet 2>/dev/null; then
-            echo "    (FMT auto-applied formatting to your working tree — review & stage)"
-        fi
-        # A residual issue -i can't fix must still fail the gate.
-        # shellcheck disable=SC2086
-        clang-format --dry-run -Werror $files
-    fi
+    bash "$PORT_ROOT/scripts/run-format.sh" ${CI:+--check}
 }
 
 # LINT gate: the C++ lint gate (clang-tidy, curated check set in .clang-tidy
@@ -501,93 +514,12 @@ fmt_gate() {
 # generates a dedicated `build-tidy` compile_commands using THAT toolchain's
 # matching clang so headers always resolve, reusing it if already present.
 # $SWCPP_TIDY_BUILD overrides the build dir.
-resolve_clang_tidy() {
-    if [ -n "${SWCPP_CLANG_TIDY:-}" ]; then echo "$SWCPP_CLANG_TIDY"; return 0; fi
-    local c
-    for c in \
-        /opt/homebrew/opt/llvm/bin/clang-tidy \
-        /usr/local/opt/llvm/bin/clang-tidy \
-        clang-tidy; do
-        if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then echo "$c"; return 0; fi
-    done
-    return 1
-}
+# The LINT gate now delegates to the CANONICAL scripts/run-lint.sh (single entry
+# point, self-bootstrapping via _env.sh). The clang-tidy resolution (newest tidy
+# for macOS-SDK parse / $SWCPP_CLANG_TIDY override) + the dedicated build-tidy
+# compile-DB generation now live in that script; run-ci just invokes it.
 lint_gate() {
-    local ct tidy_build cxx cc
-    ct="$(resolve_clang_tidy)" || { echo "no clang-tidy found" >&2; return 1; }
-    tidy_build="${SWCPP_TIDY_BUILD:-}"
-    if [ -z "$tidy_build" ]; then
-        # clang-tidy must read a CLANG-generated compile DB. Reuse an existing
-        # build-tidy (clang-built by construction below); otherwise generate one
-        # with the clang matching the chosen clang-tidy. Do NOT fall back to the
-        # plain build/ dir — the TEST gate builds that with g++ (CI) whose
-        # compile_commands carries g++-specific flags + system-header paths that
-        # clang-tidy can't parse as C++17 (it falls back to a pre-C++17 parse,
-        # yielding bogus "no template named 'optional'" / "decomposition
-        # declarations are a C++17 extension" errors). Always use clang's DB.
-        if [ -f build-tidy/compile_commands.json ]; then
-            tidy_build="build-tidy"
-        else
-            cxx="$(dirname "$ct")/clang++"; cc="$(dirname "$ct")/clang"
-            # When clang-tidy resolved to a bare name on PATH, dirname is "." and
-            # the sibling clang++/clang may not exist there — fall back to the
-            # PATH-resolved clang++/clang so CMake still gets a clang compiler.
-            [ -x "$cxx" ] || cxx="$(command -v clang++ || true)"
-            [ -x "$cc" ] || cc="$(command -v clang || true)"
-            local cmake_args=(-S . -B build-tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
-            [ -n "$cxx" ] && cmake_args+=(-DCMAKE_CXX_COMPILER="$cxx")
-            [ -n "$cc" ] && cmake_args+=(-DCMAKE_C_COMPILER="$cc")
-            cmake "${cmake_args[@]}" >&2 || return 1
-            tidy_build="build-tidy"
-        fi
-    fi
-    local files
-    files="$(find src include -name '*.cpp')"
-    [ -n "$files" ] || { echo "no C++ sources found to lint" >&2; return 1; }
-
-    # clang-tidy parallelizes trivially per-TU but the single-invocation form
-    # above runs every TU SERIALLY — historically ~68% of the whole CI gate run.
-    # Fan the SAME checks / config / scope / zero-findings bar across all cores.
-    # IDENTICAL behavior, only the parallelism changes:
-    #   * same compile DB ($tidy_build), same --header-filter, same .clang-tidy
-    #     (WarningsAsErrors:'*' => any finding is a nonzero-exit error),
-    #   * same source set (the `find src include -name '*.cpp'` list); the files
-    #     are passed to run-clang-tidy as path regexes so only those 55 TUs from
-    #     the compile DB are analysed (NOT the test/example TUs it also contains).
-    local jobs
-    jobs="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)"
-
-    # LLVM's official driver reads the same -p compile DB, applies the repo
-    # .clang-tidy, and fans TUs across -j cores. It is a SEPARATE script that
-    # internally shells out to a `clang-tidy` binary; we MUST force it to use the
-    # SAME resolved $ct (-clang-tidy-binary) so the macOS/version handling in
-    # resolve_clang_tidy() still applies and a DIFFERENT system clang-tidy can't
-    # sneak in (which would resurface the libc++ parse problems). Look for it as
-    # a sibling of the resolved $ct FIRST (same toolchain), then on PATH.
-    local rct ctdir
-    ctdir="$(dirname "$ct")"
-    rct=""
-    if [ -x "$ctdir/run-clang-tidy" ]; then rct="$ctdir/run-clang-tidy"
-    elif [ -x "$ctdir/run-clang-tidy.py" ]; then rct="$ctdir/run-clang-tidy.py"
-    elif command -v run-clang-tidy >/dev/null 2>&1; then rct="run-clang-tidy"
-    elif command -v run-clang-tidy.py >/dev/null 2>&1; then rct="run-clang-tidy.py"
-    fi
-
-    if [ -n "$rct" ]; then
-        # shellcheck disable=SC2086
-        "$rct" -p "$tidy_build" -j "$jobs" -quiet \
-            -clang-tidy-binary "$ct" \
-            -header-filter='signalwire-cpp/(src|include)/' \
-            $files
-        return $?
-    fi
-
-    # Robust fallback: parallelize the resolved $ct itself with xargs -P, same
-    # binary / flags / header-filter. xargs returns 123 if ANY child exited
-    # nonzero, so WarningsAsErrors (a finding => clang-tidy nonzero) still fails
-    # the gate. One TU per process (-n1) to match the single-file behavior.
-    echo "$files" | tr '\n' '\0' | xargs -0 -P "$jobs" -n1 \
-        "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet
+    bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)

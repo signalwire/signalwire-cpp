@@ -296,8 +296,21 @@ Guides are also available in the [`docs/`](docs/) directory:
 
 ## Testing
 
+Test, lint, and format go through the canonical self-bootstrapping scripts under
+`scripts/` — the single entry points. They resolve the C++ toolchain (clang-18 /
+llvm@18 for clang-format & clang-tidy) themselves and run from any directory:
+
 ```bash
-# Build and run the test suite
+bash scripts/run-tests.sh            # build + run the full test suite
+bash scripts/run-tests.sh agent      # run a subset (filter passed to run_tests)
+bash scripts/run-format.sh           # format the tree in place (clang-format -i)
+bash scripts/run-format.sh --check   # verify-only formatting check (CI mode)
+bash scripts/run-lint.sh             # clang-tidy curated lint set
+```
+
+You can still build + run directly:
+
+```bash
 mkdir build && cd build
 cmake .. && make -j$(nproc)
 ./run_tests
@@ -308,7 +321,8 @@ ctest -R relay
 ctest -R rest
 ```
 
-The test suite contains 258 tests covering all components.
+The test suite contains 258 tests covering all components. The full local-and-CI
+gate runner is `bash scripts/run-ci.sh`.
 
 ## License
 

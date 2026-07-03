@@ -10,19 +10,34 @@ REST client, and RELAY client stubs as a single static library.
 
 ## Build Commands
 
+Lint, format, and test go through the canonical scripts under `scripts/`. These
+are the single entry points — they self-bootstrap the C++ tool environment (they
+prepend clang-18 / llvm@18 to PATH, so clang-format / clang-tidy resolve to the
+pinned version regardless of the caller's shell) and run from ANY directory.
+Prefer them over calling `clang-format` / `clang-tidy` / `run_tests` directly.
+
 ```bash
-# Full build
+bash scripts/run-format.sh          # format the tree in place (clang-format -i)
+bash scripts/run-format.sh --check  # verify-only (clang-format --dry-run -Werror); CI FMT gate
+bash scripts/run-lint.sh            # lint (clang-tidy curated set, zero findings)
+bash scripts/run-tests.sh           # build + run the full test suite (run_tests)
+bash scripts/run-tests.sh rest_mock_ # run a subset (filter passed through to run_tests)
+```
+
+```bash
+# Direct cmake build (the scripts wrap this for tests)
 cd build && cmake .. && make -j$(nproc)
 
-# Run all 258 tests
-cd build && ./run_tests
-
-# Build from scratch
+# Build from scratch + run tests
 mkdir -p build && cd build && cmake .. && make -j$(nproc) && ./run_tests
 
 # Compile a standalone example (outside CMake)
 g++ -std=c++17 -I include -I deps examples/simple_agent.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o simple_agent
 ```
+
+The full local-and-CI gate runner is `bash scripts/run-ci.sh`; its FMT / LINT /
+TEST gates now delegate to the three scripts above (all four source
+`scripts/_env.sh` for the clang-18 PATH bootstrap).
 
 ## Architecture
 

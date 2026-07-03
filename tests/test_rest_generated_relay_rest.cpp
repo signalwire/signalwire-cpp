@@ -1426,7 +1426,7 @@ TEST(rest_mock_gen_verified_callers_get_err) {
 TEST(rest_mock_gen_addresses_create_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_address", 200, json::object());
-  (void)(client.addresses().create( {.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
+  (void)(client.addresses().create({.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -1444,7 +1444,7 @@ TEST(rest_mock_gen_addresses_create_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.addresses().create( {.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
+    (void)(client.addresses().create({.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

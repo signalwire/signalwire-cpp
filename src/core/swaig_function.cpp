@@ -29,7 +29,7 @@ SWAIGFunction::SWAIGFunction(std::string name, SwaigFunctionHandler handler,
       secure_(secure),
       fillers_(std::move(fillers)),
       wait_file_(std::move(wait_file)),
-      wait_file_loops_(std::move(wait_file_loops)),
+      wait_file_loops_(wait_file_loops),
       webhook_url_(std::move(webhook_url)),
       required_(std::move(required)),
       is_typed_handler_(is_typed_handler),
@@ -119,12 +119,18 @@ ArgsValidationResult SWAIGFunction::validate_args(const json& args) const {
 
   // Enforce each declared property's JSON `type`.
   auto type_matches = [](const std::string& type, const json& value) -> bool {
-    if (type == "string") return value.is_string();
-    if (type == "integer") return value.is_number_integer();
-    if (type == "number") return value.is_number();
-    if (type == "boolean") return value.is_boolean();
-    if (type == "array") return value.is_array();
-    if (type == "object") return value.is_object();
+    if (type == "string") { return value.is_string();
+}
+    if (type == "integer") { return value.is_number_integer();
+}
+    if (type == "number") { return value.is_number();
+}
+    if (type == "boolean") { return value.is_boolean();
+}
+    if (type == "array") { return value.is_array();
+}
+    if (type == "object") { return value.is_object();
+}
     return true;  // unknown type: nothing to enforce
   };
 

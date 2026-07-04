@@ -40,9 +40,9 @@ struct RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct CallStateEvent : public RelayEvent {
-  std::string call_state = "";
-  std::string end_reason = "";
-  std::string direction = "";
+  std::string call_state;
+  std::string end_reason;
+  std::string direction;
   json device = json::object();
   [[nodiscard]] static CallStateEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -62,14 +62,14 @@ struct CallStateEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct CallReceiveEvent : public RelayEvent {
-  std::string call_state = "";
-  std::string direction = "";
+  std::string call_state;
+  std::string direction;
   json device = json::object();
-  std::string node_id = "";
-  std::string project_id = "";
-  std::string context = "";
-  std::string segment_id = "";
-  std::string tag = "";
+  std::string node_id;
+  std::string project_id;
+  std::string context;
+  std::string segment_id;
+  std::string tag;
   [[nodiscard]] static CallReceiveEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     CallReceiveEvent e;
@@ -92,8 +92,8 @@ struct CallReceiveEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct PlayEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
+  std::string control_id;
+  std::string state;
   [[nodiscard]] static PlayEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     PlayEvent e;
@@ -110,8 +110,8 @@ struct PlayEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct RecordEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
+  std::string control_id;
+  std::string state;
   [[nodiscard]] static RecordEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     RecordEvent e;
@@ -128,9 +128,9 @@ struct RecordEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct CollectEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
-  std::string result = "";
+  std::string control_id;
+  std::string state;
+  std::string result;
   bool final = false;
   [[nodiscard]] static CollectEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -150,7 +150,7 @@ struct CollectEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct ConnectEvent : public RelayEvent {
-  std::string connect_state = "";
+  std::string connect_state;
   json peer = json::object();
   [[nodiscard]] static ConnectEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -168,7 +168,7 @@ struct ConnectEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct DetectEvent : public RelayEvent {
-  std::string control_id = "";
+  std::string control_id;
   json detect = json::object();
   [[nodiscard]] static DetectEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -186,7 +186,7 @@ struct DetectEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct FaxEvent : public RelayEvent {
-  std::string control_id = "";
+  std::string control_id;
   json fax = json::object();
   [[nodiscard]] static FaxEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -204,8 +204,8 @@ struct FaxEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct TapEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
+  std::string control_id;
+  std::string state;
   json tap = json::object();
   json device = json::object();
   [[nodiscard]] static TapEvent from_payload(const json& payload) {
@@ -226,10 +226,10 @@ struct TapEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct StreamEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
-  std::string url = "";
-  std::string name = "";
+  std::string control_id;
+  std::string state;
+  std::string url;
+  std::string name;
   [[nodiscard]] static StreamEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     StreamEvent e;
@@ -248,8 +248,8 @@ struct StreamEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct SendDigitsEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
+  std::string control_id;
+  std::string state;
   [[nodiscard]] static SendDigitsEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     SendDigitsEvent e;
@@ -266,8 +266,8 @@ struct SendDigitsEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct DialEvent : public RelayEvent {
-  std::string tag = "";
-  std::string dial_state = "";
+  std::string tag;
+  std::string dial_state;
   json call = json::object();
   [[nodiscard]] static DialEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -286,8 +286,8 @@ struct DialEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct ReferEvent : public RelayEvent {
-  std::string state = "";
-  std::string sip_refer_to = "";
+  std::string state;
+  std::string sip_refer_to;
   long sip_refer_response_code = 0;
   long sip_notify_response_code = 0;
   [[nodiscard]] static ReferEvent from_payload(const json& payload) {
@@ -324,8 +324,8 @@ struct DenoiseEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct PayEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
+  std::string control_id;
+  std::string state;
   [[nodiscard]] static PayEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     PayEvent e;
@@ -342,10 +342,10 @@ struct PayEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct QueueEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string status = "";
-  std::string queue_id = "";
-  std::string queue_name = "";
+  std::string control_id;
+  std::string status;
+  std::string queue_id;
+  std::string queue_name;
   long position = 0;
   long size = 0;
   [[nodiscard]] static QueueEvent from_payload(const json& payload) {
@@ -368,7 +368,7 @@ struct QueueEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct EchoEvent : public RelayEvent {
-  std::string state = "";
+  std::string state;
   [[nodiscard]] static EchoEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     EchoEvent e;
@@ -384,10 +384,10 @@ struct EchoEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct TranscribeEvent : public RelayEvent {
-  std::string control_id = "";
-  std::string state = "";
-  std::string url = "";
-  std::string recording_id = "";
+  std::string control_id;
+  std::string state;
+  std::string url;
+  std::string recording_id;
   long duration = 0;
   long size = 0;
   [[nodiscard]] static TranscribeEvent from_payload(const json& payload) {
@@ -410,7 +410,7 @@ struct TranscribeEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct HoldEvent : public RelayEvent {
-  std::string state = "";
+  std::string state;
   [[nodiscard]] static HoldEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     HoldEvent e;
@@ -426,9 +426,9 @@ struct HoldEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct ConferenceEvent : public RelayEvent {
-  std::string conference_id = "";
-  std::string name = "";
-  std::string status = "";
+  std::string conference_id;
+  std::string name;
+  std::string status;
   [[nodiscard]] static ConferenceEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     ConferenceEvent e;
@@ -447,7 +447,7 @@ struct ConferenceEvent : public RelayEvent {
 /// Typed event for the matching signalwire.event type.
 struct CallingErrorEvent : public RelayEvent {
   long code = 0;
-  std::string message = "";
+  std::string message;
   [[nodiscard]] static CallingErrorEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     CallingErrorEvent e;
@@ -464,15 +464,15 @@ struct CallingErrorEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct MessageReceiveEvent : public RelayEvent {
-  std::string message_id = "";
-  std::string context = "";
-  std::string direction = "";
-  std::string from_number = "";
-  std::string to_number = "";
-  std::string body = "";
+  std::string message_id;
+  std::string context;
+  std::string direction;
+  std::string from_number;
+  std::string to_number;
+  std::string body;
   json media = json::object();
   json segments = json::object();
-  std::string message_state = "";
+  std::string message_state;
   json tags = json::object();
   [[nodiscard]] static MessageReceiveEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -498,16 +498,16 @@ struct MessageReceiveEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct MessageStateEvent : public RelayEvent {
-  std::string message_id = "";
-  std::string context = "";
-  std::string direction = "";
-  std::string from_number = "";
-  std::string to_number = "";
-  std::string body = "";
+  std::string message_id;
+  std::string context;
+  std::string direction;
+  std::string from_number;
+  std::string to_number;
+  std::string body;
   json media = json::object();
   json segments = json::object();
-  std::string message_state = "";
-  std::string reason = "";
+  std::string message_state;
+  std::string reason;
   json tags = json::object();
   [[nodiscard]] static MessageStateEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);

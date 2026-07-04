@@ -52,16 +52,26 @@ std::string file_name_of(const std::string& path) { return fs::path(path).filena
 // common defaults); unknown extensions fall back to octet-stream.
 std::string mime_type(const std::string& path) {
   const std::string ext = extension_of(path);
-  if (ext == ".html" || ext == ".htm") return "text/html";
-  if (ext == ".css") return "text/css";
-  if (ext == ".js") return "application/javascript";
-  if (ext == ".json") return "application/json";
-  if (ext == ".txt") return "text/plain";
-  if (ext == ".png") return "image/png";
-  if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
-  if (ext == ".gif") return "image/gif";
-  if (ext == ".svg") return "image/svg+xml";
-  if (ext == ".pdf") return "application/pdf";
+  if (ext == ".html" || ext == ".htm") { return "text/html";
+}
+  if (ext == ".css") { return "text/css";
+}
+  if (ext == ".js") { return "application/javascript";
+}
+  if (ext == ".json") { return "application/json";
+}
+  if (ext == ".txt") { return "text/plain";
+}
+  if (ext == ".png") { return "image/png";
+}
+  if (ext == ".jpg" || ext == ".jpeg") { return "image/jpeg";
+}
+  if (ext == ".gif") { return "image/gif";
+}
+  if (ext == ".svg") { return "image/svg+xml";
+}
+  if (ext == ".pdf") { return "application/pdf";
+}
   return "application/octet-stream";
 }
 

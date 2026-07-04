@@ -140,7 +140,7 @@ json ConfigLoader::substitute_string(const std::string& value) const {
   }
   if (is_all_digits(result)) {
     try {
-      return json(static_cast<long long>(std::stoll(result)));
+      return json(std::stoll(result));
     } catch (const std::exception&) {
       return json(result);
     }

@@ -52,26 +52,36 @@ std::string file_name_of(const std::string& path) { return fs::path(path).filena
 // common defaults); unknown extensions fall back to octet-stream.
 std::string mime_type(const std::string& path) {
   const std::string ext = extension_of(path);
-  if (ext == ".html" || ext == ".htm") { return "text/html";
-}
-  if (ext == ".css") { return "text/css";
-}
-  if (ext == ".js") { return "application/javascript";
-}
-  if (ext == ".json") { return "application/json";
-}
-  if (ext == ".txt") { return "text/plain";
-}
-  if (ext == ".png") { return "image/png";
-}
-  if (ext == ".jpg" || ext == ".jpeg") { return "image/jpeg";
-}
-  if (ext == ".gif") { return "image/gif";
-}
-  if (ext == ".svg") { return "image/svg+xml";
-}
-  if (ext == ".pdf") { return "application/pdf";
-}
+  if (ext == ".html" || ext == ".htm") {
+    return "text/html";
+  }
+  if (ext == ".css") {
+    return "text/css";
+  }
+  if (ext == ".js") {
+    return "application/javascript";
+  }
+  if (ext == ".json") {
+    return "application/json";
+  }
+  if (ext == ".txt") {
+    return "text/plain";
+  }
+  if (ext == ".png") {
+    return "image/png";
+  }
+  if (ext == ".jpg" || ext == ".jpeg") {
+    return "image/jpeg";
+  }
+  if (ext == ".gif") {
+    return "image/gif";
+  }
+  if (ext == ".svg") {
+    return "image/svg+xml";
+  }
+  if (ext == ".pdf") {
+    return "application/pdf";
+  }
   return "application/octet-stream";
 }
 
@@ -85,6 +95,9 @@ bool secure_compare(const std::string& a, const std::string& b) {
 
 }  // namespace
 
+// NOLINTNEXTLINE(performance-unnecessary-value-param) — config_file is a by-value
+// parity param mirroring the Python reference constructor; it is intentionally
+// accepted-and-ignored (see body), not passed through, so a const-ref buys nothing.
 WebService::WebService(int port, std::optional<std::map<std::string, std::string>> directories,
                        std::optional<std::pair<std::string, std::string>> basic_auth,
                        std::optional<std::string> config_file, bool enable_directory_browsing,
@@ -95,8 +108,9 @@ WebService::WebService(int port, std::optional<std::map<std::string, std::string
       basic_auth_(std::move(basic_auth)),
       enable_directory_browsing_(enable_directory_browsing),
       allowed_extensions_(std::move(allowed_extensions)),
-      blocked_extensions_(blocked_extensions.has_value() ? std::move(*blocked_extensions)
-                                                         : kDefaultBlockedExtensions),
+      // The ternary's common type with the const default is `const vector&`, which
+      // silently DROPS the move (binds const&& to the copy ctor). Move explicitly.
+      blocked_extensions_(std::move(blocked_extensions).value_or(kDefaultBlockedExtensions)),
       max_file_size_(max_file_size),
       enable_cors_(enable_cors) {
   // config_file is accepted for parity; SecurityConfig/ConfigLoader wiring is
@@ -188,125 +202,134 @@ void WebService::mount_directories() {
     const std::string pattern = route + R"((/.*)?)";
     const std::string route_copy = route;
     server_->Get(pattern, [this, route_copy](const httplib::Request& req, httplib::Response& res) {
-      // Basic-auth check.
-      if (basic_auth_.has_value()) {
-        const std::string& user = basic_auth_->first;
-        const std::string& pass = basic_auth_->second;
-        bool ok = false;
-        auto it = req.headers.find("Authorization");
-        if (it != req.headers.end() && it->second.rfind("Basic ", 0) == 0) {
-          std::string encoded = it->second.substr(6);
-          // Trim surrounding whitespace before decoding.
-          while (!encoded.empty() && std::isspace(static_cast<unsigned char>(encoded.front()))) {
-            encoded.erase(encoded.begin());
-          }
-          while (!encoded.empty() && std::isspace(static_cast<unsigned char>(encoded.back()))) {
-            encoded.pop_back();
-          }
-          const std::string decoded = signalwire::base64_decode(encoded);
-          auto colon = decoded.find(':');
-          if (colon != std::string::npos) {
-            ok = secure_compare(user, decoded.substr(0, colon)) &&
-                 secure_compare(pass, decoded.substr(colon + 1));
-          }
-        }
-        if (!ok) {
-          res.status = 401;
-          res.set_header("WWW-Authenticate", "Basic realm=\"SignalWire Web Service\"");
-          res.set_content("Authentication required", "text/plain");
-          return;
-        }
-      }
-
-      // The directory may have been removed after mounting.
-      auto dir_it = directories_.find(route_copy);
-      if (dir_it == directories_.end()) {
-        res.status = 404;
-        res.set_content("File not found", "text/plain");
-        return;
-      }
-      const std::string& directory = dir_it->second;
-
-      // Compute the path relative to the route.
-      std::string rel = req.path;
-      if (rel.rfind(route_copy, 0) == 0) {
-        rel = rel.substr(route_copy.size());
-      }
-      while (!rel.empty() && rel.front() == '/') {
-        rel.erase(rel.begin());
-      }
-
-      std::error_code ec;
-      const fs::path base = fs::weakly_canonical(fs::absolute(directory), ec);
-      fs::path full = fs::weakly_canonical(fs::absolute(fs::path(directory) / rel), ec);
-
-      // Path-traversal protection: full must be within base.
-      const std::string base_s = base.string();
-      const std::string full_s = full.string();
-      const bool within = full_s == base_s || full_s.rfind(base_s + "/", 0) == 0;
-      if (!within) {
-        res.status = 403;
-        res.set_content("Access denied", "text/plain");
-        return;
-      }
-
-      if (!fs::exists(full, ec) || ec) {
-        res.status = 404;
-        res.set_content("File not found", "text/plain");
-        return;
-      }
-
-      // Directory request. When browsing is enabled, emit a simple listing;
-      // otherwise serve index.html if present (Python/Java parity).
-      if (fs::is_directory(full, ec)) {
-        const fs::path index = full / "index.html";
-        if (fs::exists(index, ec) && file_allowed(index.string())) {
-          full = index;
-        } else if (enable_directory_browsing_) {
-          std::ostringstream listing;
-          listing << "<!DOCTYPE html><html><body><ul>";
-          std::error_code list_ec;
-          for (const auto& entry : fs::directory_iterator(full, list_ec)) {
-            const std::string name = entry.path().filename().string();
-            if (!name.empty() && name.front() == '.') {
-              continue;  // skip hidden files
+      // Handlers run on httplib's worker threads; an escaping exception (e.g.
+      // base64_decode on a malformed Authorization header) would terminate the
+      // thread. Contain any throw and surface it as a 500 instead.
+      try {
+        // Basic-auth check.
+        if (basic_auth_.has_value()) {
+          const std::string& user = basic_auth_->first;
+          const std::string& pass = basic_auth_->second;
+          bool ok = false;
+          auto it = req.headers.find("Authorization");
+          if (it != req.headers.end() && it->second.rfind("Basic ", 0) == 0) {
+            std::string encoded = it->second.substr(6);
+            // Trim surrounding whitespace before decoding.
+            while (!encoded.empty() && std::isspace(static_cast<unsigned char>(encoded.front()))) {
+              encoded.erase(encoded.begin());
             }
-            const std::string suffix = entry.is_directory() ? "/" : "";
-            listing << "<li><a href=\"" << name << suffix << "\">" << name << suffix << "</a></li>";
+            while (!encoded.empty() && std::isspace(static_cast<unsigned char>(encoded.back()))) {
+              encoded.pop_back();
+            }
+            const std::string decoded = signalwire::base64_decode(encoded);
+            auto colon = decoded.find(':');
+            if (colon != std::string::npos) {
+              ok = secure_compare(user, decoded.substr(0, colon)) &&
+                   secure_compare(pass, decoded.substr(colon + 1));
+            }
           }
-          listing << "</ul></body></html>";
-          if (enable_cors_) {
-            res.set_header("Access-Control-Allow-Origin", "*");
+          if (!ok) {
+            res.status = 401;
+            res.set_header("WWW-Authenticate", "Basic realm=\"SignalWire Web Service\"");
+            res.set_content("Authentication required", "text/plain");
+            return;
           }
-          res.set_content(listing.str(), "text/html");
-          return;
-        } else {
-          res.status = 403;
-          res.set_content("Directory browsing disabled", "text/plain");
+        }
+
+        // The directory may have been removed after mounting.
+        auto dir_it = directories_.find(route_copy);
+        if (dir_it == directories_.end()) {
+          res.status = 404;
+          res.set_content("File not found", "text/plain");
           return;
         }
-      }
+        const std::string& directory = dir_it->second;
 
-      if (!file_allowed(full.string())) {
-        res.status = 403;
-        res.set_content("File type not allowed", "text/plain");
-        return;
-      }
+        // Compute the path relative to the route.
+        std::string rel = req.path;
+        if (rel.rfind(route_copy, 0) == 0) {
+          rel = rel.substr(route_copy.size());
+        }
+        while (!rel.empty() && rel.front() == '/') {
+          rel.erase(rel.begin());
+        }
 
-      std::ifstream in(full.string(), std::ios::binary);
-      if (!in) {
-        res.status = 404;
-        res.set_content("File not found", "text/plain");
-        return;
+        std::error_code ec;
+        const fs::path base = fs::weakly_canonical(fs::absolute(directory), ec);
+        fs::path full = fs::weakly_canonical(fs::absolute(fs::path(directory) / rel), ec);
+
+        // Path-traversal protection: full must be within base.
+        const std::string base_s = base.string();
+        const std::string full_s = full.string();
+        const bool within = full_s == base_s || full_s.rfind(base_s + "/", 0) == 0;
+        if (!within) {
+          res.status = 403;
+          res.set_content("Access denied", "text/plain");
+          return;
+        }
+
+        if (!fs::exists(full, ec) || ec) {
+          res.status = 404;
+          res.set_content("File not found", "text/plain");
+          return;
+        }
+
+        // Directory request. When browsing is enabled, emit a simple listing;
+        // otherwise serve index.html if present (Python/Java parity).
+        if (fs::is_directory(full, ec)) {
+          const fs::path index = full / "index.html";
+          if (fs::exists(index, ec) && file_allowed(index.string())) {
+            full = index;
+          } else if (enable_directory_browsing_) {
+            std::ostringstream listing;
+            listing << "<!DOCTYPE html><html><body><ul>";
+            std::error_code list_ec;
+            for (const auto& entry : fs::directory_iterator(full, list_ec)) {
+              const std::string name = entry.path().filename().string();
+              if (!name.empty() && name.front() == '.') {
+                continue;  // skip hidden files
+              }
+              const std::string suffix = entry.is_directory() ? "/" : "";
+              listing << "<li><a href=\"" << name << suffix << "\">" << name << suffix
+                      << "</a></li>";
+            }
+            listing << "</ul></body></html>";
+            if (enable_cors_) {
+              res.set_header("Access-Control-Allow-Origin", "*");
+            }
+            res.set_content(listing.str(), "text/html");
+            return;
+          } else {
+            res.status = 403;
+            res.set_content("Directory browsing disabled", "text/plain");
+            return;
+          }
+        }
+
+        if (!file_allowed(full.string())) {
+          res.status = 403;
+          res.set_content("File type not allowed", "text/plain");
+          return;
+        }
+
+        std::ifstream in(full.string(), std::ios::binary);
+        if (!in) {
+          res.status = 404;
+          res.set_content("File not found", "text/plain");
+          return;
+        }
+        std::ostringstream body;
+        body << in.rdbuf();
+        res.set_header("Cache-Control", "public, max-age=3600");
+        res.set_header("X-Content-Type-Options", "nosniff");
+        if (enable_cors_) {
+          res.set_header("Access-Control-Allow-Origin", "*");
+        }
+        res.set_content(body.str(), mime_type(full.string()));
+      } catch (const std::exception& e) {
+        res.status = 500;
+        res.set_content("Internal server error", "text/plain");
       }
-      std::ostringstream body;
-      body << in.rdbuf();
-      res.set_header("Cache-Control", "public, max-age=3600");
-      res.set_header("X-Content-Type-Options", "nosniff");
-      if (enable_cors_) {
-        res.set_header("Access-Control-Allow-Origin", "*");
-      }
-      res.set_content(body.str(), mime_type(full.string()));
     });
   }
 }

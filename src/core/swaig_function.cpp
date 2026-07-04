@@ -119,18 +119,24 @@ ArgsValidationResult SWAIGFunction::validate_args(const json& args) const {
 
   // Enforce each declared property's JSON `type`.
   auto type_matches = [](const std::string& type, const json& value) -> bool {
-    if (type == "string") { return value.is_string();
-}
-    if (type == "integer") { return value.is_number_integer();
-}
-    if (type == "number") { return value.is_number();
-}
-    if (type == "boolean") { return value.is_boolean();
-}
-    if (type == "array") { return value.is_array();
-}
-    if (type == "object") { return value.is_object();
-}
+    if (type == "string") {
+      return value.is_string();
+    }
+    if (type == "integer") {
+      return value.is_number_integer();
+    }
+    if (type == "number") {
+      return value.is_number();
+    }
+    if (type == "boolean") {
+      return value.is_boolean();
+    }
+    if (type == "array") {
+      return value.is_array();
+    }
+    if (type == "object") {
+      return value.is_object();
+    }
     return true;  // unknown type: nothing to enforce
   };
 
@@ -143,6 +149,8 @@ ArgsValidationResult SWAIGFunction::validate_args(const json& args) const {
     if (type_it != it.value().end() && type_it->is_string()) {
       const std::string type = type_it->get<std::string>();
       if (!type_matches(type, a.at(prop))) {
+        // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold validation-error
+        // path.
         out.errors.push_back("property '" + prop + "' must be of type " + type);
       }
     }

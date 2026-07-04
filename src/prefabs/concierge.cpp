@@ -138,12 +138,14 @@ swaig::FunctionResult ConciergeAgent::check_availability(const json& args, const
 
   for (const auto& amenity : amenities_) {
     if (iequals(amenity_name, amenity.value("name", ""))) {
+      // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold reply-string build.
       return swaig::FunctionResult(amenity_name + " is available on " + date + " at " + time +
                                    ". Would you like to make a reservation?");
     }
   }
 
   std::vector<std::string> names;
+  names.reserve(amenities_.size());
   for (const auto& amenity : amenities_) {
     names.push_back(amenity.value("name", ""));
   }
@@ -164,6 +166,7 @@ swaig::FunctionResult ConciergeAgent::get_directions(const json& args, const jso
   for (const auto& amenity : amenities_) {
     if (iequals(location, amenity.value("name", "")) && amenity.contains("location")) {
       std::string amenity_location = amenity["location"].get<std::string>();
+      // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold reply-string build.
       return swaig::FunctionResult("The " + location + " is located at " + amenity_location +
                                    ". From the main entrance, follow the signs to " +
                                    amenity_location + ".");

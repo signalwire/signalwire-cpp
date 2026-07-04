@@ -832,6 +832,23 @@ def collect(
     # never omission (RULES §2, L10).
     _apply_rest_sidecar(out_modules)
 
+    # SWML gen-payload getter projection (item D). The generated read-side
+    # payload structs under include/signalwire/core/swml_verbs_generated/*.hpp
+    # (AIParams, AIObject, UserSWAIGFunction, Webhook, …) are METHOD-LESS PODs:
+    # one ``std::optional<T>`` data member per snake wire key. The Python oracle
+    # records the SAME wire keys as zero-arg PROPERTY-GETTER methods on these
+    # classes. libclang only surfaces CXX_METHOD/CONSTRUCTOR cursors, so the
+    # struct's fields never reach ``methods_out`` and the whole class is dropped
+    # (``if not methods_out: continue``) — every oracle getter then reads as
+    # missing-port DRIFT. Project each public data-member FIELD as a zero-arg
+    # getter so the field-vs-getter SHAPE reconciles (the surface side already
+    # reconciles these as method-less on both sides — SURFACE-DIFF green — so
+    # this is the analogous signature-side projection). Idiom via the enumerator,
+    # NEVER omission (RULES §2). Reserved-word field renames (``default_`` /
+    # ``enum_``) carry a ``// wire key: <name>`` comment the parser honours, so
+    # the getter lands on the oracle's wire-keyed name.
+    _project_gen_payload_getters(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -966,6 +983,125 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
                        {"name": "http", "type": "any", "required": True}],
             "returns": "void",
         })
+
+
+# A public data-member declaration inside one of the generated payload structs,
+# with the optional trailing ``// wire key: <name>`` comment the generator emits
+# for reserved-word-avoidance renames (``default_``/``enum_`` → ``default``/
+# ``enum``). Group 1 = the C++ field identifier, group 2 = the wire-key comment
+# (if present). Method declarations (which contain ``(``) are excluded before
+# this regex is applied.
+_GEN_FIELD_RE = re.compile(
+    r"^\s+[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
+)
+_WIRE_KEY_RE = re.compile(r"wire key:\s*(\S+)")
+
+
+def _gen_payload_ns_to_module() -> dict[str, str]:
+    """The generated read-side payload namespaces this projection covers, from
+    the surface enumerator's authoritative ``GENERATED_PAYLOAD_NS`` map
+    (``signalwire::core::swml_verbs_generated`` → the Python module, etc.). The
+    header directory for each is the namespace with ``::`` → ``/`` under
+    ``include/``. Import (don't hardcode) so a new payload namespace registered
+    for the surface side is automatically covered here too."""
+    from enumerate_surface import GENERATED_PAYLOAD_NS  # type: ignore
+    return dict(GENERATED_PAYLOAD_NS)
+
+
+def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
+    """Parse the generated payload headers under ``payload_dir`` for each
+    struct's public data-member fields, mapped to their WIRE-KEY name (honouring
+    the ``// wire key:`` comment on reserved-word-avoidance renames). Returns
+    ``{StructName: [wire_field, …]}``.
+
+    These structs are one-per-file, flat, and method-less (a POD DTO: one
+    ``std::optional<T>`` member per wire key plus an open ``extras`` member),
+    so a line-oriented parse is exact — verified to reproduce the oracle's
+    getter set 1:1. Lines containing ``(`` are skipped so no accidental method /
+    initializer is read as a field.
+    """
+    out: dict[str, list[str]] = {}
+    if not payload_dir.is_dir():
+        return out
+    for hdr in sorted(payload_dir.glob("*.hpp")):
+        src = hdr.read_text(encoding="utf-8")
+        for sm in re.finditer(r"struct\s+(\w+)\s*\{(.*?)\n\};", src, re.S):
+            cls, body = sm.group(1), sm.group(2)
+            fields: list[str] = []
+            for line in body.splitlines():
+                if "(" in line:  # a method / initializer, not a data member
+                    continue
+                m = _GEN_FIELD_RE.match(line)
+                if not m:
+                    continue
+                ident, comment = m.group(1), m.group(2) or ""
+                wk = _WIRE_KEY_RE.search(comment)
+                fields.append(wk.group(1) if wk else ident)
+            if fields:
+                out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _project_gen_payload_getters(out_modules: dict) -> None:
+    """Project the generated payload structs' data-member FIELDS as zero-arg
+    property-getter methods so they match the Python oracle's getter shape,
+    across ALL generated read-side payload namespaces (swml_verbs_generated,
+    post_prompt_generated, swaig_request_generated, …).
+
+    The C++ port implements each wire key as a ``std::optional<T>`` FIELD on a
+    method-less POD struct; libclang surfaces no method for it, so without this
+    projection every one of the oracle's getters reads as missing-port DRIFT
+    even though the field IS implemented. This is field-vs-getter SHAPE idiom,
+    reconciled via the enumerator (RULES §2) — the analogue of the surface
+    enumerator force-registering these as method-less types (empty member list
+    on both sides → SURFACE-DIFF green).
+
+    Only project a field whose wire-key name the oracle records as a getter for
+    that class. Port-only data members the reference does not expose as a
+    property (e.g. the open ``extras`` member, and the wire keys Python's
+    payload class simply doesn't surface) are NOT projected — projecting them
+    would invent method surface the reference lacks. Each getter is emitted with
+    the oracle's zero-arg shape and an ``any`` return (``types_compatible``
+    treats ``any`` as compatible with the oracle's typed ``union<…>`` /
+    ``class:…`` getter returns), matching the container-accessor projection in
+    ``_apply_rest_sidecar``.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    for ns, module in _gen_payload_ns_to_module().items():
+        ref_classes = ref.get("modules", {}).get(module, {}).get("classes", {})
+        if not ref_classes:
+            # No oracle getters recorded for this payload module — nothing to
+            # project (its structs, if any, are method-less on both sides).
+            continue
+        payload_dir = PORT_ROOT / "include" / Path(*ns.split("::"))
+        struct_fields = _gen_payload_struct_fields(payload_dir)
+        if not struct_fields:
+            continue
+        mod_entry = out_modules.setdefault(module, {"classes": {}})
+        mod_entry.setdefault("classes", {})
+        for cls, fields in struct_fields.items():
+            ref_cls = ref_classes.get(cls)
+            if not ref_cls:
+                continue
+            oracle_getters = {
+                m for m in ref_cls.get("methods", {}) if m != "__init__"
+            }
+            present = [f for f in fields if f in oracle_getters]
+            if not present:
+                continue
+            cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
+            for field in present:
+                cls_entry["methods"].setdefault(field, {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                })
+            # Method-less POD: implicit default constructor is available.
+            cls_entry["methods"].setdefault("__init__", {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "void",
+            })
 
 
 def _project_kwargs_shape(out_modules: dict) -> None:

@@ -54,10 +54,29 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install build deps (cmake + g++ + OpenSSL 3 headers)
+      - name: Install build deps (cmake + g++ + OpenSSL 3 headers + ccache)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libssl-dev
+          sudo apt-get install -y cmake g++ libssl-dev ccache
+
+      # ccache cache-persistence: CMakeLists.txt already wires ccache as the
+      # compiler launcher when the binary is present (availability-gated no-op
+      # otherwise). CI runs a COLD checkout every time, so without a persisted
+      # cache every gate recompiles from scratch — the bulk of cpp's ~14min CI.
+      # Persist ~/.cache/ccache keyed on the source tree so warm runs skip the
+      # recompile (both the g++ build/ and the clang build-tidy/ share the store).
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-cpp-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'CMakeLists.txt') }}
+          restore-keys: |
+            ccache-cpp-${{ runner.os }}-
+      - name: Configure ccache (size + compress)
+        run: |
+          ccache --max-size=1G
+          ccache --set-config=compression=true
+          ccache --zero-stats || true
 
       # The FMT (clang-format) + LINT (clang-tidy) gates need the gate tools
       # PINNED to the EXACT patch the rollout was burned to zero against (18.1.8).

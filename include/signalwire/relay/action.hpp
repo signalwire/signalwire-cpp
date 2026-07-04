@@ -151,6 +151,8 @@ class Action {
 // be named at a call site / in a test); every method — including
 // start_input_timers, used by CollectAction / StandaloneCollectAction — is
 // inherited unchanged from `Action`.
+// NOLINTNEXTLINE(bugprone-macro-parentheses) — NAME is a class name here
+// (`class NAME : public Action`); it cannot be parenthesized.
 #define SIGNALWIRE_RELAY_ACTION_SUBCLASS(NAME) \
   class NAME : public Action {                 \
    public:                                     \

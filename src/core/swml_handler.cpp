@@ -111,7 +111,7 @@ json AIVerbHandler::build_config(const std::optional<std::string>& prompt_text,
   json prompt_config = json::object();
   if (prompt_text.has_value()) {
     prompt_config["text"] = *prompt_text;
-  } else {
+  } else if (prompt_pom.has_value()) {
     prompt_config["pom"] = *prompt_pom;
   }
   if (contexts.has_value()) {

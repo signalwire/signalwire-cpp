@@ -48,7 +48,7 @@ class WebService {
   explicit WebService(int port = 8002,
                       std::optional<std::map<std::string, std::string>> directories = std::nullopt,
                       std::optional<std::pair<std::string, std::string>> basic_auth = std::nullopt,
-                      std::optional<std::string> config_file = std::nullopt,
+                      const std::optional<std::string>& config_file = std::nullopt,
                       bool enable_directory_browsing = false,
                       std::optional<std::vector<std::string>> allowed_extensions = std::nullopt,
                       std::optional<std::vector<std::string>> blocked_extensions = std::nullopt,

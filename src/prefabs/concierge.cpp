@@ -138,9 +138,13 @@ swaig::FunctionResult ConciergeAgent::check_availability(const json& args, const
 
   for (const auto& amenity : amenities_) {
     if (iequals(amenity_name, amenity.value("name", ""))) {
-      // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold reply-string build.
-      return swaig::FunctionResult(amenity_name + " is available on " + date + " at " + time +
-                                   ". Would you like to make a reservation?");
+      std::string reply = amenity_name;
+      reply += " is available on ";
+      reply += date;
+      reply += " at ";
+      reply += time;
+      reply += ". Would you like to make a reservation?";
+      return swaig::FunctionResult(reply);
     }
   }
 
@@ -166,10 +170,14 @@ swaig::FunctionResult ConciergeAgent::get_directions(const json& args, const jso
   for (const auto& amenity : amenities_) {
     if (iequals(location, amenity.value("name", "")) && amenity.contains("location")) {
       std::string amenity_location = amenity["location"].get<std::string>();
-      // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold reply-string build.
-      return swaig::FunctionResult("The " + location + " is located at " + amenity_location +
-                                   ". From the main entrance, follow the signs to " +
-                                   amenity_location + ".");
+      std::string reply = "The ";
+      reply += location;
+      reply += " is located at ";
+      reply += amenity_location;
+      reply += ". From the main entrance, follow the signs to ";
+      reply += amenity_location;
+      reply += ".";
+      return swaig::FunctionResult(reply);
     }
   }
   return swaig::FunctionResult("I don't have specific directions to " + location +

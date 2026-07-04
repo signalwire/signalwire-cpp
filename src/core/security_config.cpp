@@ -271,9 +271,12 @@ json SecurityConfig::get_ssl_context_kwargs() const {
     return out;
   }
   // validate_ssl_config() (checked above via result.valid) guarantees both paths
-  // are present; .value() makes the access checked (throws, never UB).
-  out["ssl_certfile"] = ssl_cert_path_.value();
-  out["ssl_keyfile"] = ssl_key_path_.value();
+  // are present; guard explicitly so the access is provably checked, not just
+  // logically implied.
+  if (ssl_cert_path_.has_value() && ssl_key_path_.has_value()) {
+    out["ssl_certfile"] = *ssl_cert_path_;
+    out["ssl_keyfile"] = *ssl_key_path_;
+  }
   return out;
 }
 

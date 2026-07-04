@@ -149,9 +149,11 @@ ArgsValidationResult SWAIGFunction::validate_args(const json& args) const {
     if (type_it != it.value().end() && type_it->is_string()) {
       const std::string type = type_it->get<std::string>();
       if (!type_matches(type, a.at(prop))) {
-        // NOLINTNEXTLINE(performance-inefficient-string-concatenation) — cold validation-error
-        // path.
-        out.errors.push_back("property '" + prop + "' must be of type " + type);
+        std::string msg = "property '";
+        msg += prop;
+        msg += "' must be of type ";
+        msg += type;
+        out.errors.push_back(std::move(msg));
       }
     }
   }

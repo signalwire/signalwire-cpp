@@ -95,12 +95,10 @@ bool secure_compare(const std::string& a, const std::string& b) {
 
 }  // namespace
 
-// NOLINTNEXTLINE(performance-unnecessary-value-param) — config_file is a by-value
-// parity param mirroring the Python reference constructor; it is intentionally
-// accepted-and-ignored (see body), not passed through, so a const-ref buys nothing.
 WebService::WebService(int port, std::optional<std::map<std::string, std::string>> directories,
                        std::optional<std::pair<std::string, std::string>> basic_auth,
-                       std::optional<std::string> config_file, bool enable_directory_browsing,
+                       const std::optional<std::string>& config_file,
+                       bool enable_directory_browsing,
                        std::optional<std::vector<std::string>> allowed_extensions,
                        std::optional<std::vector<std::string>> blocked_extensions,
                        std::int64_t max_file_size, bool enable_cors)
@@ -201,7 +199,11 @@ void WebService::mount_directories() {
   for (const auto& [route, directory] : directories_) {
     const std::string pattern = route + R"((/.*)?)";
     const std::string route_copy = route;
-    server_->Get(pattern, [this, route_copy](const httplib::Request& req, httplib::Response& res) {
+    // The lambda body is wrapped in try/catch(...) below, so nothing actually
+    // escapes into httplib's worker thread (clang-tidy can't see through the
+    // lambda boundary, hence the inline suppression on the capture list).
+    auto handler = [this, route_copy](  // NOLINT(bugprone-exception-escape)
+                       const httplib::Request& req, httplib::Response& res) {
       // Handlers run on httplib's worker threads; an escaping exception (e.g.
       // base64_decode on a malformed Authorization header) would terminate the
       // thread. Contain any throw and surface it as a 500 instead.
@@ -326,11 +328,14 @@ void WebService::mount_directories() {
           res.set_header("Access-Control-Allow-Origin", "*");
         }
         res.set_content(body.str(), mime_type(full.string()));
-      } catch (const std::exception& e) {
+      } catch (...) {
+        // Contain ANY escaping throw (not just std::exception) so nothing
+        // propagates into httplib's worker thread.
         res.status = 500;
         res.set_content("Internal server error", "text/plain");
       }
-    });
+    };
+    server_->Get(pattern, handler);
   }
 }
 

@@ -61,3 +61,15 @@ if [ "${_CF_MAJOR:-0}" != "18" ]; then
     echo "       by putting a clang-format 18 earlier on PATH." >&2
     exit 1
 fi
+
+# --- ccache (optional compiler cache) ----------------------------------------
+# ccache is an OPTIONAL speedup: CMakeLists.txt availability-gates it as the C/C++
+# compiler launcher (find_program(CCACHE_PROGRAM ccache) — a strict no-op when
+# absent, so the build never fails for a missing ccache). We only HINT here when
+# it isn't installed; we do NOT fail, because its absence must not break a build.
+# Declared so it's present when wanted (CI declares it in porting-sdk's
+# cross-port.yml cpp matrix install step; local devs get this hint).
+if ! command -v ccache >/dev/null 2>&1; then
+    echo "note: ccache not found — C++ rebuilds will be uncached (optional)." >&2
+    echo "      Install it for near-instant warm rebuilds:  brew install ccache" >&2
+fi

@@ -1229,15 +1229,60 @@ def main() -> int:
             if Path(gcc_inc).is_dir():
                 parse_args.append(f"-I{gcc_inc}")
                 break
-    for header in headers:
-        try:
-            tu = index.parse(str(header), args=parse_args, options=TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
-        except Exception as e:
-            print(f"skip {header}: {e}", file=sys.stderr)
-            continue
+    # Parse options. PARSE_SKIP_FUNCTION_BODIES: the enumerator only reads
+    # DECLARATIONS (cursor kinds / is_definition() / parameter types + tokens),
+    # never a method's body, so telling libclang to skip bodies removes the bulk
+    # of the per-TU parse cost (3-10x) with zero effect on emitted output. We do
+    # NOT use PARSE_DETAILED_PROCESSING_RECORD: it only builds the preprocessing
+    # (macro/include) record, which nothing here consults — default-value
+    # detection reads AST tokens via arg.get_tokens(), independent of that record
+    # — so dropping it is a further speedup that leaves the output unchanged.
+    _parse_opts = TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+
+    # Single umbrella TU. The per-header approach re-parsed the whole macOS SDK +
+    # libc++ once PER header (~1000+ headers) — the SIGNATURES gate's ~27-minute
+    # cost. Instead, synthesize one in-memory TU that ``#include``s every header
+    # and parse it ONCE, so the SDK/libc++ headers parse a single time. Each
+    # header carries ``#pragma once`` so multiple include paths reaching the same
+    # header are collapsed. walk_translation_unit's file_filter still restricts
+    # the emitted cursors to declarations physically defined under include/, so
+    # the output is identical to the per-header union (collect() already merges a
+    # class that surfaced from more than one TU). We drive the umbrella off an
+    # in-memory unsaved-file so nothing is written to disk. If the single-TU
+    # parse fails outright or yields nothing (e.g. an unexpected redefinition),
+    # fall back to the per-header loop so the gate never silently under-reports.
+    umbrella_lines = [f'#include "{h.relative_to(args.include)}"' for h in headers]
+    umbrella_src = "\n".join(umbrella_lines) + "\n"
+    umbrella_name = str(args.include / "__sw_enum_umbrella__.cpp")
+    single_tu_ok = False
+    try:
+        tu = index.parse(
+            umbrella_name,
+            args=parse_args,
+            unsaved_files=[(umbrella_name, umbrella_src)],
+            options=_parse_opts,
+        )
         cls_entries, fn_entries = walk_translation_unit(tu, args.include)
-        raw_entries.extend(cls_entries)
-        raw_free_functions.extend(fn_entries)
+        if cls_entries:
+            raw_entries.extend(cls_entries)
+            raw_free_functions.extend(fn_entries)
+            single_tu_ok = True
+    except Exception as e:
+        print(f"enumerate_signatures: single-TU parse failed ({e}); "
+              f"falling back to per-header", file=sys.stderr)
+
+    if not single_tu_ok:
+        raw_entries.clear()
+        raw_free_functions.clear()
+        for header in headers:
+            try:
+                tu = index.parse(str(header), args=parse_args, options=_parse_opts)
+            except Exception as e:
+                print(f"skip {header}: {e}", file=sys.stderr)
+                continue
+            cls_entries, fn_entries = walk_translation_unit(tu, args.include)
+            raw_entries.extend(cls_entries)
+            raw_free_functions.extend(fn_entries)
 
     canonical, failures = collect(raw_entries, aliases, raw_free_functions)
     if failures:

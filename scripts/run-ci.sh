@@ -274,13 +274,28 @@ emission_gate() {
 # regenerates byte-for-byte modulo the generated_from git-sha. We snapshot the
 # committed copy, regenerate in place, diff modulo provenance via
 # check_surface_freshness.py, then restore the working copy.
+# Cache of the freshly-regenerated port_surface.json so SURFACE-FRESH and
+# SURFACE-DIFF (which both otherwise re-run enumerate_surface.py from scratch)
+# share ONE regeneration. The enumerator is deterministic on a clean tree, so a
+# single regen serves both gates. The path is derived INSIDE each gate from
+# $PORT_ROOT (not a shared top-level var) so the gates stay self-contained when a
+# harness like porting-sdk's sw-verify sources only the function definitions and
+# calls one gate directly. Cache lives under the repo-local .sw-tmp (gitignored) —
+# never /tmp.
+_fresh_surface_cache_path() { echo "$PORT_ROOT/.sw-tmp/fresh_port_surface.json"; }
+
 surface_fresh_gate() {
+    local cache; cache="$(_fresh_surface_cache_path)"
+    mkdir -p "$(dirname "$cache")"
+    rm -f "$cache"
     # 1. snapshot the committed surface (fallback cp if not tracked at HEAD).
     if ! git show HEAD:port_surface.json > /tmp/committed_surface.json 2>/dev/null; then
         cp port_surface.json /tmp/committed_surface.json || return 1
     fi
-    # 2. regenerate in place via the same host enumerator the SIGNATURES gate uses.
+    # 2. regenerate in place via the same host enumerator the SIGNATURES gate
+    #    uses, caching the fresh copy for SURFACE-DIFF to reuse.
     python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    cp port_surface.json "$cache" 2>/dev/null || true
     # 3. compare committed vs fresh, ignoring the volatile generated_from sha.
     python3 "$PORTING_SDK_DIR/scripts/check_surface_freshness.py" \
         --committed /tmp/committed_surface.json --fresh port_surface.json
@@ -298,10 +313,21 @@ surface_fresh_gate() {
 # mocks / BUILD_MODE-independent), diffs, then restores the committed copy
 # unconditionally so the gate is side-effect free.
 surface_diff_gate() {
+    # Reuse the fresh surface SURFACE-FRESH already regenerated this run (the
+    # enumerator is deterministic on a clean tree, so a second regen would be
+    # byte-identical). Fall back to regenerating if the cache is absent (e.g.
+    # SURFACE-FRESH was skipped or this gate is run standalone). diff_port_surface
+    # reads the file at ./port_surface.json, so point that at the cached fresh
+    # copy for the diff, then restore the committed working copy.
+    local cache; cache="$(_fresh_surface_cache_path)"
     if ! git show HEAD:port_surface.json > /tmp/committed_surface_diff.json 2>/dev/null; then
         cp port_surface.json /tmp/committed_surface_diff.json || return 1
     fi
-    python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    if [ -f "$cache" ]; then
+        cp "$cache" port_surface.json || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    else
+        python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    fi
     python3 "$PORTING_SDK_DIR/scripts/diff_port_surface.py" \
         --reference "$PORTING_SDK_DIR/python_surface.json" \
         --port-surface port_surface.json \

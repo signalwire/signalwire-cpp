@@ -3,6 +3,18 @@ project(signalwire VERSION 2.0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ccache — compiler-cache launcher, availability-gated so its ABSENCE is a
+# strict no-op (the build never fails for a missing ccache). When present it
+# wraps the C/C++ compiler invocations and makes warm (unchanged-source)
+# rebuilds near-instant. Declared as a dev dependency in scripts/_env.sh (local
+# brew hint) and the porting-sdk cross-port.yml cpp matrix install step.
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
+endif()
+
 # Header-only deps
 include_directories(${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)

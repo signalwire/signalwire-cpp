@@ -66,7 +66,21 @@ if [ -z "$tidy_build" ]; then
     fi
 fi
 
-files="$(find src include -name '*.cpp')"
-[ -n "$files" ] || { echo "no C++ sources found to lint" >&2; exit 1; }
-# shellcheck disable=SC2086
-exec "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet $files
+# Fan clang-tidy across cores. A single `clang-tidy file1 file2 ...` invocation
+# analyzes every TU SERIALLY — historically the whole CI wall-clock (~14min: 65 TUs
+# one at a time). clang-tidy parallelizes trivially per-TU, so run one process per
+# file across all cores. IDENTICAL behavior: same clang-tidy binary, same compile
+# DB (-p), same --header-filter, same .clang-tidy (WarningsAsErrors:'*' => any
+# finding is a nonzero exit). xargs exits 123 if ANY invocation exited nonzero, so
+# a single finding still fails the gate. Findings still print (each to its own
+# clang-tidy's stdout). Job count: cores (min 1); overridable via SWCPP_TIDY_JOBS.
+jobs="${SWCPP_TIDY_JOBS:-$( (command -v nproc >/dev/null && nproc) || sysctl -n hw.ncpu 2>/dev/null || echo 4 )}"
+# bash-3.2 compatible (macOS default): stream find -> xargs, NUL-delimited so paths
+# with spaces are safe. -n 1 = one clang-tidy per file; -P = fan across cores.
+if ! find src include -name '*.cpp' | grep -q .; then
+    echo "no C++ sources found to lint" >&2; exit 1
+fi
+find src include -name '*.cpp' -print0 \
+  | xargs -0 -P "$jobs" -n 1 "$ct" -p "$tidy_build" \
+        --header-filter='signalwire-cpp/(src|include)/' --quiet
+exit $?

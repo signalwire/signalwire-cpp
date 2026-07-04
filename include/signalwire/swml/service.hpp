@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
@@ -24,6 +25,9 @@ class Response;
 }  // namespace httplib
 
 namespace signalwire {
+namespace core {
+class SWMLVerbHandler;  // fwd (core/swml_handler.hpp)
+}  // namespace core
 namespace swml {
 
 using json = nlohmann::json;
@@ -149,6 +153,58 @@ class Service {
 
   /// Render the SWML document to JSON
   [[nodiscard]] json render_swml() const;
+
+  // ========================================================================
+  // Document-lifecycle helpers (Python parity: SWMLService.*)
+  // ========================================================================
+
+  /// Add a named section to the document (Python:
+  /// ``SWMLService.add_section``). Returns ``false`` if the section already
+  /// exists, ``true`` when a new one is created.
+  bool add_section(const std::string& section_name);
+
+  /// Add a verb to a named section (Python:
+  /// ``SWMLService.add_verb_to_section``). ``config`` is the verb's params
+  /// object. Returns ``*this`` for fluent chaining.
+  Service& add_verb_to_section(const std::string& section_name, const std::string& verb_name,
+                               const json& config);
+
+  /// Return the SWML document as a JSON object (Python:
+  /// ``SWMLService.get_document`` — a dict). Alias of ``render_swml`` under
+  /// the Python-canonical name.
+  [[nodiscard]] json get_document() const { return render_swml(); }
+
+  /// Render the SWML document to a JSON string (Python:
+  /// ``SWMLService.render_document``).
+  [[nodiscard]] std::string render_document() const;
+
+  /// Reset the document to an empty state (Python:
+  /// ``SWMLService.reset_document``).
+  void reset_document();
+
+  /// Manually override the proxy URL used to build absolute webhook URLs
+  /// (Python: ``SWMLService.manual_set_proxy_url``).
+  void manual_set_proxy_url(const std::string& proxy_url);
+
+  /// Register a routing callback for a request path (Python:
+  /// ``SWMLService.register_routing_callback``). Given a request path + params,
+  /// the callback returns the route to dispatch to (empty = no override).
+  using RoutingCallback = std::function<std::string(const std::string& path, const json& params)>;
+  void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+
+  /// Register a SWML verb handler (Python:
+  /// ``SWMLService.register_verb_handler``). Delegates to the service's verb
+  /// handler registry so custom verbs validate + build through the handler.
+  void register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler);
+
+  /// Whether full schema validation of the rendered document is enabled
+  /// (Python: ``SWMLService.full_validation_enabled``).
+  [[nodiscard]] bool full_validation_enabled() const { return full_validation_; }
+
+  /// Extract the SIP username from a request body's ``call.to`` SIP URI
+  /// (Python: static ``SWMLService.extract_sip_username``). Returns an empty
+  /// string when no SIP username can be extracted.
+  [[nodiscard]] static std::string extract_sip_username(const json& request_body);
 
   // ========================================================================
   // SWAIG tool registry (lifted from AgentBase)
@@ -295,6 +351,11 @@ class Service {
   /// SchemaUtils helper exposed via schema_utils(). Mutable so the
   /// const accessor can lazy-build it.
   mutable std::unique_ptr<signalwire::utils::SchemaUtils> schema_utils_;
+
+  std::optional<std::string> manual_proxy_url_;
+  bool full_validation_ = false;
+  std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
+  std::vector<std::shared_ptr<signalwire::core::SWMLVerbHandler>> verb_handlers_;
 
   // SWAIG tool registry — protected so subclasses can read/write directly
   // when needed (e.g. AgentBase's per-tool secure flag, BuildSwaigBlock).

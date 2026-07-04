@@ -80,6 +80,25 @@ struct Message {
   /// message is already terminal the callback fires immediately.
   void on_completed(CompletedCallback cb);
 
+  // ---- Python-parity surface (signalwire.relay.message.Message) ----------
+
+  /// Whether the message has reached a terminal state (Python: ``is_done``).
+  [[nodiscard]] bool is_done() const { return is_terminal(); }
+
+  /// Register a terminal-state callback (Python: ``on``). Alias of on_completed.
+  void on(CompletedCallback cb) { on_completed(std::move(cb)); }
+
+  /// Terminal outcome as a JSON object (Python: ``result``): the final state,
+  /// reason, and message id.
+  [[nodiscard]] json result() const {
+    return json::object({{"message_id", message_id}, {"state", state()}, {"reason", reason()}});
+  }
+
+  /// String representation (Python: ``__repr__``).
+  [[nodiscard]] std::string repr() const {
+    return "Message(id='" + message_id + "', state='" + state() + "')";
+  }
+
  private:
   struct SyncState {
     std::mutex mutex;

@@ -32,6 +32,8 @@ class Action {
   const std::string& control_id() const { return state_->control_id; }
   const std::string& state() const;
   [[nodiscard]] bool completed() const;
+  /// Python parity: ``Action.is_done`` — whether the action has finished.
+  [[nodiscard]] bool is_done() const { return completed(); }
   const json& result() const;
   const std::string& call_id() const { return state_->call_id; }
   const std::string& node_id() const { return state_->node_id; }
@@ -137,6 +139,37 @@ class Action {
 
   std::shared_ptr<SharedState> state_;
 };
+
+// ── Concrete Action subclasses ─────────────────────────────────────
+//
+// The reference (and the TS/Ruby ports) expose a concrete Action subclass
+// per verb (PlayAction, RecordAction, ...). The C++ port FLATTENS all
+// behaviour onto the unified `Action` base — the verb-specific resolution
+// semantics are configured on the base via set_event_type_filter /
+// set_resolve_on_detect / set_resolve_on_result and the method prefix. These
+// lightweight subclasses exist so the concrete class NAME is present (and can
+// be named at a call site / in a test); every method — including
+// start_input_timers, used by CollectAction / StandaloneCollectAction — is
+// inherited unchanged from `Action`.
+#define SIGNALWIRE_RELAY_ACTION_SUBCLASS(NAME) \
+  class NAME : public Action {                 \
+   public:                                     \
+    using Action::Action;                      \
+  }
+
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(PlayAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(RecordAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(CollectAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(DetectAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(FaxAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(PayAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(StreamAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(TapAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(TranscribeAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(StandaloneCollectAction);
+SIGNALWIRE_RELAY_ACTION_SUBCLASS(AIAction);
+
+#undef SIGNALWIRE_RELAY_ACTION_SUBCLASS
 
 }  // namespace relay
 }  // namespace signalwire

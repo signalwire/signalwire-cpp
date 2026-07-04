@@ -6,6 +6,7 @@
 #include <openssl/rand.h>
 
 #include <algorithm>
+#include <csignal>
 #include <set>
 
 #include "httplib.h"
@@ -76,6 +77,7 @@ AgentBase::AgentBase(const AgentBase& other) {
   function_includes_ = other.function_includes_;
   hints_ = other.hints_;
   languages_ = other.languages_;
+  multilingual_ = other.multilingual_;
   pronunciations_ = other.pronunciations_;
   ai_params_ = other.ai_params_;
   global_data_ = other.global_data_;
@@ -330,6 +332,33 @@ swaig::FunctionResult AgentBase::on_function_call(const std::string& name, const
 
 std::vector<std::string> AgentBase::list_tools() const { return tool_order_; }
 
+AgentBase& AgentBase::define_tools(const std::vector<swaig::ToolDefinition>& tools) {
+  for (const auto& tool : tools) {
+    define_tool(tool);
+  }
+  return *this;
+}
+
+AgentBase& AgentBase::register_routing_callback(RoutingCallback callback, const std::string& path) {
+  routing_callbacks_[path] = std::move(callback);
+  return *this;
+}
+
+void AgentBase::setup_graceful_shutdown() {
+  // Register process signal handlers that stop the running HTTP server so an
+  // in-flight request drains before the process exits. Mirrors Python's
+  // WebMixin.setup_graceful_shutdown (SIGINT/SIGTERM -> server.stop()).
+  static AgentBase* g_shutdown_target = nullptr;
+  g_shutdown_target = this;
+  auto handler = [](int /*signum*/) {
+    if (g_shutdown_target != nullptr) {
+      g_shutdown_target->stop();
+    }
+  };
+  std::signal(SIGINT, handler);
+  std::signal(SIGTERM, handler);
+}
+
 std::string AgentBase::create_tool_token(const std::string& tool_name,
                                          const std::string& call_id) const {
   try {
@@ -396,6 +425,15 @@ AgentBase& AgentBase::set_language_params(const std::string& code, const json& p
       }
       break;
     }
+  }
+  return *this;
+}
+
+AgentBase& AgentBase::set_multilingual(const json& config) {
+  // Mirror Python's ``if config and isinstance(config, dict)``: only a
+  // non-empty object configures the mode; anything else is ignored.
+  if (config.is_object() && !config.empty()) {
+    multilingual_ = config;
   }
   return *this;
 }
@@ -1151,6 +1189,34 @@ std::string AgentBase::detect_proxy_url(const std::map<std::string, std::string>
   return "http://" + host_ + ":" + std::to_string(port_);
 }
 
+std::string AgentBase::get_full_url(bool include_auth) const {
+  // Base: an explicitly-set proxy URL if present, else the local host:port.
+  std::string base = proxy_url_ ? *proxy_url_ : ("http://" + host_ + ":" + std::to_string(port_));
+  while (!base.empty() && base.back() == '/') {
+    base.pop_back();
+  }
+  std::string r = route();
+  if (r.empty() || r == "/") {
+    r = "";
+  } else if (r.front() != '/') {
+    r = "/" + r;
+  }
+  std::string url = base + r;
+  if (include_auth) {
+    auto creds = get_basic_auth_credentials();
+    const std::string& user = creds.first;
+    const std::string& pass = creds.second;
+    if (!user.empty() && !pass.empty()) {
+      // Insert credentials after the scheme: scheme://user:pass@rest
+      auto sep = url.find("://");
+      if (sep != std::string::npos) {
+        url = url.substr(0, sep + 3) + user + ":" + pass + "@" + url.substr(sep + 3);
+      }
+    }
+  }
+  return url;
+}
+
 json AgentBase::build_swaig_functions(const std::string& webhook_url) const {
   json functions = json::array();
 
@@ -1222,6 +1288,12 @@ json AgentBase::build_ai_verb(const std::string& webhook_url) const {
       langs.push_back(l.to_json());
     }
     ai["languages"] = langs;
+  }
+
+  // Multilingual (Mode B) — top-level ``multilingual`` object. Emitted
+  // independently of ``languages``; the server prefers it when both exist.
+  if (multilingual_.is_object() && !multilingual_.empty()) {
+    ai["multilingual"] = multilingual_;
   }
 
   // Pronunciations
@@ -1330,7 +1402,13 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
     doc.main().add_verb(v);
   }
 
-  return doc.to_json();
+  json swml = doc.to_json();
+  transform_swml(swml);
+  return swml;
+}
+
+void AgentBase::transform_swml(json&) const {
+  // Default: no transform. Subclasses (e.g. BedrockAgent) override.
 }
 
 std::unique_ptr<AgentBase> AgentBase::clone() const { return std::make_unique<AgentBase>(*this); }

@@ -74,6 +74,79 @@ AgentServer& AgentServer::set_static_dir(const std::string& dir) {
   return *this;
 }
 
+// ---- Python-parity surface -------------------------------------------------
+
+namespace {
+std::string normalize_route(const std::string& route) {
+  std::string r = route;
+  if (r.empty() || r.front() != '/') {
+    r = "/" + r;
+  }
+  return r;
+}
+}  // namespace
+
+AgentServer& AgentServer::register_(std::shared_ptr<agent::AgentBase> agent,
+                                    const std::string& route) {
+  // Python: route=None -> use the agent's own route.
+  std::string effective = route.empty() ? agent->route() : route;
+  return register_agent(std::move(agent), effective);
+}
+
+bool AgentServer::unregister(const std::string& route) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return agents_.erase(normalize_route(route)) > 0;
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<agent::AgentBase>>> AgentServer::get_agents()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::pair<std::string, std::shared_ptr<agent::AgentBase>>> out;
+  out.reserve(agents_.size());
+  for (const auto& [route, agent] : agents_) {
+    out.emplace_back(route, agent);
+  }
+  return out;
+}
+
+std::shared_ptr<agent::AgentBase> AgentServer::get_agent(const std::string& route) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = agents_.find(normalize_route(route));
+  return it == agents_.end() ? nullptr : it->second;
+}
+
+AgentServer& AgentServer::setup_sip_routing(const std::string& route, bool auto_map) {
+  sip_routing_ = true;
+  sip_route_ = normalize_route(route);
+  sip_auto_map_ = auto_map;
+  return *this;
+}
+
+AgentServer& AgentServer::register_sip_username(const std::string& username,
+                                                const std::string& route) {
+  return map_sip_username(username, route);
+}
+
+AgentServer& AgentServer::serve_static_files(const std::string& directory,
+                                             const std::string& route) {
+  static_dir_ = directory;
+  static_route_ = normalize_route(route);
+  return *this;
+}
+
+AgentServer& AgentServer::register_global_routing_callback(GlobalRoutingCallback callback_fn,
+                                                           const std::string& path) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::string normalized = normalize_route(path);
+  // Strip a trailing slash (except the bare root), mirroring Python's rstrip.
+  if (normalized.size() > 1 && normalized.back() == '/') {
+    normalized.pop_back();
+  }
+  routing_callbacks_.emplace_back(normalized, std::move(callback_fn));
+  get_logger().info("Registered global routing callback at " + normalized);
+  return *this;
+}
+
 void AgentServer::setup_routes(httplib::Server& server) {
   // Health (no auth)
   server.Get("/health", [](const httplib::Request&, httplib::Response& res) {

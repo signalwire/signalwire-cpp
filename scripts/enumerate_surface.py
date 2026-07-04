@@ -91,11 +91,29 @@ CLASS_MODULE_MAP: dict[str, str] = {
     # -- swaig ------------------------------------------------------------
     "FunctionResult": "signalwire.core.function_result",
     "ToolDefinition": "signalwire.core.swaig_function",
+    "SWAIGFunction": "signalwire.core.swaig_function",
+
+    # -- swml verb-handler registry (core/swml_handler.hpp) ---------------
+    "SWMLVerbHandler": "signalwire.core.swml_handler",
+    "AIVerbHandler": "signalwire.core.swml_handler",
+    "VerbHandlerRegistry": "signalwire.core.swml_handler",
+    # -- swml builder / renderer -----------------------------------------
+    "SWMLBuilder": "signalwire.core.swml_builder",
+    "SwmlRenderer": "signalwire.core.swml_renderer",
+
+    # -- core infra classes (auth/config/security/pom) --------------------
+    "AuthHandler": "signalwire.core.auth_handler",
+    "ConfigLoader": "signalwire.core.config_loader",
+    "SecurityConfig": "signalwire.core.security_config",
+    "PomBuilder": "signalwire.core.pom_builder",
 
     # -- skills -----------------------------------------------------------
     "SkillBase": "signalwire.core.skill_base",
     "SkillManager": "signalwire.core.skill_manager",
     "SkillRegistry": "signalwire.skills.registry",
+
+    # -- prefab agents ----------------------------------------------------
+    "BedrockAgent": "signalwire.agents.bedrock",
 
     # -- server -----------------------------------------------------------
     "AgentServer": "signalwire.agent_server",
@@ -181,6 +199,7 @@ CLASS_MODULE_MAP: dict[str, str] = {
 
     # -- relay ------------------------------------------------------------
     "RelayClient": "signalwire.relay.client",
+    "RelayError": "signalwire.relay.client",
     "Call": "signalwire.relay.call",
     "Message": "signalwire.relay.message",
     # Action / RelayEvent / CallEvent / MessageEvent / DialEvent /
@@ -446,6 +465,13 @@ _METHOD_RENAMES: dict[str, str] = {
     # HttpClient (and the legacy CrudResource) spell the DELETE verb ``del`` —
     # ``delete`` is a C++ keyword; the Python reference records ``delete``.
     "del": "delete",
+    # BedrockAgent's C++ ``repr()`` is Python's ``__repr__`` (C++ has no dunder
+    # convention; the method is the same string-representation contract).
+    "repr": "__repr__",
+    # AgentServer spells the Python ``register`` verb ``register_`` (``register``
+    # is not reserved in C++, but the trailing underscore disambiguates it from
+    # the many ``register_*`` methods and matches the port's escape convention).
+    "register_": "register",
 }
 
 
@@ -525,7 +551,7 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "get_language_params",
         "set_function_includes", "set_global_data", "set_internal_fillers",
         "set_language_params",
-        "set_languages", "set_native_functions", "set_param", "set_params",
+        "set_languages", "set_multilingual", "set_native_functions", "set_param", "set_params",
         "set_post_prompt_llm_params", "set_prompt_llm_params",
         "set_pronunciations", "update_global_data",
     ],
@@ -538,10 +564,10 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         # Empty in Python -- class exists as a marker only.
     ],
     ("signalwire.core.mixins.prompt_mixin", "PromptMixin"): [
-        "define_contexts", "get_post_prompt", "get_prompt",
+        "contexts", "define_contexts", "get_post_prompt", "get_prompt",
         "prompt_add_section", "prompt_add_subsection", "prompt_add_to_section",
         "prompt_has_section", "reset_contexts", "set_post_prompt",
-        "set_prompt_text",
+        "set_prompt_pom", "set_prompt_text",
     ],
     # Python additionally extracted a ``PromptManager`` class that
     # PromptMixin delegates to. The user-facing surface is identical
@@ -549,7 +575,7 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     # AgentBase methods to PromptManager so the cross-language audit
     # treats both paths as covered.
     ("signalwire.core.agent.prompt.manager", "PromptManager"): [
-        "define_contexts", "get_contexts", "get_post_prompt", "get_prompt",
+        "__init__", "define_contexts", "get_contexts", "get_post_prompt", "get_prompt",
         "get_raw_prompt",
         "prompt_add_section", "prompt_add_subsection", "prompt_add_to_section",
         "prompt_has_section", "set_post_prompt", "set_prompt_pom",
@@ -565,10 +591,10 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "validate_tool_token",
     ],
     ("signalwire.core.mixins.tool_mixin", "ToolMixin"): [
-        "define_tool", "on_function_call", "register_swaig_function",
+        "define_tool", "define_tools", "on_function_call", "register_swaig_function",
     ],
     ("signalwire.core.agent.tools.registry", "ToolRegistry"): [
-        "define_tool", "register_swaig_function",
+        "__init__", "define_tool", "register_swaig_function",
         "has_function", "get_function", "get_all_functions",
         "remove_function",
     ],
@@ -578,8 +604,246 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     ("signalwire.core.mixins.web_mixin", "WebMixin"): [
         "enable_debug_routes", "manual_set_proxy_url", "run", "serve",
         "set_dynamic_config_callback", "on_request", "on_swml_request",
+        "register_routing_callback", "setup_graceful_shutdown",
     ],
 }
+
+
+# -- Built-in skill projection ----------------------------------------------
+# Python ships one module per built-in skill (``signalwire.skills.<name>.skill``)
+# each exporting a ``<Name>Skill`` class. The C++ port implements each skill as a
+# class in ``src/skills/builtin/<name>.cpp`` (an implementation file, NOT a header),
+# registered at static-init via ``REGISTER_SKILL``. The header-only surface walker
+# never sees them, so — exactly like the AgentBase mixin projection — we project
+# each C++ skill class into its Python-canonical module.
+#
+# The method set is the Python-recorded surface for that skill, intersected at
+# emit time with the methods the C++ class actually has: a method the C++ class
+# defines itself, OR one it inherits from ``SkillBase`` (the shared virtual base
+# — ``setup``/``register_tools``/``get_hints``/``get_global_data``/
+# ``get_prompt_sections``/``get_parameter_schema``/``get_instance_key``/
+# ``cleanup`` — every skill genuinely has these), OR ``__init__`` (the ctor
+# always exists). We never project a method the C++ class lacks (that would be
+# inventing surface); those are recorded in PORT_OMISSIONS.
+#
+# ``(cpp_class) -> (python_module, python_class)``. C++ class names that differ
+# from Python only by casing/reserved-word idiom (``DatasphereSkill`` ->
+# ``DataSphereSkill``, ``SwmlTransferSkill`` -> ``SWMLTransferSkill``) are the
+# adapter rename, not an omission.
+# -- RELAY call-action mixin projection -------------------------------------
+# Python factors the call-action controls into an abstract mixin inheritance
+# chain — ``StoppableAction(Action)`` -> ``PausableAction`` -> ``VolumeAction``
+# -> the concrete ``PlayAction``/``RecordAction``/… . The C++ port flattens all
+# those controls onto a single ``signalwire::relay::Action`` class (same
+# precedent as TS: every concrete action carries the methods inline). Project
+# each abstract mixin base into ``signalwire.relay.call`` with the methods the
+# C++ ``Action`` class genuinely defines, so the surface membership lines up.
+# ``(python_module, python_class) -> methods to pull from the C++ Action class``.
+RELAY_ACTION_PROJECTIONS: dict[tuple[str, str], list[str]] = {
+    ("signalwire.relay.call", "StoppableAction"): ["stop"],
+    ("signalwire.relay.call", "PausableAction"): ["pause", "resume"],
+    ("signalwire.relay.call", "VolumeAction"): ["volume"],
+}
+
+SKILL_SOURCE_DIR = "src/skills/builtin"
+# Methods that live on the shared C++ ``SkillBase`` (so every concrete skill
+# inherits them and they are legitimately part of that skill's callable surface).
+_SKILL_BASE_METHODS = {
+    "setup", "register_tools", "get_hints", "get_global_data",
+    "get_prompt_sections", "get_parameter_schema", "get_instance_key",
+    "cleanup", "get_datamap_functions", "skill_name", "skill_description",
+}
+SKILL_PROJECTIONS: dict[str, tuple[str, str, list[str]]] = {
+    # cpp_class: (python_module, python_class, python_recorded_methods)
+    "ApiNinjasTriviaSkill": ("signalwire.skills.api_ninjas_trivia.skill", "ApiNinjasTriviaSkill",
+        ["__init__", "get_instance_key", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
+    "ClaudeSkillsSkill": ("signalwire.skills.claude_skills.skill", "ClaudeSkillsSkill",
+        ["get_hints", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
+    "DatasphereSkill": ("signalwire.skills.datasphere.skill", "DataSphereSkill",
+        ["cleanup", "get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
+         "get_prompt_sections", "register_tools", "setup"]),
+    "DatasphereServerlessSkill": ("signalwire.skills.datasphere_serverless.skill", "DataSphereServerlessSkill",
+        ["get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
+         "get_prompt_sections", "register_tools", "setup"]),
+    "DateTimeSkill": ("signalwire.skills.datetime.skill", "DateTimeSkill",
+        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
+    "GoogleMapsSkill": ("signalwire.skills.google_maps.skill", "GoogleMapsSkill",
+        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
+    "InfoGathererSkill": ("signalwire.skills.info_gatherer.skill", "InfoGathererSkill",
+        ["get_global_data", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
+    "JokeSkill": ("signalwire.skills.joke.skill", "JokeSkill",
+        ["get_global_data", "get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
+    "MathSkill": ("signalwire.skills.math.skill", "MathSkill",
+        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
+    "NativeVectorSearchSkill": ("signalwire.skills.native_vector_search.skill", "NativeVectorSearchSkill",
+        ["cleanup", "get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
+         "get_prompt_sections", "register_tools", "setup"]),
+    "PlayBackgroundFileSkill": ("signalwire.skills.play_background_file.skill", "PlayBackgroundFileSkill",
+        ["__init__", "get_instance_key", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
+    "SpiderSkill": ("signalwire.skills.spider.skill", "SpiderSkill",
+        ["__init__", "cleanup", "get_hints", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
+    "SwmlTransferSkill": ("signalwire.skills.swml_transfer.skill", "SWMLTransferSkill",
+        ["get_hints", "get_instance_key", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
+    "WeatherApiSkill": ("signalwire.skills.weather_api.skill", "WeatherApiSkill",
+        ["__init__", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
+    "WebSearchSkill": ("signalwire.skills.web_search.skill", "WebSearchSkill",
+        ["get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
+         "get_prompt_sections", "register_tools", "setup"]),
+    "WikipediaSearchSkill": ("signalwire.skills.wikipedia_search.skill", "WikipediaSearchSkill",
+        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "search_wiki", "setup"]),
+}
+
+
+# -- Serialization-method alias projection ----------------------------------
+# C++ names its object->JSON serializer ``to_json`` (the nlohmann/json + C++
+# convention); the Python reference records the same method as ``to_dict`` on
+# these classes (a Python object returns a dict, which the SDK then serializes).
+# Same method, port-idiom spelling. Where the C++ class genuinely has ``to_json``
+# we also surface ``to_dict`` so the membership matches — never inventing it (only
+# projected when ``to_json`` is actually present on that class). This is an alias
+# projection, not a global rename: classes like PomBuilder/PromptObjectModel carry
+# BOTH names in both languages and must not collapse.
+_TO_DICT_ALIAS_CLASSES: set[tuple[str, str]] = {
+    ("signalwire.core.contexts", "Context"),
+    ("signalwire.core.contexts", "ContextBuilder"),
+    ("signalwire.core.contexts", "GatherInfo"),
+    ("signalwire.core.contexts", "GatherQuestion"),
+    ("signalwire.core.contexts", "Step"),
+    ("signalwire.core.function_result", "FunctionResult"),
+}
+
+
+def _project_to_dict_aliases(modules: dict) -> None:
+    for (mod, cls) in _TO_DICT_ALIAS_CLASSES:
+        methods = modules.get(mod, {}).get("classes", {}).get(cls)
+        if methods is not None and "to_json" in methods and "to_dict" not in methods:
+            methods.append("to_dict")
+            modules[mod]["classes"][cls] = sorted(set(methods))
+
+
+# -- Module-level free-function projection ----------------------------------
+# The regex header walker only collects methods declared INSIDE a class; it does
+# not emit namespace-level free functions. Python exposes a few module-level
+# functions the C++ port implements as free functions in a namespace; project
+# them by (python_module -> [function names]) when the C++ header genuinely
+# defines them (verified by a source grep, never invented).
+# ``python_module: [(cpp_header_relpath, cpp_func_name, python_func_name)]``
+MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
+    # parse_event: the RELAY typed-event dispatcher (typed_events.hpp).
+    "signalwire.relay.event": [
+        ("include/signalwire/relay/typed_events.hpp", "parse_event", "parse_event"),
+    ],
+    # Serverless-mode detection free function.
+    "signalwire.utils": [
+        ("include/signalwire/utils/serverless.hpp", "is_serverless_mode", "is_serverless_mode"),
+    ],
+    # URL validation free function.
+    "signalwire.utils.url_validator": [
+        ("include/signalwire/utils/url_validator.hpp", "validate_url", "validate_url"),
+    ],
+    # Security-hygiene utilities (security_utils.py). C++ groups them in a
+    # nested ``signalwire::security::security_utils`` namespace with PascalCase
+    # names; Python keeps them module-level under
+    # ``signalwire.core.security.security_utils``. Grep the PascalCase C++ name;
+    # emit the Python snake_case name.
+    "signalwire.core.security.security_utils": [
+        ("include/signalwire/security/security_utils.hpp",
+         "FilterSensitiveHeaders", "filter_sensitive_headers"),
+        ("include/signalwire/security/security_utils.hpp", "RedactUrl", "redact_url"),
+        ("include/signalwire/security/security_utils.hpp",
+         "IsValidHostname", "is_valid_hostname"),
+    ],
+    # Inbound-webhook signature validation (webhooks.md). C++ exposes these as
+    # PascalCase free functions in ``signalwire::security``; Python keeps them
+    # module-level under ``signalwire.core.security.webhook_validator``.
+    "signalwire.core.security.webhook_validator": [
+        ("include/signalwire/security/webhook_validator.hpp",
+         "ValidateWebhookSignature", "validate_webhook_signature"),
+        ("include/signalwire/security/webhook_validator.hpp",
+         "ValidateRequest", "validate_request"),
+    ],
+    # Top-level ``signalwire/__init__.py`` package helpers. C++ implements them
+    # as free functions in ``namespace signalwire`` (src/signalwire.cpp,
+    # declared in include/signalwire/signalwire.hpp). ``RestClient`` keeps its
+    # PascalCase spelling on both sides (it is a factory named for the class).
+    "signalwire": [
+        ("include/signalwire/signalwire.hpp", "RestClient", "RestClient"),
+        ("include/signalwire/signalwire.hpp", "register_skill", "register_skill"),
+        ("include/signalwire/signalwire.hpp", "add_skill_directory", "add_skill_directory"),
+        ("include/signalwire/signalwire.hpp", "list_skills_with_params", "list_skills_with_params"),
+        ("include/signalwire/signalwire.hpp", "list_skills", "list_skills"),
+    ],
+    # Logging-config module-level helpers. C++ implements them as free functions
+    # in ``signalwire::core::logging_config`` (same snake_case names as Python).
+    "signalwire.core.logging_config": [
+        ("include/signalwire/core/logging_config.hpp",
+         "configure_logging", "configure_logging"),
+        ("include/signalwire/core/logging_config.hpp", "get_logger", "get_logger"),
+        ("include/signalwire/core/logging_config.hpp",
+         "reset_logging_configuration", "reset_logging_configuration"),
+        ("include/signalwire/core/logging_config.hpp",
+         "strip_control_chars", "strip_control_chars"),
+        ("include/signalwire/core/logging_config.hpp",
+         "get_execution_mode", "get_execution_mode"),
+    ],
+}
+
+
+def _project_module_functions(modules: dict, repo: Path) -> None:
+    for mod, funcs in MODULE_FUNCTION_PROJECTIONS.items():
+        for relpath, cpp_name, py_name in funcs:
+            hdr = repo / relpath
+            if not hdr.is_file():
+                continue
+            text = hdr.read_text(encoding="utf-8")
+            # Require the C++ header to actually define the function (return-type
+            # + name + '(') so we never surface a function the port lacks.
+            if not re.search(rf"\b{re.escape(cpp_name)}\s*\(", text):
+                continue
+            entry = modules.setdefault(mod, {"classes": {}, "functions": []})
+            if py_name not in entry["functions"]:
+                entry["functions"].append(py_name)
+                entry["functions"].sort()
+
+
+def _scan_skill_methods(repo: Path) -> dict[str, set[str]]:
+    """Return {cpp_skill_class: {method names it DEFINES}} by scanning the
+    built-in skill implementation files. A skill class is only projected if its
+    ``.cpp`` is actually present (fail-honest: a deleted skill drops out)."""
+    src = repo / SKILL_SOURCE_DIR
+    defined: dict[str, set[str]] = {}
+    if not src.is_dir():
+        return defined
+    class_re = re.compile(r"\bclass\s+([A-Za-z_]\w*Skill)\b")
+    # method def: `<name>(...) override` or `<name>(...) const override` or `<name>(...) {`
+    method_re = re.compile(r"\b([a-z_][a-z0-9_]*)\s*\([^;{]*\)\s*(?:const\s*)?(?:override|noexcept|\{)")
+    for cpp in sorted(src.glob("*.cpp")):
+        text = strip_block_comments(cpp.read_text(encoding="utf-8"))
+        # Drop ``//`` line comments too, so a method name mentioned in a doc
+        # comment doesn't perturb the regex scan.
+        text = "\n".join(strip_line_comments(ln) for ln in text.splitlines())
+        classes = class_re.findall(text)
+        methods = set(method_re.findall(text))
+        for cls in classes:
+            defined.setdefault(cls, set()).update(methods)
+    return defined
+
+
+def _project_builtin_skills(modules: dict, repo: Path) -> None:
+    """Project each built-in skill class into its Python-canonical module with the
+    intersection of Python's recorded methods and the methods the C++ class
+    genuinely has (own-defined | SkillBase-inherited | ctor)."""
+    defined = _scan_skill_methods(repo)
+    for cpp_cls, (mod, py_cls, py_methods) in SKILL_PROJECTIONS.items():
+        if cpp_cls not in defined:
+            continue  # skill not implemented in this tree — don't invent it
+        own = defined[cpp_cls]
+        present = []
+        for m in py_methods:
+            if m == "__init__" or m in own or m in _SKILL_BASE_METHODS:
+                present.append(m)
+        mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
+        mod_entry["classes"][py_cls] = sorted(set(present))
 
 
 # ---------------------------------------------------------------------------
@@ -976,6 +1240,12 @@ def module_for_class(class_name: str, ns_path: str) -> str | None:
     """
     if class_name in CLASSES_TO_SKIP:
         return None
+    # The Python-parity typed RELAY events live in ``signalwire::relay::events``
+    # (typed_events.hpp) and route to Python's ``signalwire.relay.event`` module —
+    # a NAMESPACE-keyed override, because the class names (RelayEvent/DialEvent)
+    # collide with the port's transport-side structs in ``signalwire::relay``.
+    if ns_path == "signalwire::relay::events":
+        return "signalwire.relay.event"
     if class_name in CLASS_MODULE_MAP:
         return CLASS_MODULE_MAP[class_name]
     # Port-only class: use native translation, with class name snake_cased
@@ -1095,10 +1365,19 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # classes. Emit the same method list under each mixin module path so
     # the diff against python_surface.json recognises the symbols as
     # implemented.
+    # The mixin methods live on AgentBase directly OR on its base
+    # ``swml::Service`` (which the C++ AgentBase inherits — the header walker
+    # doesn't follow inheritance, so pool both classes as donors, mirroring
+    # ruby's SURFACE_METHOD_DONORS: an AuthMixin/WebMixin method C++ defines on
+    # the shared Service base is legitimately part of AgentBase's callable
+    # surface). Service is enumerated as ``swml_service.SWMLService``.
     agent_base_methods: set[str] = set()
     ab_entry = modules.get("signalwire.core.agent_base", {})
     ab_methods = ab_entry.get("classes", {}).get("AgentBase", [])
     agent_base_methods = set(ab_methods)
+    svc_entry = modules.get("signalwire.core.swml_service", {})
+    svc_methods = svc_entry.get("classes", {}).get("SWMLService", [])
+    agent_base_methods |= set(svc_methods)
 
     for (mod, cls), expected_methods in MIXIN_PROJECTIONS.items():
         present = [m for m in expected_methods if m in agent_base_methods]
@@ -1140,6 +1419,85 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # each generated class so the surface membership matches. Idiom via
     # emit+projection, never omission.
     _project_generated_rest_methods(modules)
+
+    # Built-in skill projection: each skill class lives in src/skills/builtin/<name>.cpp
+    # (implementation file, invisible to the header walker), registered at static-init.
+    # Project each into its Python-canonical ``signalwire.skills.<name>.skill`` module.
+    _project_builtin_skills(modules, repo)
+
+    # Module-level free functions the header walker can't see (e.g. relay parse_event).
+    _project_module_functions(modules, repo)
+
+    # Serialization idiom: C++ ``to_json`` == Python ``to_dict`` on contexts +
+    # FunctionResult; surface the ``to_dict`` alias where ``to_json`` exists.
+    _project_to_dict_aliases(modules)
+
+    # RELAY abstract call-action mixin bases: the C++ ``Action`` class flattens
+    # stop/pause/resume/volume; project each Python abstract base onto
+    # signalwire.relay.call with the methods the C++ Action actually has.
+    action_methods: set[str] = set()
+    for _mod in ("signalwire.relay.action", "signalwire.relay.call"):
+        _e = modules.get(_mod, {})
+        action_methods |= set(_e.get("classes", {}).get("Action", []))
+    for (mod, cls), expected in RELAY_ACTION_PROJECTIONS.items():
+        present = sorted(m for m in expected if m in action_methods)
+        if present:
+            mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
+            mod_entry["classes"][cls] = present
+
+    # The base ``Action`` class: Python records it in ``signalwire.relay.call`` with
+    # ``__init__``/``is_done``/``wait``. The C++ ``Action`` (native module
+    # ``signalwire.relay.action``, a PORT_ADDITION) carries these; project the
+    # Python-recorded subset onto relay.call so the base symbol lines up (its
+    # richer C++ surface stays under relay.action as the port addition).
+    _action_own = modules.get("signalwire.relay.action", {}).get("classes", {}).get("Action", [])
+    if _action_own:
+        proj = sorted({"__init__"} | {m for m in ("is_done", "wait") if m in _action_own})
+        modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
+        modules["signalwire.relay.call"]["classes"]["Action"] = proj
+
+    # Concrete RELAY call-action subclasses (PlayAction/RecordAction/…). The C++
+    # port FLATTENS every control onto the unified ``Action`` and declares each
+    # concrete subclass via the ``SIGNALWIRE_RELAY_ACTION_SUBCLASS(Name)`` macro
+    # (``class Name : public Action { using Action::Action; };``). The regex
+    # header walker cannot see macro-generated classes, so project each subclass
+    # the macro actually declares in action.hpp. Every subclass inherits the
+    # unified Action's ctor (``__init__``); Collect/StandaloneCollect
+    # additionally expose ``start_input_timers`` (present on the C++ Action).
+    _action_hpp = repo / "include/signalwire/relay/action.hpp"
+    if _action_hpp.is_file():
+        _txt = _action_hpp.read_text(encoding="utf-8")
+        _declared = set(
+            re.findall(r"SIGNALWIRE_RELAY_ACTION_SUBCLASS\(([A-Za-z_]\w*)\)", _txt)
+        )
+        _declared.discard("NAME")  # the macro parameter, not a real subclass
+        _has_timers = "start_input_timers" in set(_action_own)
+        _timer_subclasses = {"CollectAction", "StandaloneCollectAction"}
+        call_mod = modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
+        for _sub in _declared:
+            _meths = ["__init__"]
+            if _sub in _timer_subclasses and _has_timers:
+                _meths.append("start_input_timers")
+            call_mod["classes"][_sub] = sorted(_meths)
+
+    # Constructor / call-operator idiom projections. The regex header walker
+    # emits ``__init__`` only for a class with an explicitly-declared public
+    # constructor, and never emits ``__call__`` (C++ spells it ``operator()``,
+    # which is in SKIP_METHOD_NAMES). These classes genuinely have the member
+    # (a private singleton ctor, a defaulted ctor, or ``operator()``); surface
+    # the Python-canonical name when the C++ class is present.
+    def _ensure_member(mod: str, cls: str, member: str) -> None:
+        entry = modules.get(mod, {}).get("classes", {}).get(cls)
+        if entry is not None and member not in entry:
+            entry.append(member)
+            modules[mod]["classes"][cls] = sorted(set(entry))
+
+    # SWAIGFunction exposes ``operator()`` + ``call`` -> Python ``__call__``.
+    _ensure_member("signalwire.core.swaig_function", "SWAIGFunction", "__call__")
+    # SkillRegistry is a singleton (private ctor); SkillBase has a defaulted
+    # protected ctor. Both genuinely construct — surface ``__init__``.
+    _ensure_member("signalwire.skills.registry", "SkillRegistry", "__init__")
+    _ensure_member("signalwire.core.skill_base", "SkillBase", "__init__")
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

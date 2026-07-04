@@ -219,6 +219,70 @@ TEST(aiconfig_set_language_params_returns_self_for_chaining) {
 }
 
 // ========================================================================
+// Multilingual (Mode B) — set_multilingual(config) -> top-level "multilingual"
+// ========================================================================
+
+TEST(aiconfig_set_multilingual_emits_wire_key) {
+    AgentBase agent;
+    json cfg = json::object({
+        {"languages", json::array({"en", "es"})},
+        {"start_language", "en"},
+        {"min_switch_words", 2},
+    });
+    agent.set_multilingual(cfg);
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai.contains("multilingual"));
+    ASSERT_EQ(ai["multilingual"], cfg);
+    return true;
+}
+
+TEST(aiconfig_no_multilingual_not_in_swml) {
+    AgentBase agent;
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_empty_object_ignored) {
+    AgentBase agent;
+    agent.set_multilingual(json::object());
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_non_object_ignored) {
+    AgentBase agent;
+    agent.set_multilingual(json("not-a-dict"));
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_coexists_with_languages) {
+    // multilingual and languages both emit; server prefers multilingual.
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "rachel", "", ""});
+    agent.set_multilingual(json::object({{"start_language", "en"}}));
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai.contains("languages"));
+    ASSERT_TRUE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_returns_self_for_chaining) {
+    AgentBase agent;
+    AgentBase& ret = agent.set_multilingual(json::object({{"start_language", "en"}}));
+    ASSERT_TRUE(&ret == &agent);
+    return true;
+}
+
+// ========================================================================
 // Pronunciations
 // ========================================================================
 

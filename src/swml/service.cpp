@@ -11,6 +11,7 @@
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/common.hpp"
+#include "signalwire/core/swml_handler.hpp"
 
 namespace signalwire {
 namespace swml {
@@ -248,6 +249,60 @@ Service& Service::sleep(int milliseconds) {
 json Service::render_swml() const { return on_render_swml(); }
 
 json Service::on_render_swml() const { return document_.to_json(); }
+
+bool Service::add_section(const std::string& section_name) {
+  if (document_.has_section(section_name)) {
+    return false;
+  }
+  // Section() creates the section on first access.
+  document_.section(section_name);
+  return true;
+}
+
+Service& Service::add_verb_to_section(const std::string& section_name, const std::string& verb_name,
+                                      const json& config) {
+  document_.add_verb_to_section(section_name, verb_name, config);
+  return *this;
+}
+
+std::string Service::render_document() const { return render_swml().dump(); }
+
+void Service::reset_document() { document_ = Document(); }
+
+void Service::manual_set_proxy_url(const std::string& proxy_url) { manual_proxy_url_ = proxy_url; }
+
+void Service::register_routing_callback(RoutingCallback callback, const std::string& path) {
+  routing_callbacks_[path] = std::move(callback);
+}
+
+void Service::register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler) {
+  if (handler) {
+    verb_handlers_.push_back(std::move(handler));
+  }
+}
+
+std::string Service::extract_sip_username(const json& request_body) {
+  // Mirror Python: pull call.to, expect a SIP URI (sip:user@host) and return
+  // the username portion. Returns "" when absent/unparseable.
+  if (!request_body.is_object() || !request_body.contains("call")) {
+    return "";
+  }
+  const auto& call = request_body["call"];
+  if (!call.is_object() || !call.contains("to") || !call["to"].is_string()) {
+    return "";
+  }
+  std::string to = call["to"].get<std::string>();
+  // Strip a leading "sip:" scheme if present.
+  const std::string scheme = "sip:";
+  if (to.rfind(scheme, 0) == 0) {
+    to = to.substr(scheme.size());
+  }
+  auto at = to.find('@');
+  if (at == std::string::npos) {
+    return "";
+  }
+  return to.substr(0, at);
+}
 
 json Service::render_main_swml(const httplib::Request&) const { return on_render_swml(); }
 

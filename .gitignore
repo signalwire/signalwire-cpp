@@ -4,3 +4,6 @@ __pycache__/
 
 # Claude Code local session settings (not part of the SDK)
 .claude/
+
+# sw-verify repo-local scratch
+.sw-tmp/

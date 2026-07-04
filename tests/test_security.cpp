@@ -176,3 +176,119 @@ TEST(session_manager_validate_token_temporary_string_args) {
                                    std::string_view{"call-77"}));
     return true;
 }
+
+// ── Session-tracking + Python-surface aliases ──────────────────────
+
+TEST(session_manager_generate_and_validate_tool_token) {
+    // Fixed secret so the token round-trips deterministically.
+    std::vector<uint8_t> secret(32, 0x42);
+    SessionManager sm(secret);
+
+    std::string token = sm.generate_token("do_thing", "call-abc");
+    ASSERT_FALSE(token.empty());
+    // create_tool_token is an alias of generate_token.
+    std::string token2 = sm.create_tool_token("do_thing", "call-abc");
+    ASSERT_FALSE(token2.empty());
+
+    // validate_tool_token(function_name, token, call_id) reorders to
+    // validate_token(token, function_name, call_id).
+    ASSERT_TRUE(sm.validate_tool_token("do_thing", token, "call-abc"));
+    ASSERT_FALSE(sm.validate_tool_token("other_fn", token, "call-abc"));
+    ASSERT_FALSE(sm.validate_tool_token("do_thing", token, "wrong-call"));
+    return true;
+}
+
+TEST(session_manager_create_session_returns_given_id) {
+    SessionManager sm;
+    ASSERT_EQ(sm.create_session("call-existing"), "call-existing");
+    return true;
+}
+
+TEST(session_manager_create_session_mints_id) {
+    SessionManager sm;
+    std::string id = sm.create_session();
+    ASSERT_FALSE(id.empty());
+    // URL-safe: no '+', '/', or '=' padding.
+    ASSERT_TRUE(id.find('+') == std::string::npos);
+    ASSERT_TRUE(id.find('/') == std::string::npos);
+    ASSERT_TRUE(id.find('=') == std::string::npos);
+    // Two mints differ.
+    ASSERT_NE(id, sm.create_session());
+    return true;
+}
+
+TEST(session_manager_metadata_round_trips) {
+    SessionManager sm;
+    sm.create_session("call-1");
+    // Unknown session -> empty object, never null.
+    ASSERT_TRUE(sm.get_session_metadata("call-unknown").is_object());
+    ASSERT_TRUE(sm.get_session_metadata("call-unknown").empty());
+
+    ASSERT_TRUE(sm.set_session_metadata("call-1", "name", "Alice"));
+    ASSERT_TRUE(sm.set_session_metadata("call-1", "count", 3));
+    json md = sm.get_session_metadata("call-1");
+    ASSERT_EQ(md.value("name", ""), "Alice");
+    ASSERT_EQ(md.value("count", 0), 3);
+
+    // Returned copy is independent of the internal store.
+    md["name"] = "Mutated";
+    ASSERT_EQ(sm.get_session_metadata("call-1").value("name", ""), "Alice");
+    return true;
+}
+
+TEST(session_manager_activate_and_end_session) {
+    SessionManager sm;
+    ASSERT_TRUE(sm.activate_session("call-2"));
+    sm.set_session_metadata("call-2", "k", "v");
+    ASSERT_EQ(sm.get_session_metadata("call-2").value("k", ""), "v");
+
+    ASSERT_TRUE(sm.end_session("call-2"));
+    // Metadata cleared after end.
+    ASSERT_TRUE(sm.get_session_metadata("call-2").empty());
+    return true;
+}
+
+TEST(session_manager_debug_token_disabled_by_default) {
+    SessionManager sm;
+    std::string token = sm.generate_token("dbg_fn", "callabc");
+    // Debug mode off (default) -> error, no decode.
+    json dbg = sm.debug_token(token);
+    ASSERT_EQ(dbg.value("error", ""), "debug mode not enabled");
+    return true;
+}
+
+TEST(session_manager_debug_token_valid) {
+    std::vector<uint8_t> secret(32, 0x11);
+    SessionManager sm(secret);
+    sm.set_debug_mode(true);
+    std::string token = sm.generate_token("dbg_fn", "callabc");  // 7 chars -> not truncated
+
+    json dbg = sm.debug_token(token);
+    ASSERT_TRUE(dbg.value("valid_format", false));
+    ASSERT_TRUE(dbg.contains("components"));
+    ASSERT_EQ(dbg["components"].value("function", ""), "dbg_fn");
+    ASSERT_EQ(dbg["components"].value("call_id", ""), "callabc");
+    ASSERT_TRUE(dbg.contains("status"));
+    // Fresh token: not expired.
+    ASSERT_FALSE(dbg["status"].value("is_expired", true));
+    return true;
+}
+
+TEST(session_manager_debug_token_truncates_long_fields) {
+    SessionManager sm;
+    sm.set_debug_mode(true);
+    std::string token = sm.generate_token("fn", "this-is-a-very-long-call-id");
+    json dbg = sm.debug_token(token);
+    ASSERT_TRUE(dbg.value("valid_format", false));
+    // call_id truncated to 8 chars + "..."
+    ASSERT_EQ(dbg["components"].value("call_id", ""), "this-is-...");
+    return true;
+}
+
+TEST(session_manager_debug_token_malformed) {
+    SessionManager sm;
+    sm.set_debug_mode(true);
+    json dbg = sm.debug_token("not-a-token");
+    ASSERT_FALSE(dbg.value("valid_format", true));
+    return true;
+}

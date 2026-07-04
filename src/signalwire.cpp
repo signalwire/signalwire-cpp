@@ -124,4 +124,24 @@ std::map<std::string, std::map<std::string, std::string>> list_skills_with_param
   return out;
 }
 
+std::vector<std::map<std::string, std::string>> list_skills() {
+  std::vector<std::map<std::string, std::string>> out;
+  auto& reg = skills::SkillRegistry::instance();
+  for (const auto& name : reg.list_skills()) {
+    std::map<std::string, std::string> entry;
+    entry["name"] = name;
+    try {
+      auto skill = reg.create(name);
+      if (skill) {
+        entry["description"] = skill->skill_description();
+        entry["version"] = skill->skill_version();
+      }
+    } catch (const std::exception& e) {
+      static_cast<void>(e);
+    }
+    out.push_back(entry);
+  }
+  return out;
+}
+
 }  // namespace signalwire

@@ -270,6 +270,24 @@ class AgentBase : public swml::Service {
                                                        const json& raw_data) override;
   [[nodiscard]] std::vector<std::string> list_tools() const;
 
+  /// Register several SWAIG tools at once (Python: ``ToolMixin.define_tools``).
+  /// Each entry is a full tool descriptor (name/description/parameters);
+  /// delegates to ``register_swaig_function`` per entry. Returns ``*this`` for
+  /// fluent chaining.
+  AgentBase& define_tools(const std::vector<swaig::ToolDefinition>& tools);
+
+  /// Register a routing callback for a request path (Python:
+  /// ``WebMixin.register_routing_callback``). Given a request path + parsed
+  /// params, the callback returns the route to dispatch to (empty = no
+  /// override). Used to steer inbound requests to per-path handlers.
+  using RoutingCallback = std::function<std::string(const std::string& path, const json& params)>;
+  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+
+  /// Install signal handlers so the agent's HTTP server drains + stops cleanly
+  /// on SIGINT/SIGTERM (Python: ``WebMixin.setup_graceful_shutdown``). Real
+  /// C++ implementation over the running httplib server.
+  void setup_graceful_shutdown();
+
   /// Mint a per-call SWAIG-function token via the agent's SessionManager.
   ///
   /// Python parity: ``state_mixin.StateMixin._create_tool_token`` —
@@ -315,6 +333,18 @@ class AgentBase : public swml::Service {
   ///
   /// Python parity: ``AIConfigMixin.get_language_params`` (029ca6f).
   [[nodiscard]] std::optional<json> get_language_params(const std::string& code) const;
+
+  /// Configure ASR-driven multilingual mode (Mode B). Emits a top-level
+  /// ``multilingual`` object on the AI verb: the recognizer runs in
+  /// code-switching mode and the agent answers in whatever language the
+  /// caller actually spoke. Mutually exclusive with set_languages() — if
+  /// both are set the server uses ``multilingual`` and ignores ``languages``.
+  /// A non-object / empty config is ignored (leaves the mode unset),
+  /// mirroring Python's ``if config and isinstance(config, dict)``.
+  ///
+  /// Python parity: ``AIConfigMixin.set_multilingual``.
+  AgentBase& set_multilingual(const json& config);
+
   AgentBase& add_pronunciation(const std::string& replace_val, const std::string& with_val,
                                bool ignore_case = false);
   AgentBase& set_pronunciations(const std::vector<Pronunciation>& pronuns);
@@ -393,6 +423,12 @@ class AgentBase : public swml::Service {
   contexts::Context& add_context(const std::string& name);
   [[nodiscard]] bool has_contexts() const;
 
+  /// Return the defined contexts as a serialised JSON object, or
+  /// ``std::nullopt`` when no contexts exist. Mirrors Python's
+  /// ``PromptMixin.contexts`` property (the read side of the contexts POM).
+  /// Alias of ``get_contexts`` under the Python-canonical name.
+  [[nodiscard]] std::optional<json> contexts() const { return get_contexts(); }
+
   /// Remove all contexts, returning the agent to a no-contexts state.
   /// Convenience wrapper around define_contexts().reset().
   AgentBase& reset_contexts();
@@ -441,6 +477,29 @@ class AgentBase : public swml::Service {
   AgentBase& add_swaig_query_param(const std::string& key, const std::string& value);
   AgentBase& clear_swaig_query_params();
   AgentBase& enable_debug_routes(bool enable = true);
+
+  // ---- Python-parity surface ----------------------------------------------
+
+  /// Agent name (Python: ``get_name``). Alias of the inherited ``name()``.
+  [[nodiscard]] std::string get_name() const { return name(); }
+
+  /// Override the SWAIG-webhook URL (Python: ``set_web_hook_url``). Alias of
+  /// set_webhook_url (the Python spelling splits ``web_hook``).
+  AgentBase& set_web_hook_url(const std::string& url) { return set_webhook_url(url); }
+
+  /// Add multiple SWAIG query params at once (Python: ``add_swaig_query_params``).
+  AgentBase& add_swaig_query_params(const json& params) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      if (it.value().is_string()) {
+        add_swaig_query_param(it.key(), it.value().get<std::string>());
+      }
+    }
+    return *this;
+  }
+
+  /// Full URL for this agent's endpoint — host, port, route (Python:
+  /// ``get_full_url``). ``include_auth`` embeds basic-auth credentials.
+  [[nodiscard]] std::string get_full_url(bool include_auth = false) const;
 
   // ========================================================================
   // SIP Methods
@@ -558,6 +617,11 @@ class AgentBase : public swml::Service {
   // Internal SWML rendering (used by render_swml_for_request)
   [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers) const;
 
+  /// Post-render transform hook. Called on the fully-rendered SWML document
+  /// just before it is returned, so a subclass can rewrite it (e.g. BedrockAgent
+  /// transforms the ``ai`` verb into ``amazon_bedrock``). Default: no-op.
+  virtual void transform_swml(json& swml) const;
+
   // ========================================================================
   // State
   // ========================================================================
@@ -581,6 +645,7 @@ class AgentBase : public swml::Service {
   // AI Config
   std::vector<std::string> hints_;
   std::vector<LanguageConfig> languages_;
+  json multilingual_;  // ASR-driven multilingual (Mode B); null when unset
   std::vector<Pronunciation> pronunciations_;
   json ai_params_;
   json global_data_;
@@ -609,6 +674,7 @@ class AgentBase : public swml::Service {
   std::optional<std::string> webhook_url_;
   std::vector<SwaigQueryParam> swaig_query_params_;
   bool debug_routes_ = false;
+  std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
 
   // MCP
   std::vector<json> mcp_servers_;

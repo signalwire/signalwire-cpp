@@ -71,6 +71,42 @@ class SkillBase {
   virtual void cleanup() {}
 
   // ========================================================================
+  // Python-parity surface (signalwire.core.skill_base.SkillBase)
+  // ========================================================================
+
+  /// Check that every required env var (required_env_vars()) is set.
+  /// Python parity: ``SkillBase.validate_env_vars``.
+  [[nodiscard]] bool validate_env_vars() const {
+    for (const auto& var : required_env_vars()) {
+      const char* v = std::getenv(var.c_str());
+      if (v == nullptr || v[0] == '\0') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Check that every required package is available. C++ links its deps at
+  /// build time (there is no runtime import), so a compiled skill's packages
+  /// are inherently present — return true. Python parity: ``validate_packages``.
+  [[nodiscard]] bool validate_packages() const { return true; }
+
+  /// Read this skill instance's namespaced state from a SWAIG handler's raw
+  /// global_data. Python parity: ``get_skill_data``.
+  [[nodiscard]] json get_skill_data(const json& raw_data) const {
+    const std::string ns = skill_namespace();
+    json global_data = raw_data.value("global_data", json::object());
+    return global_data.value(ns, json::object());
+  }
+
+  /// Write this skill instance's namespaced state into a FunctionResult (under
+  /// the skill's namespace key). Python parity: ``update_skill_data``.
+  swaig::FunctionResult& update_skill_data(swaig::FunctionResult& result, const json& data) const {
+    result.update_global_data(json::object({{skill_namespace(), data}}));
+    return result;
+  }
+
+  // ========================================================================
   // Helpers
   // ========================================================================
 
@@ -113,6 +149,16 @@ class SkillBase {
   }
 
  protected:
+  /// The global_data namespace for this skill instance: ``skill:<prefix>`` when
+  /// a ``prefix`` param is set, else ``skill:<instance_key>``. Protected — mirrors
+  /// Python's private ``_get_skill_namespace`` (off the public surface).
+  [[nodiscard]] std::string skill_namespace() const {
+    if (params_.contains("prefix") && params_["prefix"].is_string()) {
+      return "skill:" + params_["prefix"].get<std::string>();
+    }
+    return "skill:" + get_instance_key();
+  }
+
   json params_;
 };
 

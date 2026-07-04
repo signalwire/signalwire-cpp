@@ -15,6 +15,27 @@
 namespace signalwire {
 namespace security {
 
+namespace {
+/// Truncate to 8 chars + "..." when longer (matches the authoritative
+/// reference's debug_token component redaction).
+std::string truncate8(const std::string& s) { return s.size() > 8 ? s.substr(0, 8) + "..." : s; }
+
+/// Format a Unix timestamp as an ISO-8601 UTC string (matches Python's
+/// datetime.fromtimestamp(...).isoformat() closely enough for the debug view).
+std::string iso8601_utc(int64_t ts) {
+  std::time_t t = static_cast<std::time_t>(ts);
+  std::tm tm_buf{};
+#if defined(_WIN32)
+  gmtime_s(&tm_buf, &t);
+#else
+  gmtime_r(&t, &tm_buf);
+#endif
+  char buf[32];
+  std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm_buf);
+  return std::string(buf);
+}
+}  // namespace
+
 SessionManager::SessionManager() : secret_(32) {
   if (RAND_bytes(secret_.data(), 32) != 1) {
     throw std::runtime_error("Failed to generate random secret for SessionManager");
@@ -174,6 +195,137 @@ bool SessionManager::validate_token(std::string_view token, std::string_view fun
   }
 
   return true;
+}
+
+// ── Python-surface token aliases ───────────────────────────────────
+
+std::string SessionManager::generate_token(const std::string& function_name,
+                                           const std::string& call_id) const {
+  return create_token(function_name, call_id, default_expiry_secs_);
+}
+
+std::string SessionManager::create_tool_token(const std::string& function_name,
+                                              const std::string& call_id) const {
+  return generate_token(function_name, call_id);
+}
+
+bool SessionManager::validate_tool_token(std::string_view function_name, std::string_view token,
+                                         std::string_view call_id) const {
+  // Reference order is (function_name, token, call_id); validate_token takes
+  // (token, function_name, call_id).
+  return validate_token(token, function_name, call_id);
+}
+
+// ── Session lifecycle ──────────────────────────────────────────────
+
+std::string SessionManager::create_session(const std::string& call_id) {
+  std::string id = call_id;
+  if (id.empty()) {
+    // secrets.token_urlsafe(16): 16 random bytes, URL-safe base64, no padding.
+    std::vector<uint8_t> buf(16);
+    if (RAND_bytes(buf.data(), 16) != 1) {
+      throw std::runtime_error("Failed to generate random session id");
+    }
+    std::string raw(buf.begin(), buf.end());
+    id = base64_encode(raw);
+    // Make it URL-safe and drop padding (matches token_urlsafe).
+    for (char& c : id) {
+      if (c == '+') {
+        c = '-';
+      } else if (c == '/') {
+        c = '_';
+      }
+    }
+    while (!id.empty() && id.back() == '=') {
+      id.pop_back();
+    }
+  }
+  std::lock_guard<std::mutex> lock(metadata_mutex_);
+  session_metadata_.emplace(id, json::object());
+  return id;
+}
+
+bool SessionManager::activate_session(const std::string& call_id) {
+  if (!call_id.empty()) {
+    std::lock_guard<std::mutex> lock(metadata_mutex_);
+    session_metadata_.emplace(call_id, json::object());
+  }
+  return true;
+}
+
+bool SessionManager::end_session(const std::string& call_id) {
+  std::lock_guard<std::mutex> lock(metadata_mutex_);
+  session_metadata_.erase(call_id);
+  return true;
+}
+
+json SessionManager::get_session_metadata(const std::string& call_id) const {
+  std::lock_guard<std::mutex> lock(metadata_mutex_);
+  auto it = session_metadata_.find(call_id);
+  if (it == session_metadata_.end()) {
+    return json::object();
+  }
+  return it->second;  // copy
+}
+
+bool SessionManager::set_session_metadata(const std::string& call_id, const std::string& key,
+                                          const json& value) {
+  std::lock_guard<std::mutex> lock(metadata_mutex_);
+  json& entry = session_metadata_[call_id];
+  if (!entry.is_object()) {
+    entry = json::object();
+  }
+  entry[key] = value;
+  return true;
+}
+
+void SessionManager::set_debug_mode(bool enabled) { debug_mode_ = enabled; }
+
+json SessionManager::debug_token(const std::string& token) const {
+  if (!debug_mode_) {
+    return json{{"error", "debug mode not enabled"}};
+  }
+  auto dot_pos = token.find('.');
+  if (dot_pos == std::string::npos) {
+    return json{{"valid_format", false}, {"parts_count", 1}, {"token_length", token.size()}};
+  }
+  std::string encoded_payload = token.substr(0, dot_pos);
+  std::string signature = token.substr(dot_pos + 1);
+
+  std::string payload = base64_decode(encoded_payload);
+  // format: functionName:callID:expiryTimestamp
+  auto first_colon = payload.find(':');
+  auto second_colon =
+      first_colon == std::string::npos ? std::string::npos : payload.find(':', first_colon + 1);
+  if (first_colon == std::string::npos || second_colon == std::string::npos) {
+    return json{{"valid_format", false}, {"decoded", payload}, {"token_length", token.size()}};
+  }
+
+  std::string token_func = payload.substr(0, first_colon);
+  std::string token_call_id = payload.substr(first_colon + 1, second_colon - first_colon - 1);
+  std::string token_expiry_str = payload.substr(second_colon + 1);
+
+  int64_t current_time = current_timestamp();
+  json status = json::object();
+  status["current_time"] = current_time;
+  json components = json::object();
+  components["function"] = token_func;
+  components["call_id"] = truncate8(token_call_id);
+  components["expiry"] = token_expiry_str;
+  components["signature"] = truncate8(signature);
+  try {
+    int64_t expiry = std::stoll(token_expiry_str);
+    bool is_expired = expiry < current_time;
+    status["is_expired"] = is_expired;
+    status["expires_in_seconds"] = is_expired ? int64_t{0} : (expiry - current_time);
+    components["expiry_date"] = iso8601_utc(expiry);
+  } catch (...) {
+    status["is_expired"] = nullptr;
+    status["expires_in_seconds"] = nullptr;
+    components["expiry_date"] = nullptr;
+  }
+
+  return json{{"valid_format", true}, {"components", components}, {"status", status}};
 }
 
 }  // namespace security

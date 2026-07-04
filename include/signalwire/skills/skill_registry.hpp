@@ -8,8 +8,10 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "signalwire/skills/skill_base.hpp"
 
@@ -80,6 +82,55 @@ class SkillRegistry {
       }
     }
     external_paths_.push_back(path);
+  }
+
+  /// Look up a skill factory by name (Python:
+  /// ``SkillRegistry.get_skill_class`` — returns the skill *type*). C++ has no
+  /// first-class ``type`` object, so this returns whether the skill is known
+  /// (the factory exists); use ``create`` to instantiate. Mirrors the
+  /// discovery-by-name contract.
+  [[nodiscard]] bool get_skill_class(const std::string& name) const { return has_skill(name); }
+
+  /// Discover all registered skills as ``{name, ...}`` records (Python:
+  /// ``SkillRegistry.discover_skills`` -> list of dicts). Each record carries
+  /// the skill name and its instance-level schema where available.
+  [[nodiscard]] nlohmann::json discover_skills() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    nlohmann::json out = nlohmann::json::array();
+    for (const auto& [name, factory] : factories_) {
+      nlohmann::json rec;
+      rec["name"] = name;
+      out.push_back(rec);
+    }
+    return out;
+  }
+
+  /// Return every registered skill's parameter schema keyed by skill name
+  /// (Python: ``SkillRegistry.get_all_skills_schema`` -> dict[name -> schema]).
+  [[nodiscard]] nlohmann::json get_all_skills_schema() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    nlohmann::json out = nlohmann::json::object();
+    for (const auto& [name, factory] : factories_) {
+      auto skill = factory();
+      out[name] = skill ? skill->get_parameter_schema() : nlohmann::json::object();
+    }
+    return out;
+  }
+
+  /// Return the source (built-in vs external directory) each skill was loaded
+  /// from (Python: ``SkillRegistry.list_all_skill_sources`` -> dict[source ->
+  /// list of names]). Built-in factories are grouped under ``"builtin"``; the
+  /// registered external directories are listed under ``"external"``.
+  [[nodiscard]] nlohmann::json list_all_skill_sources() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    nlohmann::json out = nlohmann::json::object();
+    nlohmann::json builtin = nlohmann::json::array();
+    for (const auto& [name, factory] : factories_) {
+      builtin.push_back(name);
+    }
+    out["builtin"] = builtin;
+    out["external"] = external_paths_;
+    return out;
   }
 
   /// Returns the registered external skill directories.

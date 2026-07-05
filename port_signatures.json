@@ -5786,6 +5786,41 @@
         }
       }
     },
+    "signalwire.core.security.webhook_middleware": {
+      "functions": {
+        "validate": {
+          "params": [
+            {
+              "name": "method",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "url",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "headers",
+              "type": "dict<string,string>",
+              "required": true
+            },
+            {
+              "name": "body",
+              "type": "string",
+              "required": true
+            },
+            {
+              "name": "signing_key",
+              "type": "string",
+              "required": true,
+              "kind": "keyword"
+            }
+          ],
+          "returns": "optional<tuple<int,dict<string,string>,string>>"
+        }
+      }
+    },
     "signalwire.core.security.webhook_validator": {
       "functions": {
         "validate_request": {

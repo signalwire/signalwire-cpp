@@ -796,6 +796,20 @@ def collect(
         out_modules[py_module].setdefault("functions", {})
         out_modules[py_module]["functions"][fname] = sig
 
+    # webhook_middleware.validate: the Python oracle marks the trailing
+    # ``signing_key`` argument keyword-only (``*, signing_key``). C++ has no
+    # keyword-only parameters, but its signature is otherwise identical
+    # (method, url, headers, body, signing_key). Mark the trailing param
+    # ``keyword`` so the decomposed webhook-validation core compares EQUAL
+    # to the oracle — the difference is Python's call-site sugar, not a
+    # contract divergence (porting-sdk webhooks.md + HIDDEN_SURFACE_AUDIT).
+    _wm = out_modules.get("signalwire.core.security.webhook_middleware", {})
+    _validate_sig = _wm.get("functions", {}).get("validate")
+    if _validate_sig and _validate_sig.get("params"):
+        _last = _validate_sig["params"][-1]
+        if _last.get("name") == "signing_key":
+            _last["kind"] = "keyword"
+
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a
     # corresponding trailing positional ``nlohmann::json``-typed (i.e.

@@ -504,5 +504,59 @@ bool ValidateRequest(std::string_view signing_key, std::string_view signature, s
   return false;
 }
 
+std::optional<std::tuple<int, std::map<std::string, std::string>, std::string>> Validate(
+    std::string_view method, std::string_view url,
+    const std::map<std::string, std::string>& headers, std::string_view body,
+    std::string_view signing_key) {
+  (void)method;  // The SignalWire signing scheme does not sign the method;
+                 // it's accepted for cross-port shape parity.
+  if (signing_key.empty()) {
+    throw std::invalid_argument("signing_key is required");
+  }
+
+  // Pull the signature header case-insensitively (proxies vary the casing).
+  // ``X-SignalWire-Signature`` first, then the legacy ``X-Twilio-Signature``
+  // alias for cXML / compatibility callers.
+  auto find_header_ci = [&headers](const char* name) -> std::string {
+    std::string want(name);
+    std::transform(want.begin(), want.end(), want.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    for (const auto& kv : headers) {
+      std::string have = kv.first;
+      std::transform(have.begin(), have.end(), have.begin(),
+                     [](unsigned char c) { return std::tolower(c); });
+      if (have == want) {
+        return kv.second;
+      }
+    }
+    return {};
+  };
+
+  // Forbidden triple. No body detail beyond "Forbidden" — the validator MUST
+  // NOT leak which branch failed (missing header vs Scheme A vs Scheme B).
+  auto forbidden = []() -> ValidationResponse {
+    return {403, {{"Content-Type", "text/plain"}}, "Forbidden"};
+  };
+
+  std::string signature = find_header_ci("X-SignalWire-Signature");
+  if (signature.empty()) {
+    signature = find_header_ci("X-Twilio-Signature");
+  }
+  if (signature.empty()) {
+    return forbidden();
+  }
+
+  bool ok = false;
+  try {
+    ok = ValidateWebhookSignature(signing_key, signature, url, body);
+  } catch (const std::invalid_argument&) {
+    // Defensive: signing_key already checked non-empty above. Surface as
+    // 403 rather than leaking the cause.
+    return forbidden();
+  }
+
+  return ok ? std::nullopt : std::optional<ValidationResponse>(forbidden());
+}
+
 }  // namespace security
 }  // namespace signalwire

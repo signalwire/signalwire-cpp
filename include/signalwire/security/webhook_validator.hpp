@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <map>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -76,6 +79,55 @@ bool ValidateWebhookSignature(std::string_view signing_key, std::string_view sig
 /// @throws std::invalid_argument when ``signing_key`` is empty.
 bool ValidateRequest(std::string_view signing_key, std::string_view signature, std::string_view url,
                      const ParamsOrBody& params_or_raw_body);
+
+/// Response triple returned by ``Validate`` when a request must be
+/// rejected: ``(status, headers, body)`` — the framework-free decision
+/// core all ports share (Python ``webhook_middleware.validate``, dotnet
+/// ``WebhookValidationMiddleware.Validate``, Rack/PSGI middleware). Status
+/// is the HTTP status code, headers the response headers, body the
+/// response body text.
+using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, std::string>;
+
+/// Framework-free webhook-validation decision core (porting-sdk
+/// ``webhooks.md`` + HIDDEN_SURFACE_AUDIT Pass 1). This is the decomposed
+/// shape every port exposes so users can validate a signed inbound
+/// request WITHOUT depending on a specific HTTP framework — the
+/// cpp-httplib ``WrapWithSignatureValidation`` middleware is a thin
+/// PORT_ADDITION idiom built on top of this.
+///
+/// Pulls ``X-SignalWire-Signature`` (or the legacy ``X-Twilio-Signature``
+/// alias) out of ``headers``, then runs ``ValidateWebhookSignature``
+/// against ``url`` + ``body``.
+///
+/// @param method      HTTP method (e.g. ``"POST"``). Accepted for shape
+///                    parity with the cross-port contract; the SignalWire
+///                    signing scheme does not sign the method.
+/// @param url         Full URL SignalWire POSTed to — must match what the
+///                    platform saw (see the URL-reconstruction section of
+///                    porting-sdk/webhooks.md). The caller reconstructs it
+///                    (proxy-aware) before calling this core.
+/// @param headers     Request headers as a case-insensitively-looked-up
+///                    map; the signature header is read from here.
+/// @param body        Raw request body bytes as a UTF-8 string, BEFORE any
+///                    JSON / form parsing.
+/// @param signing_key The customer's Signing Key. MUST NOT be empty —
+///                    empty throws ``std::invalid_argument`` (a programming
+///                    error, not a validation failure).
+///
+/// @return ``std::nullopt`` when the request is valid (let it through), or
+///         a ``(403, headers, "Forbidden")`` triple when the signature is
+///         missing / invalid — never leaking which branch failed.
+///
+/// @throws std::invalid_argument when ``signing_key`` is empty.
+///
+/// The return type is spelled out structurally (rather than via the
+/// ``ValidationResponse`` alias) so the cross-port signature enumerator
+/// resolves it to the canonical ``optional<tuple<int,dict<string,string>,
+/// string>>`` shape the oracle records for ``webhook_middleware.validate``.
+std::optional<std::tuple<int, std::map<std::string, std::string>, std::string>> Validate(
+    std::string_view method, std::string_view url,
+    const std::map<std::string, std::string>& headers, std::string_view body,
+    std::string_view signing_key);
 
 }  // namespace security
 }  // namespace signalwire

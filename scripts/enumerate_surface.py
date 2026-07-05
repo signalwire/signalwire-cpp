@@ -492,6 +492,16 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     ("signalwire::security", "ValidateRequest"): (
         "signalwire.core.security.webhook_validator", "validate_request",
     ),
+    # The framework-free webhook-validation decision core (porting-sdk
+    # webhooks.md + HIDDEN_SURFACE_AUDIT Pass 1). Python exposes it as a
+    # module-level ``validate`` under ``webhook_middleware``; C++ ships the
+    # same decomposed ``(method,url,headers,body,signing_key) ->
+    # optional<(status,headers,body)>`` core as a free function. The
+    # cpp-httplib ``WrapWithSignatureValidation`` wrapper stays a
+    # PORT_ADDITION idiom on top of this.
+    ("signalwire::security", "Validate"): (
+        "signalwire.core.security.webhook_middleware", "validate",
+    ),
     # Standalone security-hygiene utils (security_utils.py). C++ groups them in
     # a nested ``signalwire::security::security_utils`` namespace with PascalCase
     # names; Python keeps them as module-level snake_case functions under

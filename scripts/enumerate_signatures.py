@@ -863,6 +863,19 @@ def collect(
     # the getter lands on the oracle's wire-keyed name.
     _project_gen_payload_getters(out_modules)
 
+    # RELAY concrete call-action control-method projection. The oracle records
+    # the control methods (stop/pause/resume/volume/start_input_timers) directly
+    # on each CONCRETE action (PlayAction/RecordAction/CollectAction/…). The C++
+    # port flattens them onto the unified ``signalwire.relay.action.Action`` and
+    # each concrete subclass inherits them (macro
+    # ``SIGNALWIRE_RELAY_ACTION_SUBCLASS``); libclang surfaces the macro-generated
+    # subclasses but not the inherited methods. Project each concrete action's
+    # oracle-required control methods, reusing the unified Action's real
+    # signatures, so the concrete-action control surface MATCHES the reference
+    # (idiom via the enumerator; the void-vs-dict return is the documented
+    # cpp_unified_action idiom, tracked in PORT_SIGNATURE_OMISSIONS).
+    _project_relay_action_subclasses(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -1054,6 +1067,54 @@ def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
             if fields:
                 out.setdefault(cls, []).extend(fields)
     return out
+
+
+# Oracle-recorded control methods per concrete RELAY call-action (mirrors
+# enumerate_surface.RELAY_ACTION_CONTROL_METHODS). Every concrete subclass
+# inherits these from the unified C++ Action.
+_RELAY_ACTION_CONTROL_METHODS: dict[str, list[str]] = {
+    "PlayAction": ["stop", "pause", "resume", "volume"],
+    "RecordAction": ["stop", "pause", "resume"],
+    "CollectAction": ["stop", "pause", "resume", "volume", "start_input_timers"],
+    "StandaloneCollectAction": ["stop", "start_input_timers"],
+    "DetectAction": ["stop"],
+    "FaxAction": ["stop"],
+    "PayAction": ["stop"],
+    "StreamAction": ["stop"],
+    "TapAction": ["stop"],
+    "TranscribeAction": ["stop"],
+    "AIAction": ["stop"],
+}
+
+
+def _project_relay_action_subclasses(out_modules: dict) -> None:
+    """Project each concrete RELAY call-action's control-method signatures onto
+    ``signalwire.relay.call.<Subclass>``, reusing the unified C++
+    ``signalwire.relay.action.Action`` method signatures.
+
+    The oracle records stop/pause/resume/volume/start_input_timers on each
+    concrete action; the C++ port flattens them onto one Action that every
+    subclass inherits (macro ``SIGNALWIRE_RELAY_ACTION_SUBCLASS`` — libclang sees
+    the subclass but not the inherited methods). Project the oracle-required set
+    per subclass, only where the unified Action genuinely defines that method
+    (never inventing surface). The subclass ``__init__`` is already surfaced by
+    libclang via the inherited ctor.
+    """
+    action_cls = (
+        out_modules.get("signalwire.relay.action", {})
+        .get("classes", {})
+        .get("Action", {})
+        .get("methods", {})
+    )
+    if not action_cls:
+        return
+    call_mod = out_modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": {}})
+    call_classes = call_mod.setdefault("classes", {})
+    for sub, methods in _RELAY_ACTION_CONTROL_METHODS.items():
+        entry = call_classes.setdefault(sub, {"methods": {}})
+        for m in methods:
+            if m in action_cls:  # only if the C++ Action truly defines it
+                entry["methods"][m] = action_cls[m]
 
 
 def _project_gen_payload_getters(out_modules: dict) -> None:

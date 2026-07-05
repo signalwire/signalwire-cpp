@@ -55,7 +55,13 @@ bool Action::wait(int timeout_ms) {
 
 void Action::stop() { send_control_command("stop"); }
 
-void Action::pause(const json& extra_params) { send_control_command("pause", extra_params); }
+void Action::pause(const std::optional<std::string>& behavior) {
+  json extra = json::object();
+  if (behavior) {
+    extra["behavior"] = *behavior;
+  }
+  send_control_command("pause", extra);
+}
 
 void Action::resume() { send_control_command("resume"); }
 

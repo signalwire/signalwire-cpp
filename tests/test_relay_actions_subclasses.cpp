@@ -67,6 +67,51 @@ TEST(relay_collect_subclasses_start_input_timers) {
     return true;
 }
 
+TEST(relay_action_concrete_control_surface) {
+    // The oracle projects the control methods directly onto each concrete
+    // action. Assert every concrete subclass exposes exactly its mandated
+    // control surface (callable on the concrete type; client-less -> no-op):
+    //   Play:    stop / pause / resume / volume
+    //   Record:  stop / pause / resume            (NO volume)
+    //   Collect: stop / pause / resume / volume / start_input_timers
+    //   others:  stop
+    PlayAction play("ctl-play");
+    play.stop();
+    play.pause();
+    play.pause("continuous");  // optional behavior, matching Python pause(behavior)
+    play.resume();
+    play.volume(-3.0);
+
+    RecordAction record("ctl-record");
+    record.stop();
+    record.pause();
+    record.pause("continuous");
+    record.resume();
+
+    CollectAction collect("ctl-collect");
+    collect.stop();
+    collect.pause();
+    collect.resume();
+    collect.volume(2.0);
+    collect.start_input_timers();
+
+    // Stop-only concrete actions.
+    DetectAction("ctl-detect").stop();
+    FaxAction("ctl-fax").stop();
+    PayAction("ctl-pay").stop();
+    StreamAction("ctl-stream").stop();
+    TapAction("ctl-tap").stop();
+    TranscribeAction("ctl-transcribe").stop();
+    AIAction("ctl-ai").stop();
+    StandaloneCollectAction("ctl-standalone").stop();
+
+    // None completed by a bare fire-and-forget control frame.
+    ASSERT_FALSE(play.completed());
+    ASSERT_FALSE(record.completed());
+    ASSERT_FALSE(collect.completed());
+    return true;
+}
+
 // ── New Call methods (client-less: resolve immediately) ─────────────
 
 TEST(relay_call_new_methods_complete_without_client) {

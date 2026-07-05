@@ -71,9 +71,7 @@ TEST(relay_mock_record_pause_journals_record_pause) {
     json rp;
     rp["audio"]["format"] = "wav";
     Action action = call->record(rp, "ec-rec-pa-1");
-    json extra;
-    extra["behavior"] = "continuous";
-    action.pause(extra);
+    action.pause("continuous");
 
     spin_evt([] { return !mt::journal_recv("calling.record.pause").empty(); }, 2000);
     auto pauses = mt::journal_recv("calling.record.pause");

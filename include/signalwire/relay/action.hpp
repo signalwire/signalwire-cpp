@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -90,10 +91,11 @@ class Action {
   /// `calling.record.stop` rather than `calling.play.stop`.
   void stop();
 
-  /// Request the server to pause this action.
-  /// `extra_params` may carry e.g. `{"behavior": "continuous"}` for
-  /// record-side pause.
-  void pause(const json& extra_params = json::object());
+  /// Request the server to pause this action. The optional `behavior`
+  /// (e.g. "continuous" for record-side pause) is sent as the `behavior`
+  /// frame field only when provided — matching Python's
+  /// `pause(behavior: str | None = None)`.
+  void pause(const std::optional<std::string>& behavior = std::nullopt);
 
   /// Request the server to resume this action.
   void resume();

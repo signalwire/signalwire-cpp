@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ afdcd34b3f55485194c74c6cad4349713a14dc70",
+  "generated_from": "signalwire-cpp @ 4aef5e4900e825edd7af1b7ecff5565b65540fe9",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1206,7 +1206,8 @@
     "signalwire.relay.call": {
       "classes": {
         "AIAction": [
-          "__init__"
+          "__init__",
+          "stop"
         ],
         "Action": [
           "__init__",
@@ -1302,45 +1303,53 @@
         ],
         "CollectAction": [
           "__init__",
-          "start_input_timers"
+          "pause",
+          "resume",
+          "start_input_timers",
+          "stop",
+          "volume"
         ],
         "DetectAction": [
-          "__init__"
+          "__init__",
+          "stop"
         ],
         "FaxAction": [
-          "__init__"
-        ],
-        "PausableAction": [
-          "pause",
-          "resume"
+          "__init__",
+          "stop"
         ],
         "PayAction": [
-          "__init__"
+          "__init__",
+          "stop"
         ],
         "PlayAction": [
-          "__init__"
+          "__init__",
+          "pause",
+          "resume",
+          "stop",
+          "volume"
         ],
         "RecordAction": [
-          "__init__"
+          "__init__",
+          "pause",
+          "resume",
+          "stop"
         ],
         "StandaloneCollectAction": [
           "__init__",
-          "start_input_timers"
-        ],
-        "StoppableAction": [
+          "start_input_timers",
           "stop"
         ],
         "StreamAction": [
-          "__init__"
+          "__init__",
+          "stop"
         ],
         "TapAction": [
-          "__init__"
+          "__init__",
+          "stop"
         ],
         "TranscribeAction": [
-          "__init__"
-        ],
-        "VolumeAction": [
-          "volume"
+          "__init__",
+          "stop"
         ]
       },
       "functions": []

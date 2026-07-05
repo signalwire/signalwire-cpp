@@ -640,19 +640,29 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
 # from Python only by casing/reserved-word idiom (``DatasphereSkill`` ->
 # ``DataSphereSkill``, ``SwmlTransferSkill`` -> ``SWMLTransferSkill``) are the
 # adapter rename, not an omission.
-# -- RELAY call-action mixin projection -------------------------------------
-# Python factors the call-action controls into an abstract mixin inheritance
-# chain — ``StoppableAction(Action)`` -> ``PausableAction`` -> ``VolumeAction``
-# -> the concrete ``PlayAction``/``RecordAction``/… . The C++ port flattens all
-# those controls onto a single ``signalwire::relay::Action`` class (same
-# precedent as TS: every concrete action carries the methods inline). Project
-# each abstract mixin base into ``signalwire.relay.call`` with the methods the
-# C++ ``Action`` class genuinely defines, so the surface membership lines up.
-# ``(python_module, python_class) -> methods to pull from the C++ Action class``.
-RELAY_ACTION_PROJECTIONS: dict[tuple[str, str], list[str]] = {
-    ("signalwire.relay.call", "StoppableAction"): ["stop"],
-    ("signalwire.relay.call", "PausableAction"): ["pause", "resume"],
-    ("signalwire.relay.call", "VolumeAction"): ["volume"],
+# -- RELAY call-action control projection -----------------------------------
+# The Python oracle no longer ships the abstract Stoppable/Pausable/Volume
+# mixin bases as cross-port symbols; it PROJECTS the control methods directly
+# onto each CONCRETE action (PlayAction: stop/pause/resume/volume; RecordAction:
+# stop/pause/resume; CollectAction: +volume+start_input_timers; the rest: stop).
+# The C++ port flattens every control onto a single ``signalwire::relay::Action``
+# class, and each concrete subclass inherits them (macro
+# ``SIGNALWIRE_RELAY_ACTION_SUBCLASS``). So we project the oracle's per-concrete-
+# action control set from the methods the C++ ``Action`` genuinely defines — the
+# real user-facing control surface, matching the reference (NOT an addition, NOT
+# an omission). ``python_concrete_class -> control methods it exposes``.
+RELAY_ACTION_CONTROL_METHODS: dict[str, list[str]] = {
+    "PlayAction": ["stop", "pause", "resume", "volume"],
+    "RecordAction": ["stop", "pause", "resume"],
+    "CollectAction": ["stop", "pause", "resume", "volume", "start_input_timers"],
+    "StandaloneCollectAction": ["stop", "start_input_timers"],
+    "DetectAction": ["stop"],
+    "FaxAction": ["stop"],
+    "PayAction": ["stop"],
+    "StreamAction": ["stop"],
+    "TapAction": ["stop"],
+    "TranscribeAction": ["stop"],
+    "AIAction": ["stop"],
 }
 
 SKILL_SOURCE_DIR = "src/skills/builtin"
@@ -1454,18 +1464,16 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # FunctionResult; surface the ``to_dict`` alias where ``to_json`` exists.
     _project_to_dict_aliases(modules)
 
-    # RELAY abstract call-action mixin bases: the C++ ``Action`` class flattens
-    # stop/pause/resume/volume; project each Python abstract base onto
-    # signalwire.relay.call with the methods the C++ Action actually has.
+    # RELAY concrete call-action control methods: the C++ ``Action`` class
+    # flattens stop/pause/resume/volume/start_input_timers; each concrete
+    # subclass inherits them. The oracle records the control methods directly on
+    # each concrete action — project the oracle's per-action set from the methods
+    # the C++ Action genuinely defines (see RELAY_ACTION_CONTROL_METHODS + the
+    # subclass-projection block below).
     action_methods: set[str] = set()
     for _mod in ("signalwire.relay.action", "signalwire.relay.call"):
         _e = modules.get(_mod, {})
         action_methods |= set(_e.get("classes", {}).get("Action", []))
-    for (mod, cls), expected in RELAY_ACTION_PROJECTIONS.items():
-        present = sorted(m for m in expected if m in action_methods)
-        if present:
-            mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
-            mod_entry["classes"][cls] = present
 
     # The base ``Action`` class: Python records it in ``signalwire.relay.call`` with
     # ``__init__``/``is_done``/``wait``. The C++ ``Action`` (native module
@@ -1484,8 +1492,11 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # (``class Name : public Action { using Action::Action; };``). The regex
     # header walker cannot see macro-generated classes, so project each subclass
     # the macro actually declares in action.hpp. Every subclass inherits the
-    # unified Action's ctor (``__init__``); Collect/StandaloneCollect
-    # additionally expose ``start_input_timers`` (present on the C++ Action).
+    # unified Action's ctor (``__init__``) PLUS the control methods the oracle
+    # records on that concrete action (RELAY_ACTION_CONTROL_METHODS) — the
+    # inherited stop/pause/resume/volume/start_input_timers are the real
+    # user-facing control surface, only projected where the C++ Action genuinely
+    # defines that method (never inventing surface).
     _action_hpp = repo / "include/signalwire/relay/action.hpp"
     if _action_hpp.is_file():
         _txt = _action_hpp.read_text(encoding="utf-8")
@@ -1493,13 +1504,12 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             re.findall(r"SIGNALWIRE_RELAY_ACTION_SUBCLASS\(([A-Za-z_]\w*)\)", _txt)
         )
         _declared.discard("NAME")  # the macro parameter, not a real subclass
-        _has_timers = "start_input_timers" in set(_action_own)
-        _timer_subclasses = {"CollectAction", "StandaloneCollectAction"}
         call_mod = modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
         for _sub in _declared:
-            _meths = ["__init__"]
-            if _sub in _timer_subclasses and _has_timers:
-                _meths.append("start_input_timers")
+            _meths = {"__init__"}
+            for _ctl in RELAY_ACTION_CONTROL_METHODS.get(_sub, []):
+                if _ctl in action_methods:  # only if the C++ Action truly has it
+                    _meths.add(_ctl)
             call_mod["classes"][_sub] = sorted(_meths)
 
     # Constructor / call-operator idiom projections. The regex header walker

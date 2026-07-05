@@ -69,8 +69,14 @@ jobs:
       # Stable key + run_id suffix so each run restores the most recent cache and
       # saves an updated one; source-hashing the key would defeat the point (we
       # WANT it to persist across source changes and only miss on the changed TUs).
+      # Split restore/save (not actions/cache) so the cache SAVES even when the
+      # gate job fails: the combined action's post-save is SKIPPED on a failed
+      # prior step, and every cpp run is currently red on the pre-existing
+      # spec-coupling — so a combined cache would never populate. The separate
+      # save step below runs with if: always().
       - name: Restore clang-tidy cache (ctcache)
-        uses: actions/cache@v4
+        id: ctcache_restore
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ctcache
           key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
@@ -151,3 +157,13 @@ jobs:
           # NOT expanduser CTCACHE_DIR, so a literal "~" would create a bogus dir.
           export CTCACHE_DIR="$HOME/.cache/ctcache"
           bash scripts/run-ci.sh
+
+      # Save the ctcache store even if the gate failed (the LINT gate still ran +
+      # populated it). Unique run_id key so every run persists an updated cache;
+      # the next run's restore-keys prefix picks up the most recent.
+      - name: Save clang-tidy cache (ctcache)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ctcache
+          key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}

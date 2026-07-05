@@ -594,11 +594,11 @@ run_gate "GEN-FRESH" "generated REST layer byte-identical to a fresh regen" \
 #   generate_relay_protocol.py -> relay/protocol_types_generated (relay-protocol/)
 #   generate_swaig_payloads.py -> core/{post_prompt,swaig_request,swaig_actions}_generated
 # (The <ns>_types_generated REST wire types are covered by generate_rest.py --check.)
-run_gate "GEN-FRESH-SWML-VERBS" "generated SWML-verb type surface byte-identical to a fresh regen" \
+run_gate "GEN-FRESH-SWML" "generated SWML-verb type surface byte-identical to a fresh regen" \
     python3 scripts/generate_swml_verbs.py --check
-run_gate "GEN-FRESH-RELAY-PROTO" "generated RELAY-protocol type surface byte-identical to a fresh regen" \
+run_gate "GEN-FRESH-RELAY" "generated RELAY-protocol type surface byte-identical to a fresh regen" \
     python3 scripts/generate_relay_protocol.py --check
-run_gate "GEN-FRESH-SWAIG-PAYLOADS" "generated SWAIG read-side payload surface byte-identical to a fresh regen" \
+run_gate "GEN-FRESH-SWAIG" "generated SWAIG read-side payload surface byte-identical to a fresh regen" \
     python3 scripts/generate_swaig_payloads.py --check
 
 # Gate 5e: GEN-FRESH-TESTS — the generated full-mock REST wire-test suite

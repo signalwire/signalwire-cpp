@@ -4545,8 +4545,9 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
-                  "required": true
+                  "type": "any",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -4559,8 +4560,9 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
-                  "required": true
+                  "type": "any",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -6553,7 +6555,7 @@
                 },
                 {
                   "name": "extra_swaig_fields",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -6891,7 +6893,7 @@
                 },
                 {
                   "name": "kwargs",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -7084,7 +7086,7 @@
                 },
                 {
                   "name": "kwargs",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -7135,7 +7137,7 @@
                 },
                 {
                   "name": "kwargs",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14407,7 +14409,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14422,7 +14424,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14437,7 +14439,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14452,7 +14454,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14486,7 +14488,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14554,7 +14556,7 @@
                 },
                 {
                   "name": "devices",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": true
                 }
               ],
@@ -14701,7 +14703,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14800,7 +14802,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14853,7 +14855,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -14868,7 +14870,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -15196,7 +15198,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -15216,7 +15218,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -15287,7 +15289,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": false,
                   "default": null
                 }
@@ -15588,7 +15590,7 @@
                 },
                 {
                   "name": "params",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": true
                 }
               ],
@@ -17254,7 +17256,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": true
                 }
               ],
@@ -17322,7 +17324,7 @@
                 },
                 {
                   "name": "data",
-                  "type": "dict<string,any>",
+                  "type": "any",
                   "required": true
                 }
               ],

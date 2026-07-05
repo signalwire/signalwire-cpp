@@ -400,8 +400,8 @@ class AgentBase : public swml::Service {
   AgentBase& enable_debug_events(bool enable = true);
   AgentBase& add_function_include(const json& include);
   AgentBase& set_function_includes(const std::vector<json>& includes);
-  AgentBase& set_prompt_llm_params(const json& params);
-  AgentBase& set_post_prompt_llm_params(const json& params);
+  AgentBase& set_prompt_llm_params(const json& params = json::object());
+  AgentBase& set_post_prompt_llm_params(const json& params = json::object());
 
   // ========================================================================
   // Verb Methods (5-phase pipeline)

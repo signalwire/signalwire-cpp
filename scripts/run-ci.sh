@@ -62,6 +62,7 @@ set -u
 set -o pipefail
 
 PORT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$PORT_ROOT/.sw-tmp"  # repo-local CI scratch (never /tmp)
 PORT_NAME="signalwire-cpp"
 
 # Shared tool-environment bootstrap — the SAME _env.sh the canonical
@@ -183,7 +184,7 @@ echo "==> TEST build mode: $BUILD_MODE"
 
 # In-container path to this repo (repo parent is mounted at /src by convention).
 SWCPP_CONTAINER_REPO="${SWCPP_CONTAINER_REPO:-/src/$PORT_NAME}"
-SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"
+SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container-internal path (docker /tmp, not host)
 
 # Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
 # BUILD_MODE. Each branch produces the same observable result: a built run_tests
@@ -289,8 +290,8 @@ surface_fresh_gate() {
     mkdir -p "$(dirname "$cache")"
     rm -f "$cache"
     # 1. snapshot the committed surface (fallback cp if not tracked at HEAD).
-    if ! git show HEAD:port_surface.json > /tmp/committed_surface.json 2>/dev/null; then
-        cp port_surface.json /tmp/committed_surface.json || return 1
+    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface.json" 2>/dev/null; then
+        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface.json" || return 1
     fi
     # 2. regenerate in place via the same host enumerator the SIGNATURES gate
     #    uses, caching the fresh copy for SURFACE-DIFF to reuse.
@@ -298,7 +299,7 @@ surface_fresh_gate() {
     cp port_surface.json "$cache" 2>/dev/null || true
     # 3. compare committed vs fresh, ignoring the volatile generated_from sha.
     python3 "$PORTING_SDK_DIR/scripts/check_surface_freshness.py" \
-        --committed /tmp/committed_surface.json --fresh port_surface.json
+        --committed "$PORT_ROOT/.sw-tmp/committed_surface.json" --fresh port_surface.json
     local rc=$?
     # 4. always restore the working copy (regen rewrote the git-sha provenance).
     git checkout -- port_surface.json 2>/dev/null
@@ -320,8 +321,8 @@ surface_diff_gate() {
     # reads the file at ./port_surface.json, so point that at the cached fresh
     # copy for the diff, then restore the committed working copy.
     local cache; cache="$(_fresh_surface_cache_path)"
-    if ! git show HEAD:port_surface.json > /tmp/committed_surface_diff.json 2>/dev/null; then
-        cp port_surface.json /tmp/committed_surface_diff.json || return 1
+    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" 2>/dev/null; then
+        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" || return 1
     fi
     if [ -f "$cache" ]; then
         cp "$cache" port_surface.json || { git checkout -- port_surface.json 2>/dev/null; return 1; }
@@ -393,7 +394,7 @@ rest_coverage_gate() {
     port="$(pick_free_port)" || { echo "rest_coverage_gate: could not allocate a free port"; return 1; }
     local mock_pkg_parent="$PORTING_SDK_DIR/test_harness/mock_signalwire"
     export PYTHONPATH="$mock_pkg_parent${PYTHONPATH:+:$PYTHONPATH}"
-    local mock_log="/tmp/rest_cov_mock_cpp.$$.log"
+    local mock_log="$PORT_ROOT/.sw-tmp/rest_cov_mock_cpp.$$.log"
     python3 -m mock_signalwire --host 127.0.0.1 --port "$port" --log-level error \
         >"$mock_log" 2>&1 &
     local mock_pid=$!

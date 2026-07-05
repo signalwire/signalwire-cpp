@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 077c5fdc9b5642029e3eeda2f950f49f7d5bce82",
+  "generated_from": "signalwire-cpp @ a658e3329cdc0329dfbfc949d8cc17091e168c3b",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -529,6 +529,7 @@
     "signalwire.core.mixins.web_mixin": {
       "classes": {
         "WebMixin": [
+          "as_router",
           "enable_debug_routes",
           "manual_set_proxy_url",
           "on_request",
@@ -796,6 +797,7 @@
           "ai",
           "amazon_bedrock",
           "answer",
+          "as_router",
           "auth_password",
           "auth_username",
           "build_tool_registry_json",

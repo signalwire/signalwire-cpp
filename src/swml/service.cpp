@@ -595,6 +595,21 @@ void Service::serve() {
   }
 }
 
+std::shared_ptr<httplib::Server> Service::as_router() {
+  // Ensure auth is resolved so the mounted routes enforce the same basic-auth
+  // the standalone serve() path does.
+  init_auth();
+
+  // A fresh Server populated with this service's routes but NOT bound to any
+  // port. In cpp-httplib the Server IS the mountable route-handler unit; the
+  // caller embeds it in their host app (listen on it, front it with TLS, or
+  // lift its handlers into a parent server). Mirrors serve()'s setup_routes
+  // registration exactly, minus the listen().
+  auto router = std::make_shared<httplib::Server>();
+  setup_routes(*router);
+  return router;
+}
+
 void Service::stop() {
   if (server_) {
     server_->stop();

@@ -5002,6 +5002,15 @@
       "classes": {
         "WebMixin": {
           "methods": {
+            "as_router": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.core.web.HostAppRouter"
+            },
             "enable_debug_routes": {
               "params": [
                 {
@@ -7410,6 +7419,15 @@
                 }
               ],
               "returns": "class:signalwire.core.swml_service.SWMLService"
+            },
+            "as_router": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.core.web.HostAppRouter"
             },
             "auth_password": {
               "params": [

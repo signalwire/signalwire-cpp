@@ -602,8 +602,8 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "validate_basic_auth", "get_basic_auth_credentials",
     ],
     ("signalwire.core.mixins.web_mixin", "WebMixin"): [
-        "enable_debug_routes", "manual_set_proxy_url", "run", "serve",
-        "set_dynamic_config_callback", "on_request", "on_swml_request",
+        "as_router", "enable_debug_routes", "manual_set_proxy_url", "run",
+        "serve", "set_dynamic_config_callback", "on_request", "on_swml_request",
         "register_routing_callback", "setup_graceful_shutdown",
     ],
 }

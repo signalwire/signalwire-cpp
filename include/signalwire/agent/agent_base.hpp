@@ -596,8 +596,9 @@ class AgentBase : public swml::Service {
   // Initialize auth
   void init_auth();
 
-  // Setup HTTP routes
-  void setup_routes(httplib::Server& server);
+  // Setup HTTP routes (overrides Service::setup_routes to add the agent's
+  // /post_prompt, /mcp, /debug endpoints; dispatched by as_router()/serve()).
+  void setup_routes(httplib::Server& server) override;
 
   // Handle SWML request
   void handle_swml_request(const httplib::Request& req, httplib::Response& res);

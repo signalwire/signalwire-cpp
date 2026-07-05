@@ -272,6 +272,25 @@ class Service {
   /// Start the HTTP server (blocking)
   void serve();
 
+  /// Build a mountable HTTP router for embedding this service's routes in a
+  /// host application, WITHOUT starting a listener.
+  ///
+  /// Returns an `httplib::Server` pre-populated with every route this service
+  /// exposes (the SWML endpoint, `/swaig`, and any subclass routes such as
+  /// AgentBase's `/post_prompt` and `/mcp`) via the same `setup_routes` logic
+  /// `serve()` uses. In cpp-httplib an `httplib::Server` IS the route-handler
+  /// unit — its registered `Handler`s (`std::function<void(const Request&,
+  /// Response&)>`) are the mountable dispatch surface — so handing one out is
+  /// the idiomatic "give me this agent's routes to embed" capability. The
+  /// caller owns the returned Server and can `listen()` on it directly, front
+  /// it behind its own TLS/proxy, or copy its handlers into a parent server.
+  ///
+  /// Python parity: WebMixin.as_router / SWMLService.as_router — the
+  /// cross-port "embed my routes in a host app" unit (Python returns a FastAPI
+  /// APIRouter, Go returns an http.Handler; C++ returns a populated
+  /// httplib::Server).
+  [[nodiscard]] std::shared_ptr<httplib::Server> as_router();
+
   /// Stop the HTTP server
   void stop();
 
@@ -363,7 +382,11 @@ class Service {
   std::vector<std::string> tool_order_;
   std::vector<json> registered_swaig_functions_;
 
-  void setup_routes(httplib::Server& server);
+  /// Register this service's HTTP routes onto `server`. Virtual so that
+  /// as_router() (and serve()) dispatch to a subclass's fuller route set —
+  /// AgentBase overrides this to add /post_prompt, /mcp, and /debug on top of
+  /// the SWML + /swaig base routes.
+  virtual void setup_routes(httplib::Server& server);
 
  private:
   void init_auth();

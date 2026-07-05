@@ -75,12 +75,32 @@ fi
 # a single finding still fails the gate. Findings still print (each to its own
 # clang-tidy's stdout). Job count: cores (min 1); overridable via SWCPP_TIDY_JOBS.
 jobs="${SWCPP_TIDY_JOBS:-$( (command -v nproc >/dev/null && nproc) || sysctl -n hw.ncpu 2>/dev/null || echo 4 )}"
+
+# clang-tidy result cache (vendored ctcache, availability-gated). When CTCACHE_DIR
+# is set AND the vendored wrapper + python3 are present, route each clang-tidy call
+# through it: it hashes the PREPROCESSED TU (all headers inlined) + the raw #include
+# lines + the resolved `--dump-config`, so any change to the file, a header it pulls
+# in, the checks, or the config invalidates and re-runs. An UNCHANGED TU returns the
+# cached result WITHOUT running clang-tidy. Fail-open by construction: any hash/cache
+# error falls through to the real clang-tidy (a finding is never skipped — audited +
+# tested: cached failures replay, edits invalidate). Absent CTCACHE_DIR / wrapper /
+# python3 => plain clang-tidy, exact prior behavior. Cross-run persistence is the CI
+# job's `actions/cache` on $CTCACHE_DIR. This composes with the xargs fan-out below.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+tidy_wrapper="$SCRIPT_DIR/clang_tidy_cache.py"
+if [ -n "${CTCACHE_DIR:-}" ] && [ -f "$tidy_wrapper" ] && command -v python3 >/dev/null 2>&1; then
+    export CTCACHE_SAVE_OUTPUT=1   # cache stdout too, so a cached run replays findings
+    tidy_cmd=(python3 "$tidy_wrapper" "$ct")
+else
+    tidy_cmd=("$ct")
+fi
+
 # bash-3.2 compatible (macOS default): stream find -> xargs, NUL-delimited so paths
-# with spaces are safe. -n 1 = one clang-tidy per file; -P = fan across cores.
+# with spaces are safe. -n 1 = one clang-tidy (cached) per file; -P = fan across cores.
 if ! find src include -name '*.cpp' | grep -q .; then
     echo "no C++ sources found to lint" >&2; exit 1
 fi
 find src include -name '*.cpp' -print0 \
-  | xargs -0 -P "$jobs" -n 1 "$ct" -p "$tidy_build" \
+  | xargs -0 -P "$jobs" -n 1 "${tidy_cmd[@]}" -p "$tidy_build" \
         --header-filter='signalwire-cpp/(src|include)/' --quiet
 exit $?

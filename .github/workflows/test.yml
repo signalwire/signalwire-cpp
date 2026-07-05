@@ -54,29 +54,28 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install build deps (cmake + g++ + OpenSSL 3 headers + ccache)
+      - name: Install build deps (cmake + g++ + OpenSSL 3 headers)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libssl-dev ccache
+          sudo apt-get install -y cmake g++ libssl-dev
 
-      # ccache cache-persistence: CMakeLists.txt already wires ccache as the
-      # compiler launcher when the binary is present (availability-gated no-op
-      # otherwise). CI runs a COLD checkout every time, so without a persisted
-      # cache every gate recompiles from scratch — the bulk of cpp's ~14min CI.
-      # Persist ~/.cache/ccache keyed on the source tree so warm runs skip the
-      # recompile (both the g++ build/ and the clang build-tidy/ share the store).
-      - name: Restore ccache
+      # clang-tidy result cache (vendored ctcache, scripts/clang_tidy_cache.py).
+      # The LINT gate — clang-tidy over 65 TUs — is cpp's CI wall-clock driver
+      # (~824s serial, ~252s after the xargs fan-out). ccache does NOT help it
+      # (that's compilation; this is static analysis), which is why the old ccache
+      # cache-persistence here was dead weight — removed. Instead persist ctcache's
+      # per-TU result cache: an UNCHANGED TU (source, its headers, checks, config
+      # all identical) returns the cached result without running clang-tidy.
+      # Stable key + run_id suffix so each run restores the most recent cache and
+      # saves an updated one; source-hashing the key would defeat the point (we
+      # WANT it to persist across source changes and only miss on the changed TUs).
+      - name: Restore clang-tidy cache (ctcache)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
-          key: ccache-cpp-${{ runner.os }}-${{ hashFiles('src/**', 'include/**', 'CMakeLists.txt') }}
+          path: ~/.cache/ctcache
+          key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            ccache-cpp-${{ runner.os }}-
-      - name: Configure ccache (size + compress)
-        run: |
-          ccache --max-size=1G
-          ccache --set-config=compression=true
-          ccache --zero-stats || true
+            ctcache-cpp-${{ runner.os }}-
 
       # The FMT (clang-format) + LINT (clang-tidy) gates need the gate tools
       # PINNED to the EXACT patch the rollout was burned to zero against (18.1.8).
@@ -143,4 +142,12 @@ jobs:
         working-directory: signalwire-cpp
         env:
           PORTING_SDK: ${{ github.workspace }}/porting-sdk
-        run: bash scripts/run-ci.sh
+        run: |
+          # Enables the vendored clang-tidy result cache in the LINT gate
+          # (run-lint.sh routes clang-tidy through scripts/clang_tidy_cache.py when
+          # CTCACHE_DIR is set + the wrapper exists). Persisted across runs by the
+          # cache step above; unset => plain clang-tidy (no behavior change). Set
+          # here (not in env:) so $HOME expands to an ABSOLUTE path — ctcache does
+          # NOT expanduser CTCACHE_DIR, so a literal "~" would create a bogus dir.
+          export CTCACHE_DIR="$HOME/.cache/ctcache"
+          bash scripts/run-ci.sh

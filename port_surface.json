@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ a658e3329cdc0329dfbfc949d8cc17091e168c3b",
+  "generated_from": "signalwire-cpp @ afdcd34b3f55485194c74c6cad4349713a14dc70",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -609,6 +609,12 @@
         ]
       },
       "functions": []
+    },
+    "signalwire.core.security.webhook_middleware": {
+      "classes": {},
+      "functions": [
+        "validate"
+      ]
     },
     "signalwire.core.security.webhook_validator": {
       "classes": {},

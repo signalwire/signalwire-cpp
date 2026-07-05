@@ -772,6 +772,18 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
         ("include/signalwire/security/webhook_validator.hpp",
          "ValidateRequest", "validate_request"),
     ],
+    # Framework-free webhook-validation decision core (webhooks.md +
+    # HIDDEN_SURFACE_AUDIT Pass 1). C++ ships it as the ``Validate`` free
+    # function in ``signalwire::security`` (webhook_validator.hpp); Python
+    # exposes it module-level as ``webhook_middleware.validate``. The
+    # cpp-httplib ``WrapWithSignatureValidation`` wrapper stays a
+    # PORT_ADDITION idiom on top of this. The bare ``Validate(`` grep does
+    # NOT match ``ValidateWebhookSignature(`` / ``ValidateRequest(`` (those
+    # have no word-boundary before ``(``), so this surfaces only the core.
+    "signalwire.core.security.webhook_middleware": [
+        ("include/signalwire/security/webhook_validator.hpp",
+         "Validate", "validate"),
+    ],
     # Top-level ``signalwire/__init__.py`` package helpers. C++ implements them
     # as free functions in ``namespace signalwire`` (src/signalwire.cpp,
     # declared in include/signalwire/signalwire.hpp). ``RestClient`` keeps its

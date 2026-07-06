@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cctype>
 #include <csignal>
+#include <map>
+#include <optional>
 #include <set>
 #include <tuple>
 
@@ -1557,17 +1559,15 @@ bool AgentBase::validate_auth(const httplib::Request& req, httplib::Response& re
 
 void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) {
-    return;
-  }
 
-  // Extract query params
-  std::map<std::string, std::string> query_params;
-  for (const auto& p : req.params) {
-    query_params[p.first] = p.second;
-  }
+  // Thin framework adapter: extract (method, url, headers, body) from the
+  // httplib request and DELEGATE the auth/routing-307/render-200 decision to the
+  // decomposed core handle_request(). Do NOT re-implement auth or render here —
+  // the served path must produce the same 401/307/200 the primitive does,
+  // including the routing-callback redirect (previously skipped on this path).
 
-  // Extract headers
+  // Headers lowercased so detect_proxy_url()'s x-forwarded-* lookups resolve;
+  // handle_request()'s Authorization lookup is case-insensitive either way.
   std::map<std::string, std::string> headers;
   for (const auto& h : req.headers) {
     std::string lower_key = h.first;
@@ -1575,19 +1575,26 @@ void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Respon
     headers[lower_key] = h.second;
   }
 
-  // Parse body
-  json body_params = json::object();
+  // Parse body (best-effort: a malformed body is non-fatal -> empty object).
+  std::optional<json> body_params;
   if (!req.body.empty()) {
     try {
       body_params = json::parse(req.body);
     } catch (const std::exception& e) {
-      // best-effort: malformed body is non-fatal; proceed with empty params
       (void)e;
     }
   }
 
-  json swml = render_swml_for_request(query_params, body_params, headers);
-  res.set_content(swml.dump(), "application/json");
+  auto [status, resp_headers, resp_body] =
+      handle_request(req.method, req.path, headers, body_params);
+
+  res.status = status;
+  for (const auto& kv : resp_headers) {
+    res.set_header(kv.first, kv.second);
+  }
+  // A 307 redirect carries an empty body and only the Location header; a 200
+  // carries the rendered SWML; a 401 carries the JSON error + WWW-Authenticate.
+  res.set_content(resp_body, "application/json");
 }
 
 void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Response& res) {

@@ -7,7 +7,10 @@
 #include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <map>
+#include <optional>
 #include <regex>
+#include <tuple>
 
 #include "httplib.h"
 #include "server/tls_server.hpp"
@@ -637,14 +640,39 @@ void Service::setup_routes(httplib::Server& server) {
   // Subclass extension hook (AgentBase adds /post_prompt, /mcp).
   register_additional_routes(server);
 
-  // Main SWML endpoint
+  // Main SWML endpoint — thin adapter over the decomposed handle_request()
+  // core so the served path enforces the same auth/routing-307/render-200
+  // decision the primitive does (the routing-callback redirect was previously
+  // skipped here). Extract (method, url, headers, body); marshal the returned
+  // (status, headers, body) triple back, including the 307 Location and the
+  // 401 WWW-Authenticate.
   auto swml_handler = [this](const httplib::Request& req, httplib::Response& res) {
     add_security_headers(res);
-    if (!validate_auth(req, res)) {
-      return;
+
+    std::map<std::string, std::string> headers;
+    for (const auto& h : req.headers) {
+      std::string lower_key = h.first;
+      std::transform(lower_key.begin(), lower_key.end(), lower_key.begin(), ::tolower);
+      headers[lower_key] = h.second;
     }
-    json swml = render_main_swml(req);
-    res.set_content(swml.dump(), "application/json");
+
+    std::optional<json> body_params;
+    if (!req.body.empty()) {
+      try {
+        body_params = json::parse(req.body);
+      } catch (const std::exception& e) {
+        (void)e;
+      }
+    }
+
+    auto [status, resp_headers, resp_body] =
+        handle_request(req.method, req.path, headers, body_params);
+
+    res.status = status;
+    for (const auto& kv : resp_headers) {
+      res.set_header(kv.first, kv.second);
+    }
+    res.set_content(resp_body, "application/json");
   };
   server.Get(route_, swml_handler);
   server.Post(route_, swml_handler);

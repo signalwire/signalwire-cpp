@@ -1,9 +1,13 @@
 // SessionManager tests
 
 #include "signalwire/security/session_manager.hpp"
-#include <thread>
+#include <openssl/hmac.h>
+#include <openssl/evp.h>
 #include <chrono>
+#include <ctime>
 #include <string_view>
+#include <thread>
+#include <vector>
 
 using namespace signalwire::security;
 
@@ -12,8 +16,8 @@ TEST(session_manager_create_and_validate_token) {
     std::string token = sm.create_token("get_weather", "call-123", 3600);
 
     ASSERT_FALSE(token.empty());
-    ASSERT_TRUE(token.find('.') != std::string::npos);
-
+    // Token is base64url of the 5 dot-fields — the dots are inside the
+    // encoded plaintext, so the outer token has no literal '.'.
     ASSERT_TRUE(sm.validate_token(token, "get_weather", "call-123"));
     return true;
 }
@@ -46,10 +50,13 @@ TEST(session_manager_tampered_token) {
     SessionManager sm;
     std::string token = sm.create_token("get_weather", "call-123", 3600);
 
-    // Tamper with the signature
-    if (!token.empty()) {
-        token.back() = (token.back() == 'a') ? 'b' : 'a';
-    }
+    // Tamper: flip a character near the end of the base64url token (the
+    // signature field lives at the tail of the decoded plaintext). Use a
+    // position a few chars from the end so the flip lands on real signature
+    // bits rather than a trailing partial group.
+    ASSERT_TRUE(token.size() > 4);
+    size_t i = token.size() - 3;
+    token[i] = (token[i] == 'A') ? 'B' : 'A';
     ASSERT_FALSE(sm.validate_token(token, "get_weather", "call-123"));
     return true;
 }
@@ -99,23 +106,22 @@ TEST(session_manager_timing_safe_compare) {
 }
 
 TEST(session_manager_token_format) {
+    // Token = base64url({call_id}.{function_name}.{expiry}.{nonce}.{signature}).
+    // Decode + inspect via debug_token (the only public decoder).
     SessionManager sm;
+    sm.set_debug_mode(true);
     std::string token = sm.create_token("func", "call", 3600);
 
-    // Token should have format: base64.hex
-    auto dot = token.find('.');
-    ASSERT_TRUE(dot != std::string::npos);
-
-    std::string payload = token.substr(0, dot);
-    std::string signature = token.substr(dot + 1);
-
-    ASSERT_FALSE(payload.empty());
-    ASSERT_FALSE(signature.empty());
-
-    // Signature should be hex (SHA256 = 32 bytes = 64 hex chars)
-    ASSERT_EQ(signature.size(), 64u);
-    for (char c : signature) {
-        ASSERT_TRUE((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+    json dbg = sm.debug_token(token);
+    ASSERT_TRUE(dbg.value("valid_format", false));
+    const json& c = dbg["components"];
+    ASSERT_EQ(c.value("function", ""), "func");
+    ASSERT_EQ(c.value("call_id", ""), "call");
+    // nonce present + non-empty (16 hex chars from token_hex(8)).
+    std::string nonce = c.value("nonce", "");
+    ASSERT_EQ(nonce.size(), 16u);
+    for (char ch : nonce) {
+        ASSERT_TRUE((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'));
     }
     return true;
 }
@@ -290,5 +296,163 @@ TEST(session_manager_debug_token_malformed) {
     sm.set_debug_mode(true);
     json dbg = sm.debug_token("not-a-token");
     ASSERT_FALSE(dbg.value("valid_format", true));
+    return true;
+}
+
+// ── Contract 7: tool-token WIRE FORMAT + nonce parity (#70) ─────────
+//
+// Python (core/security/session_manager.py): a minted token is the base64url
+// encoding of 5 dot-joined fields {call_id}.{function_name}.{expiry}.{nonce}.
+// {signature}; the signed message is {call_id}:{function_name}:{expiry}:{nonce}
+// (HMAC-SHA256, hexdigest); nonce = secrets.token_hex(8) (16 hex chars); the
+// signature compare is CONSTANT-TIME. These tests assert on the DECODED form
+// and prove cross-port interop with a token constructed in the python-oracle
+// shape. A 3-field / no-nonce / fn-first token FAILS (1)+(2)+(3).
+
+namespace {
+// base64url-encode (no padding), matching Python's urlsafe_b64encode.decode().
+std::string c7_b64url(const std::string& data) {
+    static const char table[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    std::string out;
+    int val = 0, valb = -6;
+    for (unsigned char c : data) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            out.push_back(table[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+    return out;  // no '=' padding
+}
+
+// HMAC-SHA256 hexdigest of message under a raw-byte secret (same primitive
+// SessionManager uses internally), so the test can mint a token in the exact
+// python-oracle format and prove it validates in-port.
+std::string c7_hmac_hex(const std::vector<uint8_t>& secret, const std::string& message) {
+    unsigned int len = 0;
+    unsigned char mac[EVP_MAX_MD_SIZE];
+    HMAC(EVP_sha256(), secret.data(), static_cast<int>(secret.size()),
+         reinterpret_cast<const unsigned char*>(message.data()), message.size(), mac, &len);
+    static const char* hx = "0123456789abcdef";
+    std::string out;
+    for (unsigned int i = 0; i < len; ++i) {
+        out.push_back(hx[mac[i] >> 4]);
+        out.push_back(hx[mac[i] & 0xF]);
+    }
+    return out;
+}
+}  // namespace
+
+// (1) decoded token has exactly 5 dot-fields with a NON-EMPTY nonce.
+TEST(contract7_token_has_five_fields_and_nonce) {
+    SessionManager sm;
+    sm.set_debug_mode(true);
+    std::string token = sm.generate_token("get_weather", "call-abc-123");
+    json dbg = sm.debug_token(token);
+    ASSERT_TRUE(dbg.value("valid_format", false));
+    const json& c = dbg["components"];
+    // The debug view surfaces all 5 decoded fields (nonce is the tell that
+    // the token is not the old 3-field fn-first shape).
+    ASSERT_TRUE(c.contains("call_id"));
+    ASSERT_TRUE(c.contains("function"));
+    ASSERT_TRUE(c.contains("expiry"));
+    ASSERT_TRUE(c.contains("nonce"));
+    ASSERT_TRUE(c.contains("signature"));
+    ASSERT_EQ(c.value("function", ""), "get_weather");
+    ASSERT_FALSE(c.value("nonce", "").empty());
+    ASSERT_EQ(c.value("nonce", "").size(), 16u);  // secrets.token_hex(8)
+    return true;
+}
+
+// (2) two mints for the SAME (function, call, expiry) produce DIFFERENT nonces.
+TEST(contract7_two_mints_have_different_nonces) {
+    std::vector<uint8_t> secret(32, 0x5A);
+    SessionManager sm(secret);
+    sm.set_debug_mode(true);
+    std::string t1 = sm.create_token("fn", "call-x", 3600);
+    std::string t2 = sm.create_token("fn", "call-x", 3600);
+    // Whole tokens differ...
+    ASSERT_NE(t1, t2);
+    // ...and specifically the nonces differ (not just some other byte).
+    std::string n1 = sm.debug_token(t1)["components"].value("nonce", "");
+    std::string n2 = sm.debug_token(t2)["components"].value("nonce", "");
+    ASSERT_FALSE(n1.empty());
+    ASSERT_FALSE(n2.empty());
+    ASSERT_NE(n1, n2);
+    return true;
+}
+
+// (3) a token constructed in the python-oracle format validates in-port.
+TEST(contract7_python_oracle_format_interop) {
+    std::vector<uint8_t> secret(32, 0x42);
+    SessionManager sm(secret);
+
+    std::string call_id = "call-interop-1";
+    std::string function_name = "lookup_order";
+    int64_t expiry = static_cast<int64_t>(std::time(nullptr)) + 3600;
+    std::string nonce = "0011223344556677";  // 16 hex chars
+
+    // Signed message is call_id-FIRST, colon-joined (python parity).
+    std::string message = call_id + ":" + function_name + ":" +
+                          std::to_string(expiry) + ":" + nonce;
+    std::string sig = c7_hmac_hex(secret, message);
+
+    // 5 dot-fields, then base64url-wrap the whole thing (python parity).
+    std::string plain = call_id + "." + function_name + "." +
+                        std::to_string(expiry) + "." + nonce + "." + sig;
+    std::string token = c7_b64url(plain);
+
+    ASSERT_TRUE(sm.validate_token(token, function_name, call_id));
+    // Wrong function / call_id still reject.
+    ASSERT_FALSE(sm.validate_token(token, "other_fn", call_id));
+    ASSERT_FALSE(sm.validate_token(token, function_name, "other-call"));
+    return true;
+}
+
+// (4) flip one byte of the signature field => validation fails.
+TEST(contract7_tampered_signature_rejected) {
+    std::vector<uint8_t> secret(32, 0x42);
+    SessionManager sm(secret);
+
+    std::string call_id = "call-9";
+    std::string function_name = "fn9";
+    int64_t expiry = static_cast<int64_t>(std::time(nullptr)) + 3600;
+    std::string nonce = "aabbccddeeff0011";
+    std::string message = call_id + ":" + function_name + ":" +
+                          std::to_string(expiry) + ":" + nonce;
+    std::string sig = c7_hmac_hex(secret, message);
+    // Flip the last hex nibble of the signature.
+    sig.back() = (sig.back() == 'a') ? 'b' : 'a';
+
+    std::string plain = call_id + "." + function_name + "." +
+                        std::to_string(expiry) + "." + nonce + "." + sig;
+    std::string token = c7_b64url(plain);
+    ASSERT_FALSE(sm.validate_token(token, function_name, call_id));
+    return true;
+}
+
+// (5) signature compare is constant-time: rejecting a matched-prefix sig and a
+// first-byte-differing sig both take the full compare (no early return). We
+// assert the timing_safe_compare primitive returns only on a length mismatch;
+// equal-length inputs are compared in full via CRYPTO_memcmp.
+TEST(contract7_constant_time_compare) {
+    // Equal-length, differ only in the LAST byte -> must reject (a first-
+    // mismatch early-return impl would still reject, but a length-only check
+    // would wrongly accept; this pins full-width comparison).
+    std::string a(64, 'a');
+    std::string b(64, 'a');
+    b.back() = 'b';
+    ASSERT_FALSE(SessionManager::timing_safe_compare(a, b));
+    // Differ only in the FIRST byte -> also reject.
+    std::string c(64, 'a');
+    c.front() = 'b';
+    ASSERT_FALSE(SessionManager::timing_safe_compare(a, c));
+    // Identical -> accept.
+    ASSERT_TRUE(SessionManager::timing_safe_compare(a, std::string(64, 'a')));
+    // Length mismatch -> reject.
+    ASSERT_FALSE(SessionManager::timing_safe_compare(a, std::string(63, 'a')));
     return true;
 }

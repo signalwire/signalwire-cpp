@@ -14,6 +14,7 @@
 
 #include "signalwire/common.hpp"
 #include "signalwire/datamap/datamap.hpp"
+#include "signalwire/skills/claude_skills_core.hpp"
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skills_http.hpp"
 #include "signalwire/skills/web_search_core.hpp"
@@ -983,8 +984,15 @@ class InfoGathererSkillR : public SkillBase {
   }
 };
 
+// Real SKILL.md discovery — the registered claude_skills implementation.
+// Discovers subdirectories of skills_path containing a SKILL.md, parses the
+// frontmatter, and declares one SWAIG tool per skill. Logic lives in
+// claude_skills_core.hpp, shared with builtin/claude_skills.cpp so the two can
+// never drift. Native execution of skill code is impossible (AOT) — discover +
+// declare only.
 class ClaudeSkillsSkillR : public SkillBase {
   std::string sp_, tp_ = "claude_";
+  std::vector<claude_core::DiscoveredSkill> discovered_;
 
  public:
   std::string skill_name() const override { return "claude_skills"; }
@@ -993,17 +1001,23 @@ class ClaudeSkillsSkillR : public SkillBase {
   bool setup(const json& p) override {
     params_ = p;
     sp_ = get_param<std::string>(p, "skills_path", "");
-    return !sp_.empty();
+    tp_ = get_param<std::string>(p, "tool_prefix", "claude_");
+    if (sp_.empty()) {
+      return false;
+    }
+    discovered_ = claude_core::discover_skills(sp_);
+    return true;
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
-    return {define_tool(
-        tp_ + "skill", "Claude skill",
-        json::object(
-            {{"type", "object"},
-             {"properties", json::object({{"arguments", json::object({{"type", "string"}})}})}}),
-        [](const json& a, const json&) -> swaig::FunctionResult {
-          return swaig::FunctionResult("Claude: " + a.value("arguments", ""));
-        })};
+    std::vector<swaig::ToolDefinition> tools;
+    tools.reserve(discovered_.size());
+    for (const auto& skill : discovered_) {
+      tools.push_back(claude_core::build_tool(skill, tp_));
+    }
+    return tools;
+  }
+  std::vector<std::string> get_hints() const override {
+    return claude_core::hints_from(discovered_);
   }
 };
 

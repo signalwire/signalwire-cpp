@@ -16,7 +16,13 @@ using json = nlohmann::json;
 
 /// Manages HMAC-SHA256 based session tokens for secure SWAIG tool calls.
 ///
-/// Token format: base64(functionName:callID:expiryTimestamp) + "." + hex(hmac_signature)
+/// Token format (Python parity, `core/security/session_manager.py`): the token
+/// is the base64url-encoding of the 5 dot-joined fields
+/// ``{call_id}.{function_name}.{expiry}.{nonce}.{signature}`` where
+/// ``signature = hex(hmac_sha256("{call_id}:{function_name}:{expiry}:{nonce}"))``
+/// and ``nonce`` is 16 hex chars (``secrets.token_hex(8)``). Validation
+/// base64url-decodes, splits the 5 fields, recomputes the HMAC, and compares in
+/// CONSTANT time.
 class SessionManager {
  public:
   /// Construct with a random 32-byte secret
@@ -123,8 +129,20 @@ class SessionManager {
   /// Base64 decode
   static std::string base64_decode(const std::string& encoded);
 
+  /// Base64url encode (URL-safe alphabet, no padding) — matches Python's
+  /// ``base64.urlsafe_b64encode(...).decode()`` used to wrap the whole token.
+  static std::string base64url_encode(const std::string& data);
+
+  /// Base64url decode (URL-safe alphabet, tolerates missing padding) —
+  /// inverse of ``base64url_encode`` / Python's ``urlsafe_b64decode``.
+  static std::string base64url_decode(const std::string& encoded);
+
   /// Hex encode
   static std::string hex_encode(const std::vector<uint8_t>& data);
+
+  /// Generate a random nonce of ``bytes`` bytes as a hex string — mirrors
+  /// Python's ``secrets.token_hex(bytes)`` (``2*bytes`` hex chars).
+  static std::string token_hex(int bytes);
 
   /// Get current Unix timestamp
   static int64_t current_timestamp();

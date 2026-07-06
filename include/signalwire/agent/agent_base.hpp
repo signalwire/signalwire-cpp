@@ -56,7 +56,18 @@ struct LanguageConfig {
   std::string code;
   std::string voice;
   std::string engine;
-  std::string fillers;
+  /// Explicit model name (e.g. "eleven_turbo_v2_5", "arcana"). Emitted as
+  /// the language object's ``model`` key only when non-empty — matches the
+  /// Python reference (add_language ``model=`` kwarg).
+  std::string model;
+  /// Speech fillers spoken for natural pacing. Emitted as
+  /// ``speech_fillers`` when both speech+function fillers are set, or as
+  /// the deprecated ``fillers`` key when only one kind is present (parity
+  /// with the Python reference add_language filler handling).
+  std::vector<std::string> speech_fillers;
+  /// Filler phrases spoken while a function call is in flight. Emitted as
+  /// ``function_fillers`` when paired with speech_fillers.
+  std::vector<std::string> function_fillers;
   /// Per-language params dict (engine-specific tuning, voice
   /// settings, etc.). Emitted as the language object's ``params``
   /// key in SWML only when non-empty — matches Python reference
@@ -72,8 +83,18 @@ struct LanguageConfig {
     if (!engine.empty()) {
       j["engine"] = engine;
     }
-    if (!fillers.empty()) {
-      j["fillers"] = fillers;
+    if (!model.empty()) {
+      j["model"] = model;
+    }
+    // Filler emission mirrors Python: both kinds -> the two explicit keys;
+    // only one kind -> the deprecated combined ``fillers`` key.
+    if (!speech_fillers.empty() && !function_fillers.empty()) {
+      j["speech_fillers"] = speech_fillers;
+      j["function_fillers"] = function_fillers;
+    } else if (!speech_fillers.empty()) {
+      j["fillers"] = speech_fillers;
+    } else if (!function_fillers.empty()) {
+      j["fillers"] = function_fillers;
     }
     // Only emit the params key when non-empty so we don't pollute
     // SWML with empty objects (parity with Python's
@@ -317,7 +338,13 @@ class AgentBase : public swml::Service {
 
   AgentBase& add_hint(const std::string& hint);
   AgentBase& add_hints(const std::vector<std::string>& hints);
-  AgentBase& add_pattern_hint(const std::string& pattern);
+  /// Add a STRUCTURED pattern hint. Mirrors Python's
+  /// ``add_pattern_hint(hint, pattern, replace, ignore_case=False)``: appends
+  /// a ``{hint, pattern, replace, ignore_case}`` object to the hints list
+  /// (not a bare string), which renders into the SWML ``ai.hints`` array.
+  /// No-op unless hint, pattern, and replace are all non-empty (parity).
+  AgentBase& add_pattern_hint(const std::string& hint, const std::string& pattern,
+                              const std::string& replace, bool ignore_case = false);
   AgentBase& add_language(const LanguageConfig& lang);
   AgentBase& set_languages(const std::vector<LanguageConfig>& langs);
 
@@ -676,7 +703,10 @@ class AgentBase : public swml::Service {
   std::vector<json> function_includes_;
 
   // AI Config
-  std::vector<std::string> hints_;
+  /// Hints list. Plain string hints are stored as JSON strings; structured
+  /// pattern hints (add_pattern_hint) are stored as JSON objects. Rendered
+  /// verbatim into the SWML ``ai.hints`` array.
+  std::vector<json> hints_;
   std::vector<LanguageConfig> languages_;
   json multilingual_;  // ASR-driven multilingual (Mode B); null when unset
   std::vector<Pronunciation> pronunciations_;

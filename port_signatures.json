@@ -4390,9 +4390,25 @@
                   "kind": "self"
                 },
                 {
+                  "name": "hint",
+                  "type": "string",
+                  "required": true
+                },
+                {
                   "name": "pattern",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "replace",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "ignore_case",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"

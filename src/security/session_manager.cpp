@@ -100,6 +100,36 @@ std::string SessionManager::base64_decode(const std::string& encoded) {
   return out;
 }
 
+std::string SessionManager::base64url_encode(const std::string& data) {
+  std::string out = base64_encode(data);
+  for (char& c : out) {
+    if (c == '+') {
+      c = '-';
+    } else if (c == '/') {
+      c = '_';
+    }
+  }
+  while (!out.empty() && out.back() == '=') {
+    out.pop_back();
+  }
+  return out;
+}
+
+std::string SessionManager::base64url_decode(const std::string& encoded) {
+  std::string std_b64 = encoded;
+  for (char& c : std_b64) {
+    if (c == '-') {
+      c = '+';
+    } else if (c == '_') {
+      c = '/';
+    }
+  }
+  while (std_b64.size() % 4) {
+    std_b64.push_back('=');
+  }
+  return base64_decode(std_b64);
+}
+
 std::string SessionManager::hex_encode(const std::vector<uint8_t>& data) {
   std::ostringstream ss;
   ss << std::hex << std::setfill('0');
@@ -107,6 +137,14 @@ std::string SessionManager::hex_encode(const std::vector<uint8_t>& data) {
     ss << std::setw(2) << static_cast<int>(b);
   }
   return ss.str();
+}
+
+std::string SessionManager::token_hex(int bytes) {
+  std::vector<uint8_t> buf(static_cast<size_t>(bytes));
+  if (RAND_bytes(buf.data(), bytes) != 1) {
+    throw std::runtime_error("Failed to generate random nonce");
+  }
+  return hex_encode(buf);
 }
 
 int64_t SessionManager::current_timestamp() { return static_cast<int64_t>(std::time(nullptr)); }
@@ -129,75 +167,81 @@ bool SessionManager::timing_safe_compare(const std::string& a, const std::string
 std::string SessionManager::create_token(const std::string& function_name,
                                          const std::string& call_id, int expiry_seconds) const {
   int64_t expiry = current_timestamp() + expiry_seconds;
-  std::string payload = function_name + ":" + call_id + ":" + std::to_string(expiry);
-  std::string encoded_payload = base64_encode(payload);
+  std::string nonce = token_hex(8);  // 16 hex chars, matches secrets.token_hex(8)
 
-  std::string signature = hmac_sha256(encoded_payload);
-  std::vector<uint8_t> sig_bytes(signature.begin(), signature.end());
+  // Sign the call_id-first colon-joined message (Python parity).
+  std::string message = call_id + ":" + function_name + ":" + std::to_string(expiry) + ":" + nonce;
+  std::string sig_raw = hmac_sha256(message);
+  std::vector<uint8_t> sig_bytes(sig_raw.begin(), sig_raw.end());
   std::string hex_sig = hex_encode(sig_bytes);
 
-  return encoded_payload + "." + hex_sig;
+  // Combine the 5 dot-joined fields, then base64url-wrap the whole token.
+  std::string token =
+      call_id + "." + function_name + "." + std::to_string(expiry) + "." + nonce + "." + hex_sig;
+  return base64url_encode(token);
 }
 
 bool SessionManager::validate_token(std::string_view token, std::string_view function_name,
                                     std::string_view call_id) const {
-  auto dot_pos = token.find('.');
-  if (dot_pos == std::string_view::npos) {
+  // Reject validation when no call_id is provided (Python parity).
+  if (call_id.empty()) {
     return false;
   }
 
-  // token.substr now yields a string_view; materialise the slices we hand
-  // to the std::string-taking helpers (hmac_sha256 / timing_safe_compare /
-  // base64_decode) into owning strings.
-  std::string encoded_payload(token.substr(0, dot_pos));
-  std::string provided_sig(token.substr(dot_pos + 1));
-
-  // Recompute signature
-  std::string expected_sig_raw = hmac_sha256(encoded_payload);
-  std::vector<uint8_t> sig_bytes(expected_sig_raw.begin(), expected_sig_raw.end());
-  std::string expected_sig = hex_encode(sig_bytes);
-
-  // Timing-safe comparison
-  if (!timing_safe_compare(provided_sig, expected_sig)) {
+  // base64url-decode the whole token, then split into the 5 dot-fields
+  // {call_id}.{function_name}.{expiry}.{nonce}.{signature}.
+  std::string decoded = base64url_decode(std::string(token));
+  std::vector<std::string> parts;
+  {
+    size_t start = 0;
+    while (true) {
+      size_t dot = decoded.find('.', start);
+      if (dot == std::string::npos) {
+        parts.push_back(decoded.substr(start));
+        break;
+      }
+      parts.push_back(decoded.substr(start, dot - start));
+      start = dot + 1;
+    }
+  }
+  if (parts.size() != 5) {
     return false;
   }
 
-  // Decode payload and check fields
-  std::string payload = base64_decode(encoded_payload);
-  // format: functionName:callID:expiryTimestamp
-  auto first_colon = payload.find(':');
-  if (first_colon == std::string::npos) {
-    return false;
-  }
-  auto second_colon = payload.find(':', first_colon + 1);
-  if (second_colon == std::string::npos) {
+  const std::string& token_call_id = parts[0];
+  const std::string& token_func = parts[1];
+  const std::string& token_expiry_str = parts[2];
+  const std::string& token_nonce = parts[3];
+  const std::string& token_signature = parts[4];
+
+  // Verify the function matches.
+  if (token_func != std::string(function_name)) {
     return false;
   }
 
-  std::string token_func = payload.substr(0, first_colon);
-  std::string token_call_id = payload.substr(first_colon + 1, second_colon - first_colon - 1);
-  std::string token_expiry_str = payload.substr(second_colon + 1);
-
-  // Timing-safe field comparison: a plain != short-circuits on the first
-  // differing byte, leaking the matched-prefix length. Compare the parsed
-  // fields against the expected values in constant time.
-  if (!timing_safe_compare(token_func, std::string(function_name))) {
-    return false;
-  }
-  if (!timing_safe_compare(token_call_id, std::string(call_id))) {
-    return false;
-  }
-
+  // Check expiry.
   try {
     int64_t expiry = std::stoll(token_expiry_str);
-    if (current_timestamp() > expiry) {
+    if (expiry < current_timestamp()) {
       return false;
     }
   } catch (...) {
     return false;
   }
 
-  return true;
+  // Recompute the signature over the signed message and compare in constant
+  // time (timing_safe_compare short-circuits ONLY on a length mismatch).
+  std::string message =
+      token_call_id + ":" + token_func + ":" + token_expiry_str + ":" + token_nonce;
+  std::string expected_sig_raw = hmac_sha256(message);
+  std::vector<uint8_t> sig_bytes(expected_sig_raw.begin(), expected_sig_raw.end());
+  std::string expected_sig = hex_encode(sig_bytes);
+  if (!timing_safe_compare(token_signature, expected_sig)) {
+    return false;
+  }
+
+  // Finally verify the call_id matches (checked last, per the reference).
+  return timing_safe_compare(token_call_id, std::string(call_id));
 }
 
 // ── Python-surface token aliases ───────────────────────────────────
@@ -288,25 +332,31 @@ json SessionManager::debug_token(const std::string& token) const {
   if (!debug_mode_) {
     return json{{"error", "debug mode not enabled"}};
   }
-  auto dot_pos = token.find('.');
-  if (dot_pos == std::string::npos) {
-    return json{{"valid_format", false}, {"parts_count", 1}, {"token_length", token.size()}};
+  // base64url-decode the whole token, then split into the 5 dot-fields.
+  std::string decoded = base64url_decode(token);
+  std::vector<std::string> parts;
+  {
+    size_t start = 0;
+    while (true) {
+      size_t dot = decoded.find('.', start);
+      if (dot == std::string::npos) {
+        parts.push_back(decoded.substr(start));
+        break;
+      }
+      parts.push_back(decoded.substr(start, dot - start));
+      start = dot + 1;
+    }
   }
-  std::string encoded_payload = token.substr(0, dot_pos);
-  std::string signature = token.substr(dot_pos + 1);
-
-  std::string payload = base64_decode(encoded_payload);
-  // format: functionName:callID:expiryTimestamp
-  auto first_colon = payload.find(':');
-  auto second_colon =
-      first_colon == std::string::npos ? std::string::npos : payload.find(':', first_colon + 1);
-  if (first_colon == std::string::npos || second_colon == std::string::npos) {
-    return json{{"valid_format", false}, {"decoded", payload}, {"token_length", token.size()}};
+  if (parts.size() != 5) {
+    return json{
+        {"valid_format", false}, {"parts_count", parts.size()}, {"token_length", token.size()}};
   }
 
-  std::string token_func = payload.substr(0, first_colon);
-  std::string token_call_id = payload.substr(first_colon + 1, second_colon - first_colon - 1);
-  std::string token_expiry_str = payload.substr(second_colon + 1);
+  std::string token_call_id = parts[0];
+  std::string token_func = parts[1];
+  std::string token_expiry_str = parts[2];
+  std::string token_nonce = parts[3];
+  std::string signature = parts[4];
 
   int64_t current_time = current_timestamp();
   json status = json::object();
@@ -315,6 +365,7 @@ json SessionManager::debug_token(const std::string& token) const {
   components["function"] = token_func;
   components["call_id"] = truncate8(token_call_id);
   components["expiry"] = token_expiry_str;
+  components["nonce"] = token_nonce;
   components["signature"] = truncate8(signature);
   try {
     int64_t expiry = std::stoll(token_expiry_str);

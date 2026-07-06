@@ -400,9 +400,14 @@ AgentBase& AgentBase::add_hints(const std::vector<std::string>& hints) {
   return *this;
 }
 
-AgentBase& AgentBase::add_pattern_hint(const std::string& pattern) {
-  // Pattern hints are treated the same as regular hints
-  hints_.push_back(pattern);
+AgentBase& AgentBase::add_pattern_hint(const std::string& hint, const std::string& pattern,
+                                       const std::string& replace, bool ignore_case) {
+  // Structured pattern hint (Python parity): append the full object, not a
+  // bare string. No-op unless hint/pattern/replace are all provided.
+  if (!hint.empty() && !pattern.empty() && !replace.empty()) {
+    hints_.push_back(json{
+        {"hint", hint}, {"pattern", pattern}, {"replace", replace}, {"ignore_case", ignore_case}});
+  }
   return *this;
 }
 

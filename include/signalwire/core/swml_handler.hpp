@@ -109,6 +109,17 @@ class VerbHandlerRegistry {
   /// Whether a handler exists for a verb.
   [[nodiscard]] bool has_handler(const std::string& verb_name) const;
 
+  /// The registered verb names, sorted (Python:
+  /// ``sorted(VerbHandlerRegistry._handlers.keys())``).
+  [[nodiscard]] std::vector<std::string> get_verb_names() const {
+    std::vector<std::string> names;
+    names.reserve(handlers_.size());
+    for (const auto& [verb, handler] : handlers_) {
+      names.push_back(verb);
+    }
+    return names;  // std::map iterates in sorted key order
+  }
+
  private:
   std::map<std::string, std::shared_ptr<SWMLVerbHandler>> handlers_;
 };

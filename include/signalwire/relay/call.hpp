@@ -100,7 +100,14 @@ class Call {
                     Gender gender, const std::string& voice = "", double volume = 0.0);
   Action prompt_audio(const std::string& url, const json& collect, double volume = 0.0);
   Action collect(const json& params, const std::string& control_id = "");
-  Action connect(const json& devices);
+  /// Bridge the call to one or more destinations. ``devices`` is the nested
+  /// serial/parallel device array; ``options`` carries the optional bridge
+  /// knobs (``ringback``, ``tag``, ``max_duration``, ``max_price_per_minute``,
+  /// ``status_url``, or any extra) merged into the ``calling.connect`` frame —
+  /// Python parity: ``Call.connect(devices, *, ringback=…, tag=…,
+  /// max_duration=…, **kwargs)``. Without ``options`` these knobs never reached
+  /// the wire.
+  Action connect(const json& devices, const json& options = json::object());
   Action disconnect();
   Action detect(const json& params, const std::string& control_id = "");
   // Typed detect convenience wrappers (mirror Python's detect_digit/

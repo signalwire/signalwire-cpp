@@ -13,6 +13,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 
 namespace signalwire {
@@ -112,6 +113,10 @@ struct PlayEvent : public RelayEvent {
 struct RecordEvent : public RelayEvent {
   std::string control_id;
   std::string state;
+  std::string url;
+  double duration = 0.0;
+  long size = 0;
+  json record = json::object();
   [[nodiscard]] static RecordEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     RecordEvent e;
@@ -122,6 +127,15 @@ struct RecordEvent : public RelayEvent {
     const json& p = base.params;
     e.control_id = p.value("control_id", std::string());
     e.state = p.value("state", std::string());
+    // url/duration/size FALLBACK from the nested record{} then flat params
+    // (Python parity: RecordEvent.from_payload —
+    // ``rec.get("url", p.get("url", ""))`` etc.). Without this, a RecordEvent
+    // decodes with an empty url/duration/size.
+    const json rec = p.contains("record") && p["record"].is_object() ? p["record"] : json::object();
+    e.record = rec;
+    e.url = rec.value("url", p.value("url", std::string()));
+    e.duration = rec.value("duration", p.value("duration", 0.0));
+    e.size = rec.value<long>("size", p.value<long>("size", 0));
     return e;
   }
 };
@@ -130,8 +144,13 @@ struct RecordEvent : public RelayEvent {
 struct CollectEvent : public RelayEvent {
   std::string control_id;
   std::string state;
-  std::string result;
-  bool final = false;
+  /// The collect result is a structured object (e.g.
+  /// ``{"type":"digit","params":{"digits":"1234"}}``), not a scalar — Python
+  /// parity: ``result: dict``. Reading it as a string dropped the payload.
+  json result = json::object();
+  /// Tri-state: absent (nullopt), true, or false — Python parity
+  /// ``final: bool | None``.
+  std::optional<bool> final;
   [[nodiscard]] static CollectEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     CollectEvent e;
@@ -142,8 +161,10 @@ struct CollectEvent : public RelayEvent {
     const json& p = base.params;
     e.control_id = p.value("control_id", std::string());
     e.state = p.value("state", std::string());
-    e.result = p.value("result", std::string());
-    e.final = p.value("final", false);
+    e.result = p.contains("result") ? p["result"] : json::object();
+    if (p.contains("final") && p["final"].is_boolean()) {
+      e.final = p["final"].get<bool>();
+    }
     return e;
   }
 };

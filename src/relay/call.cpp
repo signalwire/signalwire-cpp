@@ -148,9 +148,16 @@ Action Call::hangup(const std::string& reason) {
   return execute_simple("end", p);
 }
 
-Action Call::connect(const json& devices) {
+Action Call::connect(const json& devices, const json& options) {
   json p;
   p["devices"] = devices;
+  // Merge the optional bridge knobs (ringback/tag/max_duration/…) into the
+  // frame — Python parity: Call.connect passes them through into params.
+  if (options.is_object()) {
+    for (auto it = options.begin(); it != options.end(); ++it) {
+      p[it.key()] = it.value();
+    }
+  }
   return execute_simple("connect", p);
 }
 

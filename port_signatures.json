@@ -162,6 +162,15 @@
               ],
               "returns": "list<tuple<string,class:signalwire.core.agent_base.AgentBase>>"
             },
+            "get_sip_username_mapping": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "dict<string,string>"
+            },
             "list_routes": {
               "params": [
                 {
@@ -170,6 +179,20 @@
                 }
               ],
               "returns": "list<string>"
+            },
+            "lookup_sip_route": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "username",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "string"
             },
             "map_sip_username": {
               "params": [
@@ -1135,6 +1158,15 @@
               ],
               "returns": "string"
             },
+            "get_global_data": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "get_name": {
               "params": [
                 {
@@ -1143,6 +1175,15 @@
                 }
               ],
               "returns": "string"
+            },
+            "get_sip_usernames": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
             },
             "handle_mcp_request": {
               "params": [
@@ -7354,6 +7395,15 @@
               ],
               "returns": "class:signalwire.core.swml_handler.SWMLVerbHandler"
             },
+            "get_verb_names": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
             "has_handler": {
               "params": [
                 {
@@ -7798,6 +7848,15 @@
                 }
               ],
               "returns": "class:signalwire.core.swaig_function.ToolDefinition"
+            },
+            "get_routing_callback_paths": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
             },
             "goto_section": {
               "params": [
@@ -14770,6 +14829,12 @@
                   "name": "devices",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "options",
+                  "type": "any",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"

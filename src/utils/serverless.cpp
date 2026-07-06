@@ -8,10 +8,12 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <regex>
 
 #include "signalwire/agent/agent_base.hpp"
 #include "signalwire/common.hpp"
 #include "signalwire/core/logging_config.hpp"
+#include "signalwire/swaig/function_result.hpp"
 
 namespace signalwire {
 namespace utils {
@@ -81,6 +83,86 @@ ServerlessResponse dispatch(agent::AgentBase& agent, const std::string& method,
   return ServerlessResponse{status, resp_headers, resp_body};
 }
 
+// Strip leading + trailing '/' from a path (Python's path.strip("/")).
+std::string strip_slashes(const std::string& s) {
+  size_t b = s.find_first_not_of('/');
+  if (b == std::string::npos) {
+    return "";
+  }
+  size_t e = s.find_last_not_of('/');
+  return s.substr(b, e - b + 1);
+}
+
+// Lambda basic-auth check over the event headers (Python parity:
+// AuthMixin._check_lambda_auth). Returns true only for a valid Basic header.
+bool check_lambda_auth(agent::AgentBase& agent, const json& event) {
+  if (!event.is_object() || !event.contains("headers")) {
+    return false;
+  }
+  std::map<std::string, std::string> headers = headers_from_json(event["headers"]);
+  std::string auth;
+  for (const auto& [k, v] : headers) {
+    std::string lk = k;
+    std::transform(lk.begin(), lk.end(), lk.begin(), ::tolower);
+    if (lk == "authorization") {
+      auth = v;
+      break;
+    }
+  }
+  if (auth.size() < 6 || auth.substr(0, 6) != "Basic ") {
+    return false;
+  }
+  std::string decoded = signalwire::base64_decode(auth.substr(6));
+  auto colon = decoded.find(':');
+  if (colon == std::string::npos) {
+    return false;
+  }
+  return agent.validate_basic_auth(decoded.substr(0, colon), decoded.substr(colon + 1));
+}
+
+// The 401 auth challenge (Python parity: AuthMixin._send_lambda_auth_challenge).
+ServerlessResponse lambda_auth_challenge() {
+  return ServerlessResponse{401,
+                            {{"WWW-Authenticate", "Basic realm=\"SignalWire Agent\""},
+                             {"Content-Type", "application/json"}},
+                            R"({"error": "Unauthorized"})"};
+}
+
+// Execute a SWAIG function in serverless context and return the JSON-encoded
+// result (Python parity: ServerlessMixin._execute_swaig_function). Validates the
+// function-name format and existence exactly as the reference does.
+std::string execute_serverless_swaig(agent::AgentBase& agent, const std::string& function_name,
+                                     const json& args, const json& raw_data) {
+  static const std::regex name_re("^[a-zA-Z_][a-zA-Z0-9_]*$");
+  if (!function_name.empty() && !std::regex_match(function_name, name_re)) {
+    return json{{"error", "Invalid function name format: '" + function_name + "'"}}.dump();
+  }
+  if (!agent.has_function(function_name)) {
+    return json{{"error", "Function '" + function_name + "' not found"}}.dump();
+  }
+  swaig::FunctionResult result = agent.on_function_call(function_name, args, raw_data);
+  return result.to_json().dump();
+}
+
+// Extract the SWAIG args from raw_data (mirrors the FastAPI handler +
+// serverless_mixin: argument.parsed[0], else parse argument.raw).
+json extract_swaig_args(const json& raw_data) {
+  if (raw_data.is_object() && raw_data.contains("argument") && raw_data["argument"].is_object()) {
+    const json& argument = raw_data["argument"];
+    if (argument.contains("parsed") && argument["parsed"].is_array() &&
+        !argument["parsed"].empty()) {
+      return argument["parsed"][0];
+    }
+    if (argument.contains("raw") && argument["raw"].is_string()) {
+      json parsed = json::parse(argument["raw"].get<std::string>(), nullptr, false);
+      if (!parsed.is_discarded()) {
+        return parsed;
+      }
+    }
+  }
+  return json::object();
+}
+
 std::string env_or(const std::map<std::string, std::string>& env, const std::string& key,
                    const std::string& dflt) {
   auto it = env.find(key);
@@ -127,7 +209,48 @@ ServerlessResponse handle_lambda(agent::AgentBase& agent, const json& event, con
                                                    ? headers_from_json(event["headers"])
                                                    : std::map<std::string, std::string>{};
 
-  return dispatch(agent, method, path, headers, body);
+  // Lambda-mode auth + SWAIG dispatch (Python parity:
+  // ServerlessMixin.handle_serverless_request lambda branch). The event's
+  // rawPath is agent-RELATIVE: "swaig" (function in body) or "{function_name}"
+  // dispatches a SWAIG function directly; root/other renders SWML. This is why
+  // the reference does NOT route the raw path through handle_request's
+  // route-prefixed dispatch.
+  if (!check_lambda_auth(agent, event)) {
+    return lambda_auth_challenge();
+  }
+
+  const std::string rel_path = strip_slashes(path);
+
+  // Parse the body once for SWAIG dispatch (function name + args + raw_data).
+  json raw_data = json::object();
+  std::string function_name;
+  if (body && !body->empty()) {
+    json parsed = json::parse(*body, nullptr, false);
+    if (!parsed.is_discarded() && parsed.is_object()) {
+      raw_data = parsed;
+      if (parsed.contains("function") && parsed["function"].is_string()) {
+        function_name = parsed["function"].get<std::string>();
+      }
+    }
+  }
+
+  const std::map<std::string, std::string> swaig_headers = {{"Content-Type", "application/json"}};
+
+  // Case 1: /swaig endpoint with a function name in the body.
+  if ((rel_path == "swaig") && !function_name.empty()) {
+    json args = extract_swaig_args(raw_data);
+    return ServerlessResponse{200, swaig_headers,
+                              execute_serverless_swaig(agent, function_name, args, raw_data)};
+  }
+  // Case 2: path-based function routing (e.g. "/say_hello").
+  if (!rel_path.empty() && rel_path != "swaig") {
+    json args = extract_swaig_args(raw_data);
+    return ServerlessResponse{200, swaig_headers,
+                              execute_serverless_swaig(agent, rel_path, args, raw_data)};
+  }
+
+  // Case 3: root path (or /swaig without a function) — render SWML.
+  return dispatch(agent, "GET", "/", headers, std::nullopt);
 }
 
 ServerlessResponse handle_gcf(agent::AgentBase& agent, const std::string& method,

@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 4742b1efeb93a6bc4fccfa241770d434248dcc7e",
+  "generated_from": "signalwire-cpp @ 35f6c9924be7e9a6fb856991a3213dfea6c8a935",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -34,7 +34,9 @@
           "enable_sip_routing",
           "get_agent",
           "get_agents",
+          "get_sip_username_mapping",
           "list_routes",
+          "lookup_sip_route",
           "map_sip_username",
           "register",
           "register_agent",
@@ -146,11 +148,13 @@
           "enable_sip_routing",
           "get_contexts",
           "get_full_url",
+          "get_global_data",
           "get_language_params",
           "get_name",
           "get_post_prompt",
           "get_prompt",
           "get_raw_prompt",
+          "get_sip_usernames",
           "handle_mcp_request",
           "handle_request",
           "handle_serverless_request",
@@ -789,6 +793,7 @@
         "VerbHandlerRegistry": [
           "__init__",
           "get_handler",
+          "get_verb_names",
           "has_handler",
           "register_handler"
         ]
@@ -835,6 +840,7 @@
           "get_basic_auth_credentials_with_source",
           "get_document",
           "get_function",
+          "get_routing_callback_paths",
           "goto_section",
           "handle_request",
           "hangup",

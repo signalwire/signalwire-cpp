@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/server/agent_server.hpp"
 
+#include <algorithm>
+
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/agent/agent_base.hpp"
@@ -10,6 +12,12 @@
 
 namespace signalwire {
 namespace server {
+
+namespace {
+// Forward-declared so the SIP-mapping members defined above the anonymous-
+// namespace definition can normalize routes to a leading "/".
+std::string normalize_route(const std::string& route);
+}  // namespace
 
 AgentServer::AgentServer(const std::string& host, int port) : host_(host), port_(port) {
   std::string env_port = get_env("PORT", "");
@@ -65,8 +73,31 @@ AgentServer& AgentServer::map_sip_username(const std::string& username, const st
     get_logger().warn("Invalid SIP username: " + username);
     return *this;
   }
-  sip_routes_[username] = route;
+  // Store the mapping under the LOWERCASED username, with the route normalized
+  // to a leading "/" — Python parity: AgentServer.register_sip_username stores
+  // ``self._sip_username_mapping[username.lower()] = route`` and lookups
+  // case-fold. Without lowercasing, a "Bob"/"BOB"/"bob" lookup misses.
+  std::string key = username;
+  std::transform(key.begin(), key.end(), key.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  sip_routes_[key] = normalize_route(route);
   return *this;
+}
+
+std::string AgentServer::lookup_sip_route(const std::string& username) const {
+  // Case-fold on lookup (Python parity: AgentServer._lookup_sip_route uses
+  // ``username.lower()``). Returns "" when no mapping exists.
+  std::string key = username;
+  std::transform(key.begin(), key.end(), key.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = sip_routes_.find(key);
+  return it != sip_routes_.end() ? it->second : std::string{};
+}
+
+std::map<std::string, std::string> AgentServer::get_sip_username_mapping() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return sip_routes_;
 }
 
 AgentServer& AgentServer::set_static_dir(const std::string& dir) {
@@ -221,7 +252,10 @@ void AgentServer::setup_routes(httplib::Server& server) {
         return;
       }
 
-      auto it = sip_routes_.find(username);
+      std::string sip_key = username;
+      std::transform(sip_key.begin(), sip_key.end(), sip_key.begin(),
+                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      auto it = sip_routes_.find(sip_key);
       if (it != sip_routes_.end()) {
         res.set_content(json::object({{"route", it->second}}).dump(), "application/json");
       } else {

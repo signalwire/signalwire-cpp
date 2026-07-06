@@ -384,6 +384,9 @@ class AgentBase : public swml::Service {
   AgentBase& set_params(const json& params);
   AgentBase& set_global_data(const json& data);
   AgentBase& update_global_data(const json& data);
+  /// The accumulated global-data object (Python: ``AgentBase._global_data``).
+  /// Returns a copy; an empty object when nothing has been set.
+  [[nodiscard]] json get_global_data() const;
   AgentBase& set_native_functions(const std::vector<std::string>& funcs);
   /// The complete set of internal SWAIG function names that accept
   /// fillers, matching the SWAIGInternalFiller schema definition.
@@ -540,6 +543,9 @@ class AgentBase : public swml::Service {
   AgentBase& enable_sip_routing(bool enable = true);
   AgentBase& register_sip_username(const std::string& username);
   AgentBase& auto_map_sip_usernames(bool enable = true);
+  /// The registered SIP usernames (lowercased set — Python:
+  /// ``AgentBase._sip_usernames``). Returned in registration order.
+  [[nodiscard]] std::vector<std::string> get_sip_usernames() const;
 
   // ========================================================================
   // Auth

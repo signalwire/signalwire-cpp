@@ -509,6 +509,10 @@ AgentBase& AgentBase::update_global_data(const json& data) {
   return *this;
 }
 
+json AgentBase::get_global_data() const {
+  return global_data_.is_object() ? global_data_ : json::object();
+}
+
 AgentBase& AgentBase::set_native_functions(const std::vector<std::string>& funcs) {
   native_functions_ = funcs;
   return *this;
@@ -1050,6 +1054,8 @@ AgentBase& AgentBase::register_sip_username(const std::string& username) {
   }
   return *this;
 }
+
+std::vector<std::string> AgentBase::get_sip_usernames() const { return sip_usernames_; }
 
 AgentBase& AgentBase::auto_map_sip_usernames(bool enable) {
   auto_map_sip_ = enable;

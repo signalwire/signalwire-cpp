@@ -77,6 +77,16 @@ class AgentServer {
   /// Map a SIP username to a route (Python: ``register_sip_username``).
   AgentServer& register_sip_username(const std::string& username, const std::string& route);
 
+  /// Look up the route registered for a SIP username, case-insensitively;
+  /// returns an empty string when none is registered (Python:
+  /// ``AgentServer._lookup_sip_route`` — ``self._sip_username_mapping.get(
+  /// username.lower())``).
+  [[nodiscard]] std::string lookup_sip_route(const std::string& username) const;
+
+  /// The username -> route mapping (keys are lowercased). Python:
+  /// ``AgentServer._sip_username_mapping``.
+  [[nodiscard]] std::map<std::string, std::string> get_sip_username_mapping() const;
+
   /// Serve static files from a directory at ``route`` (Python:
   /// ``serve_static_files``).
   AgentServer& serve_static_files(const std::string& directory, const std::string& route = "/");

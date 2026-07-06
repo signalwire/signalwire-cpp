@@ -122,6 +122,31 @@ target_link_libraries(emit_skills signalwire)
 add_executable(route_registry tools/route_registry.cpp)
 target_link_libraries(route_registry signalwire)
 
+# ── Layer-D per-surface dump programs ────────────────────────────────────────
+# One dump per behavioral surface for the porting-sdk per-surface differs
+# (porting-sdk/scripts/diff_port_{wire,swml,state,http,wire_relay}.py). Each
+# builds the shared corpus natively, emits {case_id -> observable-artifact} as
+# one canonical JSON object on stdout, and the differ byte-compares it against
+# the Python oracle. Mirror the Go reference dumps
+# (signalwire-go/cmd/{wire,swml,state,http,wire-relay}-dump).
+add_executable(wire_dump tools/wire_dump.cpp)
+target_link_libraries(wire_dump signalwire)
+
+add_executable(swml_dump tools/swml_dump.cpp)
+target_link_libraries(swml_dump signalwire)
+
+add_executable(state_dump tools/state_dump.cpp)
+target_link_libraries(state_dump signalwire)
+
+add_executable(http_dump tools/http_dump.cpp)
+target_link_libraries(http_dump signalwire)
+
+# wire_relay_dump links the RELAY client + stands up an in-process mock WS
+# server (IXWebSocket) to capture the frames the client sends. It uses the
+# IXWebSocket server headers directly, so link ixwebsocket explicitly.
+add_executable(wire_relay_dump tools/wire_relay_dump.cpp)
+target_link_libraries(wire_relay_dump signalwire ixwebsocket)
+
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that
 # every method referenced in docs and examples resolves to a real symbol; the

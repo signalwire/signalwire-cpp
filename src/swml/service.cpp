@@ -74,7 +74,7 @@ Service& Service::set_auth(const std::string& username, const std::string& passw
   return *this;
 }
 
-void Service::init_auth() {
+void Service::init_auth() const {
   if (auth_initialized_) {
     return;
   }
@@ -109,6 +109,10 @@ bool Service::timing_safe_compare(const std::string& a, const std::string& b) {
 }
 
 bool Service::validate_basic_auth(const std::string& username, const std::string& password) const {
+  // Lazily resolve credentials (from env or a generated password) so an auth
+  // check works from any entry point — a serverless dispatch validates auth
+  // without a prior serve()/as_router() having called init_auth().
+  init_auth();
   return timing_safe_compare(username, auth_user_) && timing_safe_compare(password, auth_pass_);
 }
 
@@ -358,9 +362,23 @@ std::tuple<int, std::map<std::string, std::string>, std::string> Service::handle
   // registered for the request's path. A returned non-empty route -> 307.
   const std::string callback_path = path_from_url(url);
   if (method == "POST" && request_body.is_object() && !request_body.empty()) {
-    auto cb = routing_callbacks_.find(callback_path);
-    if (cb != routing_callbacks_.end() && cb->second) {
-      std::string route = cb->second(request_body, headers);
+    // Match the request path against the registered (already-normalized)
+    // callback paths, allowing for the service route prefix (Python parity:
+    // ``_callback_path_for_url`` matches ``normalized == cb OR
+    // normalized.endswith(cb)``). So a callback registered at "/sip" fires for
+    // a request to "/swml/sip".
+    const RoutingCallback* matched = nullptr;
+    for (const auto& [cb_path, cb_fn] : routing_callbacks_) {
+      const bool ends_with = callback_path.size() >= cb_path.size() &&
+                             callback_path.compare(callback_path.size() - cb_path.size(),
+                                                   cb_path.size(), cb_path) == 0;
+      if (cb_fn && (callback_path == cb_path || ends_with)) {
+        matched = &cb_fn;
+        break;
+      }
+    }
+    if (matched != nullptr) {
+      std::string route = (*matched)(request_body, headers);
       if (!route.empty()) {
         return {307, {{"Location", route}}, ""};
       }
@@ -376,7 +394,27 @@ void Service::reset_document() { document_ = Document(); }
 void Service::manual_set_proxy_url(const std::string& proxy_url) { manual_proxy_url_ = proxy_url; }
 
 void Service::register_routing_callback(RoutingCallback callback, const std::string& path) {
-  routing_callbacks_[path] = std::move(callback);
+  // Normalize the path for consistent lookup (Python parity:
+  // ``SWMLService.register_routing_callback`` — ``path.rstrip("/")`` then
+  // prepend a leading "/" if absent). So "/sip/" -> "/sip", "voice" -> "/voice".
+  std::string normalized = path;
+  while (!normalized.empty() && normalized.back() == '/') {
+    normalized.pop_back();
+  }
+  if (normalized.empty() || normalized.front() != '/') {
+    normalized = "/" + normalized;
+  }
+  routing_callbacks_[normalized] = std::move(callback);
+}
+
+std::vector<std::string> Service::get_routing_callback_paths() const {
+  std::vector<std::string> paths;
+  paths.reserve(routing_callbacks_.size());
+  for (const auto& [path, cb] : routing_callbacks_) {
+    paths.push_back(path);
+  }
+  std::sort(paths.begin(), paths.end());  // std::map is sorted, but be explicit
+  return paths;
 }
 
 void Service::register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler) {
@@ -396,16 +434,23 @@ std::string Service::extract_sip_username(const json& request_body) {
     return "";
   }
   std::string to = call["to"].get<std::string>();
-  // Strip a leading "sip:" scheme if present.
-  const std::string scheme = "sip:";
-  if (to.rfind(scheme, 0) == 0) {
-    to = to.substr(scheme.size());
+  // Python parity (SWMLService.extract_sip_username): three branches on the
+  // 'to' URI scheme.
+  //   - "sip:username@domain" -> username portion (before the first '@'; the
+  //     whole remainder when there is no '@', mirroring Python's split("@",1)[0])
+  //   - "tel:+1234567890"     -> the number after "tel:"
+  //   - otherwise             -> the whole 'to' field verbatim
+  const std::string sip_scheme = "sip:";
+  const std::string tel_scheme = "tel:";
+  if (to.rfind(sip_scheme, 0) == 0) {
+    std::string rest = to.substr(sip_scheme.size());
+    auto at = rest.find('@');
+    return at == std::string::npos ? rest : rest.substr(0, at);
   }
-  auto at = to.find('@');
-  if (at == std::string::npos) {
-    return "";
+  if (to.rfind(tel_scheme, 0) == 0) {
+    return to.substr(tel_scheme.size());
   }
-  return to.substr(0, at);
+  return to;
 }
 
 json Service::render_main_swml(const httplib::Request&) const { return on_render_swml(); }

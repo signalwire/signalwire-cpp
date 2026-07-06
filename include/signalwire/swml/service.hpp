@@ -210,6 +210,10 @@ class Service {
       const json& body, const std::map<std::string, std::string>& headers)>;
   void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
 
+  /// The registered (normalized) routing-callback paths, sorted (Python:
+  /// ``sorted(SWMLService._routing_callbacks.keys())``).
+  [[nodiscard]] std::vector<std::string> get_routing_callback_paths() const;
+
   /// Register a SWML verb handler (Python:
   /// ``SWMLService.register_verb_handler``). Delegates to the service's verb
   /// handler registry so custom verbs validate + build through the handler.
@@ -380,9 +384,13 @@ class Service {
   std::string host_ = "0.0.0.0";
   int port_ = 3000;
 
-  std::string auth_user_;
-  std::string auth_pass_;
-  bool auth_initialized_ = false;
+  // Mutable so credentials can be lazily resolved from the environment on the
+  // first auth check regardless of entry point (init_auth() is const and called
+  // by the const validate_basic_auth). Mirrors the reference's lazy auth
+  // resolution: a serverless dispatch validates auth without a prior serve().
+  mutable std::string auth_user_;
+  mutable std::string auth_pass_;
+  mutable bool auth_initialized_ = false;
 
   Schema schema_;
   /// SchemaUtils helper exposed via schema_utils(). Mutable so the
@@ -407,7 +415,7 @@ class Service {
   virtual void setup_routes(httplib::Server& server);
 
  private:
-  void init_auth();
+  void init_auth() const;
 
   std::unique_ptr<httplib::Server> server_;
 };

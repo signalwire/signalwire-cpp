@@ -123,9 +123,13 @@ class ParameterSchema {
                            const std::string& description = "") {
     json prop = json::object();
     prop["type"] = "string";
-    if (!description.empty()) prop["description"] = description;
+    if (!description.empty()) {
+      prop["description"] = description;
+    }
     json arr = json::array();
-    for (const auto& v : values) arr.push_back(v);
+    for (const auto& v : values) {
+      arr.push_back(v);
+    }
     prop["enum"] = arr;
     properties_[name] = prop;
     return *this;
@@ -140,7 +144,9 @@ class ParameterSchema {
                             const std::string& description = "") {
     json prop = json::object();
     prop["type"] = "array";
-    if (!description.empty()) prop["description"] = description;
+    if (!description.empty()) {
+      prop["description"] = description;
+    }
     prop["items"] = json::object({{"type", item_type}});
     properties_[name] = prop;
     return *this;
@@ -153,7 +159,9 @@ class ParameterSchema {
                             const std::string& description = "") {
     json prop = json::object();
     prop["type"] = "array";
-    if (!description.empty()) prop["description"] = description;
+    if (!description.empty()) {
+      prop["description"] = description;
+    }
     prop["items"] = item_schema.to_json();
     properties_[name] = prop;
     return *this;
@@ -169,7 +177,9 @@ class ParameterSchema {
   ParameterSchema& object_of(const std::string& name, const ParameterSchema& nested,
                              const std::string& description = "") {
     json prop = nested.to_json();  // already {type:object, properties:{...}, [required]}
-    if (!description.empty()) prop["description"] = description;
+    if (!description.empty()) {
+      prop["description"] = description;
+    }
     properties_[name] = prop;
     return *this;
   }
@@ -217,7 +227,9 @@ class ParameterSchema {
     out["properties"] = properties_;
     if (!required_.empty()) {
       json req = json::array();
-      for (const auto& r : required_) req.push_back(r);
+      for (const auto& r : required_) {
+        req.push_back(r);
+      }
       out["required"] = req;
     }
     return out;
@@ -242,7 +254,9 @@ class ParameterSchema {
                               const std::string& description) {
     json prop = json::object();
     prop["type"] = json_type;
-    if (!description.empty()) prop["description"] = description;
+    if (!description.empty()) {
+      prop["description"] = description;
+    }
     properties_[name] = prop;
     return *this;
   }

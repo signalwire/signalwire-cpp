@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 4aef5e4900e825edd7af1b7ecff5565b65540fe9",
+  "generated_from": "signalwire-cpp @ 255af95df22ba9e770b64e46a1af260e72f48951",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -100,6 +100,13 @@
       },
       "functions": []
     },
+    "signalwire.core.agent.tools.type_inference": {
+      "classes": {},
+      "functions": [
+        "create_typed_handler_wrapper",
+        "infer_schema"
+      ]
+    },
     "signalwire.core.agent_base": {
       "classes": {
         "AgentBase": [
@@ -145,6 +152,7 @@
           "get_prompt",
           "get_raw_prompt",
           "handle_mcp_request",
+          "handle_request",
           "has_contexts",
           "has_skill",
           "is_mcp_server_enabled",
@@ -825,6 +833,7 @@
           "get_document",
           "get_function",
           "goto_section",
+          "handle_request",
           "hangup",
           "has_function",
           "has_tool",

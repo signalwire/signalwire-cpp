@@ -515,6 +515,16 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     ("signalwire::security::security_utils", "IsValidHostname"): (
         "signalwire.core.security.security_utils", "is_valid_hostname",
     ),
+    # SWAIG schema inference (type_inference.py). C++ groups these in a nested
+    # ``signalwire::swaig::type_inference`` namespace (snake_case names);
+    # Python keeps them module-level under
+    # ``signalwire.core.agent.tools.type_inference``.
+    ("signalwire::swaig::type_inference", "infer_schema"): (
+        "signalwire.core.agent.tools.type_inference", "infer_schema",
+    ),
+    ("signalwire::swaig::type_inference", "create_typed_handler_wrapper"): (
+        "signalwire.core.agent.tools.type_inference", "create_typed_handler_wrapper",
+    ),
 }
 
 
@@ -804,6 +814,17 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
         ("include/signalwire/signalwire.hpp", "add_skill_directory", "add_skill_directory"),
         ("include/signalwire/signalwire.hpp", "list_skills_with_params", "list_skills_with_params"),
         ("include/signalwire/signalwire.hpp", "list_skills", "list_skills"),
+    ],
+    # SWAIG schema-inference module-level helpers (type_inference.py). C++
+    # implements them as free functions in
+    # ``signalwire::swaig::type_inference`` (same snake_case names as Python).
+    # Python reflects a callable's type hints; C++ has no lambda reflection, so
+    # infer_schema derives the schema from the typed ``ParameterSchema``
+    # params-builder — same output tuple, idiomatic input.
+    "signalwire.core.agent.tools.type_inference": [
+        ("include/signalwire/swaig/type_inference.hpp", "infer_schema", "infer_schema"),
+        ("include/signalwire/swaig/type_inference.hpp",
+         "create_typed_handler_wrapper", "create_typed_handler_wrapper"),
     ],
     # Logging-config module-level helpers. C++ implements them as free functions
     # in ``signalwire::core::logging_config`` (same snake_case names as Python).

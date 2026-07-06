@@ -190,6 +190,18 @@ diverge from Python's.
   catch-all for fields the typed setters don't enumerate; C++
   emits the typed setters only and reaches the dynamic fields via
   `update(resource_id, params)` for the rare full-control case.
+- `cpp_typed_builder_infer`: Python's `type_inference.infer_schema`
+  reflects a callable's type hints (`inspect.signature` + `typing`
+  introspection) to build the SWAIG parameter schema; C++ has no runtime
+  parameter-name/type-hint reflection over an arbitrary lambda, so — like
+  the .NET / Ruby ports (which infer from a delegate's parameter list) —
+  the C++ port infers the schema from the port's typed `ParameterSchema`
+  params-builder. Same output tuple `(parameters, required, description,
+  is_typed, has_raw_data)`; only the input is idiomatic (a built
+  `ParameterSchema` instead of a raw callable). `create_typed_handler_wrapper`
+  likewise wraps a C++ `ToolHandler` (`std::function<FunctionResult(json,
+  json)>`) to the standard `(args, raw_data)` calling convention rather than
+  a bare Python callable.
 
 ## Documented signature divergences
 
@@ -269,6 +281,8 @@ signalwire.core.agent.prompt.manager.PromptManager.define_contexts: cpp_define_c
 signalwire.core.agent.prompt.manager.PromptManager.prompt_add_section: cpp_typed_overload_subset
 signalwire.core.agent.prompt.manager.PromptManager.prompt_add_to_section: cpp_typed_overload_subset
 signalwire.core.agent.tools.registry.ToolRegistry.define_tool: cpp_typed_overload_subset
+signalwire.core.agent.tools.type_inference.infer_schema: cpp_typed_builder_infer: Python reflects a callable's type hints; C++ has no lambda reflection so infers the schema from the typed ParameterSchema params-builder — same output tuple (parameters, required, description, is_typed, has_raw_data), idiomatic input.
+signalwire.core.agent.tools.type_inference.create_typed_handler_wrapper: cpp_typed_builder_infer: Python wraps a bare callable to the (args, raw_data) convention; C++ wraps a ToolHandler (std::function<FunctionResult(json,json)>) to the same convention — same wrap-and-forward behavior, idiomatic handler type.
 signalwire.core.agent_base.AgentBase.add_answer_verb: cpp_typed_overload_split
 signalwire.core.agent_base.AgentBase.enable_sip_routing: cpp_typed_overload_subset
 signalwire.core.agent_base.AgentBase.on_summary: cpp_typed_overload_subset

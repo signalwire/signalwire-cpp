@@ -11,6 +11,7 @@
 #include <set>
 #include <shared_mutex>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -277,10 +278,13 @@ class AgentBase : public swml::Service {
   AgentBase& define_tools(const std::vector<swaig::ToolDefinition>& tools);
 
   /// Register a routing callback for a request path (Python:
-  /// ``WebMixin.register_routing_callback``). Given a request path + parsed
-  /// params, the callback returns the route to dispatch to (empty = no
-  /// override). Used to steer inbound requests to per-path handlers.
-  using RoutingCallback = std::function<std::string(const std::string& path, const json& params)>;
+  /// ``WebMixin.register_routing_callback``). The callback receives the parsed
+  /// request ``body`` and the request ``headers`` and returns the route to
+  /// dispatch to (empty string = no override), matching Python's
+  /// ``callback_fn(body, headers) -> route | None``. Used to steer inbound
+  /// requests to per-path handlers.
+  using RoutingCallback = std::function<std::string(
+      const json& body, const std::map<std::string, std::string>& headers)>;
   AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/");
 
   /// Install signal handlers so the agent's HTTP server drains + stops cleanly
@@ -561,6 +565,20 @@ class AgentBase : public swml::Service {
   [[nodiscard]] json render_swml_for_request(
       const std::map<std::string, std::string>& query_params, const json& body_params,
       const std::map<std::string, std::string>& headers) const;
+
+  /// Framework-free request-dispatch core (Python:
+  /// ``AgentBase.handle_request``). Overrides ``SWMLService::handle_request`` so
+  /// the primitive dispatch surface renders SWML via AgentBase's request-aware
+  /// render path (``render_swml_for_request``) instead of the base
+  /// ``render_document``. Over plain ``(method, url, headers, body)`` primitives
+  /// it performs proxy detection, basic-auth over the header map, and the
+  /// routing-callback check, returning a ``(status, response_headers,
+  /// body_string)`` triple with the 401-auth and 307-redirect behavior
+  /// preserved.
+  [[nodiscard]] std::tuple<int, std::map<std::string, std::string>, std::string> handle_request(
+      const std::string& method, const std::string& url,
+      const std::map<std::string, std::string>& headers,
+      const std::optional<json>& body = std::nullopt);
 
   // ========================================================================
   // Server

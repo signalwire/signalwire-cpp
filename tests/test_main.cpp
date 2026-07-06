@@ -77,6 +77,8 @@ static std::vector<TestCase>& get_tests() {
 #include "test_web_service.cpp"
 #include "test_function_result.cpp"
 #include "test_parameter_schema.cpp"
+#include "test_type_inference.cpp"
+#include "test_handle_request.cpp"
 #include "test_media_enums.cpp"
 #include "test_security.cpp"
 #include "test_security_config.cpp"

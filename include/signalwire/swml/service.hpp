@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "signalwire/logging.hpp"
@@ -178,6 +179,20 @@ class Service {
   /// ``SWMLService.render_document``).
   [[nodiscard]] std::string render_document() const;
 
+  /// Framework-free request-dispatch core (Python:
+  /// ``SWMLService.handle_request``). The primitive dispatch surface the SDK
+  /// ports share: over plain ``(method, url, headers, body)`` primitives it
+  /// performs proxy detection, basic-auth over the header map, the
+  /// routing-callback check, then renders the SWML document — returning a
+  /// ``(status, response_headers, body_string)`` triple. On auth failure it
+  /// returns ``(401, {"WWW-Authenticate":"Basic"}, {"error":"Unauthorized"})``;
+  /// on a routing-callback redirect ``(307, {"Location": route}, "")``;
+  /// otherwise ``(200, {}, render_document())``.
+  [[nodiscard]] std::tuple<int, std::map<std::string, std::string>, std::string> handle_request(
+      const std::string& method, const std::string& url,
+      const std::map<std::string, std::string>& headers,
+      const std::optional<json>& body = std::nullopt);
+
   /// Reset the document to an empty state (Python:
   /// ``SWMLService.reset_document``).
   void reset_document();
@@ -187,9 +202,12 @@ class Service {
   void manual_set_proxy_url(const std::string& proxy_url);
 
   /// Register a routing callback for a request path (Python:
-  /// ``SWMLService.register_routing_callback``). Given a request path + params,
-  /// the callback returns the route to dispatch to (empty = no override).
-  using RoutingCallback = std::function<std::string(const std::string& path, const json& params)>;
+  /// ``SWMLService.register_routing_callback``). The callback receives the
+  /// parsed request ``body`` and the request ``headers`` and returns the route
+  /// to dispatch to (empty string = no override), matching Python's
+  /// ``callback_fn(body, headers) -> route | None``.
+  using RoutingCallback = std::function<std::string(
+      const json& body, const std::map<std::string, std::string>& headers)>;
   void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
 
   /// Register a SWML verb handler (Python:

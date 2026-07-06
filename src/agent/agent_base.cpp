@@ -6,8 +6,10 @@
 #include <openssl/rand.h>
 
 #include <algorithm>
+#include <cctype>
 #include <csignal>
 #include <set>
+#include <tuple>
 
 #include "httplib.h"
 #include "server/tls_server.hpp"
@@ -1365,6 +1367,99 @@ json AgentBase::render_swml_for_request(const std::map<std::string, std::string>
   }
 
   return render_swml_internal(headers);
+}
+
+// ---------------------------------------------------------------------------
+// Framework-free request-dispatch primitives (Python:
+// AgentBase.handle_request). File-local helpers mirror SWMLService's, but the
+// render path is AgentBase's request-aware render_swml_for_request.
+// ---------------------------------------------------------------------------
+namespace {
+
+std::string agent_header_lookup(const std::map<std::string, std::string>& headers,
+                                const std::string& name) {
+  auto exact = headers.find(name);
+  if (exact != headers.end()) {
+    return exact->second;
+  }
+  std::string want = name;
+  std::transform(want.begin(), want.end(), want.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  for (const auto& kv : headers) {
+    std::string key = kv.first;
+    std::transform(key.begin(), key.end(), key.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (key == want) {
+      return kv.second;
+    }
+  }
+  return "";
+}
+
+std::string agent_path_from_url(const std::string& url) {
+  std::string path = url;
+  auto scheme = path.find("://");
+  if (scheme != std::string::npos) {
+    auto slash = path.find('/', scheme + 3);
+    path = (slash == std::string::npos) ? std::string("/") : path.substr(slash);
+  }
+  auto q = path.find_first_of("?#");
+  if (q != std::string::npos) {
+    path = path.substr(0, q);
+  }
+  std::string trimmed = path;
+  while (!trimmed.empty() && trimmed.front() == '/') {
+    trimmed.erase(trimmed.begin());
+  }
+  while (!trimmed.empty() && trimmed.back() == '/') {
+    trimmed.pop_back();
+  }
+  return "/" + trimmed;
+}
+
+}  // namespace
+
+std::tuple<int, std::map<std::string, std::string>, std::string> AgentBase::handle_request(
+    const std::string& method, const std::string& url,
+    const std::map<std::string, std::string>& headers, const std::optional<json>& body) {
+  init_auth();
+
+  const json request_body = body.value_or(json::object());
+
+  // Basic-auth over the passed header map.
+  bool authorized = false;
+  std::string auth_header = agent_header_lookup(headers, "Authorization");
+  if (auth_header.size() >= 7 && auth_header.substr(0, 6) == "Basic ") {
+    std::string decoded = signalwire::base64_decode(auth_header.substr(6));
+    auto colon = decoded.find(':');
+    if (colon != std::string::npos) {
+      std::string user = decoded.substr(0, colon);
+      std::string pass = decoded.substr(colon + 1);
+      authorized = signalwire::timing_safe_compare(user, auth_user_) &&
+                   signalwire::timing_safe_compare(pass, auth_pass_);
+    }
+  }
+  if (!authorized) {
+    return {401, {{"WWW-Authenticate", "Basic"}}, R"({"error":"Unauthorized"})"};
+  }
+
+  // Routing callback: only for POST with a non-empty parsed body and a callback
+  // registered for the request's path. A returned non-empty route -> 307.
+  const std::string callback_path = agent_path_from_url(url);
+  if (method == "POST" && request_body.is_object() && !request_body.empty()) {
+    auto cb = routing_callbacks_.find(callback_path);
+    if (cb != routing_callbacks_.end() && cb->second) {
+      std::string route = cb->second(request_body, headers);
+      if (!route.empty()) {
+        return {307, {{"Location", route}}, ""};
+      }
+    }
+  }
+
+  // Render SWML via AgentBase's request-aware path (empty query params, the
+  // parsed body as body params, the request headers for proxy detection).
+  json swml = render_swml_for_request({}, request_body, headers);
+  return {200, {}, swml.dump()};
 }
 
 // Private helper to actually render

@@ -846,6 +846,41 @@
         }
       }
     },
+    "signalwire.core.agent.tools.type_inference": {
+      "functions": {
+        "create_typed_handler_wrapper": {
+          "params": [
+            {
+              "name": "func",
+              "type": "callable<list<any,any>,class:signalwire.core.function_result.FunctionResult>",
+              "required": true
+            },
+            {
+              "name": "has_raw_data",
+              "type": "bool",
+              "required": true
+            }
+          ],
+          "returns": "class:signalwire.tool_handler.ToolHandler"
+        },
+        "infer_schema": {
+          "params": [
+            {
+              "name": "params",
+              "type": "class:signalwire.swaig.parameter_schema.ParameterSchema",
+              "required": true
+            },
+            {
+              "name": "description",
+              "type": "optional<string>",
+              "required": false,
+              "default": null
+            }
+          ],
+          "returns": "class:signalwire.inferred_schema.InferredSchema"
+        }
+      }
+    },
     "signalwire.core.agent_base": {
       "classes": {
         "AgentBase": {
@@ -1122,6 +1157,36 @@
                 }
               ],
               "returns": "any"
+            },
+            "handle_request": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "method",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "headers",
+                  "type": "dict<string,string>",
+                  "required": true
+                },
+                {
+                  "name": "body",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "tuple<int,dict<string,string>,string>"
             },
             "has_contexts": {
               "params": [
@@ -7697,6 +7762,36 @@
                 }
               ],
               "returns": "class:signalwire.core.swml_service.SWMLService"
+            },
+            "handle_request": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "method",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "headers",
+                  "type": "dict<string,string>",
+                  "required": true
+                },
+                {
+                  "name": "body",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "tuple<int,dict<string,string>,string>"
             },
             "hangup": {
               "params": [

@@ -4,6 +4,7 @@
 #include <openssl/rand.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <iostream>
 #include <regex>
@@ -266,6 +267,106 @@ Service& Service::add_verb_to_section(const std::string& section_name, const std
 }
 
 std::string Service::render_document() const { return render_swml().dump(); }
+
+// ---------------------------------------------------------------------------
+// Framework-free request-dispatch primitives (Python:
+// SWMLService.handle_request / _handle_request_core). Shared helpers below are
+// file-local so AgentBase's override can reuse the same decode/derive logic.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Case-insensitive lookup of a header value from a plain header map. Returns an
+// empty string when the header is absent (headers may be lower- or mixed-case
+// depending on the caller).
+std::string header_lookup(const std::map<std::string, std::string>& headers,
+                          const std::string& name) {
+  auto exact = headers.find(name);
+  if (exact != headers.end()) {
+    return exact->second;
+  }
+  std::string want = name;
+  std::transform(want.begin(), want.end(), want.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  for (const auto& kv : headers) {
+    std::string key = kv.first;
+    std::transform(key.begin(), key.end(), key.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (key == want) {
+      return kv.second;
+    }
+  }
+  return "";
+}
+
+// Derive the request path from a full URL or bare path (Python:
+// _callback_path_for_url uses urlparse(url).path). Strips scheme+authority and
+// any query/fragment, then normalizes to a single leading slash.
+std::string path_from_url(const std::string& url) {
+  std::string path = url;
+  auto scheme = path.find("://");
+  if (scheme != std::string::npos) {
+    auto slash = path.find('/', scheme + 3);
+    path = (slash == std::string::npos) ? std::string("/") : path.substr(slash);
+  }
+  auto q = path.find_first_of("?#");
+  if (q != std::string::npos) {
+    path = path.substr(0, q);
+  }
+  // Normalize: strip surrounding slashes, re-add a single leading one.
+  std::string trimmed = path;
+  while (!trimmed.empty() && trimmed.front() == '/') {
+    trimmed.erase(trimmed.begin());
+  }
+  while (!trimmed.empty() && trimmed.back() == '/') {
+    trimmed.pop_back();
+  }
+  return "/" + trimmed;
+}
+
+}  // namespace
+
+std::tuple<int, std::map<std::string, std::string>, std::string> Service::handle_request(
+    const std::string& method, const std::string& url,
+    const std::map<std::string, std::string>& headers, const std::optional<json>& body) {
+  // Ensure basic-auth credentials exist (the FastAPI path resolves these on
+  // serve()/as_router(); the primitive path must resolve them too).
+  init_auth();
+
+  const json request_body = body.value_or(json::object());
+
+  // Basic-auth over the passed header map (mirror validate_auth's decode +
+  // timing-safe compare, but framework-free). On any failure -> 401.
+  bool authorized = false;
+  std::string auth_header = header_lookup(headers, "Authorization");
+  if (auth_header.size() >= 7 && auth_header.substr(0, 6) == "Basic ") {
+    std::string decoded = signalwire::base64_decode(auth_header.substr(6));
+    auto colon = decoded.find(':');
+    if (colon != std::string::npos) {
+      std::string user = decoded.substr(0, colon);
+      std::string pass = decoded.substr(colon + 1);
+      authorized = timing_safe_compare(user, auth_user_) && timing_safe_compare(pass, auth_pass_);
+    }
+  }
+  if (!authorized) {
+    return {401, {{"WWW-Authenticate", "Basic"}}, R"({"error":"Unauthorized"})"};
+  }
+
+  // Routing callback: only for POST with a non-empty parsed body and a callback
+  // registered for the request's path. A returned non-empty route -> 307.
+  const std::string callback_path = path_from_url(url);
+  if (method == "POST" && request_body.is_object() && !request_body.empty()) {
+    auto cb = routing_callbacks_.find(callback_path);
+    if (cb != routing_callbacks_.end() && cb->second) {
+      std::string route = cb->second(request_body, headers);
+      if (!route.empty()) {
+        return {307, {{"Location", route}}, ""};
+      }
+    }
+  }
+
+  // Otherwise render the SWML document.
+  return {200, {}, render_document()};
+}
 
 void Service::reset_document() { document_ = Document(); }
 

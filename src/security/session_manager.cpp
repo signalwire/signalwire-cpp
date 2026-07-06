@@ -178,10 +178,13 @@ bool SessionManager::validate_token(std::string_view token, std::string_view fun
   std::string token_call_id = payload.substr(first_colon + 1, second_colon - first_colon - 1);
   std::string token_expiry_str = payload.substr(second_colon + 1);
 
-  if (token_func != function_name) {
+  // Timing-safe field comparison: a plain != short-circuits on the first
+  // differing byte, leaking the matched-prefix length. Compare the parsed
+  // fields against the expected values in constant time.
+  if (!timing_safe_compare(token_func, std::string(function_name))) {
     return false;
   }
-  if (token_call_id != call_id) {
+  if (!timing_safe_compare(token_call_id, std::string(call_id))) {
     return false;
   }
 

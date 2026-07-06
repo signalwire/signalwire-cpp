@@ -635,12 +635,30 @@ AgentBase& AgentBase::set_function_includes(const std::vector<json>& includes) {
 }
 
 AgentBase& AgentBase::set_prompt_llm_params(const json& params) {
-  prompt_llm_params_ = params;
+  // MERGE, don't replace (Python: self._prompt_llm_params.update(params) —
+  // ai_config_mixin.py:669). Two calls with distinct keys must accumulate both.
+  if (!prompt_llm_params_.is_object()) {
+    prompt_llm_params_ = json::object();
+  }
+  if (params.is_object()) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      prompt_llm_params_[it.key()] = it.value();
+    }
+  }
   return *this;
 }
 
 AgentBase& AgentBase::set_post_prompt_llm_params(const json& params) {
-  post_prompt_llm_params_ = params;
+  // MERGE, don't replace (Python: self._post_prompt_llm_params.update(params) —
+  // ai_config_mixin.py:703).
+  if (!post_prompt_llm_params_.is_object()) {
+    post_prompt_llm_params_ = json::object();
+  }
+  if (params.is_object()) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      post_prompt_llm_params_[it.key()] = it.value();
+    }
+  }
   return *this;
 }
 
@@ -975,6 +993,39 @@ json AgentBase::handle_mcp_request(const json& body) {
 
 AgentBase& AgentBase::enable_sip_routing(bool enable) {
   sip_routing_enabled_ = enable;
+  if (!enable) {
+    return *this;
+  }
+
+  // Register a routing callback at /sip that CONSULTS the registered SIP
+  // usernames (mirrors Python AgentBase.enable_sip_routing /
+  // sip_routing_callback). The callback extracts the SIP username from the
+  // request body and, like Python/Go, returns an empty route in both the
+  // matched and unmatched cases (a matched username is already handled by this
+  // agent, so normal SWML rendering continues — no redirect). The point is
+  // that the mapping is now CONSULTED over the served /sip path, not merely
+  // stored: the served endpoint reaches this callback and extracts the
+  // username, instead of 404-ing.
+  register_routing_callback(
+      [this](const json& body, const std::map<std::string, std::string>&) -> std::string {
+        std::string sip_username = signalwire::swml::Service::extract_sip_username(body);
+        if (!sip_username.empty()) {
+          std::string lowered = sip_username;
+          std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::tolower);
+          bool matched = std::find(sip_usernames_.begin(), sip_usernames_.end(), lowered) !=
+                         sip_usernames_.end();
+          get_logger().info((matched ? "sip_username_matched: " : "sip_username_not_matched: ") +
+                            sip_username);
+        }
+        // Matched or not, routing continues (empty route -> render SWML).
+        return "";
+      },
+      "/sip");
+
+  // Auto-map common usernames (mirrors Python enable_sip_routing's auto_map=True
+  // default): derive + register usernames from the agent name/route.
+  auto_map_sip_usernames(true);
+
   return *this;
 }
 
@@ -985,12 +1036,59 @@ AgentBase& AgentBase::register_sip_username(const std::string& username) {
     get_logger().warn("Invalid SIP username format: " + username);
     return *this;
   }
-  sip_usernames_.push_back(username);
+  // Store lower-cased (mirrors Python's self._sip_usernames.add(username.lower()))
+  // so the /sip routing callback's case-insensitive match works.
+  std::string lowered = username;
+  std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::tolower);
+  if (std::find(sip_usernames_.begin(), sip_usernames_.end(), lowered) == sip_usernames_.end()) {
+    sip_usernames_.push_back(lowered);
+  }
   return *this;
 }
 
 AgentBase& AgentBase::auto_map_sip_usernames(bool enable) {
   auto_map_sip_ = enable;
+  if (!enable) {
+    return *this;
+  }
+
+  // Mirror Python auto_map_sip_usernames: derive SIP usernames from the agent
+  // name and route (lower-cased, stripped to [a-z0-9_]) and register them so
+  // they are actually consulted by the /sip routing callback.
+  auto clean = [](std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    std::string out;
+    for (char c : s) {
+      if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+        out.push_back(c);
+      }
+    }
+    return out;
+  };
+
+  std::string clean_name = clean(name_);
+  if (!clean_name.empty()) {
+    register_sip_username(clean_name);
+  }
+
+  std::string clean_route = clean(route_);
+  if (!clean_route.empty() && clean_route != clean_name) {
+    register_sip_username(clean_route);
+  }
+
+  // Register a no-vowels variation of the name when it is long enough.
+  if (clean_name.size() > 3) {
+    std::string no_vowels;
+    for (char c : clean_name) {
+      if (c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u') {
+        no_vowels.push_back(c);
+      }
+    }
+    if (no_vowels != clean_name && no_vowels.size() > 2) {
+      register_sip_username(no_vowels);
+    }
+  }
+
   return *this;
 }
 
@@ -1748,6 +1846,28 @@ void AgentBase::setup_routes(httplib::Server& server) {
       });
   server.Get(base, swml_get);
   server.Post(base, swml_post);
+
+  // Mount any registered routing-callback paths (e.g. "/sip" from
+  // enable_sip_routing) so the served path reaches handle_request() and
+  // CONSULTS the callback, mirroring Python's WebMixin routing-callback routes.
+  // Without this the callback would be stored-but-unreachable (a POST to /sip
+  // 404s). The GET/POST both delegate to handle_swml_request -> handle_request,
+  // which runs the callback (POST + non-empty body) and renders SWML otherwise.
+  for (const auto& [cb_path, cb] : routing_callbacks_) {
+    (void)cb;
+    if (cb_path == base || cb_path.empty()) {
+      continue;  // base route already mounted above
+    }
+    security::HttpHandler cb_get = [this](const httplib::Request& req, httplib::Response& res) {
+      handle_swml_request(req, res);
+    };
+    security::HttpHandler cb_post =
+        wrap_post([this](const httplib::Request& req, httplib::Response& res) {
+          handle_swml_request(req, res);
+        });
+    server.Get(cb_path, cb_get);
+    server.Post(cb_path, cb_post);
+  }
 
   // SWAIG endpoint — POST signature-validated when key is set.
   std::string swaig_path = base + (base.back() == '/' ? "" : "/") + "swaig";

@@ -7,6 +7,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <ctime>
 #include <regex>
 #include <sstream>
@@ -847,7 +848,7 @@ class ApiNinjasTriviaSkillR : public SkillBase {
 };
 
 class NativeVectorSearchSkillR : public SkillBase {
-  std::string tn_ = "search_knowledge", ru_;
+  std::string tn_ = "search_knowledge", ru_, index_name_;
 
  public:
   std::string skill_name() const override { return "native_vector_search"; }
@@ -857,6 +858,11 @@ class NativeVectorSearchSkillR : public SkillBase {
     params_ = p;
     tn_ = get_param<std::string>(p, "tool_name", "search_knowledge");
     ru_ = get_param<std::string>(p, "remote_url", "");
+    index_name_ = get_param<std::string>(p, "index_name", "");
+    // Strip a single trailing slash so ru_ + "/search" is well-formed.
+    if (!ru_.empty() && ru_.back() == '/') {
+      ru_.pop_back();
+    }
     return !ru_.empty() || p.contains("index_file");
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
@@ -865,11 +871,80 @@ class NativeVectorSearchSkillR : public SkillBase {
         json::object(
             {{"type", "object"},
              {"properties", json::object({{"query", json::object({{"type", "string"}})}})}}),
-        [](const json& a, const json&) -> swaig::FunctionResult {
-          return swaig::FunctionResult("Search: " + a.value("query", ""));
+        [this](const json& a, const json&) -> swaig::FunctionResult {
+          std::string query = a.value("query", "");
+          if (query.empty()) {
+            return swaig::FunctionResult("Please provide a search query.");
+          }
+          if (!ru_.empty()) {
+            return search_remote(query, a.value("count", 3));
+          }
+          return swaig::FunctionResult(
+              "Vector search for '" + query +
+              "': local index mode is not supported in this build; configure a "
+              "remote_url for network search.");
         })};
   }
   std::vector<std::string> get_hints() const override { return {"search", "find"}; }
+
+ private:
+  // Network mode (Python _search_remote): POST {query,index_name,count,...} to
+  // <remote_url>/search and format the returned results into the tool result.
+  swaig::FunctionResult search_remote(const std::string& query, int count) const {
+    json request = json::object({
+        {"query", query},
+        {"index_name", index_name_},
+        {"count", count},
+        {"similarity_threshold", get_param<double>(params_, "similarity_threshold", 0.0)},
+        {"tags", params_.contains("tags") ? params_["tags"] : json::array()},
+    });
+
+    SkillHttpResponse resp = http_post(ru_ + "/search", request.dump(), "application/json", {}, 30);
+
+    if (resp.status == 0) {
+      return swaig::FunctionResult("Remote search error: " + resp.error);
+    }
+    if (resp.status != 200) {
+      return swaig::FunctionResult("Remote search failed with status " +
+                                   std::to_string(resp.status));
+    }
+
+    json data;
+    try {
+      data = json::parse(resp.body);
+    } catch (const std::exception& e) {
+      return swaig::FunctionResult(std::string("Remote search response parse error: ") + e.what());
+    }
+
+    const json results =
+        data.contains("results") && data["results"].is_array() ? data["results"] : json::array();
+    if (results.empty()) {
+      return swaig::FunctionResult("No search results found for '" + query + "'.");
+    }
+
+    std::string response =
+        "Found " + std::to_string(results.size()) + " relevant results for '" + query + "':\n";
+    int i = 1;
+    for (const auto& result : results) {
+      std::string content = result.value("content", "");
+      double score = result.value("score", 0.0);
+      std::string filename;
+      if (result.contains("metadata") && result["metadata"].is_object()) {
+        filename = result["metadata"].value("filename", "");
+      }
+      char score_buf[16];
+      std::snprintf(score_buf, sizeof(score_buf), "%.2f", score);
+      response += "\n**Result " + std::to_string(i) + "**";
+      if (!filename.empty()) {
+        response += " (from " + filename + ", relevance: " + score_buf + ")";
+      } else {
+        response += " (relevance: " + std::string(score_buf) + ")";
+      }
+      response += "\n" + content + "\n";
+      ++i;
+    }
+    return swaig::FunctionResult(response);
+  }
 };
 
 class InfoGathererSkillR : public SkillBase {

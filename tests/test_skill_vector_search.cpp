@@ -50,13 +50,30 @@ TEST(skill_vectorsearch_custom_tool_name) {
     return true;
 }
 
-TEST(skill_vectorsearch_handler) {
+TEST(skill_vectorsearch_handler_empty_query) {
     auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
     skill->setup(json::object({{"remote_url", "https://search.example.com"}}));
     auto tools = skill->register_tools();
+    // Empty query -> the prompt-for-query message (mirrors Python).
+    auto result = tools[0].handler(json::object({{"query", ""}}), json::object());
+    auto resp = result.to_json()["response"].get<std::string>();
+    ASSERT_TRUE(resp.find("search query") != std::string::npos);
+    return true;
+}
+
+TEST(skill_vectorsearch_handler_remote_unreachable_reports_error) {
+    // In network mode the handler makes a REAL POST. Point it at an
+    // unroutable host (RFC 5737 TEST-NET-1) so the transport fails fast and the
+    // handler surfaces a real error — NOT a "[Would query…]" stub string. The
+    // live-POST happy path is covered in test_tier2_behavioral.cpp against a
+    // mock server.
+    auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
+    skill->setup(json::object({{"remote_url", "http://192.0.2.1:9"}}));
+    auto tools = skill->register_tools();
     auto result = tools[0].handler(json::object({{"query", "test"}}), json::object());
     auto resp = result.to_json()["response"].get<std::string>();
-    ASSERT_TRUE(resp.find("test") != std::string::npos);
+    ASSERT_TRUE(resp.find("Would query") == std::string::npos);
+    ASSERT_TRUE(resp.find("Remote search error") != std::string::npos);
     return true;
 }
 

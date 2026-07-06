@@ -18,9 +18,6 @@ lines and Markdown-style headers/paragraphs are ignored by the parser.
   auto-materialized `create` endpoints on `SwmlWebhooksResource`,
   `CxmlWebhooksResource`, `AutoMaterializedWebhook`, and
   `CxmlApplicationsResource`.
-- `serverless_out_of_scope`: C++ has no first-class Lambda/GCF/Azure
-  runtime; custom-runtime-only deployment is out of scope per
-  `porting-sdk/PORTING_GUIDE.md` Serverless Support section.
 - `python_collapsed` / `python_collapsed_mixin`: Python's multiple
   inheritance fans methods out across mixin classes; C++ collapses them
   onto the concrete class. `scripts/enumerate_surface.py` projects
@@ -57,7 +54,6 @@ signalwire.core.contexts.create_simple_context: impossible: Python module-level 
 signalwire.core.data_map.create_expression_tool: impossible: Python module-level factory composing an expression tool from **kwargs + a callable pattern-map; C++'s datamap::DataMap builds the same wire shape fluently — the free-function FORM has no static-C++ analog (Java/TS/PHP compose fluently likewise)
 signalwire.core.data_map.create_simple_api_tool: impossible: Python module-level factory composing an API tool from **kwargs; C++ builds the same wire shape fluently via datamap::DataMap(...).webhook(...).output(...) — the free-function FORM has no static-C++ analog (Java/TS/PHP compose fluently likewise)
 signalwire.core.function_result.FunctionResult.to_dict: python_collapsed: Python to_dict() returns a Python dict; C++ to_json() returns the equivalent nlohmann::json. to_dict name is intentionally replaced by to_json.
-signalwire.core.mixins.serverless_mixin.ServerlessMixin.handle_serverless_request: impossible: dispatches a serverless request by runtime-detecting the platform event shape (Lambda/GCF/Azure); C++ is AOT with no first-class serverless runtime — the single duck-typed entry has no static-C++ form (Java ships per-platform runtime adapters; TS/PHP likewise)
 signalwire.core.mixins.tool_mixin.ToolMixin.tool: impossible: Python @tool decorator method relies on the decorator protocol; C++ has no method-decorator feature — tools register via define_tool(...) directly (Java/TS/PHP omit as impossible)
 signalwire.core.mixins.web_mixin.WebMixin.get_app: impossible: returns a FastAPI/Flask ASGI/WSGI app object; C++ has no such framework — the service runs httplib directly, so there is no app object to return (Java/TS/PHP omit the framework-app FORM identically)
 signalwire.core.swml_builder.SWMLBuilder.__getattr__: impossible: Python runtime __getattr__ dynamic verb dispatch; C++ has no __getattr__/method_missing analog — SWMLBuilder expands each named verb (answer/hangup/ai/play/say) as an explicit method (Java/TS/PHP expand identically)

@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 255af95df22ba9e770b64e46a1af260e72f48951",
+  "generated_from": "signalwire-cpp @ 4742b1efeb93a6bc4fccfa241770d434248dcc7e",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -153,6 +153,7 @@
           "get_raw_prompt",
           "handle_mcp_request",
           "handle_request",
+          "handle_serverless_request",
           "has_contexts",
           "has_skill",
           "is_mcp_server_enabled",
@@ -500,7 +501,9 @@
     },
     "signalwire.core.mixins.serverless_mixin": {
       "classes": {
-        "ServerlessMixin": []
+        "ServerlessMixin": [
+          "handle_serverless_request"
+        ]
       },
       "functions": []
     },

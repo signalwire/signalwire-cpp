@@ -1608,6 +1608,14 @@ void AgentBase::transform_swml(json&) const {
 
 std::unique_ptr<AgentBase> AgentBase::clone() const { return std::make_unique<AgentBase>(*this); }
 
+utils::ServerlessResponse AgentBase::handle_serverless_request(const json& event,
+                                                               const json& context,
+                                                               const std::string& mode) {
+  // Oracle-matching instance entry point; the per-platform dispatch lives in
+  // signalwire::utils (handle_lambda / _gcf / _azure / _cgi).
+  return utils::handle_serverless_request(*this, event, context, mode);
+}
+
 // ============================================================================
 // HTTP Handlers
 // ============================================================================

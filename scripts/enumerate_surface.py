@@ -602,7 +602,10 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "set_prompt_text",
     ],
     ("signalwire.core.mixins.serverless_mixin", "ServerlessMixin"): [
-        # C++ has no Lambda/GCF/Azure runtime; tracked as PORT_OMISSIONS.
+        # AgentBase::handle_serverless_request delegates to the per-platform
+        # dispatchers in signalwire::utils. Projected here so the ServerlessMixin
+        # method matches (surface + signature).
+        "handle_serverless_request",
     ],
     ("signalwire.core.mixins.skill_mixin", "SkillMixin"): [
         "add_skill", "has_skill", "list_skills", "remove_skill",

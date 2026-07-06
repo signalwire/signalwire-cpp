@@ -24,6 +24,7 @@
 #include "signalwire/swaig/tool_definition.hpp"
 #include "signalwire/swml/document.hpp"
 #include "signalwire/swml/service.hpp"
+#include "signalwire/utils/serverless.hpp"
 
 namespace httplib {
 class Server;
@@ -579,6 +580,19 @@ class AgentBase : public swml::Service {
       const std::string& method, const std::string& url,
       const std::map<std::string, std::string>& headers,
       const std::optional<json>& body = std::nullopt);
+
+  /// Auto-detect (or force via ``mode``) the serverless platform and dispatch
+  /// the request to the matching handler, returning the ``(status, headers,
+  /// body)`` response. Oracle-matching entry point for Python
+  /// ``ServerlessMixin.handle_serverless_request(event, context, mode)``:
+  /// ``mode`` empty = auto-detect via get_execution_mode, selecting
+  /// lambda / google_cloud_function / azure_function / cgi. Delegates to the
+  /// per-platform dispatchers in ``signalwire::utils`` (handle_lambda / _gcf /
+  /// _azure / _cgi); an unknown/``"server"`` mode renders SWML via a plain GET
+  /// so a dispatch always produces a real response.
+  [[nodiscard]] utils::ServerlessResponse handle_serverless_request(
+      const json& event = json::object(), const json& context = json::object(),
+      const std::string& mode = "");
 
   // ========================================================================
   // Server

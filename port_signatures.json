@@ -4892,6 +4892,41 @@
         }
       }
     },
+    "signalwire.core.mixins.serverless_mixin": {
+      "classes": {
+        "ServerlessMixin": {
+          "methods": {
+            "handle_serverless_request": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "event",
+                  "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "context",
+                  "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "mode",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.utils.serverless_response.ServerlessResponse"
+            }
+          }
+        }
+      }
+    },
     "signalwire.core.mixins.skill_mixin": {
       "classes": {
         "SkillMixin": {

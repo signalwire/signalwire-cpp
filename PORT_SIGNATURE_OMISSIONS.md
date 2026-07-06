@@ -306,9 +306,7 @@ signalwire.core.agent.prompt.manager.PromptManager.get_prompt: cpp_get_prompt_st
 signalwire.core.agent.tools.registry.ToolRegistry.get_all_functions: cpp_typed_tool_payload
 signalwire.core.agent.tools.registry.ToolRegistry.get_function: cpp_typed_tool_payload
 signalwire.core.agent_base.AgentBase.on_debug_event: cpp_callable_typedef
-signalwire.core.agent_base.AgentBase.pom: cpp_pom_runtime_shape
 signalwire.core.contexts.Context.add_step: cpp_typed_step_positional
-signalwire.core.contexts.GatherInfo.add_question: cpp_gather_question_kwargs
 signalwire.core.data_map.DataMap.expression: cpp_pattern_string
 signalwire.core.function_result.FunctionResult.pay: cpp_postal_code_string
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.enable_debug_events: cpp_debug_level_bool

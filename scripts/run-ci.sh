@@ -148,6 +148,31 @@ PORTING_SDK_DIR="$(resolve_porting_sdk)" || {
     exit 2
 }
 
+# signalwire-python checkout used as the ORACLE side of the Layer-D BEHAVIORAL-*
+# gates (diff_port_<surface>.py builds the golden by importing signalwire-python).
+# Resolved the SAME way porting-sdk's diff_port_emission._resolve_python_sdk does:
+# $PYTHON_SDK env wins (CI sets it), else adjacency ($PORT_ROOT/../signalwire-python
+# — the layout used both locally and in the cross-port workflow). Passed explicitly
+# to each differ via --python-sdk so the gate never depends on `signalwire` already
+# being importable from the caller's ambient environment.
+resolve_python_sdk() {
+    if [ -n "${PYTHON_SDK:-}" ] && [ -d "$PYTHON_SDK/signalwire" ]; then
+        echo "$PYTHON_SDK"
+        return 0
+    fi
+    if [ -d "$PORT_ROOT/../signalwire-python/signalwire" ]; then
+        (cd "$PORT_ROOT/../signalwire-python" && pwd)
+        return 0
+    fi
+    return 1
+}
+
+PYTHON_SDK_DIR="$(resolve_python_sdk)" || {
+    echo "FATAL: signalwire-python not found (needed as the BEHAVIORAL-* oracle)." >&2
+    echo "       (expected $PORT_ROOT/../signalwire-python or \$PYTHON_SDK env var)" >&2
+    exit 2
+}
+
 FAILED_GATES=""
 
 run_gate() {
@@ -189,9 +214,11 @@ SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container
 # Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
 # BUILD_MODE. Each branch produces the same observable result: a built run_tests
 # (+ emit_corpus, reused by the EMISSION gate; + emit_skills, reused by the
-# SKILL-CONTRACT gate) and run_tests' exit code. The two dump binaries are built
-# here too so the downstream gates don't reconfigure the tree (and so the host /
-# exec modes leave ready-to-run binaries).
+# SKILL-CONTRACT gate; + the five Layer-D dump binaries wire_dump/swml_dump/
+# state_dump/http_dump/wire_relay_dump, reused by the BEHAVIORAL-* gates) and
+# run_tests' exit code. The dump binaries are built here too so the downstream
+# gates don't reconfigure the tree (and so the host / exec modes leave
+# ready-to-run binaries).
 test_gate() {
     case "$BUILD_MODE" in
         host)
@@ -205,14 +232,15 @@ test_gate() {
             # scripts/run-tests.sh (self-bootstrapping, host mode). run-tests.sh
             # rebuilds run_tests (a near-no-op since it was just built) and runs
             # the full suite.
-            cmake --build build --target emit_corpus emit_skills -j || return 1
+            cmake --build build --target emit_corpus emit_skills \
+                wire_dump swml_dump state_dump http_dump wire_relay_dump -j || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -221,7 +249,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -260,6 +288,43 @@ emission_gate() {
             echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
     esac
     python3 "$PORTING_SDK_DIR/scripts/diff_port_emission.py" --dump-cmd "$dump_cmd"
+}
+
+# BEHAVIORAL-<SURFACE> gates (Layer D): run each surface's dump binary and diff its
+# observed behavior against the signalwire-python oracle
+# (porting-sdk/scripts/diff_port_<surface>.py + tools/<surface>_dump.cpp). Locks
+# the 64 cross-port behaviors so they can never silently regress. Same BUILD_MODE
+# dump-cmd routing as the EMISSION gate: for host/exec the binary persists
+# (`./build/<surface>_dump` / a docker-exec into the running container); for the
+# throwaway run: mode the container vanishes after test_gate, so the dump-cmd is a
+# self-contained docker run that (re)builds the target with logs on stderr and
+# execs it so ONLY the JSON reaches stdout. The dumps already emit pure JSON on
+# stdout (logs go to stderr) regardless of ambient SIGNALWIRE_LOG_* env.
+behavioral_gate() {
+    local surface="$1"  # wire | swml | state | http | wire_relay
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)
+            dump_cmd="$PORT_ROOT/build/${surface}_dump"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/${surface}_dump"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                 && cmake --build $SWCPP_CONTAINER_BUILD --target ${surface}_dump -j\$(nproc) 1>&2 \
+                 && exec $SWCPP_CONTAINER_BUILD/${surface}_dump'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_${surface}.py" \
+        --port cpp \
+        --python-sdk "$PYTHON_SDK_DIR" \
+        --dump-cmd "$dump_cmd"
 }
 
 # SURFACE-FRESH gate: prove the committed port_surface.json (Layer B) still
@@ -642,6 +707,20 @@ run_gate "GEN-FRESH-TESTS" "generated REST wire-test suite byte-identical to a f
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
     emission_gate
+
+# Gate 6b: BEHAVIORAL-* (Layer D) — diff each surface's dump against the python
+# oracle so the 64 cross-port behaviors can never silently regress. Dump binaries
+# built in the TEST gate; each differ builds its golden from signalwire-python.
+run_gate "BEHAVIORAL-WIRE" "diff_port_wire vs python oracle (Layer D)" \
+    behavioral_gate wire
+run_gate "BEHAVIORAL-SWML" "diff_port_swml vs python oracle (Layer D)" \
+    behavioral_gate swml
+run_gate "BEHAVIORAL-STATE" "diff_port_state vs python oracle (Layer D)" \
+    behavioral_gate state
+run_gate "BEHAVIORAL-HTTP" "diff_port_http vs python oracle (Layer D)" \
+    behavioral_gate http
+run_gate "BEHAVIORAL-WIRE-RELAY" "diff_port_wire_relay vs python oracle (Layer D)" \
+    behavioral_gate wire_relay
 
 # Gate 7: FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate

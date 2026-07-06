@@ -13,20 +13,22 @@ int main() {
 
         // Dial
         auto call = client.calling().dial({
-            {"to", "+15551234567"}, {"from", "+15559876543"},
-            {"url", "https://example.com/handler"}
+            .from = "+15559876543",
+            .to = "+15551234567",
+            .url = "https://example.com/handler",
         });
         std::string call_id = call.value("call_id", "");
         std::cout << "Call ID: " << call_id << "\n";
 
         // Play audio
         client.calling().play(call_id, {
-            {"type", "tts"}, {"params", {{"text", "Recording will begin now."}}}
+            .play = json::array({{{"type", "tts"},
+                                  {"params", {{"text", "Recording will begin now."}}}}}),
         });
 
         // Start recording
         client.calling().record(call_id, {
-            {"stereo", true}, {"format", "wav"}
+            .extras = {{"record", {{"stereo", true}, {"format", "wav"}}}},
         });
 
         std::cout << "Playing and recording on call " << call_id << "\n";

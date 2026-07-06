@@ -23,6 +23,7 @@ Categories:
 
 begin: std::string::begin / std::vector::begin
 del: CrudResource/HttpClient DELETE verb — `delete` is a C++ keyword, so the real emitted method is `del`; the parity surface records the Python name `delete` (enumerate_surface RESERVED_WORD map del→delete), so docs correctly showing `.del(...)` won't resolve against port_surface.json
+delete_: generated BaseResource/FabricResource DELETE verb — `delete` is a C++ keyword, so the real emitted method is `delete_`; the parity surface records the Python name `delete` (enumerate_surface RESERVED_WORD map delete_→delete), so docs correctly showing `.delete_(...)` won't resolve against port_surface.json
 dump: nlohmann::json::dump() — vendored, not in port surface JSON
 empty: std::string::empty / std::vector::empty / std::optional::empty
 end: std::string::end / std::vector::end

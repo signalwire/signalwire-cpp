@@ -24,9 +24,9 @@ int main() {
         // Place a test call
         std::cout << "\nPlacing test call...\n";
         auto result = client.calling().dial({
-            {"to", "+15551234567"},
-            {"from", "+15559876543"},
-            {"url", "https://example.com/handler"}
+            .from = "+15559876543",
+            .to = "+15551234567",
+            .url = "https://example.com/handler",
         });
         std::cout << "  Call: " << result.dump(2) << "\n";
 

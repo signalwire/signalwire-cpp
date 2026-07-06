@@ -30,13 +30,14 @@ int main() {
 
         // Place a test call
         auto call = client.calling().dial({
-            {"to", "+15551234567"}, {"from", "+15559876543"},
-            {"url", "https://example.com/handler"}
+            .from = "+15559876543",
+            .to = "+15551234567",
+            .url = "https://example.com/handler",
         });
         std::cout << "  Call: " << call.dump() << "\n";
 
         // Cleanup
-        client.fabric().ai_agents.del(agent_id);
+        client.fabric().ai_agents.delete_(agent_id);
         std::cout << "  Deleted agent\n";
 
     } catch (const SignalWireRestError& e) {

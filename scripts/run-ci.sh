@@ -565,6 +565,43 @@ spec_parity_gate() {
         --gaps "$PORTING_SDK_DIR/SPEC_IMPLEMENTATION_GAPS.md"
 }
 
+# ROUTE-COLLISION gate: cross-references the route-registry (operation ->
+# (method, path)) with the surface enumeration to find latent route-split /
+# crud-dup / orphan-dto defects. cpp HAS a registry (the route_registry binary),
+# so — unlike ports without one — this gate can run standalone. It is built +
+# run per BUILD_MODE exactly like spec_parity_gate above (host binary / docker
+# exec / throwaway docker run that rebuilds it), then the collision checker
+# reads the registry. The 2 fabric list_addresses route-split entries are the
+# user-approved ROUTE_COLLISION_ALLOW.md exceptions (392bb5b); orphan-dto is
+# report-only inside the gate. Enforcing (no --report-only).
+route_collision_gate() {
+    local reg
+    reg="$(mktemp -t cpp_route_registry.XXXXXX.json)"
+    # shellcheck disable=SC2064
+    trap "rm -f '$reg'" RETURN
+    case "$BUILD_MODE" in
+        host)
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            docker exec "$c" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
+                && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/route_collision.py" \
+        --port cpp --repo . --registry-json "$reg"
+}
+
 # FMT gate: the C++ format gate (clang-format, config in .clang-format —
 # Google base / 100-col). Source-style only; proven surface/emission-neutral
 # (the libclang SIGNATURES enumerator + the regex SURFACE enumerator are both
@@ -812,6 +849,35 @@ run_gate "META-CONSISTENT" "package metadata consistency" \
 #          (git-ls-files proxy; cpp has no CPack/install listing)
 run_gate "ARTIFACT-DENY" "no porting artifacts in the PUBLISHED package (git ls-files proxy)" \
     python3 "$PORTING_SDK_DIR/scripts/artifact_deny.py" --port cpp --repo .
+
+# --- Expansion gates (Tier 5 / release; blocking, non-report-only) ------------
+# Five more shared porting-sdk gates. The backlog is burned to zero for cpp and
+# the GEN_TYPE_DEGENERACY_ALLOW.md / ROUTE_COLLISION_ALLOW.md allowlists are
+# user-approved, so all five pass enforcing. Four are pure host-side Python
+# (BUILD_MODE-blind); ROUTE-COLLISION needs the route_registry binary and so is
+# built + run per BUILD_MODE via route_collision_gate above. SEMVER-DIFF is NOT
+# wired (HELD pending the user's version-bump decision).
+
+# Gate 20: GEN-TYPE-DEGENERACY — generated typed surface isn't all loose aliases
+run_gate "GEN-TYPE-DEGENERACY" "generated types aren't degenerate loose aliases / private-in-public (allowlist honored)" \
+    python3 "$PORTING_SDK_DIR/scripts/gen_type_degeneracy.py" --port cpp --repo .
+
+# Gate 21: PUBLIC-JARGON — no internal porting jargon in public doc comments
+run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comments" \
+    python3 "$PORTING_SDK_DIR/scripts/public_jargon.py" --port cpp --repo .
+
+# Gate 22: ROUTE-COLLISION — no route-split / crud-dup (registry-driven; allowlist honored)
+run_gate "ROUTE-COLLISION" "no route-split/crud-dup between registry + surface (ROUTE_COLLISION_ALLOW.md honored)" \
+    route_collision_gate
+
+# Gate 23: GEN-IDIOM — generated code is NOT lint-excluded (runs through clang-tidy)
+run_gate "GEN-IDIOM" "generated code is not lint-excluded from the idiom linter" \
+    python3 "$PORTING_SDK_DIR/scripts/gen_idiom.py" --port cpp --repo .
+
+# Gate 24: RELEASE-FRESH — publish workflow runs the gates BEFORE publishing
+#          (cpp HAS a publish workflow: release.yml, gates-before-publish)
+run_gate "RELEASE-FRESH" "publish workflow runs gates before publishing" \
+    python3 "$PORTING_SDK_DIR/scripts/release_fresh.py" --port cpp --repo .
 
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"

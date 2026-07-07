@@ -24,3 +24,4 @@ Format: `- <file> — reason (approver, date)`.
 - DOC_LANG_ALLOW.md — the doc-lang-purity gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
 - DOC_LINKS_ALLOW.md — the doc-links gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
 - ARTIFACT_DENY_ALLOW.md — the artifact-deny gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
+- ROUTE_COLLISION_ALLOW.md — the route-collision gate's allowlist file, read at repo root by porting-sdk route_collision.py by that gate's convention (orchestrator, 2026-07-07)

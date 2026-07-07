@@ -7,4 +7,4 @@ it into C++ would be inventing an API the port does not have.
 
 Format: `- path — reason (approver, date)`.
 
-- docs/mcp_gateway_reference.md — documents the MCP-to-SWAIG Gateway, an approved Python-only component not ported to any SDK (porting-sdk RULES §I.1); its Python fences are the authoritative reference for that Python service, so they are kept as-is (orchestrator, 2026-07-06)
+_(none — docs/mcp_gateway_reference.md was rewritten to document the C++ `mcp_gateway` client skill; it no longer contains Python fences, so its allow entry was removed.)_

@@ -6,6 +6,17 @@ The Fabric API (`/api/fabric`) manages a subset of SignalWire resource types in 
 
 All exposed resource types share the same methods:
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/rest/rest_client.hpp>
+#include <nlohmann/json.hpp>
+#include <string>
+
+using json = nlohmann::json;
+signalwire::rest::RestClient client("example-space", "project-id", "api-token");
+std::string pn_id = "pn-uuid";
+```
+
 ```cpp
 // List all resources of this type
 auto items = client.fabric().ai_agents.list();
@@ -24,10 +35,10 @@ auto got = client.fabric().ai_agents.get("agent-uuid");
 client.fabric().ai_agents.update("agent-uuid", {{"name", "Updated Name"}});
 
 // Delete a resource
-client.fabric().ai_agents.del("agent-uuid");
+client.fabric().ai_agents.delete_("agent-uuid");
 ```
 
-Every typed `client.fabric().<name>` member is a `CrudResource` with `list / create / get / update / del`. The per-resource notes below cover only the exceptions.
+Every typed `client.fabric().<name>` member is a `CrudResource` with `list / create / get / update / delete_`. The per-resource notes below cover only the exceptions.
 
 ## Resource Types
 
@@ -61,10 +72,10 @@ To produce an `swml_webhook` or `cxml_webhook` resource, bind a phone number to 
 
 ```cpp
 // Auto-creates an swml_webhook Fabric resource
-client.phone_numbers().set_swml_webhook(pn_id, "https://example.com/swml");
+client.phone_numbers().setSwmlWebhook(pn_id, {.url = "https://example.com/swml"});
 
 // Auto-creates a cxml_webhook Fabric resource
-client.phone_numbers().set_cxml_webhook(pn_id, "https://example.com/voice.xml");
+client.phone_numbers().setCxmlWebhook(pn_id, {.url = "https://example.com/voice.xml"});
 ```
 
 Full model and all 11 call-handler variants: see **[phone-binding.md](phone-binding.md)**.
@@ -75,7 +86,7 @@ See **[phone-binding.md](phone-binding.md)** for the `PhoneCallHandler` enum, th
 
 ```cpp
 // SWML webhook (your backend returns SWML per call)
-client.phone_numbers().set_swml_webhook(pn_id, "https://example.com/swml");
+client.phone_numbers().setSwmlWebhook(pn_id, {.url = "https://example.com/swml"});
 ```
 
 ### `assign_phone_route` is not shipped
@@ -96,5 +107,5 @@ auto all_resources = client.fabric().resources.list();
 auto resource = client.fabric().resources.get("resource-uuid");
 
 // Delete any resource
-client.fabric().resources.del("resource-uuid");
+client.fabric().resources.delete_("resource-uuid");
 ```

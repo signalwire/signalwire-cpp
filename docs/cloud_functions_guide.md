@@ -2,6 +2,16 @@
 
 This guide covers deploying SignalWire AI Agents to Google Cloud Functions and Azure Functions.
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include <string>
+
+using json = nlohmann::json;
+```
+
 ## Overview
 
 SignalWire AI Agents now support deployment to major cloud function platforms:
@@ -39,7 +49,7 @@ using json = nlohmann::json;
 
 int main() {
     // Create and configure your agent.
-    agent::AgentBase agent("my-agent", "/");
+    signalwire::agent::AgentBase agent("my-agent", "/");
     agent.prompt_add_section("Role", "You are a helpful assistant.");
 
     // Build the event describing the invocation. On Cloud Run / GCF 2nd gen
@@ -139,7 +149,7 @@ using namespace signalwire;
 using json = nlohmann::json;
 
 int main() {
-    agent::AgentBase agent("my-agent", "/");
+    signalwire::agent::AgentBase agent("my-agent", "/");
     agent.prompt_add_section("Role", "You are a helpful assistant.");
 
     // Populate this from the inbound Azure request (method / headers / body);
@@ -248,7 +258,7 @@ Both platforms support HTTP Basic Authentication:
 The agent automatically validates credentials in cloud function environments:
 
 ```cpp
-agent::AgentBase agent("my-agent", "/");
+signalwire::agent::AgentBase agent("my-agent", "/");
 agent.set_auth("your-username", "your-password");
 ```
 
@@ -366,15 +376,16 @@ curl -u username:password \
 **Environment Detection:**
 ```cpp
 #include <signalwire/core/logging_config.hpp>
+#include <iostream>
 
 // Check the detected execution mode ("server", "lambda",
 // "google_cloud_function", "azure_function", "cgi", ...).
-std::cout << "Detected mode: " << signalwire::core::get_execution_mode() << "\n";
+std::cout << "Detected mode: " << signalwire::core::logging_config::get_execution_mode() << "\n";
 ```
 
 **URL Generation:**
 ```cpp
-agent::AgentBase agent("test", "/");
+signalwire::agent::AgentBase agent("test", "/");
 std::cout << "Base URL: " << agent.get_full_url() << "\n";
 std::cout << "Auth URL: " << agent.get_full_url(/*include_auth=*/true) << "\n";
 ```

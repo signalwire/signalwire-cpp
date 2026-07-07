@@ -6,14 +6,26 @@ The SignalWire Agents SDK includes a modular skills system that lets you add cap
 
 Instead of manually implementing every agent capability, you can now:
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/skills/skill_base.hpp>
+#include <signalwire/skills/skill_registry.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
 
-using namespace signalwire;
-using json = nlohmann::json;
-
+int main() {
 // Create an agent
-agent::AgentBase agent("My Assistant");
+signalwire::agent::AgentBase agent("My Assistant");
 
 // Add skills with one-liners!
 agent.add_skill("web_search");   // Web search capability with default settings
@@ -27,6 +39,7 @@ agent.add_skill("web_search", {
 });
 
 // Your agent now has all these capabilities automatically
+}
 ```
 
 ## Architecture
@@ -221,26 +234,25 @@ agent.add_skill("swml_transfer", {
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
 
-using namespace signalwire;
-
+int main() {
 // Create agent and add skills
-agent::AgentBase agent("Assistant", "/assistant");
+signalwire::agent::AgentBase agent("Assistant", "/assistant");
 agent.add_skill("datetime");
 agent.add_skill("math");
 agent.add_skill("web_search");  // Uses defaults: 1 result, no delay
 
 // Start the agent
 agent.run();
+}
 ```
 
 ### Skills with Custom Parameters
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
 
-using namespace signalwire;
-
+int main() {
 // Create agent
-agent::AgentBase agent("Research Assistant", "/research");
+signalwire::agent::AgentBase agent("Research Assistant", "/research");
 
 // Add web search optimized for research (more results)
 agent.add_skill("web_search", {
@@ -254,6 +266,7 @@ agent.add_skill("math");
 
 // Start the agent
 agent.run();
+}
 ```
 
 ### Different Parameter Configurations
@@ -279,22 +292,22 @@ agent.add_skill("web_search", {
 
 ### Check Available Skills
 ```cpp
-#include <signalwire/skills/skill_registry.hpp>
-
-using namespace signalwire;
-
 // List all registered skills
-for (const std::string& name : skills::SkillRegistry::instance().list_skills()) {
+for (const std::string& name : signalwire::skills::SkillRegistry::instance().list_skills()) {
     std::cout << "- " << name << "\n";
 }
 
 // Or get every skill's parameter schema keyed by name
-json schema = skills::SkillRegistry::instance().get_all_skills_schema();
+json schema = signalwire::skills::SkillRegistry::instance().get_all_skills_schema();
 ```
 
 ### Runtime Skill Management
 ```cpp
-agent::AgentBase agent("Dynamic Agent");
+#include <signalwire/agent/agent_base.hpp>
+#include <iostream>
+
+int main() {
+signalwire::agent::AgentBase agent("Dynamic Agent");
 
 // Add skills with different configurations
 agent.add_skill("math");
@@ -310,6 +323,7 @@ agent.remove_skill("math");
 // Check if a specific skill is loaded
 if (agent.has_skill("datetime")) {
     std::cout << "Date/time capabilities available\n";
+}
 }
 ```
 
@@ -461,9 +475,10 @@ int main() {
 ## Migration Guide
 
 **Before (manual implementation):**
+<!-- snippet: no-compile illustration referencing undefined params_json/handler placeholders -->
 ```cpp
 // Had to manually implement every capability
-class WebSearchAgent : public agent::AgentBase {
+class WebSearchAgent : public signalwire::agent::AgentBase {
 public:
     WebSearchAgent() : AgentBase("WebSearchAgent") {
         // Wire up the search backend by hand
@@ -475,13 +490,17 @@ public:
 
 **After (skills system with parameters):**
 ```cpp
+#include <signalwire/agent/agent_base.hpp>
+
+int main() {
 // Simple one-liner with custom configuration
-agent::AgentBase agent("WebSearchAgent");
+signalwire::agent::AgentBase agent("WebSearchAgent");
 agent.add_skill("web_search", {
     {"num_results", 3},  // Get more results
     {"delay", 0.5}       // Be respectful to servers
 });
 // Done! Full web search capability with custom settings.
+}
 ```
 
 The skills system makes SignalWire agents more modular, maintainable, and configurable. 

@@ -18,6 +18,16 @@ frameworks are also linked). See the root README for the full build recipe.
 #include <signalwire/relay/client.hpp>
 ```
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/call.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::relay::RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+```
+
 ## Configuration
 
 You need three things to connect:
@@ -63,12 +73,17 @@ export SIGNALWIRE_SPACE=example.signalwire.com
 ```
 
 ```cpp
-auto client = RelayClient::from_env();
-client.on_call([](Call& call) {
-    call.answer();
-    call.hangup();
-});
-client.run();
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/call.hpp>
+
+int main() {
+    auto client = signalwire::relay::RelayClient::from_env();
+    client.on_call([](signalwire::relay::Call& call) {
+        call.answer();
+        call.hangup();
+    });
+    client.run();
+}
 ```
 
 ## Contexts
@@ -78,11 +93,15 @@ a call arrives on a context you're subscribed to, your `on_call` handler is
 invoked. Set contexts at construction, or change them after connecting:
 
 ```cpp
-RelayClient client("project", "token", "example.signalwire.com", {"sales", "support"});
+#include <signalwire/relay/client.hpp>
 
-// Or dynamically after connecting
-client.subscribe({"billing"});
-client.unsubscribe({"sales"});
+int main() {
+    signalwire::relay::RelayClient client("project", "token", "example.signalwire.com", {"sales", "support"});
+
+    // Or dynamically after connecting
+    client.subscribe({"billing"});
+    client.unsubscribe({"sales"});
+}
 ```
 
 ## Making Outbound Calls
@@ -97,7 +116,7 @@ client.connect();
 json devices = {{
     {{"type", "phone"}, {"params", {{"to_number", "+15551234567"}, {"from_number", "+15559876543"}}}}
 }};
-Call call = client.dial(devices);
+signalwire::relay::Call call = client.dial(devices);
 std::cout << "call_id: " << call.call_id() << "\n";
 
 auto action = call.play({{{"type", "tts"}, {"params", {{"text", "This is an outbound call."}}}}});
@@ -114,7 +133,7 @@ json devices = {{
     {{"type", "phone"}, {"params", {{"to_number", "+15551111111"}, {"from_number", "+15559876543"}}}},
     {{"type", "phone"}, {"params", {{"to_number", "+15552222222"}, {"from_number", "+15559876543"}}}}
 }};
-Call call = client.dial(devices);
+signalwire::relay::Call call = client.dial(devices);
 ```
 
 `dial(devices, tag, dial_timeout_ms, max_duration)` accepts an optional explicit

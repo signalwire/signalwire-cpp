@@ -22,9 +22,9 @@ int main() {
 
     // Place a call
     auto call = client.calling().dial({
-        {"to", "+15551234567"},
-        {"from", "+15559876543"},
-        {"url", "https://example.com/handler"}
+        .from = "+15559876543",
+        .to = "+15551234567",
+        .url = "https://example.com/handler",
     });
 }
 ```
@@ -33,7 +33,7 @@ int main() {
 
 - Single `RestClient` with namespaced sub-objects for every API
 - 21 API namespaces: Fabric, Calling, Phone Numbers, Datasphere, Video, Compat, and more
-- Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `del()`
+- Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - Specialized methods per namespace (dial, search, lookup, publish, etc.)
 - Environment variable configuration (`RestClient::from_env()`)
 - JSON dict returns via nlohmann/json -- no wrapper objects to learn

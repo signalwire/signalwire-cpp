@@ -50,16 +50,25 @@ export SIGNALWIRE_API_TOKEN=your-api-token
 export SIGNALWIRE_SPACE=example.signalwire.com
 ```
 
+<!-- snippet-setup -->
 ```cpp
-auto client = RestClient::from_env();
-auto agents = client.fabric().ai_agents.list();
+#include <signalwire/rest/rest_client.hpp>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+signalwire::rest::RestClient client("example-space", "project-id", "api-token");
+```
+
+```cpp
+auto env_client = signalwire::rest::RestClient::from_env();
+auto agents = env_client.fabric().ai_agents.list();
 ```
 
 ## CRUD Pattern
 
 Most resources follow the same CRUD pattern. Request bodies are `nlohmann::json`
 objects; query params are a `std::map<std::string, std::string>`. The delete
-method is named `del` (because `delete` is a C++ keyword):
+method is named `delete_` (because `delete` is a C++ keyword):
 
 ```cpp
 // List
@@ -75,7 +84,7 @@ agent = client.fabric().ai_agents.get("agent-uuid");
 client.fabric().ai_agents.update("agent-uuid", {{"name", "Updated Name"}});
 
 // Delete
-client.fabric().ai_agents.del("agent-uuid");
+client.fabric().ai_agents.delete_("agent-uuid");
 ```
 
 Fabric resources also support listing addresses:

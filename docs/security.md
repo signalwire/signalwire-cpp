@@ -84,7 +84,7 @@ public:
 
 int main() {
     MyAgent agent;
-    agent.serve(3000);  // honours SWML_BASIC_AUTH_* and host/CORS settings
+    agent.serve();  // honours SWML_BASIC_AUTH_* and host/CORS settings; port from the constructor
 }
 ```
 

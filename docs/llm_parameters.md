@@ -15,6 +15,22 @@ SignalWire AI Agents SDK provides methods to customize LLM parameters for both t
 Sets LLM parameters for the main agent prompt. Accepts any parameters (as a
 JSON object) that will be passed to the server.
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/prefabs/prefabs.hpp>
+#include <signalwire/server/agent_server.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
 ```cpp
 agent.set_prompt_llm_params({
     {"temperature", 0.7},
@@ -81,7 +97,7 @@ Repetition control. Penalizes tokens based on their frequency in the conversatio
 
 ### Customer Service Agent
 ```cpp
-class CustomerServiceAgent : public agent::AgentBase {
+class CustomerServiceAgent : public signalwire::agent::AgentBase {
 public:
     CustomerServiceAgent() : AgentBase("customer-service", "/support") {
         prompt_add_section("Role", "You are a professional customer service representative.");
@@ -100,7 +116,7 @@ public:
 
 ### Creative Writing Assistant
 ```cpp
-class CreativeWritingAgent : public agent::AgentBase {
+class CreativeWritingAgent : public signalwire::agent::AgentBase {
 public:
     CreativeWritingAgent() : AgentBase("creative-writer", "/writer") {
         prompt_add_section("Role", "You are a creative writing assistant.");
@@ -119,7 +135,7 @@ public:
 
 ### Technical Documentation Bot
 ```cpp
-class TechnicalDocsAgent : public agent::AgentBase {
+class TechnicalDocsAgent : public signalwire::agent::AgentBase {
 public:
     TechnicalDocsAgent() : AgentBase("tech-docs", "/docs") {
         prompt_add_section("Role", "You are a technical documentation assistant.");
@@ -143,7 +159,7 @@ public:
 
 ### Legal Advisor Bot
 ```cpp
-class LegalAdvisorAgent : public agent::AgentBase {
+class LegalAdvisorAgent : public signalwire::agent::AgentBase {
 public:
     LegalAdvisorAgent() : AgentBase("legal-advisor", "/legal") {
         prompt_add_section("Role", "You are a legal information assistant.");

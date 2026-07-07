@@ -18,6 +18,19 @@ The parameter schema system allows skills to declare their configurable paramete
 
 Use `skills::SkillRegistry::get_all_skills_schema()` to get a complete schema of all registered skills, keyed by skill name:
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/skills/skill_base.hpp>
+#include <signalwire/skills/skill_registry.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
 ```cpp
 #include <signalwire/skills/skill_registry.hpp>
 
@@ -347,6 +360,7 @@ All skills automatically inherit these base parameters from `SkillBase`:
 
 Skills like `datetime` and `math` that don't need configuration:
 
+<!-- snippet: no-compile method-override body illustration (belongs inside a SkillBase subclass) -->
 ```cpp
 json get_parameter_schema() const override {
   // No configurable parameters — return an empty schema
@@ -358,6 +372,7 @@ json get_parameter_schema() const override {
 
 Skills like `web_search` with multiple configuration options:
 
+<!-- snippet: no-compile method-override body illustration (belongs inside a SkillBase subclass) -->
 ```cpp
 json get_parameter_schema() const override {
   return json::object({

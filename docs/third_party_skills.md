@@ -103,6 +103,20 @@ REGISTER_SKILL(WeatherSkill)
 
 Register individual skill factories programmatically with the global `SkillRegistry`. (The `REGISTER_SKILL(WeatherSkill)` macro above already does this at load time; calling `register_skill` directly is the explicit equivalent.)
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/skills/skill_base.hpp>
+#include <signalwire/skills/skill_registry.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
+<!-- snippet: no-compile depends on WeatherSkill defined in a preceding block; illustrates file-scope registration + agent subclass -->
 ```cpp
 #include "signalwire/agent/agent_base.hpp"
 #include "signalwire/skills/skill_registry.hpp"
@@ -129,6 +143,7 @@ class MyAgent : public agent::AgentBase {
 
 Register directories containing multiple skills:
 
+<!-- snippet: no-compile file-scope statements + shared agent illustration (registration snippet, not a full program) -->
 ```cpp
 #include "signalwire/skills/skill_registry.hpp"
 
@@ -158,6 +173,7 @@ skill with the global `SkillRegistry` the moment it is linked into your program 
 loaded as a shared library). Package a collection of skills as their own static or
 shared library and link it — no runtime discovery step is required:
 
+<!-- snippet: no-compile abridged illustration (WeatherSkill body elided, still abstract) -->
 ```cpp
 // weather_skill.cpp
 #include "signalwire/skills/skill_base.hpp"
@@ -226,6 +242,7 @@ my_skills_directory/
 
 Third-party skills are fully integrated with the SDK's discovery system:
 
+<!-- snippet: no-compile file-scope statement illustration (schema query, not a full program) -->
 ```cpp
 #include "signalwire/skills/skill_registry.hpp"
 
@@ -285,6 +302,7 @@ The `weather` entry looks like this:
 
 ### 3. Error Handling
 
+<!-- snippet: no-compile method-override body illustration (belongs inside a SkillBase subclass) -->
 ```cpp
 /// Proper setup with error handling
 bool setup(const json& params) override {
@@ -368,6 +386,7 @@ agent.add_skill("weather", {{"tool_name", "weatherapi"},
 
 Customize tool names for better agent prompts:
 
+<!-- snippet: no-compile method-override body illustration (belongs inside a SkillBase subclass) -->
 ```cpp
 std::vector<swaig::ToolDefinition> register_tools() override {
   std::string tool_name = get_param<std::string>(params_, "tool_name", "get_weather");
@@ -384,6 +403,7 @@ std::vector<swaig::ToolDefinition> register_tools() override {
 
 Load skills that depend on other skills:
 
+<!-- snippet: no-compile method-override body illustration (belongs inside a SkillBase subclass) -->
 ```cpp
 bool setup(const json& params) override {
   params_ = params;
@@ -399,6 +419,7 @@ bool setup(const json& params) override {
 
 Test your skills before distribution:
 
+<!-- snippet: no-compile uses the project's TEST/ASSERT_* macros + WeatherSkill (compiled only inside the test harness) -->
 ```cpp
 // test_my_skill.cpp — using the project's TEST / ASSERT_* macros
 #include "signalwire/agent/agent_base.hpp"
@@ -451,6 +472,7 @@ skill library, or call `ensure_builtin_skills_registered()` for built-in skills.
 
 Debug environment variable loading:
 
+<!-- snippet: no-compile file-scope statement illustration (env-var debug snippet, not a full program) -->
 ```cpp
 #include "signalwire/skills/skill_registry.hpp"
 #include <cstdlib>

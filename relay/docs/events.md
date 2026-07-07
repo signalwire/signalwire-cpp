@@ -7,13 +7,25 @@ to any registered handlers.
 
 ## Listening for Events
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/call.hpp>
+#include <signalwire/relay/relay_event.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::relay::RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+signalwire::relay::Call call;
+```
+
 ### On a Call
 
 Register an observer with `on_event`. The handler receives a `CallEvent`:
 
 ```cpp
-client.on_call([](Call& call) {
-    call.on_event([](const CallEvent& ev) {
+client.on_call([](signalwire::relay::Call& call) {
+    call.on_event([](const signalwire::relay::CallEvent& ev) {
         std::cout << "Event: " << ev.event_type << " state=" << ev.call_state << "\n";
     });
 });
@@ -32,7 +44,7 @@ call.wait_for_ended();
 A generic observer fires for every dispatched event after typed routing:
 
 ```cpp
-client.on_event([](const RelayEvent& ev) {
+client.on_event([](const signalwire::relay::RelayEvent& ev) {
     std::cout << "raw event: " << ev.event_type << "\n";
 });
 ```
@@ -83,9 +95,12 @@ fields:
 | `DialEvent` | `tag`, `dial_state`, `call_info` |
 
 ```cpp
-void on_event(const RelayEvent& ev) {
+#include <signalwire/relay/relay_event.hpp>
+#include <iostream>
+
+void on_event(const signalwire::relay::RelayEvent& ev) {
     if (ev.event_type == "calling.call.state") {
-        auto ce = CallEvent::from_relay_event(ev);
+        auto ce = signalwire::relay::CallEvent::from_relay_event(ev);
         std::cout << "call_state: " << ce.call_state << "\n";
     }
 }

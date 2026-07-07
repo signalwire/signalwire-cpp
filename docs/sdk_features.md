@@ -1,5 +1,19 @@
 # SignalWire AI Agents SDK: Why the SDK, Not Raw SWML
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include <string>
+
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+```
+
 ## The Problem with Raw SWML
 
 SWML (SignalWire Markup Language) is a JSON document format that defines how an agent behaves during a call -- 30+ verbs, an AI verb with dozens of parameters, SWAIG (SignalWire AI Gateway) function definitions with JSON Schema, post-prompt URLs, webhook authentication, language arrays, pronunciation rules, hints, global data, contexts, steps, gather configs. Writing it by hand means constructing deeply nested JSON, manually building authenticated webhook URLs, hand-coding parameter schemas, and deploying separate webhook servers for your tools. Every agent becomes a bespoke JSON engineering project.
@@ -28,10 +42,12 @@ The agent auto-detects its own public URL -- including behind ngrok, load balanc
 
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
+#include <nlohmann/json.hpp>
 
 using namespace signalwire;
+using json = nlohmann::json;
 
-class WeatherAgent : public agent::AgentBase {
+class WeatherAgent : public signalwire::agent::AgentBase {
 public:
     WeatherAgent() : AgentBase("weather", "/weather") {
         prompt_add_section("Role", "You help with weather.");
@@ -44,7 +60,7 @@ public:
             [](const json& args, const json& raw_data) {
                 std::string city = args.at("city");
                 // ... fetch weather ...
-                return swaig::FunctionResult("72°F and sunny in " + city);
+                return signalwire::swaig::FunctionResult("72°F and sunny in " + city);
             });
     }
 };
@@ -80,6 +96,7 @@ POM sections are rendered by the platform into a format the LLM understands with
 
 ### 1. Decorated Functions (Local Execution)
 
+<!-- snippet: no-compile illustrative handler body calls the reader's own `db` accessor / order model -->
 ```cpp
 agent.define_tool(
     "lookup_order", "Look up an order",
@@ -88,7 +105,7 @@ agent.define_tool(
      {"required", {"order_id"}}},
     [](const json& args, const json& raw_data) {
         auto order = db.get(args.at("order_id"));
-        return swaig::FunctionResult("Order " + order.id + ": " + order.status)
+        return signalwire::swaig::FunctionResult("Order " + order.id + ": " + order.status)
             .update_global_data({{"current_order", order.to_json()}});
     });
 ```
@@ -100,12 +117,12 @@ The handler is a `swaig::ToolHandler` -- a `std::function<swaig::FunctionResult(
 ### 2. DataMap (Server-Side Execution)
 
 ```cpp
-auto data_map = datamap::DataMap("check_stock")
+auto data_map = signalwire::datamap::DataMap("check_stock")
     .purpose("Check product stock levels")
     .parameter("sku", "string", "Product SKU", /*required=*/true)
     .webhook("GET", "https://api.warehouse.com/stock/${args.sku}")
-    .output(swaig::FunctionResult("Stock for ${args.sku}: ${response.quantity} units"))
-    .fallback_output(swaig::FunctionResult("Could not check stock right now"));
+    .output(signalwire::swaig::FunctionResult("Stock for ${args.sku}: ${response.quantity} units"))
+    .fallback_output(signalwire::swaig::FunctionResult("Could not check stock right now"));
 
 agent.register_swaig_function(data_map.to_swaig_function());
 ```
@@ -194,12 +211,14 @@ PGI is enforced through four layers of constraint, each operating independently.
 ### PGI in Practice: Blackjack
 
 ```cpp
+auto& ctx = agent.define_contexts().add_context("game");
+
 ctx.add_step("betting")
     .set_functions({"place_bet"})
     .set_valid_steps({"playing"});
 
 ctx.add_step("playing")
-    .set_functions({"hit", "stand", "double_down"})
+    .set_functions(std::vector<std::string>{"hit", "stand", "double_down"})
     .set_valid_steps({"hand_complete"});
 
 ctx.add_step("you_lost")
@@ -213,15 +232,16 @@ The `you_lost` step has zero functions and zero valid transitions. The game is o
 
 The tool handler demonstrates execution authority -- the model has no idea a step change is about to happen:
 
+<!-- snippet: no-compile illustrative handler calls the example's own calculate_hand / format_card helpers -->
 ```cpp
-swaig::ToolHandler handle_hit = [](const json& args, const json& raw_data) {
+signalwire::swaig::ToolHandler handle_hit = [](const json& args, const json& raw_data) {
     json game = raw_data.at("global_data").at("game_state");
     json card = game["deck"].back();
     game["deck"].erase(game["deck"].end() - 1);
     game["player_hand"].push_back(card);
     int score = calculate_hand(game["player_hand"]);
 
-    auto result = swaig::FunctionResult(
+    auto result = signalwire::swaig::FunctionResult(
         "You drew " + format_card(card) + ". Your total is " + std::to_string(score) + ".");
     result.update_global_data({{"game_state", game}});
 
@@ -254,7 +274,6 @@ The SDK's contexts/steps/function restrictions are the primitives that make PGI 
 ## Deployment: One `run()` Call
 
 ```cpp
-MyAgent agent;
 agent.run();
 ```
 
@@ -280,10 +299,11 @@ For standalone mode, the SDK provides:
 
 ## Multi-Agent Hosting
 
+<!-- snippet: no-compile registers the reader's own SalesAgent/SupportAgent/TriageAgent subclasses -->
 ```cpp
 #include <signalwire/server/agent_server.hpp>
 
-server::AgentServer server("0.0.0.0", 3000);
+signalwire::server::AgentServer server("0.0.0.0", 3000);
 server.register_agent(std::make_shared<SalesAgent>(), "/sales");
 server.register_agent(std::make_shared<SupportAgent>(), "/support");
 server.register_agent(std::make_shared<TriageAgent>(), "/triage");
@@ -296,11 +316,12 @@ One process, multiple agents, route-based dispatch. Each agent gets its own SWML
 
 ## Dynamic Configuration and Multi-Tenancy
 
+<!-- snippet: no-compile illustrative callback calls the reader's own load_tenant_config helper -->
 ```cpp
 agent.set_dynamic_config_callback(
     [](const std::map<std::string, std::string>& query,
        const json& body, const std::map<std::string, std::string>& headers,
-       agent::AgentBase& copy) {
+       signalwire::agent::AgentBase& copy) {
         auto it = headers.find("X-Tenant-ID");
         std::string tenant = (it != headers.end()) ? it->second : "default";
         json config = load_tenant_config(tenant);
@@ -357,14 +378,14 @@ Production-ready patterns for common use cases:
 #include <signalwire/prefabs/prefabs.hpp>
 
 // Collect structured data
-prefabs::InfoGathererAgent gatherer("info_gatherer", "/");
+signalwire::prefabs::InfoGathererAgent gatherer("info_gatherer", "/");
 gatherer.set_questions({
     {{"key", "name"}, {"question", "What is your name?"}},
     {{"key", "issue"}, {"question", "Describe your issue"}, {"confirm", true}}
 });
 
 // Route calls to departments
-prefabs::ReceptionistAgent receptionist("receptionist", "/");
+signalwire::prefabs::ReceptionistAgent receptionist("receptionist", "/");
 receptionist.set_departments({
     {"sales", {{"number", "+15551234567"}, {"description", "Product inquiries"}}},
     {"support", {{"number", "+15559876543"}, {"description", "Technical help"}}}
@@ -384,7 +405,7 @@ Everything the platform supports, the SDK exposes as methods:
 agent.set_prompt_llm_params({{"temperature", 0.3}, {"top_p", 0.9}, {"barge_confidence", 0.7}});
 
 // Multi-language
-agent::LanguageConfig spanish;
+signalwire::agent::LanguageConfig spanish;
 spanish.name = "Spanish";
 spanish.code = "es";
 spanish.voice = "google.es-ES-Neural2-A";

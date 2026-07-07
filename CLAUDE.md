@@ -97,11 +97,26 @@ All test files are `#include`d into `test_main.cpp` and compiled as one translat
 
 ## Common Patterns
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+```
+
 ### Agent Creation
 ```cpp
-class MyAgent : public agent::AgentBase {
+class MyAgent : public signalwire::agent::AgentBase {
 public:
     MyAgent() : AgentBase("name", "/route") {
+        json params_json = {{"type", "object"}, {"properties", json::object()}};
+        signalwire::swaig::ToolHandler handler =
+            [](const json& args, const json& raw) { return signalwire::swaig::FunctionResult("ok"); };
         prompt_add_section("Role", "...");
         define_tool("tool_name", "description", params_json, handler);
         add_skill("datetime");
@@ -111,8 +126,8 @@ public:
 
 ### Tool Handlers
 ```cpp
-swaig::ToolHandler handler = [](const json& args, const json& raw) {
-    return swaig::FunctionResult("Response text")
+signalwire::swaig::ToolHandler handler = [](const json& args, const json& raw) {
+    return signalwire::swaig::FunctionResult("Response text")
         .update_global_data({{"key", "value"}})
         .say("Speaking this aloud");
 };
@@ -120,11 +135,11 @@ swaig::ToolHandler handler = [](const json& args, const json& raw) {
 
 ### DataMap (server-side tools)
 ```cpp
-auto dm = datamap::DataMap("tool")
+auto dm = signalwire::datamap::DataMap("tool")
     .purpose("...")
     .parameter("p", "string", "desc", true)
     .webhook("GET", "https://api.example.com/${args.p}")
-    .output(swaig::FunctionResult("Result: ${response.value}"));
+    .output(signalwire::swaig::FunctionResult("Result: ${response.value}"));
 agent.register_swaig_function(dm.to_swaig_function());
 ```
 
@@ -134,7 +149,7 @@ auto& ctx = agent.define_contexts().add_context("default");
 ctx.add_step("step1")
     .add_section("Task", "Do something")
     .set_step_criteria("Done condition")
-    .set_valid_steps({"step2"});
+    .set_valid_steps(std::vector<std::string>{"step2"});
 ```
 
 ## Important Notes

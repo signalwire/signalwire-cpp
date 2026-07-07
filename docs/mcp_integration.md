@@ -11,6 +11,22 @@ These features are independent and can be used separately or together.
 
 Use `add_mcp_server()` to connect your agent to remote MCP servers. Tools are discovered at call start via the MCP protocol and added to the AI's tool list alongside your defined tools.
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/prefabs/prefabs.hpp>
+#include <signalwire/server/agent_server.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
 ```cpp
 agent.add_mcp_server("https://mcp.example.com/tools",
     {{"Authorization", "Bearer sk-xxx"}});
@@ -54,8 +70,8 @@ agent.define_tool("get_weather", "Get weather for a location",
     json::object({{"type", "object"}, {"properties", json::object({
         {"location", json::object({{"type", "string"}})}
     })}}),
-    [](const json& args, const json&) -> FunctionResult {
-        return FunctionResult("72F sunny in " + args.value("location", "unknown"));
+    [](const json& args, const json&) -> signalwire::swaig::FunctionResult {
+        return signalwire::swaig::FunctionResult("72F sunny in " + args.value("location", "unknown"));
     });
 ```
 

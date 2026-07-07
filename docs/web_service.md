@@ -1,5 +1,18 @@
 # WebService Documentation
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/web/web_service.hpp>
+#include <nlohmann/json.hpp>
+#include <map>
+#include <string>
+#include <vector>
+#include <optional>
+#include <memory>
+
+using json = nlohmann::json;
+```
+
 The `WebService` class provides static file serving capabilities for the SignalWire AI Agents SDK. It maps URL route prefixes to local directories and serves their files over an in-process HTTP server (the vendored cpp-httplib), with file-allowed safety checks, path-traversal protection, and optional basic auth.
 
 ## Table of Contents
@@ -50,7 +63,7 @@ using namespace signalwire;
 
 int main() {
     // Create a service to serve files
-    web::WebService service(
+    signalwire::web::WebService service(
         8002,
         std::map<std::string, std::string>{
             {"/docs", "./documentation"},
@@ -70,7 +83,7 @@ WebService is configured through its constructor.
 ### Constructor Parameters
 
 ```cpp
-web::WebService service(
+signalwire::web::WebService service(
     8002,                                    // Port to bind to
     std::map<std::string, std::string>{      // URL path to directory mappings
         {"/docs", "./documentation"},
@@ -120,6 +133,7 @@ The `file_allowed()` accessor reports whether a given path would be served under
 the current size and extension/name filters:
 
 ```cpp
+signalwire::web::WebService service(8002, std::map<std::string, std::string>{{"/docs", "./documentation"}});
 bool ok = service.file_allowed("./documentation/index.html");
 ```
 
@@ -133,7 +147,7 @@ Default maximum file size is 100MB. Configure it via the `max_file_size`
 constructor argument:
 
 ```cpp
-web::WebService service(
+signalwire::web::WebService service(
     8002, std::nullopt, std::nullopt, std::nullopt,
     false, std::nullopt, std::nullopt,
     50LL * 1024 * 1024);  // 50MB
@@ -201,11 +215,7 @@ Serve files from mounted directories
 ### Basic File Serving
 
 ```cpp
-#include <signalwire/web/web_service.hpp>
-
-using namespace signalwire;
-
-web::WebService service(
+signalwire::web::WebService service(
     8002,
     std::map<std::string, std::string>{
         {"/docs", "./documentation"},
@@ -221,7 +231,7 @@ service.start();
 ### With Directory Browsing
 
 ```cpp
-web::WebService service(
+signalwire::web::WebService service(
     8002,
     std::map<std::string, std::string>{{"/files", "./public"}},
     std::nullopt, std::nullopt,
@@ -235,7 +245,7 @@ service.start();
 
 ```cpp
 // Only serve web assets
-web::WebService service(
+signalwire::web::WebService service(
     8002,
     std::map<std::string, std::string>{{"/web", "./www"}},
     std::nullopt, std::nullopt,
@@ -246,7 +256,7 @@ web::WebService service(
 ### Dynamic Directory Management
 
 ```cpp
-web::WebService service;  // defaults (port 8002, no directories)
+signalwire::web::WebService service;  // defaults (port 8002, no directories)
 
 // Add directories after construction
 service.add_directory("/docs", "./documentation");
@@ -261,7 +271,7 @@ service.start();
 ### With Custom Authentication
 
 ```cpp
-web::WebService service(
+signalwire::web::WebService service(
     8002,
     std::map<std::string, std::string>{{"/private", "./sensitive-docs"}},
     std::make_pair("admin", "super-secret-password"));
@@ -272,7 +282,7 @@ service.start();
 
 ```cpp
 // Pass port 0 to bind an OS-assigned ephemeral port; start() returns it.
-web::WebService service(
+signalwire::web::WebService service(
     0, std::map<std::string, std::string>{{"/docs", "./documentation"}});
 int bound = service.start("127.0.0.1");
 // ... exercise the service on `bound` ...
@@ -295,7 +305,7 @@ Run WebService as a dedicated static file server:
 using namespace signalwire;
 
 int main() {
-    web::WebService service(
+    signalwire::web::WebService service(
         8002,
         std::map<std::string, std::string>{
             {"/docs", "/var/www/docs"},
@@ -322,20 +332,20 @@ thread), so you can start it and then run your agent on a different port:
 
 using namespace signalwire;
 
-class MyAgent : public agent::AgentBase {
+class MyAgent : public signalwire::agent::AgentBase {
 public:
     MyAgent() : AgentBase("My Agent") {}
 };
 
 int main() {
     // Start WebService in the background (returns immediately)
-    web::WebService web(
+    signalwire::web::WebService web(
         8002, std::map<std::string, std::string>{{"/docs", "./agent-docs"}});
     web.start();
 
-    // Run the agent on its own port
+    // Run the agent on its own port (set via the constructor's port argument)
     MyAgent agent;
-    agent.serve(3000);  // Agent on port 3000, WebService on 8002
+    agent.serve();  // Agent on its constructor port (3000), WebService on 8002
 }
 ```
 
@@ -459,6 +469,7 @@ void remove_directory(const std::string& route);
 Remove a directory from being served (no-op when absent).
 
 ##### file_allowed()
+<!-- snippet: no-compile member-function signature listing (const qualifier shown out of class context) -->
 ```cpp
 bool file_allowed(const std::string& file_path) const;
 ```
@@ -475,7 +486,7 @@ WebService complements AI agents by providing static file serving:
 using namespace signalwire;
 using json = nlohmann::json;
 
-class DocumentationAgent : public agent::AgentBase {
+class DocumentationAgent : public signalwire::agent::AgentBase {
 public:
     DocumentationAgent() : AgentBase("Documentation Assistant") {
         // Reference documentation served by WebService
@@ -503,13 +514,13 @@ public:
 
 int main() {
     // Start WebService for documentation (non-blocking)
-    web::WebService web(
+    signalwire::web::WebService web(
         8002, std::map<std::string, std::string>{{"/docs", "./documentation"}});
     web.start();
 
-    // Start the agent
+    // Start the agent (port comes from its constructor, default 3000)
     DocumentationAgent agent;
-    agent.serve(3000);
+    agent.serve();
 }
 ```
 

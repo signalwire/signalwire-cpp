@@ -21,12 +21,26 @@ language-neutral wire contract the skill speaks to the gateway.
 `mcp_gateway` is a built-in skill; no extra dependency is required. Add it to an
 agent with `add_skill`, passing a JSON object of parameters:
 
+<!-- snippet-setup -->
 ```cpp
-#include <signalwire/signalwire.hpp>
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/prefabs/prefabs.hpp>
+#include <signalwire/server/agent_server.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
 
-using signalwire::agent::AgentBase;
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-class McpAgent : public AgentBase {
+class McpAgent : public signalwire::agent::AgentBase {
  public:
   McpAgent() : AgentBase("mcp-agent", "/mcp") {
     add_skill("mcp_gateway", {
@@ -63,7 +77,7 @@ The skill's `setup()` reads exactly these keys from the parameter object:
 Each element of `services` is an object; the skill reads its `name`:
 
 ```cpp
-add_skill("mcp_gateway", {
+agent.add_skill("mcp_gateway", {
     {"gateway_url", "https://gateway.example.com:8080"},
     {"services", {
         {{"name", "todo"}},

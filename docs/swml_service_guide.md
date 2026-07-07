@@ -1,5 +1,18 @@
 # SignalWire SWML Service Guide
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/swml/service.hpp>
+#include <signalwire/logging.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+#include <string>
+
+using json = nlohmann::json;
+signalwire::swml::Service service;
+json document = json::object();
+```
+
 ## Table of Contents
 - [Introduction](#introduction)
 - [Installation](#installation)
@@ -55,17 +68,17 @@ using namespace signalwire;
 using json = nlohmann::json;
 
 int main() {
-    swml::Service service;
+    signalwire::swml::Service service;
     service.set_name("voice-service")
            .set_route("/voice")
            .set_host("0.0.0.0")
            .set_port(3000);
 
-    // Build the SWML document. Start fresh, then add verbs.
+    // Build the SWML document. Start fresh, then add verbs to the "main" section.
     service.reset_document();
-    service.add_verb("answer", json::object());
-    service.add_verb("play", {{"url", "say:Hello, thank you for calling our service."}});
-    service.add_verb("hangup", json::object());
+    service.add_verb("main", "answer", json::object());
+    service.add_verb("main", "play", {{"url", "say:Hello, thank you for calling our service."}});
+    service.add_verb("main", "hangup", json::object());
 
     // Start the service (blocking).
     service.serve();
@@ -88,23 +101,19 @@ The C++ SDK provides a thread-safe, process-wide logger that all services share.
 Obtain the shared logger and call the level methods:
 
 ```cpp
-#include <signalwire/logging.hpp>
-
-using namespace signalwire;
-
-Logger& log = Logger::instance();  // or: get_logger()
+signalwire::Logger& logger = signalwire::Logger::instance();  // or: signalwire::get_logger()
 
 // Basic logging
-log.info("service_started");
+logger.info("service_started");
 
 // Contextual detail — build the message yourself
-log.debug("document_created size=" + std::to_string(document.dump().size()));
+logger.debug("document_created size=" + std::to_string(document.dump().size()));
 
 // Error logging
 try {
     // Some operation
 } catch (const std::exception& e) {
-    log.error(std::string("operation_failed error=") + e.what());
+    logger.error(std::string("operation_failed error=") + e.what());
 }
 ```
 
@@ -122,7 +131,7 @@ The following log levels are available (in increasing order of severity), corres
 To suppress logs when running a service, raise the level so only warnings and above are shown:
 
 ```cpp
-Logger::instance().set_level(LogLevel::Warn);  // Only show warnings and above
+signalwire::Logger::instance().set_level(signalwire::LogLevel::Warn);  // Only show warnings and above
 ```
 
 You can also set the level for the whole process via the environment before startup:
@@ -157,7 +166,7 @@ SWML documents have the following basic structure:
 ### Document Methods
 
 - `reset_document()`: Reset the document to an empty state
-- `add_verb(verb_name, config)`: Add a verb to the main section
+- `add_verb(section_name, verb_name, config)`: Add a verb to a named section (e.g. `"main"`)
 - `add_section(section_name)`: Add a new section
 - `add_verb_to_section(section_name, verb_name, config)`: Add a verb to a specific section
 - `get_document()`: Get the current document as a dictionary
@@ -165,7 +174,7 @@ SWML documents have the following basic structure:
 
 ### Common Verb Shortcuts
 
-- `add_verb(verb_name, config)`: Add any SWML verb with configuration
+- `add_verb(section_name, verb_name, config)`: Add any SWML verb to a section with configuration
 
 ## Verb Handling
 
@@ -177,13 +186,13 @@ When adding a verb, the service validates it against the schema to ensure it has
 
 ```cpp
 // This will validate the configuration against the schema
-service.add_verb("play", {
+service.add_verb("main", "play", {
     {"url", "say:Hello, world!"},
     {"volume", 5}
 });
 
 // This would fail validation (invalid parameter)
-service.add_verb("play", {
+service.add_verb("main", "play", {
     {"invalid_param", "value"}
 });
 ```
@@ -196,15 +205,16 @@ You can register custom verb handlers for specialized verb processing. Subclass
 
 ```cpp
 #include <signalwire/core/swml_handler.hpp>
+#include <signalwire/swml/service.hpp>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
-class CustomPlayHandler : public core::SWMLVerbHandler {
+class CustomPlayHandler : public signalwire::core::SWMLVerbHandler {
 public:
     std::string get_verb_name() const override { return "play"; }
 
-    core::VerbValidationResult validate_config(const json& config) const override {
+    signalwire::core::VerbValidationResult validate_config(const json& config) const override {
         (void)config;
         // Custom validation logic: {valid, errors}
         return {true, {}};
@@ -216,7 +226,9 @@ public:
     }
 };
 
-service.register_verb_handler(std::make_shared<CustomPlayHandler>());
+void register_handlers(signalwire::swml::Service& service) {
+    service.register_verb_handler(std::make_shared<CustomPlayHandler>());
+}
 ```
 
 ## Web Service Features
@@ -239,7 +251,6 @@ Where `route` is the route path specified when creating the service.
 Basic authentication is automatically set up for all endpoints. Credentials are generated if not provided, or can be specified with `set_auth`:
 
 ```cpp
-swml::Service service;
 service.set_name("my-service")
        .set_auth("username", "password");
 ```
@@ -253,7 +264,7 @@ You can also set credentials using environment variables:
 You can override the `on_swml_request` method to customize SWML documents based on request data:
 
 ```cpp
-class VipVoiceService : public swml::Service {
+class VipVoiceService : public signalwire::swml::Service {
 protected:
     std::optional<json> on_swml_request(
         const std::optional<json>& request_data = std::nullopt,
@@ -265,13 +276,13 @@ protected:
 
         // Customize document based on request_data
         reset_document();
-        add_verb("answer", json::object());
+        add_verb("main", "answer", json::object());
 
         // Add custom verbs based on request_data
         if (request_data->value("caller_type", "") == "vip") {
-            add_verb("play", {{"url", "say:Welcome VIP caller!"}});
+            add_verb("main", "play", {{"url", "say:Welcome VIP caller!"}});
         } else {
-            add_verb("play", {{"url", "say:Welcome caller!"}});
+            add_verb("main", "play", {{"url", "say:Welcome caller!"}});
         }
 
         // Return std::nullopt to use the document we've built without
@@ -319,6 +330,7 @@ service.register_routing_callback(
 
 You can override `on_request` and use the `callback_path` argument to serve different content for different paths. Return `std::nullopt` to use the default SWML rendering, or a JSON object to modify/augment the document:
 
+<!-- snippet: no-compile method-override fragment shown outside its enclosing Service subclass -->
 ```cpp
 std::optional<json> on_request(
     const std::optional<json>& request_data = std::nullopt,
@@ -362,7 +374,7 @@ Here's an example of a service that uses routing callbacks to handle different t
 using namespace signalwire;
 using json = nlohmann::json;
 
-class MultiSectionService : public swml::Service {
+class MultiSectionService : public signalwire::swml::Service {
 public:
     MultiSectionService() {
         set_name("multi-section");
@@ -460,10 +472,13 @@ exposes; the caller owns it and can `listen()` on it directly or front it behind
 its own TLS/proxy:
 
 ```cpp
-swml::Service service;
-service.set_name("my-service");
+#include <signalwire/swml/service.hpp>
+#include <httplib.h>
 
-auto router = service.as_router();
+signalwire::swml::Service router_service;
+router_service.set_name("my-service");
+
+auto router = router_service.as_router();
 router->listen("0.0.0.0", 8080);
 ```
 
@@ -475,7 +490,6 @@ the service's schema helper via `schema_utils()` if you need to inspect verb
 metadata directly:
 
 ```cpp
-swml::Service service;
 auto& utils = service.schema_utils();  // signalwire::utils::SchemaUtils
 ```
 
@@ -524,7 +538,7 @@ returns `Service&` for chaining):
 using namespace signalwire;
 using json = nlohmann::json;
 
-class VoicemailService : public swml::Service {
+class VoicemailService : public signalwire::swml::Service {
 public:
     VoicemailService(const std::string& host = "0.0.0.0", int port = 3000) {
         set_name("voicemail");
@@ -579,7 +593,7 @@ private:
 using namespace signalwire;
 using json = nlohmann::json;
 
-class CallRouterService : public swml::Service {
+class CallRouterService : public signalwire::swml::Service {
 protected:
     std::optional<json> on_swml_request(
         const std::optional<json>& request_data = std::nullopt,

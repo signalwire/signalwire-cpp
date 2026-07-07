@@ -73,6 +73,20 @@ When entering a context, these parameters control conversation behavior:
 
 Contexts can have their own prompts (separate from entry parameters):
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::contexts::Context context("ctx");
+signalwire::contexts::Context ctx("ctx");
+signalwire::contexts::Step step("step");
+```
+
 ```cpp
 // Simple string prompt
 context.set_prompt("Context-specific guidance");
@@ -111,7 +125,7 @@ The system provides fine-grained control over conversation flow:
 
 using namespace signalwire;
 
-class OnboardingAgent : public agent::AgentBase {
+class OnboardingAgent : public signalwire::agent::AgentBase {
 public:
     OnboardingAgent() : AgentBase("Onboarding Assistant", "/onboarding") {
         // Define contexts (replaces traditional prompt setup)
@@ -158,7 +172,7 @@ int main() {
 
 using namespace signalwire;
 
-class CustomerServiceAgent : public agent::AgentBase {
+class CustomerServiceAgent : public signalwire::agent::AgentBase {
 public:
     CustomerServiceAgent() : AgentBase("Customer Service", "/service") {
         // Add skills for enhanced capabilities
@@ -187,7 +201,7 @@ public:
         tech.add_step("technical_help")
             .add_section("Current Task", "Help diagnose and resolve technical issues")
             .add_section("Available Tools", "Use web search and datetime functions for technical solutions")
-            .set_functions({"web_search", "datetime"})
+            .set_functions(std::vector<std::string>{"web_search", "datetime"})
             .set_step_criteria("Issue is resolved or escalated")
             .set_valid_contexts({"triage"});
 
@@ -203,7 +217,7 @@ public:
         auto& general = contexts.add_context("general");
         general.add_step("general_help")
             .set_text("I'm here to help with general questions. What can I assist you with?")
-            .set_functions({"web_search", "datetime"})
+            .set_functions(std::vector<std::string>{"web_search", "datetime"})
             .set_step_criteria("Question has been answered")
             .set_valid_contexts({"triage"});
     }
@@ -221,6 +235,7 @@ int main() {
 
 The main entry point for defining contexts and steps.
 
+<!-- snippet: no-compile API-signature reference (mixes a call with a method-declaration illustration) -->
 ```cpp
 // Get the builder
 auto& contexts = define_contexts();  // returns contexts::ContextBuilder&
@@ -233,6 +248,7 @@ Context& add_context(const std::string& name);
 
 Represents a conversation context or workflow state.
 
+<!-- snippet: no-compile class API-signature reference (member-declaration illustration, not runnable) -->
 ```cpp
 class Context {
     // Create a new step in this context
@@ -345,7 +361,7 @@ step.set_valid_contexts({});                         // Trapped in current conte
 
 ```cpp
 // Allow specific functions only
-step.set_functions({"datetime", "math"});
+step.set_functions(std::vector<std::string>{"datetime", "math"});
 
 // Block all functions
 step.set_functions("none");
@@ -401,7 +417,7 @@ step.set_valid_contexts({"main"});  // Override - only main allowed
 ### Complete Navigation Example
 
 ```cpp
-auto& contexts = define_contexts();
+auto& contexts = agent.define_contexts();
 
 // Main context
 auto& main = contexts.add_context("main");
@@ -441,7 +457,7 @@ Control which AI tools/functions are available in each step for enhanced securit
 // step;  // Don't call set_functions()
 
 // Allow specific functions only
-step.set_functions({"datetime", "math", "web_search"});
+step.set_functions(std::vector<std::string>{"datetime", "math", "web_search"});
 
 // Block all functions
 step.set_functions("none");
@@ -450,7 +466,7 @@ step.set_functions("none");
 ### Security-Focused Example
 
 ```cpp
-class SecureBankingAgent : public agent::AgentBase {
+class SecureBankingAgent : public signalwire::agent::AgentBase {
 public:
     SecureBankingAgent() : AgentBase("Banking Assistant", "/banking") {
         // Add potentially sensitive functions
@@ -463,7 +479,7 @@ public:
         auto& public_ctx = contexts.add_context("public");
         public_ctx.add_step("welcome")
             .set_text("Welcome to banking support. Are you an existing customer?")
-            .set_functions({"datetime", "web_search"})  // Safe functions only
+            .set_functions(std::vector<std::string>{"datetime", "web_search"})  // Safe functions only
             .set_valid_contexts({"authenticated", "public"});
 
         // Authenticated context - restricted for security
@@ -480,17 +496,17 @@ public:
 
 ```cpp
 // Progressive function access based on trust level
-auto& contexts = define_contexts();
+auto& contexts = agent.define_contexts();
 
 // Low trust - limited functions
 auto& public_ctx = contexts.add_context("public");
 public_ctx.add_step("initial_contact")
-    .set_functions({"datetime"});  // Only safe functions
+    .set_functions(std::vector<std::string>{"datetime"});  // Only safe functions
 
 // Medium trust - more functions
 auto& verified = contexts.add_context("verified");
 verified.add_step("verified_user")
-    .set_functions({"datetime", "web_search"});  // Add search capability
+    .set_functions(std::vector<std::string>{"datetime", "web_search"});  // Add search capability
 
 // High trust - full access
 auto& authenticated = contexts.add_context("authenticated");
@@ -608,6 +624,7 @@ Without a gather `prompt`, the AI jumps straight into asking the first question 
 
 Each question has a `type` that controls the JSON schema of the `answer` parameter in `gather_submit`:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // String (default) - free text
 .add_gather_question("name", "What is your name?", "string")
@@ -626,6 +643,7 @@ Each question has a `type` that controls the JSON schema of the `answer` paramet
 
 When `confirm=True`, the AI must read the answer back to the caller and get explicit confirmation before submitting:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 .add_gather_question(
     "last_name",
@@ -645,6 +663,7 @@ How it works:
 
 Each question can have additional instructions and specific functions made available:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 .add_gather_question(
     "home_airport",
@@ -662,6 +681,7 @@ The `resolve_airport` function must already be registered on the agent. The `fun
 
 Answers are stored in `global_data`, which is available in prompt variable expansion via `${key}`:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Store under a namespace
 .set_gather_info(/*output_key=*/"profile")
@@ -771,7 +791,7 @@ Flow:
 ### Example 1: Technical Support Troubleshooting
 
 ```cpp
-class TechnicalSupportAgent : public agent::AgentBase {
+class TechnicalSupportAgent : public signalwire::agent::AgentBase {
 public:
     TechnicalSupportAgent() : AgentBase("Tech Support", "/tech-support") {
         // Add diagnostic tools
@@ -798,7 +818,7 @@ public:
         hardware.add_step("hardware_diagnosis")
             .add_section("Current Task", "Guide user through hardware diagnostics")
             .add_section("Available Tools", "Use web search to find hardware specifications and troubleshooting guides")
-            .set_functions({"web_search"})  // Can search for hardware info
+            .set_functions(std::vector<std::string>{"web_search"})  // Can search for hardware info
             .set_step_criteria("Hardware issue diagnosed")
             .set_valid_steps({"hardware_solution"});
 
@@ -812,7 +832,7 @@ public:
         software.add_step("software_diagnosis")
             .add_section("Current Task", "Diagnose software-related issues")
             .add_section("Available Tools", "Use web search for software updates and datetime to check for recent changes")
-            .set_functions({"web_search", "datetime"})  // Can check for updates
+            .set_functions(std::vector<std::string>{"web_search", "datetime"})  // Can check for updates
             .set_step_criteria("Software issue identified")
             .set_valid_steps({"software_fix", "escalation"});
 
@@ -836,7 +856,7 @@ public:
         network.add_step("network_diagnosis")
             .add_section("Current Task", "Diagnose network and connectivity issues")
             .add_section("Available Tools", "Use web search to check service status and datetime for outage windows")
-            .set_functions({"web_search", "datetime"})  // Check service status
+            .set_functions(std::vector<std::string>{"web_search", "datetime"})  // Check service status
             .set_step_criteria("Network issue diagnosed")
             .set_valid_steps({"network_fix"});
 
@@ -856,7 +876,7 @@ int main() {
 ### Example 2: Multi-Step Application Process
 
 ```cpp
-class LoanApplicationAgent : public agent::AgentBase {
+class LoanApplicationAgent : public signalwire::agent::AgentBase {
 public:
     LoanApplicationAgent() : AgentBase("Loan Application", "/loan-app") {
         // Add verification tools
@@ -887,7 +907,7 @@ public:
                 "Social Security Number",
                 "Phone number and email"
             })
-            .set_functions({"datetime"})  // Can validate dates
+            .set_functions(std::vector<std::string>{"datetime"})  // Can validate dates
             .set_step_criteria("All personal information collected and verified")
             .set_valid_steps({"employment_info", "personal_info"});  // Can review/edit
 
@@ -933,7 +953,7 @@ int main() {
 ### Example 3: E-commerce Customer Service
 
 ```cpp
-class EcommerceServiceAgent : public agent::AgentBase {
+class EcommerceServiceAgent : public signalwire::agent::AgentBase {
 public:
     EcommerceServiceAgent() : AgentBase("E-commerce Support", "/ecommerce") {
         // Add tools for order management
@@ -960,7 +980,7 @@ public:
         orders.add_step("order_assistance")
             .add_section("Current Task", "Help with order status, modifications, and tracking")
             .add_section("Available Tools", "Use datetime to check delivery dates and processing times")
-            .set_functions({"datetime"})  // Can check delivery dates
+            .set_functions(std::vector<std::string>{"datetime"})  // Can check delivery dates
             .set_step_criteria("Order issue resolved or escalated")
             .set_valid_contexts({"main"});
 
@@ -983,7 +1003,7 @@ public:
         products.add_step("product_help")
             .add_section("Current Task", "Help customers with product questions")
             .add_section("Available Tools", "Use web search to find detailed product information and specifications")
-            .set_functions({"web_search"})  // Can search for product info
+            .set_functions(std::vector<std::string>{"web_search"})  // Can search for product info
             .set_step_criteria("Product question answered")
             .set_valid_contexts({"main"});
 
@@ -1009,6 +1029,7 @@ int main() {
 
 Use descriptive step names that indicate purpose:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Good
 .add_step("collect_shipping_address")
@@ -1025,6 +1046,7 @@ Use descriptive step names that indicate purpose:
 
 Define clear, testable completion criteria:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Good - specific and measurable
 .set_step_criteria("User has provided valid email address and confirmed subscription preferences")
@@ -1039,6 +1061,7 @@ Define clear, testable completion criteria:
 
 Design intuitive navigation that matches user expectations:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Allow users to go back and review
 .set_valid_steps({"review_info", "edit_details", "confirm_submission"})
@@ -1054,12 +1077,13 @@ Design intuitive navigation that matches user expectations:
 
 Restrict functions based on security and context needs:
 
+<!-- snippet: no-compile illustration referencing undeclared public_step/auth_step/sensitive_step objects -->
 ```cpp
 // Public areas - limited functions
-public_step.set_functions({"datetime", "web_search"});
+public_step.set_functions(std::vector<std::string>{"datetime", "web_search"});
 
 // Authenticated areas - more functions allowed
-auth_step.set_functions({"datetime", "web_search", "user_profile"});
+auth_step.set_functions(std::vector<std::string>{"datetime", "web_search", "user_profile"});
 
 // Sensitive operations - minimal functions
 billing_step.set_functions("none");
@@ -1070,6 +1094,8 @@ billing_step.set_functions("none");
 Organize contexts by functional area or user journey:
 
 ```cpp
+auto& contexts = agent.define_contexts();
+
 // By functional area
 for (const auto& name : {"triage", "technical_support", "billing", "account_management"})
     contexts.add_context(name);
@@ -1087,6 +1113,7 @@ for (const auto& name : {"public", "authenticated", "admin"})
 
 Provide recovery paths for common issues:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Allow users to retry failed steps
 .set_valid_steps({"retry_payment", "choose_different_method", "contact_support"})
@@ -1123,6 +1150,7 @@ step.add_section("Role", "You are a technical specialist")
 
 **Error**: When using a single context with a name other than "default"
 
+<!-- snippet: no-compile wrong-vs-correct illustration (deliberately redeclares context; contexts is illustrative) -->
 ```cpp
 // Wrong
 auto& context = contexts.add_context("main");  // Error!
@@ -1168,11 +1196,11 @@ step.set_valid_contexts({"main", "help"});
 ```cpp
 // Check function restrictions
 step.set_functions("none");  // All functions blocked
-step.set_functions({"datetime"});  // Only datetime allowed
+step.set_functions(std::vector<std::string>{"datetime"});  // Only datetime allowed
 
 // Verify function names match your agent's functions
-add_skill("web_search");  // Function name is "web_search"
-step.set_functions({"web_search"});  // Must match exactly
+agent.add_skill("web_search");  // Function name is "web_search"
+step.set_functions(std::vector<std::string>{"web_search"});  // Must match exactly
 ```
 
 ### Debugging Tips
@@ -1181,9 +1209,13 @@ step.set_functions({"web_search"});  // Must match exactly
 
 Add logging to understand flow:
 
+<!-- snippet: no-compile free-function definition illustration (harness wraps bare fragments in main, where a nested function is illegal) -->
 ```cpp
-contexts::Step& create_step_with_logging(contexts::Context& context, const std::string& name) {
-    contexts::Step& step = context.add_step(name);
+#include <signalwire/contexts/contexts.hpp>
+#include <iostream>
+
+signalwire::contexts::Step& create_step_with_logging(signalwire::contexts::Context& context, const std::string& name) {
+    signalwire::contexts::Step& step = context.add_step(name);
     std::cout << "Created step: " << name << "\n";
     return step;
 }
@@ -1193,6 +1225,7 @@ contexts::Step& create_step_with_logging(contexts::Context& context, const std::
 
 Check that all referenced steps/contexts exist:
 
+<!-- snippet: no-compile dangling method-chain illustration (no receiver object) -->
 ```cpp
 // Ensure referenced steps exist
 .set_valid_steps({"review", "edit"})  // Both "review" and "edit" steps must exist
@@ -1210,7 +1243,7 @@ Verify functions are properly restricted:
 // step;  // No set_functions() call
 
 // Test with restrictions
-step.set_functions({"datetime"});
+step.set_functions(std::vector<std::string>{"datetime"});
 
 // Test with no functions
 step.set_functions("none");
@@ -1222,7 +1255,7 @@ step.set_functions("none");
 
 **Before (Traditional POM):**
 ```cpp
-class TraditionalAgent : public agent::AgentBase {
+class TraditionalAgent : public signalwire::agent::AgentBase {
 public:
     TraditionalAgent() : AgentBase("assistant", "/assistant") {
         prompt_add_section("Role", "You are a helpful assistant");
@@ -1238,7 +1271,7 @@ public:
 
 **After (Contexts and Steps):**
 ```cpp
-class ContextsAgent : public agent::AgentBase {
+class ContextsAgent : public signalwire::agent::AgentBase {
 public:
     ContextsAgent() : AgentBase("assistant", "/assistant") {
         auto& contexts = define_contexts();
@@ -1262,7 +1295,7 @@ public:
 You can use both traditional prompts and contexts in the same agent:
 
 ```cpp
-class HybridAgent : public agent::AgentBase {
+class HybridAgent : public signalwire::agent::AgentBase {
 public:
     HybridAgent() : AgentBase("hybrid", "/hybrid") {
         // Traditional prompt sections (from skills, global settings, etc.)
@@ -1305,7 +1338,7 @@ To switch contexts dynamically during a conversation, return a `swaig::FunctionR
 using namespace signalwire;
 using json = nlohmann::json;
 
-class MultiContextAgent : public agent::AgentBase {
+class MultiContextAgent : public signalwire::agent::AgentBase {
 public:
     MultiContextAgent() : AgentBase("multi-context", "/multi") {
         // Define contexts using the ContextBuilder pattern
@@ -1356,7 +1389,7 @@ Collects a travel profile with typed questions and confirmation, then recommends
 
 using namespace signalwire;
 
-class TravelAgent : public agent::AgentBase {
+class TravelAgent : public signalwire::agent::AgentBase {
 public:
     TravelAgent() : AgentBase("Travel Agent", "/travel") {
         prompt_add_section("Role", "You are a friendly travel booking assistant.");
@@ -1402,7 +1435,7 @@ Gathers issue details, then routes to the right team using normal mode navigatio
 
 using namespace signalwire;
 
-class SupportAgent : public agent::AgentBase {
+class SupportAgent : public signalwire::agent::AgentBase {
 public:
     SupportAgent() : AgentBase("Support Agent", "/support") {
         prompt_add_section("Role", "You are a technical support agent.");
@@ -1432,7 +1465,7 @@ public:
 
         ctx.add_step("tech_support")
             .set_text("Help the caller with their technical issue. Details: ${ticket}.")
-            .set_functions({"run_diagnostics", "check_service_status"});
+            .set_functions(std::vector<std::string>{"run_diagnostics", "check_service_status"});
 
         ctx.add_step("general_support")
             .set_text("Help the caller with their general inquiry. Details: ${ticket}.");

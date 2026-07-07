@@ -1,5 +1,17 @@
 # Configuration Guide
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/core/config_loader.hpp>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+```
+
 This guide explains the unified configuration system available in SignalWire AI Agents SDK.
 
 ## Overview
@@ -11,14 +23,13 @@ All SignalWire services (SWML-based agents, Search, MCP Gateway) now support opt
 ### Zero Configuration (Default)
 ```cpp
 // Works with no config file needed
-MyAgent agent;
-agent.serve(3000);
+agent.serve();
 ```
 
 ### With Configuration File
 ```cpp
 // Load a config file explicitly via ConfigLoader
-core::ConfigLoader loader(std::vector<std::string>{"production_config.json"});
+signalwire::core::ConfigLoader loader(std::vector<std::string>{"production_config.json"});
 json config = loader.get_config();
 ```
 
@@ -271,13 +282,8 @@ After (Option 3 - Mix config and env vars):
 ### Loading Configuration
 
 ```cpp
-#include <signalwire/core/config_loader.hpp>
-
-using namespace signalwire;
-using json = nlohmann::json;
-
 // Load config
-core::ConfigLoader loader(std::vector<std::string>{"my_config.json"});
+signalwire::core::ConfigLoader loader(std::vector<std::string>{"my_config.json"});
 if (loader.has_config()) {
     json config = loader.get_config();
 

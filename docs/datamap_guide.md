@@ -140,21 +140,34 @@ Function Call → Template Expansion → HTTP Request → Response Processing �
 | **Development Speed** | Slower (code + deploy) | Faster (configuration only) |
 
 **Traditional Webhook Example:**
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/rest/http_client.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+```
+
 ```cpp
 // A traditional webhook is a define_tool handler you host and run yourself:
 // custom HTTP request logic, custom error handling, custom response shaping.
-define_tool("search_knowledge", "Search the knowledge base",
+agent.define_tool("search_knowledge", "Search the knowledge base",
     {{"type", "object"}, {"properties", {
         {"query", {{"type", "string"}, {"description", "Search query"}}}
     }}, {"required", {"query"}}},
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)raw;
         // Custom HTTP request logic (you write and host this).
-        rest::HttpClient client("https://api.example.com");
+        signalwire::rest::HttpClient client("https://api.example.com", "user", "pass");
         json data = client.post("/search", {{"query", args.value("query", "")}});
         // Custom response processing.
         std::string text = data["results"][0]["text"].get<std::string>();
-        return swaig::FunctionResult("Found: " + text);
+        return signalwire::swaig::FunctionResult("Found: " + text);
     });
 ```
 
@@ -2299,12 +2312,12 @@ For common patterns, the fluent `datamap::DataMap` builder keeps creation concis
 A single-webhook GET tool is a short builder chain:
 
 ```cpp
-auto weather = datamap::DataMap("get_weather")
+auto weather = signalwire::datamap::DataMap("get_weather")
     .purpose("Get current weather for a city")
     .parameter("location", "string", "City name", true)
     .webhook("GET", "https://api.weather.com/v1/current?key=API_KEY&q=${args.location}",
         {{"X-API-Key", "your-api-key"}})
-    .output(swaig::FunctionResult(
+    .output(signalwire::swaig::FunctionResult(
         "Weather: ${response.current.condition.text}, ${response.current.temp_f}F"))
     .error_keys({"error"});
 agent.register_swaig_function(weather.to_swaig_function());
@@ -2315,14 +2328,14 @@ agent.register_swaig_function(weather.to_swaig_function());
 Pattern-based tools skip the HTTP call and use `expression(test_value, pattern, output)`:
 
 ```cpp
-auto control = datamap::DataMap("media_control")
+auto control = signalwire::datamap::DataMap("media_control")
     .parameter("command", "string", "Control command")
     .expression("${args.command}", "start|play|begin",
-        swaig::FunctionResult().add_action("start", true))
+        signalwire::swaig::FunctionResult().add_action("start", true))
     .expression("${args.command}", "stop|end|pause",
-        swaig::FunctionResult().add_action("stop", true))
+        signalwire::swaig::FunctionResult().add_action("stop", true))
     .expression("${args.command}", "next|skip",
-        swaig::FunctionResult().add_action("next", true));
+        signalwire::swaig::FunctionResult().add_action("next", true));
 agent.register_swaig_function(control.to_swaig_function());
 ```
 

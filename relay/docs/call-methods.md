@@ -4,6 +4,17 @@ A `signalwire::relay::Call` represents a live phone call. You get one from the
 `on_call` handler (inbound) or from `client.dial(...)` (outbound). Call objects
 hold shared internal state, so they can be copied or returned by value.
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/relay/call.hpp>
+#include <signalwire/relay/action.hpp>
+#include <signalwire/relay/relay_event.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::relay::Call call;
+```
+
 ## Accessors
 
 | Accessor | Type | Description |
@@ -48,7 +59,7 @@ if (action.completed()) {
 
 ```cpp
 auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello"}}}}});
-action.on_completed([](const Action& a) {
+action.on_completed([](const signalwire::relay::Action& a) {
     std::cout << "Done: " << a.result().dump() << "\n";
 });
 // continues immediately; callback fires when playback finishes
@@ -367,7 +378,7 @@ Register an observer for every event on this call.
 `CallEventHandler = std::function<void(const CallEvent&)>`.
 
 ```cpp
-call.on_event([](const CallEvent& ev) {
+call.on_event([](const signalwire::relay::CallEvent& ev) {
     std::cout << "Event: " << ev.event_type << " state=" << ev.call_state << "\n";
 });
 ```

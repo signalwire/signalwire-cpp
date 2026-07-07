@@ -1131,15 +1131,19 @@ External webhook functions delegate to an external HTTP service instead of runni
 
 using namespace signalwire;
 
-auto dm = datamap::DataMap("get_weather")
-    .purpose("Get weather from external service")
-    .parameter("location", "string", "City or location")
-    .webhook("GET", "https://weather-api.example.com/current?location=${args.location}")
-    .output(swaig::FunctionResult("Weather: ${response.summary}"));
+int main() {
+    signalwire::agent::AgentBase agent("my-agent");
 
-// Register it on the agent; there is no local handler — the request is
-// served by the external service the webhook points at.
-agent.register_swaig_function(dm.to_swaig_function());
+    auto dm = datamap::DataMap("get_weather")
+        .purpose("Get weather from external service")
+        .parameter("location", "string", "City or location")
+        .webhook("GET", "https://weather-api.example.com/current?location=${args.location}")
+        .output(swaig::FunctionResult("Weather: ${response.summary}"));
+
+    // Register it on the agent; there is no local handler — the request is
+    // served by the external service the webhook points at.
+    agent.register_swaig_function(dm.to_swaig_function());
+}
 ```
 
 **Testing External Webhooks:**

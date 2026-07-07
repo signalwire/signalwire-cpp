@@ -153,8 +153,9 @@ def _find_libclang() -> str | None:
         "/usr/lib/x86_64-linux-gnu/libclang-17.so.1",
         "/usr/lib/x86_64-linux-gnu/libclang-16.so.1",
         "/usr/lib/x86_64-linux-gnu/libclang-15.so.1",
-        # Local-dev fallback (the historic hardcode).
-        "/home/devuser/.local/lib/python3.12/site-packages/clang/native/libclang.so",
+        # Local-dev fallback: the clang python bindings' bundled native lib,
+        # derived from $HOME so it is machine-agnostic.
+        str(Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"),
     ):
         if Path(cand).is_file():
             return cand
@@ -167,9 +168,8 @@ from clang.cindex import CursorKind, Index, TranslationUnit
 
 HERE = Path(__file__).resolve().parent
 PORT_ROOT = HERE.parent
-PSDK = (PORT_ROOT.parent / "porting-sdk").resolve()
-if not PSDK.is_dir():
-    PSDK = Path("/usr/local/home/devuser/src/porting-sdk")
+PSDK = Path(os.environ["PORTING_SDK_DIR"]).resolve() if os.environ.get("PORTING_SDK_DIR") \
+    else (PORT_ROOT.parent / "porting-sdk").resolve()
 
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(signalwire VERSION 2.0.1 LANGUAGES CXX)
+project(signalwire VERSION 2.0.1
+        HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
+        LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 

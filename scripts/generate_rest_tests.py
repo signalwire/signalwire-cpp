@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -39,9 +40,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PORT_ROOT = HERE.parent
-PSDK = (PORT_ROOT.parent / "porting-sdk").resolve()
+PSDK = Path(os.environ["PORTING_SDK_DIR"]).resolve() if os.environ.get("PORTING_SDK_DIR") \
+    else (PORT_ROOT.parent / "porting-sdk").resolve()
 if not PSDK.is_dir():
-    PSDK = Path("/usr/local/home/devuser/src/porting-sdk")
+    raise SystemExit(
+        f"porting-sdk not found at {PSDK}; clone it adjacent to this repo "
+        "(../porting-sdk) or set PORTING_SDK_DIR")
 
 # Import the mock's own spec loader so our matched_route resolution is identical
 # to what the mock journals at runtime.

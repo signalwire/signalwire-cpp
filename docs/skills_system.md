@@ -1,29 +1,32 @@
-# SignalWire Agents Skills System
+# SignalWire Agents Skills System (C++)
 
-The SignalWire Agents SDK now includes a modular skills system that lets you add capabilities to your agents with simple one-liner calls and configurable parameters.
+The SignalWire Agents SDK includes a modular skills system that lets you add capabilities to your agents with simple one-liner calls and configurable parameters.
 
 ## What's New
 
 Instead of manually implementing every agent capability, you can now:
 
-```python
-from signalwire import AgentBase
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-# Create an agent
-agent = AgentBase("My Assistant")
+using namespace signalwire;
+using json = nlohmann::json;
 
-# Add skills with one-liners!
-agent.add_skill("web_search")   # Web search capability with default settings
-agent.add_skill("datetime")     # Current date/time info  
-agent.add_skill("math")         # Mathematical calculations
+// Create an agent
+agent::AgentBase agent("My Assistant");
 
-# Add skills with custom parameters!
+// Add skills with one-liners!
+agent.add_skill("web_search");   // Web search capability with default settings
+agent.add_skill("datetime");     // Current date/time info
+agent.add_skill("math");         // Mathematical calculations
+
+// Add skills with custom parameters!
 agent.add_skill("web_search", {
-    "num_results": 3,  # Get 3 search results instead of default 1
-    "delay": 0.5       # Add 0.5s delay between requests instead of default 0
-})
+    {"num_results", 3},  // Get 3 search results instead of default 1
+    {"delay", 0.5}       // Add 0.5s delay between requests instead of default 0
+});
 
-# Your agent now has all these capabilities automatically
+// Your agent now has all these capabilities automatically
 ```
 
 ## Architecture
@@ -31,14 +34,14 @@ agent.add_skill("web_search", {
 The skills system consists of:
 
 ### Core Infrastructure
-- **`SkillBase`** - Abstract base class for all skills with parameter support
-- **`SkillManager`** - Handles loading/unloading and lifecycle management with parameters
-- **`AgentBase.add_skill()`** - Simple method to add skills to agents with optional parameters
+- **`skills::SkillBase`** - Abstract base class for all skills with parameter support
+- **`skills::SkillManager`** - Handles loading/unloading and lifecycle management with parameters
+- **`AgentBase::add_skill()`** - Simple method to add skills to agents with optional parameters
 
-### Discovery & Registry  
-- **`SkillRegistry`** - Auto-discovers skills from the `skills/` directory
-- **Auto-discovery** - Skills are found automatically on import
-- **Validation** - Checks dependencies and environment variables
+### Discovery & Registry
+- **`skills::SkillRegistry`** - Global registry of skill factories
+- **Auto-registration** - Built-in skills register themselves at link time via the `REGISTER_SKILL` macro
+- **Validation** - Checks environment variables (`validate_env_vars()`); C++ links its dependencies at build time, so there is no runtime package check
 
 ### Built-in Skills
 - **`web_search`** - Google Custom Search API integration with web scraping
@@ -52,7 +55,7 @@ Search the internet and extract content from web pages.
 
 **Requirements:**
 - Environment variables: `GOOGLE_SEARCH_API_KEY`, `GOOGLE_SEARCH_ENGINE_ID`
-- Packages: `beautifulsoup4`, `requests`
+- HTTP and HTML handling are provided by the SDK's vendored dependencies (no extra install)
 
 **Parameters:**
 - `num_results` (default: 1) - Number of search results to retrieve (1-10)
@@ -62,28 +65,27 @@ Search the internet and extract content from web pages.
 - `web_search(query, num_results)` - Search and scrape web content
 
 **Usage examples:**
-```python
-# Default: fast single result
-agent.add_skill("web_search")
+```cpp
+// Default: fast single result
+agent.add_skill("web_search");
 
-# Custom: multiple results with delay
+// Custom: multiple results with delay
 agent.add_skill("web_search", {
-    "num_results": 3,
-    "delay": 0.5
-})
+    {"num_results", 3},
+    {"delay", 0.5}
+});
 
-# Speed optimized: single result, no delay
+// Speed optimized: single result, no delay
 agent.add_skill("web_search", {
-    "num_results": 1,
-    "delay": 0
-})
+    {"num_results", 1},
+    {"delay", 0}
+});
 ```
 
 ### Date/Time (`datetime`)  
 Get current date and time information.
 
-**Requirements:**
-- Packages: `pytz`
+**Requirements:** None (timezone handling is built in)
 
 **Parameters:** None (no configurable parameters)
 
@@ -104,9 +106,7 @@ Perform mathematical calculations.
 ### Native Vector Search (`native_vector_search`)
 Search local document collections using vector similarity and keyword search.
 
-**Requirements:**
-- Packages: `sentence-transformers`, `scikit-learn`, `numpy`
-- Install with: `pip install signalwire-agents[search]`
+**Requirements:** None beyond the SDK itself — the search backend is built into `libsignalwire.a`
 
 **Parameters:**
 - `tool_name` (default: "search_knowledge") - Custom name for the search tool
@@ -124,40 +124,38 @@ Search local document collections using vector similarity and keyword search.
 - `search_knowledge(query, count)` - Search documents with hybrid vector/keyword search
 
 **Usage examples:**
-```python
-# Local mode with auto-build from concepts guide
+```cpp
+// Local mode with auto-build from a docs directory
 agent.add_skill("native_vector_search", {
-    "tool_name": "search_docs",
-    "build_index": True,
-    "source_dir": "./docs",  # Will build from directory
-    "index_file": "concepts.swsearch"
-})
+    {"tool_name", "search_docs"},
+    {"build_index", true},
+    {"source_dir", "./docs"},  // Will build from directory
+    {"index_file", "concepts.swsearch"}
+});
 
-# Or build from specific concepts guide file
+// Or build from a specific pre-built index file
 agent.add_skill("native_vector_search", {
-    "tool_name": "search_concepts",
-    "index_file": "concepts.swsearch"  # Pre-built from concepts guide
-})
+    {"tool_name", "search_concepts"},
+    {"index_file", "concepts.swsearch"}  // Pre-built index
+});
 
-# Remote mode
+// Remote mode
 agent.add_skill("native_vector_search", {
-    "remote_url": "http://localhost:8001",
-    "index_name": "knowledge"
-})
+    {"remote_url", "http://localhost:8001"},
+    {"index_name", "knowledge"}
+});
 
-# Multiple instances for different document collections
+// Multiple instances for different document collections
 agent.add_skill("native_vector_search", {
-    "tool_name": "search_examples",
-    "index_file": "examples.swsearch"
-})
+    {"tool_name", "search_examples"},
+    {"index_file", "examples.swsearch"}
+});
 ```
-
-For complete documentation, see [Search Overview](search_overview.md).
 
 ### SWML Transfer (`swml_transfer`)
 Transfer calls between agents using pattern matching.
 
-**Requirements:** None (no additional packages or environment variables required)
+**Requirements:** None (no additional dependencies or environment variables required)
 
 **Parameters:**
 - `tool_name` (default: "transfer_call") - Custom name for the transfer function
@@ -179,215 +177,240 @@ Transfer calls between agents using pattern matching.
 - `transfer_call(transfer_type, ...required_fields)` (or custom tool_name) - Transfer based on pattern matching with optional required fields
 
 **Usage examples:**
-```python
-# Simple transfer between departments
+```cpp
+// Simple transfer between departments
 agent.add_skill("swml_transfer", {
-    "tool_name": "transfer_to_department",
-    "transfers": {
-        "/sales/i": {
-            "url": "https://example.com/sales",
-            "message": "Transferring to sales...",
-            "return_message": "Sales transfer complete."
-        },
-        "/support/i": {
-            "url": "https://example.com/support",
-            "message": "Transferring to support...",
-            "return_message": "Support transfer complete."
-        }
-    }
-})
+    {"tool_name", "transfer_to_department"},
+    {"transfers", {
+        {"/sales/i", {
+            {"url", "https://example.com/sales"},
+            {"message", "Transferring to sales..."},
+            {"return_message", "Sales transfer complete."}
+        }},
+        {"/support/i", {
+            {"url", "https://example.com/support"},
+            {"message", "Transferring to support..."},
+            {"return_message", "Support transfer complete."}
+        }}
+    }}
+});
 
-# Multiple instances for different transfer types
+// Multiple instances for different transfer types
 agent.add_skill("swml_transfer", {
-    "tool_name": "route_call",
-    "parameter_name": "department",
-    "transfers": {
-        "/sales|billing/i": {
-            "url": "https://api.company.com/sales",
-            "message": "Connecting to sales team...",
-            "post_process": True
-        },
-        "/technical|support/i": {
-            "url": "https://api.company.com/support",
-            "message": "Connecting to support team...",
-            "post_process": True
-        }
-    },
-    "default_message": "Would you like sales or support?"
-})
+    {"tool_name", "route_call"},
+    {"parameter_name", "department"},
+    {"transfers", {
+        {"/sales|billing/i", {
+            {"url", "https://api.company.com/sales"},
+            {"message", "Connecting to sales team..."},
+            {"post_process", true}
+        }},
+        {"/technical|support/i", {
+            {"url", "https://api.company.com/support"},
+            {"message", "Connecting to support team..."},
+            {"post_process", true}
+        }}
+    }},
+    {"default_message", "Would you like sales or support?"}
+});
 ```
 
 ## Usage Examples
 
 ### Basic Usage
-```python
-from signalwire import AgentBase
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-# Create agent and add skills
-agent = AgentBase("Assistant", route="/assistant")
-agent.add_skill("datetime")
-agent.add_skill("math") 
-agent.add_skill("web_search")  # Uses defaults: 1 result, no delay
+using namespace signalwire;
 
-# Start the agent
-agent.run()
+// Create agent and add skills
+agent::AgentBase agent("Assistant", "/assistant");
+agent.add_skill("datetime");
+agent.add_skill("math");
+agent.add_skill("web_search");  // Uses defaults: 1 result, no delay
+
+// Start the agent
+agent.run();
 ```
 
 ### Skills with Custom Parameters
-```python
-from signalwire import AgentBase
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-# Create agent
-agent = AgentBase("Research Assistant", route="/research")
+using namespace signalwire;
 
-# Add web search optimized for research (more results)
+// Create agent
+agent::AgentBase agent("Research Assistant", "/research");
+
+// Add web search optimized for research (more results)
 agent.add_skill("web_search", {
-    "num_results": 5,   # Get more comprehensive results
-    "delay": 1.0        # Be respectful to websites
-})
+    {"num_results", 5},   // Get more comprehensive results
+    {"delay", 1.0}        // Be respectful to websites
+});
 
-# Add other skills without parameters
-agent.add_skill("datetime")
-agent.add_skill("math")
+// Add other skills without parameters
+agent.add_skill("datetime");
+agent.add_skill("math");
 
-# Start the agent
-agent.run()
+// Start the agent
+agent.run();
 ```
 
 ### Different Parameter Configurations
-```python
-# Speed-optimized for quick responses
+```cpp
+// Speed-optimized for quick responses
 agent.add_skill("web_search", {
-    "num_results": 1,
-    "delay": 0
-})
+    {"num_results", 1},
+    {"delay", 0}
+});
 
-# Comprehensive research mode
+// Comprehensive research mode
 agent.add_skill("web_search", {
-    "num_results": 5,
-    "delay": 1.0
-})
+    {"num_results", 5},
+    {"delay", 1.0}
+});
 
-# Balanced approach
+// Balanced approach
 agent.add_skill("web_search", {
-    "num_results": 3,
-    "delay": 0.5
-})
+    {"num_results", 3},
+    {"delay", 0.5}
+});
 ```
 
 ### Check Available Skills
-```python
-from signalwire.skills.registry import skill_registry
+```cpp
+#include <signalwire/skills/skill_registry.hpp>
 
-# List all discovered skills
-for skill in skill_registry.list_skills():
-    print(f"- {skill['name']}: {skill['description']}")
-    if skill['required_env_vars']:
-        print(f"  Requires: {', '.join(skill['required_env_vars'])}")
+using namespace signalwire;
+
+// List all registered skills
+for (const std::string& name : skills::SkillRegistry::instance().list_skills()) {
+    std::cout << "- " << name << "\n";
+}
+
+// Or get every skill's parameter schema keyed by name
+json schema = skills::SkillRegistry::instance().get_all_skills_schema();
 ```
 
 ### Runtime Skill Management
-```python
-agent = AgentBase("Dynamic Agent")
+```cpp
+agent::AgentBase agent("Dynamic Agent");
 
-# Add skills with different configurations
-agent.add_skill("math")
-agent.add_skill("datetime")
-agent.add_skill("web_search", {"num_results": 2, "delay": 0.3})
+// Add skills with different configurations
+agent.add_skill("math");
+agent.add_skill("datetime");
+agent.add_skill("web_search", {{"num_results", 2}, {"delay", 0.3}});
 
-# Check what's loaded
-print("Loaded skills:", agent.list_skills())
+// Check what's loaded
+std::vector<std::string> loaded = agent.list_skills();
 
-# Remove a skill
-agent.remove_skill("math")
+// Remove a skill
+agent.remove_skill("math");
 
-# Check if specific skill is loaded
-if agent.has_skill("datetime"):
-    print("Date/time capabilities available")
+// Check if a specific skill is loaded
+if (agent.has_skill("datetime")) {
+    std::cout << "Date/time capabilities available\n";
+}
 ```
 
 ## Creating Custom Skills
 
-Create a new skill by extending `SkillBase` with parameter support:
+Create a new skill by extending `skills::SkillBase` with parameter support. Override the required virtuals and register the class with the `REGISTER_SKILL` macro:
 
-```python
-# signalwire/skills/my_skill/skill.py
-from signalwire.core.skill_base import SkillBase
-from signalwire.core.function_result import SwaigFunctionResult
+```cpp
+// my_skill.cpp
+#include <signalwire/skills/skill_base.hpp>
+#include <signalwire/skills/skill_registry.hpp>
 
-class MyCustomSkill(SkillBase):
-    SKILL_NAME = "my_skill"
-    SKILL_DESCRIPTION = "Does something awesome with configurable parameters"
-    SKILL_VERSION = "1.0.0"
-    REQUIRED_PACKAGES = ["requests"]  # Optional
-    REQUIRED_ENV_VARS = ["API_KEY"]   # Optional
-    
-    def setup(self) -> bool:
-        """Initialize the skill with parameters"""
-        if not self.validate_env_vars() or not self.validate_packages():
-            return False
-            
-        # Use parameters with defaults
-        self.max_items = self.params.get('max_items', 10)
-        self.timeout = self.params.get('timeout', 30)
-        self.retry_count = self.params.get('retry_count', 3)
-        
-        return True
-        
-    def register_tools(self) -> None:
-        """Register SWAIG tools with the agent"""
-        self.define_tool(
-            name="my_function",
-            description=f"Does something cool (max {self.max_items} items)",
-            parameters={
-                "input": {
-                    "type": "string",
-                    "description": "Input parameter"
-                }
-            },
-            handler=self._my_handler
-        )
-    
-    def _my_handler(self, args, raw_data):
-        """Handle the tool call using configured parameters"""
-        # Use self.max_items, self.timeout, self.retry_count in your logic
-        return SwaigFunctionResult(f"Processed with max_items={self.max_items}")
-        
-    def get_hints(self):
-        """Speech recognition hints"""
-        return ["custom", "skill", "awesome"]
-        
-    def get_prompt_sections(self):
-        """Prompt sections to add to agent"""
-        return [{
-            "title": "Custom Capability",
-            "body": f"You can do custom things with my_skill (configured for {self.max_items} items)."
-        }]
+namespace signalwire {
+namespace skills {
+
+class MyCustomSkill : public SkillBase {
+ public:
+    std::string skill_name() const override { return "my_skill"; }
+    std::string skill_description() const override {
+        return "Does something awesome with configurable parameters";
+    }
+    std::string skill_version() const override { return "1.0.0"; }
+    std::vector<std::string> required_env_vars() const override { return {"API_KEY"}; }
+
+    // Initialize the skill with parameters. Return true on success.
+    bool setup(const json& params) override {
+        params_ = params;
+        if (!validate_env_vars() || !validate_packages()) {
+            return false;
+        }
+        // Use parameters with defaults
+        max_items_ = get_param<int>(params, "max_items", 10);
+        timeout_ = get_param<int>(params, "timeout", 30);
+        retry_count_ = get_param<int>(params, "retry_count", 3);
+        return true;
+    }
+
+    // Register SWAIG tools with the agent.
+    std::vector<swaig::ToolDefinition> register_tools() override {
+        return {define_tool(
+            "my_function", "Does something cool",
+            json::object({{"type", "object"},
+                          {"properties",
+                           json::object({{"input",
+                                          json::object({{"type", "string"},
+                                                        {"description", "Input parameter"}})}})}}),
+            [this](const json& args, const json&) -> swaig::FunctionResult {
+                // Use max_items_, timeout_, retry_count_ in your logic
+                return swaig::FunctionResult("Processed with max_items=" +
+                                             std::to_string(max_items_));
+            })};
+    }
+
+    // Speech recognition hints
+    std::vector<std::string> get_hints() const override {
+        return {"custom", "skill", "awesome"};
+    }
+
+    // Prompt sections to add to the agent
+    std::vector<SkillPromptSection> get_prompt_sections() const override {
+        return {{"Custom Capability",
+                 "You can do custom things with my_skill.",
+                 {}}};
+    }
+
+ private:
+    int max_items_ = 10;
+    int timeout_ = 30;
+    int retry_count_ = 3;
+};
+
+REGISTER_SKILL(MyCustomSkill)
+
+}  // namespace skills
+}  // namespace signalwire
 ```
 
-The skill will be automatically discovered and available as:
-```python
-# Use defaults
-agent.add_skill("my_skill")
+Once linked into your program, the skill is available by name:
+```cpp
+// Use defaults
+agent.add_skill("my_skill");
 
-# Use custom parameters
+// Use custom parameters
 agent.add_skill("my_skill", {
-    "max_items": 20,
-    "timeout": 60,
-    "retry_count": 5
-})
+    {"max_items", 20},
+    {"timeout", 60},
+    {"retry_count", 5}
+});
 ```
 
 ## Quick Start
 
-1. **Install dependencies:**
+1. **Build the library** (all dependencies are vendored — no package manager needed):
    ```bash
-   pip install pytz beautifulsoup4 requests
+   mkdir -p build && cd build && cmake .. && make -j$(nproc)
    ```
 
-2. **Run the demo:**
+2. **Build and run the demo:**
    ```bash
-   python examples/skills_demo.py
+   g++ -std=c++17 -I include -I deps examples/skills_demo.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o skills_demo
+   ./skills_demo
    ```
 
 3. **For web search, set environment variables:**
@@ -398,25 +421,30 @@ agent.add_skill("my_skill", {
 
 ## Testing
 
-Test the skills system with parameters:
+Test the skills system with parameters — build and run a small program:
 
-```bash
-python3 -c "
-from signalwire import AgentBase
-from signalwire.skills.registry import skill_registry
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/skills/skill_registry.hpp>
+#include <iostream>
 
-# Show discovered skills
-print('Available skills:', [s['name'] for s in skill_registry.list_skills()])
+using namespace signalwire;
 
-# Create agent and load skills with parameters
-agent = AgentBase('Test', route='/test')
-agent.add_skill('datetime')
-agent.add_skill('math')
-agent.add_skill('web_search', {'num_results': 2, 'delay': 0.5})
+int main() {
+    // Show registered skills
+    for (const std::string& name : skills::SkillRegistry::instance().list_skills()) {
+        std::cout << "Available skill: " << name << "\n";
+    }
 
-print('Loaded skills:', agent.list_skills())
-print('Skills system with parameters working!')
-"
+    // Create agent and load skills with parameters
+    agent::AgentBase agent("Test", "/test");
+    agent.add_skill("datetime");
+    agent.add_skill("math");
+    agent.add_skill("web_search", {{"num_results", 2}, {"delay", 0.5}});
+
+    std::cout << "Loaded skills: " << agent.list_skills().size() << "\n";
+    std::cout << "Skills system with parameters working!\n";
+}
 ```
 
 ## Benefits
@@ -433,25 +461,27 @@ print('Skills system with parameters working!')
 ## Migration Guide
 
 **Before (manual implementation):**
-```python
-# Had to manually implement every capability
-class WebSearchAgent(AgentBase):
-    def __init__(self):
-        super().__init__("WebSearchAgent")
-        self.setup_google_search()
-        self.define_tool("web_search", ...)
-        # Lots of manual code...
+```cpp
+// Had to manually implement every capability
+class WebSearchAgent : public agent::AgentBase {
+public:
+    WebSearchAgent() : AgentBase("WebSearchAgent") {
+        // Wire up the search backend by hand
+        define_tool("web_search", "Search the web", params_json, handler);
+        // Lots of manual code...
+    }
+};
 ```
 
 **After (skills system with parameters):**
-```python
-# Simple one-liner with custom configuration
-agent = AgentBase("WebSearchAgent")
+```cpp
+// Simple one-liner with custom configuration
+agent::AgentBase agent("WebSearchAgent");
 agent.add_skill("web_search", {
-    "num_results": 3,  # Get more results
-    "delay": 0.5       # Be respectful to servers
-})
-# Done! Full web search capability with custom settings.
+    {"num_results", 3},  // Get more results
+    {"delay", 0.5}       // Be respectful to servers
+});
+// Done! Full web search capability with custom settings.
 ```
 
 The skills system makes SignalWire agents more modular, maintainable, and configurable. 

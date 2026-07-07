@@ -21,36 +21,57 @@ The agent automatically detects Google Cloud Functions environment using these v
 
 ### Deployment Steps
 
-1. **Create your agent file** (`main.py`):
-```python
-import functions_framework
-from your_agent_module import YourAgent
+Google Cloud Functions and Azure Functions do not offer a first-class C++
+runtime, so a C++ agent is packaged as a **container** (deployable to Cloud Run /
+Cloud Functions 2nd gen, or an Azure Custom Handler). The container's HTTP entry
+point translates the inbound request into an event JSON and dispatches it through
+`agent.handle_serverless_request(event, context, mode)`, which returns a
+`(status, headers, body)` response.
 
-# Create agent instance
-agent = YourAgent(
-    name="my-agent",
-    # Configure your agent parameters
-)
+1. **Write your handler** (`main.cpp`) — a small HTTP server that forwards each
+   request to the agent:
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/utils/serverless.hpp>
 
-@functions_framework.http
-def agent_handler(request):
-    """HTTP Cloud Function entry point"""
-    return agent.handle_serverless_request(event=request)
+using namespace signalwire;
+using json = nlohmann::json;
+
+int main() {
+    // Create and configure your agent.
+    agent::AgentBase agent("my-agent", "/");
+    agent.prompt_add_section("Role", "You are a helpful assistant.");
+
+    // Build the event describing the invocation. On Cloud Run / GCF 2nd gen
+    // you populate this from the incoming HTTP request; here we force the
+    // Google Cloud Function dispatch mode.
+    json event = {
+        {"method", "POST"},
+        {"path", "/"},
+        {"headers", json::object()},
+        {"body", ""}
+    };
+
+    utils::ServerlessResponse resp =
+        agent.handle_serverless_request(event, json::object(),
+                                        "google_cloud_function");
+
+    // resp.status / resp.headers / resp.body — write these back to the caller.
+    return resp.status == 200 ? 0 : 1;
+}
 ```
 
-2. **Create requirements.txt**:
-```
-functions-framework==3.*
-signalwire-agents
-# Add your other dependencies
-```
-
-3. **Deploy using gcloud**:
+2. **Build and link** against the static library (`libsignalwire.a`) inside your
+   container image:
 ```bash
-gcloud functions deploy my-agent \
-    --runtime python39 \
-    --trigger-http \
-    --entry-point agent_handler \
+g++ -std=c++17 -I include -I deps main.cpp \
+    -L build -lsignalwire -lssl -lcrypto -lpthread -o agent
+```
+
+3. **Deploy the container** (Cloud Run / Cloud Functions 2nd gen):
+```bash
+gcloud run deploy my-agent \
+    --source . \
     --allow-unauthenticated
 ```
 
@@ -95,34 +116,68 @@ The agent automatically detects Azure Functions environment using these variable
 
 ### Deployment Steps
 
+Azure Functions runs C++ as a **Custom Handler**: the Functions host forwards
+each trigger to a self-hosted HTTP server (your compiled agent binary) over
+`localhost`.
+
 1. **Create your function app structure**:
 ```
 my-agent-function/
-├── __init__.py
+├── agent            # compiled C++ handler binary
+├── host.json
 ├── function.json
-└── requirements.txt
+└── Dockerfile
 ```
 
-2. **Create `__init__.py`**:
-```python
-import azure.functions as func
-from your_agent_module import YourAgent
+2. **Write the custom handler** (`main.cpp`) — a small HTTP server that
+   dispatches each request through the agent:
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/utils/serverless.hpp>
 
-# Create agent instance
-agent = YourAgent(
-    name="my-agent",
-    # Configure your agent parameters
-)
+using namespace signalwire;
+using json = nlohmann::json;
 
-def main(req: func.HttpRequest) -> func.HttpResponse:
-    """Azure Function entry point"""
-    return agent.handle_serverless_request(event=req)
+int main() {
+    agent::AgentBase agent("my-agent", "/");
+    agent.prompt_add_section("Role", "You are a helpful assistant.");
+
+    // Populate this from the inbound Azure request (method / headers / body);
+    // "azure_function" forces the Azure dispatch path.
+    json request = {
+        {"method", "POST"},
+        {"url", "/"},
+        {"headers", json::object()},
+        {"body", ""}
+    };
+
+    utils::ServerlessResponse resp =
+        agent.handle_serverless_request(request, json::object(),
+                                        "azure_function");
+
+    // Write resp.status / resp.headers / resp.body back to the Functions host.
+    return resp.status == 200 ? 0 : 1;
+}
 ```
 
-3. **Create `function.json`**:
+3. **Create `host.json`** declaring the custom handler:
 ```json
 {
-  "scriptFile": "__init__.py",
+  "version": "2.0",
+  "customHandler": {
+    "description": {
+      "defaultExecutablePath": "agent",
+      "workingDirectory": "",
+      "arguments": []
+    },
+    "enableForwardingHttpRequest": true
+  }
+}
+```
+
+4. **Create `function.json`**:
+```json
+{
   "bindings": [
     {
       "authLevel": "anonymous",
@@ -140,21 +195,13 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
 }
 ```
 
-4. **Create `requirements.txt`**:
-```
-azure-functions
-signalwire-agents
-# Add your other dependencies
-```
-
-5. **Deploy using Azure CLI**:
+5. **Deploy using Azure CLI** (custom-handler function app):
 ```bash
 # Create function app
 az functionapp create \
     --resource-group myResourceGroup \
     --consumption-plan-location westus \
-    --runtime python \
-    --runtime-version 3.9 \
+    --runtime custom \
     --functions-version 4 \
     --name my-agent-function \
     --storage-account mystorageaccount
@@ -200,12 +247,9 @@ Both platforms support HTTP Basic Authentication:
 ### Automatic Authentication
 The agent automatically validates credentials in cloud function environments:
 
-```python
-agent = YourAgent(
-    name="my-agent",
-    username="your-username",
-    password="your-password"
-)
+```cpp
+agent::AgentBase agent("my-agent", "/");
+agent.set_auth("your-username", "your-password");
 ```
 
 ### Authentication Flow
@@ -218,152 +262,60 @@ agent = YourAgent(
 
 ### SignalWire Agent Testing Tool
 
-The SignalWire AI Agents SDK includes a testing tool (`swaig-test`) that can simulate cloud function environments for comprehensive testing before deployment.
+The C++ SDK ships a `swaig-test` CLI (`bin/swaig-test`) for testing an agent's
+SWAIG tools. It operates against a **running agent over HTTP** or introspects a
+**compiled example binary** — it does not simulate cloud-function runtimes
+(there is no `--simulate-serverless` mode in the C++ tool). To validate the
+serverless dispatch path directly, drive `handle_serverless_request(...)` from a
+small C++ program with a synthesized event, as shown in the deployment sections
+above.
 
-#### Cloud Function Environment Simulation
+#### Introspecting a Compiled Example
 
-**Google Cloud Functions:**
+`--example <name>` locates the CMake-built binary under `build/`, runs it with
+`SWAIG_LIST_TOOLS=1`, and prints the registered tools — no port binding, no HTTP:
+
 ```bash
-# Test SWML generation in GCP environment
-swaig-test examples/my_agent.py --simulate-serverless cloud_function --gcp-project my-project --dump-swml
-
-# Test function execution
-swaig-test examples/my_agent.py --simulate-serverless cloud_function --gcp-project my-project --exec my_function --param value
-
-# With custom region and service
-swaig-test examples/my_agent.py --simulate-serverless cloud_function \
-  --gcp-project my-project \
-  --gcp-region us-west1 \
-  --gcp-service my-service \
-  --dump-swml
+# List the tools a compiled example registers
+swaig-test --example llm_params_demo --list-tools
 ```
 
-**Azure Functions:**
+#### Testing a Running Agent Over HTTP
+
+Start your agent (locally or in a container), then point `swaig-test` at its URL.
+Basic-auth credentials can be embedded in the URL:
+
 ```bash
-# Test SWML generation in Azure environment
-swaig-test examples/my_agent.py --simulate-serverless azure_function --dump-swml
+# List the tools the running agent exposes
+swaig-test http://user:pass@localhost:3000/my-agent --list-tools
 
-# Test function execution
-swaig-test examples/my_agent.py --simulate-serverless azure_function --exec my_function --param value
+# Dump the generated SWML document
+swaig-test http://user:pass@localhost:3000/my-agent --dump-swml
 
-# With custom environment and URL
-swaig-test examples/my_agent.py --simulate-serverless azure_function \
-  --azure-env Production \
-  --azure-function-url https://myapp.azurewebsites.net/api/myfunction \
-  --dump-swml
+# Execute a specific SWAIG tool
+swaig-test http://user:pass@localhost:3000/my-agent \
+  --exec search_knowledge --param query=test
 ```
-
-#### Environment Variable Testing
-
-Test with custom environment variables:
-```bash
-# Set individual environment variables
-swaig-test examples/my_agent.py --simulate-serverless cloud_function \
-  --env GOOGLE_CLOUD_PROJECT=my-project \
-  --env DEBUG=1 \
-  --exec my_function
-
-# Load from environment file
-swaig-test examples/my_agent.py --simulate-serverless azure_function \
-  --env-file production.env \
-  --dump-swml
-```
-
-#### Authentication Testing
-
-Test authentication in cloud function environments:
-```bash
-# Test with authentication (uses agent's configured credentials)
-swaig-test examples/my_agent.py --simulate-serverless cloud_function \
-  --gcp-project my-project \
-  --dump-swml --verbose
-
-# The tool automatically tests:
-# - Basic auth credential embedding in URLs
-# - Authentication challenge responses
-# - Platform-specific auth handling
-```
-
-#### URL Generation Testing
-
-Verify that URLs are generated correctly for each platform:
-```bash
-# Check URL generation with verbose output
-swaig-test examples/my_agent.py --simulate-serverless cloud_function \
-  --gcp-project my-project \
-  --dump-swml --verbose
-
-# Extract webhook URLs from SWML
-swaig-test examples/my_agent.py --simulate-serverless azure_function \
-  --dump-swml --raw | jq '.sections.main[1].ai.SWAIG.functions[].web_hook_url'
-```
-
-#### Available Testing Options
-
-**Platform Selection:**
-- `--simulate-serverless cloud_function` - Google Cloud Functions
-- `--simulate-serverless azure_function` - Azure Functions  
-- `--simulate-serverless lambda` - AWS Lambda
-- `--simulate-serverless cgi` - CGI environment
-
-**Google Cloud Platform Options:**
-- `--gcp-project PROJECT_ID` - Set Google Cloud project ID
-- `--gcp-region REGION` - Set Google Cloud region (default: us-central1)
-- `--gcp-service SERVICE` - Set service name
-- `--gcp-function-url URL` - Override function URL
-
-**Azure Functions Options:**
-- `--azure-env ENVIRONMENT` - Set Azure environment (default: Development)
-- `--azure-function-url URL` - Override Azure Function URL
-
-**Environment Variables:**
-- `--env KEY=value` - Set individual environment variables
-- `--env-file FILE` - Load environment variables from file
 
 **Output Options:**
-- `--dump-swml` - Generate and display SWML document
-- `--verbose` - Show detailed information
-- `--raw` - Output raw JSON (useful for piping to jq)
-
-#### Complete Testing Workflow
-
-```bash
-# 1. List available agents and tools
-swaig-test examples/my_agent.py --list-agents
-swaig-test examples/my_agent.py --list-tools
-
-# 2. Test SWML generation for each platform
-swaig-test examples/my_agent.py --simulate-serverless cloud_function --gcp-project test-project --dump-swml
-swaig-test examples/my_agent.py --simulate-serverless azure_function --dump-swml
-
-# 3. Test specific function execution
-swaig-test examples/my_agent.py --simulate-serverless cloud_function --gcp-project test-project --exec search_knowledge --query "test"
-
-# 4. Test with production-like environment
-swaig-test examples/my_agent.py --simulate-serverless azure_function --env-file production.env --exec my_function --param value
-
-# 5. Verify authentication and URL generation
-swaig-test examples/my_agent.py --simulate-serverless cloud_function --gcp-project prod-project --dump-swml --verbose
-```
+- `--list-tools` — List the SWAIG tools registered on the agent
+- `--dump-swml` — Generate and display the SWML document
+- `--exec <tool>` — Execute a specific SWAIG tool (URL mode)
+- `--param key=value` — Pass an argument to `--exec`
 
 ### Local Testing
 
-**Google Cloud Functions:**
+Build and run your compiled handler locally, then exercise it with `curl` or
+`swaig-test`:
+
 ```bash
-# Install Functions Framework
-pip install functions-framework
+# Build the static library and your handler
+mkdir -p build && cd build && cmake .. && make -j$(nproc)
+g++ -std=c++17 -I ../include -I ../deps ../main.cpp \
+    -L . -lsignalwire -lssl -lcrypto -lpthread -o agent
 
-# Run locally
-functions-framework --target=agent_handler --debug
-```
-
-**Azure Functions:**
-```bash
-# Install Azure Functions Core Tools
-npm install -g azure-functions-core-tools@4
-
-# Run locally
-func start
+# Run it (a Service/AgentBase serve() listens on the configured port)
+./agent
 ```
 
 ### Testing Authentication
@@ -412,18 +364,19 @@ curl -u username:password \
 ### Common Issues
 
 **Environment Detection:**
-```python
-# Check detected mode
-from signalwire.core.logging_config import get_execution_mode
-print(f"Detected mode: {get_execution_mode()}")
+```cpp
+#include <signalwire/core/logging_config.hpp>
+
+// Check the detected execution mode ("server", "lambda",
+// "google_cloud_function", "azure_function", "cgi", ...).
+std::cout << "Detected mode: " << signalwire::core::get_execution_mode() << "\n";
 ```
 
 **URL Generation:**
-```python
-# Check generated URLs
-agent = YourAgent(name="test")
-print(f"Base URL: {agent.get_full_url()}")
-print(f"Auth URL: {agent.get_full_url(include_auth=True)}")
+```cpp
+agent::AgentBase agent("test", "/");
+std::cout << "Base URL: " << agent.get_full_url() << "\n";
+std::cout << "Auth URL: " << agent.get_full_url(/*include_auth=*/true) << "\n";
 ```
 
 **Authentication Issues:**
@@ -433,18 +386,22 @@ print(f"Auth URL: {agent.get_full_url(include_auth=True)}")
 
 ### Debugging
 
-Enable debug logging:
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
+Enable debug logging by raising the shared logger's level (or setting the
+`SIGNALWIRE_LOG_LEVEL=debug` environment variable before startup):
+```cpp
+#include <signalwire/logging.hpp>
+
+signalwire::Logger::instance().set_level(signalwire::LogLevel::Debug);
 ```
 
-Check environment variables:
-```python
-import os
-for key, value in os.environ.items():
-    if 'FUNCTION' in key or 'AZURE' in key or 'GOOGLE' in key:
-        print(f"{key}: {value}")
+Check the relevant environment variables:
+```cpp
+for (const char* key : {"FUNCTION_TARGET", "K_SERVICE", "GOOGLE_CLOUD_PROJECT",
+                        "AZURE_FUNCTIONS_ENVIRONMENT", "FUNCTIONS_WORKER_RUNTIME"}) {
+    if (const char* value = std::getenv(key)) {
+        std::cout << key << ": " << value << "\n";
+    }
+}
 ```
 
 ## Migration from Other Platforms
@@ -462,7 +419,7 @@ for key, value in os.environ.items():
 
 ## Examples
 
-See `examples/lambda_agent.py` for a complete AWS Lambda deployment example.
+See `examples/lambda_agent.cpp` for a complete AWS Lambda deployment example.
 
 ## Support
 

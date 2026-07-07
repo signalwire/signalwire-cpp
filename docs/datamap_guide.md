@@ -140,17 +140,22 @@ Function Call → Template Expansion → HTTP Request → Response Processing �
 | **Development Speed** | Slower (code + deploy) | Faster (configuration only) |
 
 **Traditional Webhook Example:**
-```python
-def search_knowledge(args, post_data):
-    # Custom HTTP request logic
-    response = requests.post("https://api.example.com/search", 
-                           json={"query": args["query"]})
-    # Custom error handling
-    if response.status_code != 200:
-        return {"error": "API request failed"}
-    # Custom response processing
-    data = response.json()
-    return {"response": f"Found: {data['results'][0]['text']}"}
+```cpp
+// A traditional webhook is a define_tool handler you host and run yourself:
+// custom HTTP request logic, custom error handling, custom response shaping.
+define_tool("search_knowledge", "Search the knowledge base",
+    {{"type", "object"}, {"properties", {
+        {"query", {{"type", "string"}, {"description", "Search query"}}}
+    }}, {"required", {"query"}}},
+    [](const json& args, const json& raw) -> swaig::FunctionResult {
+        (void)raw;
+        // Custom HTTP request logic (you write and host this).
+        rest::HttpClient client("https://api.example.com");
+        json data = client.post("/search", {{"query", args.value("query", "")}});
+        // Custom response processing.
+        std::string text = data["results"][0]["text"].get<std::string>();
+        return swaig::FunctionResult("Found: " + text);
+    });
 ```
 
 **DataMap Equivalent:**
@@ -2287,45 +2292,38 @@ DataMap functions can be debugged using various tools:
 
 ### 12.0 Helper Functions
 
-For common patterns, convenience functions simplify DataMap creation:
+For common patterns, the fluent `datamap::DataMap` builder keeps creation concise:
 
 #### Simple API Tool
 
-```python
-from signalwire.core.data_map import create_simple_api_tool
+A single-webhook GET tool is a short builder chain:
 
-weather = create_simple_api_tool(
-    name='get_weather',
-    url='https://api.weather.com/v1/current?key=API_KEY&q=${location}',
-    response_template='Weather: ${response.current.condition.text}, ${response.current.temp_f}°F',
-    parameters={
-        'location': {
-            'type': 'string',
-            'description': 'City name',
-            'required': True
-        }
-    },
-    headers={'X-API-Key': 'your-api-key'},
-    error_keys=['error']
-)
+```cpp
+auto weather = datamap::DataMap("get_weather")
+    .purpose("Get current weather for a city")
+    .parameter("location", "string", "City name", true)
+    .webhook("GET", "https://api.weather.com/v1/current?key=API_KEY&q=${args.location}",
+        {{"X-API-Key", "your-api-key"}})
+    .output(swaig::FunctionResult(
+        "Weather: ${response.current.condition.text}, ${response.current.temp_f}F"))
+    .error_keys({"error"});
+agent.register_swaig_function(weather.to_swaig_function());
 ```
 
 #### Expression Tool
 
-```python
-from signalwire.core.data_map import create_expression_tool
+Pattern-based tools skip the HTTP call and use `expression(test_value, pattern, output)`:
 
-control = create_expression_tool(
-    name='media_control',
-    patterns={
-        r'start|play|begin': SwaigFunctionResult().add_action('start', True),
-        r'stop|end|pause': SwaigFunctionResult().add_action('stop', True),
-        r'next|skip': SwaigFunctionResult().add_action('next', True)
-    },
-    parameters={
-        'command': {'type': 'string', 'description': 'Control command'}
-    }
-)
+```cpp
+auto control = datamap::DataMap("media_control")
+    .parameter("command", "string", "Control command")
+    .expression("${args.command}", "start|play|begin",
+        swaig::FunctionResult().add_action("start", true))
+    .expression("${args.command}", "stop|end|pause",
+        swaig::FunctionResult().add_action("stop", true))
+    .expression("${args.command}", "next|skip",
+        swaig::FunctionResult().add_action("next", true));
+agent.register_swaig_function(control.to_swaig_function());
 ```
 
 ### 12.1 Multiple Webhook Fallback Chains

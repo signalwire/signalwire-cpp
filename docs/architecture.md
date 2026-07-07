@@ -82,13 +82,13 @@ DataMap tools follow a pipeline execution model on the SignalWire server:
 ### Core Components
 
 1. **Builder Pattern**: Fluent interface for constructing data_map configurations
-   ```python
-   tool = (DataMap('function_name')
-       .description('Function purpose')
-       .parameter('param', 'string', 'Description', required=True)
-       .webhook('GET', 'https://api.example.com/endpoint')
-       .output(SwaigFunctionResult('Response template'))
-   )
+   ```cpp
+   auto tool = datamap::DataMap("function_name")
+       .description("Function purpose")
+       .parameter("param", "string", "Description", /*required=*/true)
+       .webhook("GET", "https://api.example.com/endpoint")
+       .output(swaig::FunctionResult("Response template"));
+   agent.register_swaig_function(tool.to_swaig_function());
    ```
 
 2. **Processing Pipeline**: Ordered execution with early termination
@@ -109,28 +109,27 @@ DataMap tools follow a pipeline execution model on the SignalWire server:
 The system supports different tool patterns:
 
 1. **API Integration Tools**: Direct REST API calls
-   ```python
-   weather_tool = (DataMap('get_weather')
-       .webhook('GET', 'https://api.weather.com/v1/current?q=${location}')
-       .output(SwaigFunctionResult('Weather: ${response.current.condition}'))
-   )
+   ```cpp
+   auto weather_tool = datamap::DataMap("get_weather")
+       .webhook("GET", "https://api.weather.com/v1/current?q=${location}")
+       .output(swaig::FunctionResult("Weather: ${response.current.condition}"));
    ```
 
 2. **Expression-Based Tools**: Pattern matching without API calls
-   ```python
-   control_tool = (DataMap('file_control')
-       .expression(r'start.*', SwaigFunctionResult().add_action('start', True))
-       .expression(r'stop.*', SwaigFunctionResult().add_action('stop', True))
-   )
+   ```cpp
+   auto control_tool = datamap::DataMap("file_control")
+       .expression("${args.command}", "start.*",
+           swaig::FunctionResult("Starting").add_action("start", true))
+       .expression("${args.command}", "stop.*",
+           swaig::FunctionResult("Stopping").add_action("stop", true));
    ```
 
 3. **Array Processing Tools**: Handle list responses
-   ```python
-   search_tool = (DataMap('search_docs')
-       .webhook('GET', 'https://api.docs.com/search')
-       .foreach('${response.results}')
-       .output(SwaigFunctionResult('Found: ${foreach.title}'))
-   )
+   ```cpp
+   auto search_tool = datamap::DataMap("search_docs")
+       .webhook("GET", "https://api.docs.com/search")
+       .foreach({{"input_key", "${response.results}"}, {"output_key", "foreach"}})
+       .output(swaig::FunctionResult("Found: ${foreach.title}"));
    ```
 
 ### Integration with Agent Architecture
@@ -268,25 +267,30 @@ The skills system follows a three-layer architecture:
 
 Skills support configurable parameters for customization:
 
-```python
-# Default behavior
-agent.add_skill("web_search")
+```cpp
+// Default behavior
+add_skill("web_search");
 
-# Custom configuration
-agent.add_skill("web_search", {
-    "num_results": 3,
-    "delay": 0.5
-})
+// Custom configuration
+add_skill("web_search", {
+    {"num_results", 3},
+    {"delay", 0.5}
+});
 ```
 
-Parameters are passed to the skill constructor and accessible via `self.params`:
+Parameters are passed to the skill's `setup()` method as a JSON object:
 
-```python
-class WebSearchSkill(SkillBase):
-    def setup(self) -> bool:
-        self.num_results = self.params.get('num_results', 1)
-        self.delay = self.params.get('delay', 0)
-        # Configure behavior based on parameters
+```cpp
+class WebSearchSkill : public skills::SkillBase {
+    bool setup(const json& params) override {
+        num_results_ = params.value("num_results", 1);
+        delay_ = params.value("delay", 0.0);
+        // Configure behavior based on parameters
+        return true;
+    }
+    int num_results_ = 1;
+    double delay_ = 0.0;
+};
 ```
 
 ### Error Handling
@@ -341,90 +345,106 @@ The SDK implements a multi-layer security model:
 The SDK is designed to be highly extensible:
 
 1. **Custom Agents**: Extend AgentBase to create specialized agents
-   ```python
-   class CustomAgent(AgentBase):
-       def __init__(self):
-           super().__init__(name="custom", route="/custom")
+   ```cpp
+   class CustomAgent : public agent::AgentBase {
+   public:
+       CustomAgent() : AgentBase("custom", "/custom") {}
+   };
    ```
 
-2. **Tool Registration**: Add new tools using the decorator pattern
-   ```python
-   @AgentBase.tool(
-       name="tool_name", 
-       description="Tool description",
-       parameters={...},
-       secure=True
-   )
-   def my_tool(self, args, raw_data):
-       # Tool implementation
+2. **Tool Registration**: Add new tools with `define_tool`
+   ```cpp
+   define_tool("tool_name", "Tool description",
+       swaig::ParameterSchema{}.string("arg", "An argument").required({"arg"}),
+       [](const json& args, const json& raw) -> swaig::FunctionResult {
+           (void)raw;
+           // Tool implementation
+           return swaig::FunctionResult("Done");
+       },
+       /*secure=*/true);
    ```
 
 3. **Prompt Customization**: Add sections, hints, languages
-   ```python
-   agent.add_language(name="English", code="en-US", voice="elevenlabs.josh")
-   agent.add_hints(["SignalWire", "SWML", "SWAIG"])
+   ```cpp
+   add_language({"English", "en-US", "elevenlabs.josh"});
+   add_hints({"SignalWire", "SWML", "SWAIG"});
    ```
 
 4. **Session Management**: The SDK includes session management for secure function calls
 
-5. **Request Handling**: Override request handling methods
-   ```python
-   def on_swml_request(self, request_data):
-       # Custom request handling
+5. **Request Handling**: Register a callback to inspect and steer requests
+   ```cpp
+   register_routing_callback(
+       [](const json& body, const std::map<std::string, std::string>& headers) -> std::string {
+           (void)body; (void)headers;
+           // Custom request handling; return a route to redirect to ("" = no override)
+           return "";
+       },
+       "/custom");
    ```
 
 6. **Custom Prefabs**: Create reusable agent patterns
-   ```python
-   class MyCustomPrefab(AgentBase):
-       def __init__(self, config_param1, config_param2, **kwargs):
-           super().__init__(**kwargs)
-           # Configure the agent based on parameters
-           self.prompt_add_section("Personality", body=f"Customized based on: {config_param1}")
+   ```cpp
+   class MyCustomPrefab : public agent::AgentBase {
+   public:
+       MyCustomPrefab(const std::string& config_param1)
+           : AgentBase("custom-prefab", "/custom") {
+           // Configure the agent based on parameters
+           prompt_add_section("Personality", "Customized based on: " + config_param1);
+       }
+   };
    ```
 
 7. **Dynamic Configuration**: Per-request agent configuration for flexible behavior
-   ```python
-   def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-       # Configure agent differently based on request data
-       # agent is the actual AgentBase instance
-       tier = query_params.get('tier', 'standard')
-       agent.set_params({"end_of_speech_timeout": 300 if tier == 'premium' else 500})
-   
-   self.set_dynamic_config_callback(self.configure_agent_dynamically)
+   ```cpp
+   set_dynamic_config_callback(
+       [](const std::map<std::string, std::string>& query_params,
+          const json& body_params, const std::map<std::string, std::string>& headers,
+          agent::AgentBase& agent) {
+           (void)body_params; (void)headers;
+           // Configure agent differently based on request data
+           auto it = query_params.find("tier");
+           bool premium = (it != query_params.end() && it->second == "premium");
+           agent.set_params({{"end_of_speech_timeout", premium ? 300 : 500}});
+       });
    ```
 
 8. **Skills Integration**: Add capabilities with one-liner calls
-   ```python
-   # Add built-in skills
-   agent.add_skill("web_search")
-   agent.add_skill("datetime")
-   agent.add_skill("math")
-   
-   # Configure skills with parameters
-   agent.add_skill("web_search", {
-       "num_results": 3,
-       "delay": 0.5
-   })
+   ```cpp
+   // Add built-in skills
+   add_skill("web_search");
+   add_skill("datetime");
+   add_skill("math");
+
+   // Configure skills with parameters
+   add_skill("web_search", {
+       {"num_results", 3},
+       {"delay", 0.5}
+   });
    ```
 
 9. **Custom Skills**: Create reusable skill modules
-   ```python
-   from signalwire.core.skill_base import SkillBase
-   
-   class MyCustomSkill(SkillBase):
-       SKILL_NAME = "my_skill"
-       SKILL_DESCRIPTION = "A custom skill"
-       REQUIRED_PACKAGES = ["requests"]
-       REQUIRED_ENV_VARS = ["API_KEY"]
-       
-       def setup(self) -> bool:
-           # Initialize the skill
-           return True
-           
-       def register_tools(self) -> None:
-           # Register tools with the agent using the wrapper method
-           # This automatically includes swaig_fields
-           self.define_tool(...)
+   ```cpp
+   #include <signalwire/skills/skill_base.hpp>
+
+   class MyCustomSkill : public skills::SkillBase {
+   public:
+       std::string skill_name() const override { return "my_skill"; }
+       std::string skill_description() const override { return "A custom skill"; }
+       std::vector<std::string> required_packages() const override { return {}; }
+       std::vector<std::string> required_env_vars() const override { return {"API_KEY"}; }
+
+       bool setup(const json& params) override {
+           (void)params;
+           // Initialize the skill
+           return true;
+       }
+
+       std::vector<swaig::ToolDefinition> register_tools() override {
+           // Build and return the skill's SWAIG tool definitions
+           return {};
+       }
+   };
    ```
 
 ### Dynamic Configuration
@@ -617,22 +637,24 @@ Dynamic configuration integrates with other SDK components:
 
 The system includes robust error handling:
 
-```python
-def configure_agent_dynamically(self, query_params, body_params, headers, agent):
-    try:
-        # Primary configuration logic
-        # agent is the actual AgentBase instance
-        tier = query_params.get('tier', 'standard')
-        if tier == 'premium':
-            agent.set_params({"end_of_speech_timeout": 300})
-            agent.add_hints(["premium support", "priority handling"])
-    except ConfigurationError as e:
-        # Log error and apply safe defaults
-        self.log.error("dynamic_config_error", error=str(e))
-        # Agent retains its base configuration
-    except Exception as e:
-        # Catch-all - agent continues with existing configuration
-        self.log.error("dynamic_config_critical", error=str(e))
+```cpp
+set_dynamic_config_callback(
+    [](const std::map<std::string, std::string>& query_params,
+       const json& body_params, const std::map<std::string, std::string>& headers,
+       agent::AgentBase& agent) {
+        (void)body_params; (void)headers;
+        try {
+            // Primary configuration logic
+            auto it = query_params.find("tier");
+            if (it != query_params.end() && it->second == "premium") {
+                agent.set_params({{"end_of_speech_timeout", 300}});
+                agent.add_hints({"premium support", "priority handling"});
+            }
+        } catch (const std::exception& e) {
+            // Log error and apply safe defaults; agent retains its base configuration
+            logging::Logger::instance().error(std::string("dynamic_config_error: ") + e.what());
+        }
+    });
 ```
 
 #### Migration Strategy
@@ -992,25 +1014,26 @@ Functions are defined with:
 - Security settings
 
 Example:
-```python
-@AgentBase.tool(
-    name="get_weather",
-    description="Get the current weather for a location",
-    parameters={
-        "location": {
-            "type": "string",
-            "description": "The city or location to get weather for"
-        }
-    }
-)
-def get_weather(self, args, raw_data):
-    location = args.get("location", "Unknown location")
-    return SwaigFunctionResult(f"It's sunny and 72°F in {location}.")
+```cpp
+json params = {
+    {"type", "object"},
+    {"properties",
+     {{"location",
+       {{"type", "string"},
+        {"description", "The city or location to get weather for"}}}}}};
+
+define_tool(
+    "get_weather", "Get the current weather for a location", params,
+    [](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
+        std::string location =
+            args.value("location", std::string{"Unknown location"});
+        return swaig::FunctionResult("It's sunny and 72F in " + location + ".");
+    });
 ```
 
 ### HTTP Routing
 
-The SDK uses FastAPI for routing with these key endpoints:
+The SDK uses the vendored cpp-httplib server for routing with these key endpoints:
 
 - **/** (GET/POST): Main endpoint that returns the SWML document
 - **/swaig/** (POST): Endpoint for executing SWAIG functions

@@ -43,6 +43,7 @@ cmake .. && make -j$(nproc)
 
 Each agent is a self-contained microservice that generates [SWML](docs/swml_service_guide.md) (SignalWire Markup Language) and handles [SWAIG](docs/swaig_reference.md) (SignalWire AI Gateway) tool calls. The SignalWire platform runs the entire AI pipeline (STT, LLM, TTS) -- your agent just defines the behavior.
 
+<!-- include: examples/quickstart_agent.cpp#agent -->
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
 #include <ctime>
@@ -120,6 +121,7 @@ See [examples/README.md](examples/README.md) for the full list organized by cate
 
 Real-time call control and messaging over WebSocket. The RELAY client connects to SignalWire via the Blade protocol and gives you imperative control over live phone calls and SMS/MMS.
 
+<!-- include: examples/quickstart_relay.cpp#relay -->
 ```cpp
 #include <signalwire/relay/client.hpp>
 
@@ -154,6 +156,7 @@ See the **[RELAY documentation](relay/README.md)** for the full guide, API refer
 
 Synchronous REST client for managing SignalWire resources and controlling calls over HTTP. No WebSocket required.
 
+<!-- include: examples/quickstart_rest.cpp#rest -->
 ```cpp
 #include <signalwire/rest/rest_client.hpp>
 
@@ -165,11 +168,13 @@ int main() {
 
     auto agents = client.fabric().ai_agents.list();
     auto call   = client.calling().dial({
-        {"to", "+15551234567"}, {"from", "+15559876543"},
-        {"url", "https://example.com/handler"}
+        .from = "+15559876543", .to = "+15551234567",
+        .url = "https://example.com/handler",
     });
     auto numbers = client.phone_numbers().search({{"area_code", "512"}});
-    auto results = client.datasphere().documents.search({{"query_string", "billing policy"}});
+    auto results = client.datasphere().documents.search({
+        .query_string = "billing policy",
+    });
 }
 ```
 

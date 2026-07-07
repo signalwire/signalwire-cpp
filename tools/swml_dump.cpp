@@ -19,6 +19,8 @@
 #include <vector>
 
 #include "signalwire/agent/agent_base.hpp"
+#include "signalwire/swaig/function_result.hpp"
+#include "signalwire/swaig/tool_definition.hpp"
 
 using json = nlohmann::json;
 using signalwire::agent::AgentBase;
@@ -151,6 +153,29 @@ int main() {
     AgentBase a = new_agent();
     a.add_pronunciation("SW", "SignalWire", true);
     out["swml_add_pronunciation"] = extract(render(a), "ai.pronounce");
+  }
+
+  // swml_define_tool_complete_schema: define_tool with a COMPLETE
+  // {type,properties,required} schema must render ai.SWAIG.functions[?lookup]
+  // .parameters as that schema FLAT (pass-through), NOT double-wrapped.
+  {
+    AgentBase a = new_agent();
+    json schema = json{{"type", "object"},
+                       {"properties", {{"q", {{"type", "string"}}}}},
+                       {"required", json::array({"q"})}};
+    a.define_tool("lookup", "Look up a thing", schema,
+                  [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
+    json funcs = extract(render(a), "ai.SWAIG.functions");
+    json params = json(nullptr);
+    if (funcs.is_array()) {
+      for (const auto& f : funcs) {
+        if (f.is_object() && f.value("function", "") == "lookup" && f.contains("parameters")) {
+          params = f["parameters"];
+          break;
+        }
+      }
+    }
+    out["swml_define_tool_complete_schema"] = params;
   }
 
   std::cout << out.dump() << "\n";

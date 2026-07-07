@@ -775,6 +775,44 @@ run_gate "SWAIG-COVERAGE" "FunctionResult exposes every engine response action" 
         --check \
         --emission "$PORT_ROOT/src/swaig/function_result.cpp"
 
+# --- Day-one deterministic gates (blocking, non-report-only) ------------------
+# Six shared porting-sdk gates that police docs/metadata/artifact hygiene. All
+# pure Python, host-side, BUILD_MODE-blind (no compiler / no mocks). Wired here
+# with run_gate exactly like the sibling python gates above so they BLOCK CI.
+#
+# ARTIFACT-DENY runs in git-ls-files PROXY mode: cpp has no CPack/install target
+# and no standard package-list tool, so there is no authoritative published-file
+# listing to feed `--listing -`. The proxy scans `git ls-files` and passes via
+# the port's committed ARTIFACT_DENY_ALLOW.md. (Authoritative --listing mode is
+# used by ports whose package tool emits a real file list; cpp is proxy-mode.)
+
+# Gate 14: DOC-LANG-PURITY — no python-verbatim docs in a non-python port
+run_gate "DOC-LANG-PURITY" "no python-verbatim docs in a non-python port" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_lang_purity.py" --port cpp --repo .
+
+# Gate 15: DOC-LINKS — every relative markdown link resolves to a tracked file
+run_gate "DOC-LINKS" "every relative markdown link resolves to a tracked file" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_links.py" --port cpp --repo .
+
+# Gate 16: ROOT-HYGIENE — no audit/scratch clutter tracked at repo root
+#          (allowlist ROOT_HYGIENE_ALLOW.md)
+run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlist ROOT_HYGIENE_ALLOW.md)" \
+    python3 "$PORTING_SDK_DIR/scripts/root_hygiene.py" --port cpp --repo .
+
+# Gate 17: IGNORE-LEDGER-VERIFY — no laundered false-absence entries in
+#          DOC_AUDIT_IGNORE.md
+run_gate "IGNORE-LEDGER-VERIFY" "no laundered false-absence entries in DOC_AUDIT_IGNORE.md" \
+    python3 "$PORTING_SDK_DIR/scripts/ignore_ledger_verify.py" --port cpp --repo .
+
+# Gate 18: META-CONSISTENT — package metadata consistency
+run_gate "META-CONSISTENT" "package metadata consistency" \
+    python3 "$PORTING_SDK_DIR/scripts/meta_consistent.py" --port cpp --repo .
+
+# Gate 19: ARTIFACT-DENY — no porting artifacts in the shipped package
+#          (git-ls-files proxy; cpp has no CPack/install listing)
+run_gate "ARTIFACT-DENY" "no porting artifacts in the PUBLISHED package (git ls-files proxy)" \
+    python3 "$PORTING_SDK_DIR/scripts/artifact_deny.py" --port cpp --repo .
+
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"
     exit 0

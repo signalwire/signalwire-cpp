@@ -831,6 +831,9 @@ run_gate "DOC-LANG-PURITY" "no python-verbatim docs in a non-python port" \
 run_gate "DOC-LINKS" "every relative markdown link resolves to a tracked file" \
     python3 "$PORTING_SDK_DIR/scripts/doc_links.py" --port cpp --repo .
 
+run_gate "README-INCLUDE" "doc code blocks are byte-identical to their gate-compiled fixture regions" \
+    python3 "$PORTING_SDK_DIR/scripts/readme_include.py" --port cpp --repo .
+
 # Gate 16: ROOT-HYGIENE — no audit/scratch clutter tracked at repo root
 #          (allowlist ROOT_HYGIENE_ALLOW.md)
 run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlist ROOT_HYGIENE_ALLOW.md)" \

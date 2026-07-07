@@ -48,7 +48,14 @@ FetchContent_MakeAvailable(ixwebsocket)
 # All sources
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
-add_library(signalwire STATIC ${SOURCES})
+# SHARED (not STATIC) so the published/installed library carries its transitive
+# link dependencies (OpenSSL, ixwebsocket, zlib, and on Apple the CoreFoundation/
+# Security frameworks) as recorded DT_NEEDED / load-command entries. That is what
+# lets a downstream consumer link with a bare `-lsignalwire` (no need to re-list
+# every private dep) — a static archive cannot convey those, so a plain
+# `g++ … -lsignalwire` against a static build fails to resolve OpenSSL/ixwebsocket
+# symbols (PACKAGE-SMOKE #92). The internal tools/tests below link it the same way.
+add_library(signalwire SHARED ${SOURCES})
 # cpp-httplib TLS enabled — requires OpenSSL 3.0+ (build with a 3.0+ toolchain;
 # OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
 # httplib::SSLServer for the webhook server (in-process TLS termination).
@@ -78,6 +85,59 @@ target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE
 # public surface AND out of the signature enumerator (which scans include/
 # only). Consumers never see them.
 target_include_directories(signalwire PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Record the shared library's own ABSOLUTE installed location as its runtime name
+# so a consumer that links it with a bare `-lsignalwire` (no rpath, no
+# LD_LIBRARY_PATH) still finds it at load time from wherever it was installed.
+#   macOS: INSTALL_NAME_DIR bakes an absolute install-name (LC_ID_DYLIB) instead
+#          of the default `@rpath/…` (which a plain consumer has no LC_RPATH for),
+#          so the consumer's load command is the absolute dylib path.
+#   ELF:   bake an ABSOLUTE SONAME (`-Wl,-soname,<abs>`) so the consumer's
+#          DT_NEEDED is the absolute .so path — ld.so loads it directly without a
+#          DT_RPATH/RUNPATH or LD_LIBRARY_PATH on the consumer side.
+# Uses the absolute libdir so the value is correct regardless of CMAKE_INSTALL_PREFIX.
+include(GNUInstallDirs)
+set_target_properties(signalwire PROPERTIES
+    INSTALL_NAME_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
+if(NOT APPLE AND NOT WIN32)
+    target_link_options(signalwire PRIVATE
+        "LINKER:-soname,${CMAKE_INSTALL_FULL_LIBDIR}/libsignalwire.so")
+endif()
+
+# ── Install rules ────────────────────────────────────────────────────────────
+# What a consumer gets from `cmake --install` (or `--build --target install`):
+# the built shared library into <prefix>/lib and every PUBLIC header into
+# <prefix>/include, so `g++ -I<prefix>/include -L<prefix>/lib -lsignalwire`
+# compiles, links, AND runs against nothing but the installed artifact. Without
+# these the package ships nothing (PACKAGE-SMOKE #92). Only the public library +
+# headers are installed — the internal audit/dump tools (emit_corpus /
+# emit_skills / route_registry / *_dump), run_tests, and the examples are
+# intentionally NOT installed; they're build-time verification programs, not part
+# of the package.
+
+# The library -> <prefix>/lib (libsignalwire.{so,dylib}) / <prefix>/bin on Windows.
+install(TARGETS signalwire
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Public headers -> <prefix>/include/signalwire/... (preserves the include tree
+# so `#include <signalwire/rest/rest_client.hpp>` resolves from the install).
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/signalwire
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Vendored header-only deps the PUBLIC headers pull in (`<nlohmann/json.hpp>`,
+# httplib.h) -> <prefix>/include, so a consumer that only has -I<prefix>/include
+# still resolves them. deps/ is on the build's include path (line ~22); shipping
+# it makes the installed headers self-contained. deps/nlohmann/json.hpp is a
+# RELATIVE symlink to ../json.hpp; install(DIRECTORY) copies it as-is, and since
+# deps/json.hpp is installed too the link still resolves in the install tree
+# (<prefix>/include/nlohmann/json.hpp -> ../json.hpp == <prefix>/include/json.hpp).
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/deps/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING
+        PATTERN "*.h"
+        PATTERN "*.hpp")
 
 # Tests
 enable_testing()

@@ -41,5 +41,5 @@ signalwire-go (both APPROVED by user 2026-07-07).
      needs explicit written approval. java/go carry the identical entries approved by
      user 2026-07-07. -->
 
-- CallFlows.list_addresses — spec-declared singular-path override (openapi.yaml:801); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (PENDING APPROVAL — parity with java/go user-approved 2026-07-07)
-- ConferenceRooms.list_addresses — spec-declared singular-path override (openapi.yaml:1074); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (PENDING APPROVAL — parity with java/go user-approved 2026-07-07)
+- CallFlows.list_addresses — spec-declared singular-path override (openapi.yaml:801); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (APPROVED: user 2026-07-07 (same class as go+java) — parity with java/go user-approved 2026-07-07)
+- ConferenceRooms.list_addresses — spec-declared singular-path override (openapi.yaml:1074); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (APPROVED: user 2026-07-07 (same class as go+java) — parity with java/go user-approved 2026-07-07)

@@ -94,7 +94,7 @@ class AIVerbHandler : public SWMLVerbHandler {
 /// Registry for SWML verb handlers.
 ///
 /// Maps verb name -> handler. The "ai" handler is registered automatically on
-/// construction (Python parity).
+/// construction.
 class VerbHandlerRegistry {
  public:
   /// Initialize with the default handlers (AIVerbHandler).

@@ -242,15 +242,15 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.cxml_webhooks.delete_", c.fabric().cxml_webhooks.delete_(id));
   CALL("fabric.cxml_webhooks.list_addresses", c.fabric().cxml_webhooks.list_addresses(id, q));
 
-  // conference_rooms: CRUD + a SINGULARISED sibling addresses path, so it
-  // overrides list_addresses as listAddresses (camelCase) — call that, not the
-  // plural base list_addresses.
+  // conference_rooms: CRUD + a SINGULARISED sibling addresses path. The
+  // generated resource overrides list_addresses to that singular path (hiding
+  // the plural base member), so there is ONE canonical list_addresses route.
   CALL("fabric.conference_rooms.list", c.fabric().conference_rooms.list(q));
   CALL("fabric.conference_rooms.create", c.fabric().conference_rooms.create(body));
   CALL("fabric.conference_rooms.get", c.fabric().conference_rooms.get(id));
   CALL("fabric.conference_rooms.update", c.fabric().conference_rooms.update(id, body));
   CALL("fabric.conference_rooms.delete_", c.fabric().conference_rooms.delete_(id));
-  CALL("fabric.conference_rooms.listAddresses", c.fabric().conference_rooms.listAddresses(id, q));
+  CALL("fabric.conference_rooms.list_addresses", c.fabric().conference_rooms.list_addresses(id, q));
 
   // call_flows: CRUD + addresses + versions/deploy (singular sub-paths).
   CALL("fabric.call_flows.list", c.fabric().call_flows.list(q));
@@ -258,7 +258,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.call_flows.get", c.fabric().call_flows.get(id));
   CALL("fabric.call_flows.update", c.fabric().call_flows.update(id, body));
   CALL("fabric.call_flows.delete_", c.fabric().call_flows.delete_(id));
-  CALL("fabric.call_flows.listAddresses", c.fabric().call_flows.listAddresses(id, q));
+  CALL("fabric.call_flows.list_addresses", c.fabric().call_flows.list_addresses(id, q));
   CALL("fabric.call_flows.listVersions", c.fabric().call_flows.listVersions(id, q));
   CALL("fabric.call_flows.deployVersion", c.fabric().call_flows.deployVersion(id, body));
 
@@ -277,13 +277,14 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.fabric().subscribers.updateSipEndpoint(id, id, {}));
   CALL("fabric.subscribers.deleteSipEndpoint", c.fabric().subscribers.deleteSipEndpoint(id, id));
 
-  // cxml_applications: list/get/update/delete/listAddresses dispatch; create()
+  // cxml_applications: list/get/update/delete/list_addresses dispatch; create()
   // throws by design (cXML apps cannot be created via this API).
   CALL("fabric.cxml_applications.list", c.fabric().cxml_applications.list(q));
   CALL("fabric.cxml_applications.get", c.fabric().cxml_applications.get(id));
   CALL("fabric.cxml_applications.update", c.fabric().cxml_applications.update(id, {}));
   CALL("fabric.cxml_applications.delete_", c.fabric().cxml_applications.delete_(id));
-  CALL("fabric.cxml_applications.listAddresses", c.fabric().cxml_applications.listAddresses(id, q));
+  CALL("fabric.cxml_applications.list_addresses",
+       c.fabric().cxml_applications.list_addresses(id, q));
   skipped.emplace_back("fabric.cxml_applications.create",
                        "no create route — cXML apps cannot be created via this API (BaseResource)");
 
@@ -291,7 +292,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.resources.list", c.fabric().resources.list(q));
   CALL("fabric.resources.get", c.fabric().resources.get(id));
   CALL("fabric.resources.delete_", c.fabric().resources.delete_(id));
-  CALL("fabric.resources.listAddresses", c.fabric().resources.listAddresses(id, q));
+  CALL("fabric.resources.list_addresses", c.fabric().resources.list_addresses(id, q));
   CALL("fabric.resources.assignDomainApplication",
        c.fabric().resources.assignDomainApplication(id, {.domain_application_id = SENTINEL}));
   CALL(

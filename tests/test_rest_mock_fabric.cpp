@@ -45,12 +45,12 @@ TEST(rest_mock_fabric_addresses_get_uses_address_id) {
 }
 
 // ---------------------------------------------------------------------------
-// CallFlowsResource.listAddresses -- singular 'call_flow' subpath
+// CallFlowsResource.list_addresses -- singular 'call_flow' subpath
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().call_flows.listAddresses("cf-1");
+    auto body = client.fabric().call_flows.list_addresses("cf-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -63,12 +63,12 @@ TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
 }
 
 // ---------------------------------------------------------------------------
-// ConferenceRoomsResource.listAddresses -- singular 'conference_room' subpath
+// ConferenceRoomsResource.list_addresses -- singular 'conference_room' subpath
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_singular_path) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().conference_rooms.listAddresses("cr-1");
+    auto body = client.fabric().conference_rooms.list_addresses("cr-1");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     auto j = mocktest::journal_last();
@@ -208,7 +208,7 @@ TEST(rest_mock_fabric_resources_delete) {
 
 TEST(rest_mock_fabric_resources_list_addresses) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().resources.listAddresses("res-3");
+    auto body = client.fabric().resources.list_addresses("res-3");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());

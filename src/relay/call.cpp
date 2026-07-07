@@ -152,7 +152,7 @@ Action Call::connect(const json& devices, const json& options) {
   json p;
   p["devices"] = devices;
   // Merge the optional bridge knobs (ringback/tag/max_duration/…) into the
-  // frame — Python parity: Call.connect passes them through into params.
+  // frame — Corresponds to Call.connect passes them through into params.
   if (options.is_object()) {
     for (auto it = options.begin(); it != options.end(); ++it) {
       p[it.key()] = it.value();
@@ -193,7 +193,7 @@ Action Call::join_room(const std::string& name) {
   return execute_simple("join_room", p);
 }
 
-// ── Additional call-control methods (Python/Java parity) ────────────
+// ── Additional call-control methods ────────────
 
 Action Call::user_event(const std::string& event) {
   json p;

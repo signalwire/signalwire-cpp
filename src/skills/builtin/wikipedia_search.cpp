@@ -33,7 +33,7 @@ class WikipediaSearchSkill : public SkillBase {
   }
 
   /// Search Wikipedia for ``query`` and return a formatted titles+snippets
-  /// string (Python parity: ``WikipediaSearchSkill.search_wiki``). Empty query
+  /// string (Corresponds to ``WikipediaSearchSkill.search_wiki``). Empty query
   /// or no hits returns the configured no-results message.
   std::string search_wiki(const std::string& query) const {
     if (query.empty()) {

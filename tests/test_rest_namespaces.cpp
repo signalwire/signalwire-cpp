@@ -146,13 +146,6 @@ TEST(rest_error_class_details) {
     return true;
 }
 
-TEST(rest_crud_resource_construction) {
-    HttpClient client("http://localhost:9999", "proj", "tok");
-    CrudResource r(client, "/api/v1/items");
-    // Construction alone should not crash
-    return true;
-}
-
 TEST(rest_client_base_url_format) {
     RestClient client("my-space.signalwire.com", "proj", "tok");
     ASSERT_EQ(client.http_client().base_url(), "https://my-space.signalwire.com");

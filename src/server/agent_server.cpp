@@ -74,7 +74,7 @@ AgentServer& AgentServer::map_sip_username(const std::string& username, const st
     return *this;
   }
   // Store the mapping under the LOWERCASED username, with the route normalized
-  // to a leading "/" — Python parity: AgentServer.register_sip_username stores
+  // to a leading "/" — Corresponds to AgentServer.register_sip_username stores
   // ``self._sip_username_mapping[username.lower()] = route`` and lookups
   // case-fold. Without lowercasing, a "Bob"/"BOB"/"bob" lookup misses.
   std::string key = username;
@@ -85,7 +85,7 @@ AgentServer& AgentServer::map_sip_username(const std::string& username, const st
 }
 
 std::string AgentServer::lookup_sip_route(const std::string& username) const {
-  // Case-fold on lookup (Python parity: AgentServer._lookup_sip_route uses
+  // Case-fold on lookup (Corresponds to AgentServer._lookup_sip_route uses
   // ``username.lower()``). Returns "" when no mapping exists.
   std::string key = username;
   std::transform(key.begin(), key.end(), key.begin(),
@@ -105,7 +105,7 @@ AgentServer& AgentServer::set_static_dir(const std::string& dir) {
   return *this;
 }
 
-// ---- Python-parity surface -------------------------------------------------
+// ---- Public surface -------------------------------------------------
 
 namespace {
 std::string normalize_route(const std::string& route) {

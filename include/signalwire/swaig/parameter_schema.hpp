@@ -46,8 +46,8 @@ using json = nlohmann::json;
 // This is ADDITIVE: the untyped `json` path keeps working unchanged. The
 // builder is a PORT_ADDITION (Python's `define_tool` takes a raw dict; there
 // is no typed builder in the reference). Idiom: "let the language shine" —
-// type the knowable JSON-Schema property shapes that Python leaves as a bare
-// dict (porting-sdk/IDIOM_PASS_JOURNAL.md §4 "Tier 2 flagship").
+// type the knowable JSON-Schema property shapes that the reference leaves as a
+// bare dict.
 //
 // `[[nodiscard]]` policy (consistent with the earlier Tier-2 pass + DataMap):
 // the value-returning terminals (`to_json()`, const accessors) are

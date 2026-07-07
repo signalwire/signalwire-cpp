@@ -274,7 +274,7 @@ json RelayClient::execute(const std::string& method, const json& params) {
   // NOT inject project_id/protocol into calling frames — the `protocol` is a
   // connect-handshake field, and project identity is carried by the session /
   // the token, not re-sent per RPC. Injecting them here polluted every frame
-  // with phantom keys the wire spec (and the oracle) doesn't carry.
+  // with phantom keys the wire spec (and the reference) doesn't carry.
   return send_request(method, params);
 }
 

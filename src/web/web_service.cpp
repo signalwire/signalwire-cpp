@@ -48,7 +48,7 @@ std::string extension_of(const std::string& name) {
 
 std::string file_name_of(const std::string& path) { return fs::path(path).filename().string(); }
 
-// Minimal extension -> MIME mapping (parity with the reference custom types +
+// Minimal extension -> MIME mapping (matches the reference custom types +
 // common defaults); unknown extensions fall back to octet-stream.
 std::string mime_type(const std::string& path) {
   const std::string ext = extension_of(path);
@@ -111,8 +111,8 @@ WebService::WebService(int port, std::optional<std::map<std::string, std::string
       blocked_extensions_(std::move(blocked_extensions).value_or(kDefaultBlockedExtensions)),
       max_file_size_(max_file_size),
       enable_cors_(enable_cors) {
-  // config_file is accepted for parity; SecurityConfig/ConfigLoader wiring is
-  // out of scope for this class.
+  // config_file is accepted for API compatibility; SecurityConfig/ConfigLoader
+  // wiring is out of scope for this class.
   static_cast<void>(config_file);
 
   if (directories.has_value()) {
@@ -277,7 +277,7 @@ void WebService::mount_directories() {
         }
 
         // Directory request. When browsing is enabled, emit a simple listing;
-        // otherwise serve index.html if present (Python/Java parity).
+        // otherwise serve index.html if present .
         if (fs::is_directory(full, ec)) {
           const fs::path index = full / "index.html";
           if (fs::exists(index, ec) && file_allowed(index.string())) {

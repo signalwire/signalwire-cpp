@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Webhook signature validation — see include/signalwire/security/webhook_validator.hpp
-// for the contract and porting-sdk/webhooks.md for the cross-language spec.
+// for the contract and the SignalWire webhook signature spec for the cross-language spec.
 
 #include "signalwire/security/webhook_validator.hpp"
 
@@ -313,7 +313,7 @@ std::string urldecode_form(std::string_view in) {
 /// list if the body is empty or contains nothing that decodes as form data.
 ///
 /// Preserves submission order — required for repeated-key handling per
-/// porting-sdk/webhooks.md.
+/// the SignalWire webhook signature spec.
 std::vector<std::pair<std::string, std::string>> parse_form_body(std::string_view body) {
   std::vector<std::pair<std::string, std::string>> items;
   if (body.empty()) {
@@ -509,7 +509,7 @@ std::optional<std::tuple<int, std::map<std::string, std::string>, std::string>> 
     const std::map<std::string, std::string>& headers, std::string_view body,
     std::string_view signing_key) {
   (void)method;  // The SignalWire signing scheme does not sign the method;
-                 // it's accepted for cross-port shape parity.
+                 // it's accepted for cross-port shape compatibility.
   if (signing_key.empty()) {
     throw std::invalid_argument("signing_key is required");
   }

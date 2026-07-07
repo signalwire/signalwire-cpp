@@ -30,9 +30,9 @@ namespace relay {
 /// synchronous connect() contract relay::RelayClient depends on.
 ///
 /// TLS certificate verification is ALWAYS on for the connect() (wss://) path.
-/// To trust a private/self-signed CA (e.g. the porting-sdk test CA), set the
-/// SSL_CERT_FILE environment variable to the CA bundle — the same cross-port
-/// idiom the other ports honor; it is wired into ix::SocketTLSOptions::caFile.
+/// To trust a private/self-signed CA (e.g. a local test CA), set the
+/// SSL_CERT_FILE environment variable to the CA bundle; it is wired into
+/// ix::SocketTLSOptions::caFile.
 /// When unset, the system trust store is used (production / public CAs).
 class WebSocketClient {
  public:

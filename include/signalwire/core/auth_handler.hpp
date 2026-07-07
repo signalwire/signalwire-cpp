@@ -35,13 +35,13 @@ using json = nlohmann::json;
 /// case-insensitive (see ``AuthHandler``'s internal lookup).
 using Headers = std::map<std::string, std::string>;
 
-/// Basic-auth credential carrier (parity with FastAPI's HTTPBasicCredentials).
+/// Basic-auth credential carrier (matches FastAPI's HTTPBasicCredentials).
 struct BasicCredentials {
   std::string username;
   std::string password;
 };
 
-/// Bearer-token credential carrier (parity with FastAPI's
+/// Bearer-token credential carrier (matches FastAPI's
 /// HTTPAuthorizationCredentials).
 struct BearerCredentials {
   std::string credentials;
@@ -122,7 +122,7 @@ class AuthHandler {
 
   SecurityConfig& security_config_;
 
-  // Configured auth methods (parity with Python's self.auth_methods dict).
+  // Configured auth methods (matches Python's self.auth_methods dict).
   bool basic_enabled_ = false;
   std::string basic_username_;
   std::string basic_password_;

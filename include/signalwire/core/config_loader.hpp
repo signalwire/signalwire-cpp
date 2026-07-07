@@ -14,7 +14,7 @@
 // ``.yml`` files are NOT supported here (the Python/Java ports also default to
 // JSON config files; the default search paths are all ``*.json``). After
 // substitution, string values that look like booleans/integers/floats are
-// coerced to those native JSON types (Python parity).
+// coerced to those native JSON types.
 #pragma once
 
 #include <nlohmann/json.hpp>

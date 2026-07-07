@@ -49,7 +49,7 @@ struct WebhookValidatorOptions {
 /// 4. Call ``ValidateWebhookSignature``.
 /// 5. On invalid / missing signature: respond ``403 Forbidden`` with no
 ///    body detail. The downstream handler is NOT called. Per the
-///    porting-sdk spec, the validator MUST NOT log which branch failed
+///    webhook signature spec, the validator MUST NOT log which branch failed
 ///    or the expected signature.
 /// 6. On valid: call ``downstream(req, res)``. The handler can read
 ///    ``req.body`` directly — cpp-httplib buffers it for repeat reads.

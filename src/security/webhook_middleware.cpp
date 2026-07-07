@@ -3,7 +3,7 @@
 //
 // cpp-httplib middleware adapter for SignalWire webhook signature
 // validation. See include/signalwire/security/webhook_middleware.hpp for
-// the contract and porting-sdk/webhooks.md for the spec.
+// the contract and the SignalWire webhook signature spec for the spec.
 
 #include "signalwire/security/webhook_middleware.hpp"
 

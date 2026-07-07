@@ -270,7 +270,7 @@ class WebSearchSkillR : public SkillBase {
   // Per Python 8aad242 — optional prefix/postfix wrapped around the
   // success response only (transport/HTTP/parse errors stay raw).
   std::string rp_, rpf_;
-  // Latency-control params (Python parity: 51101da + 295745b). Shared
+  // Latency-control params (Corresponds to 51101da + 295745b). Shared
   // implementation lives in web_search_core.hpp so this skill and the
   // builtin WebSearchSkill can never drift. overall_deadline +
   // per_page_timeout are the contract; parallel_scrape is best-effort.
@@ -353,8 +353,8 @@ class WebSearchSkillR : public SkillBase {
           // run() handles snippets_only / deadline-bounded scraping /
           // snippet fallback. Returns UNWRAPPED body.
           std::string response = web_search_core::run(q, cands, lp, nr, mcl, no_items);
-          // Wrap the success / snippet / scraped response (parity with
-          // Python 8aad242). The no-items message stays unwrapped.
+          // Wrap the success / snippet / scraped response; the no-items
+          // message stays unwrapped.
           if (response != no_items) {
             if (!rp.empty()) {
               response = rp + "\n\n" + response;
@@ -371,7 +371,7 @@ class WebSearchSkillR : public SkillBase {
   }
   json get_global_data() const override { return json::object({{"web_search_enabled", true}}); }
   json get_parameter_schema() const override {
-    // Advertise the 6 latency / response params (Python parity: 295745b).
+    // Advertise the 6 latency / response params (Corresponds to 295745b).
     return web_search_core::schema_fragment();
   }
 };

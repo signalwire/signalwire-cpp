@@ -94,13 +94,6 @@ TEST(rest_signalwire_client_has_all_namespaces) {
     return true;
 }
 
-TEST(rest_crud_resource) {
-    HttpClient client("http://localhost:9999", "proj", "tok");
-    CrudResource resource(client, "/api/test");
-    // Just verify construction doesn't crash
-    return true;
-}
-
 TEST(rest_error_class) {
     SignalWireRestError err(404, "Not found", "{\"error\":\"not found\"}");
     ASSERT_EQ(err.status(), 404);

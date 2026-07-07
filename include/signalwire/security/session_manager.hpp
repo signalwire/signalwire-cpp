@@ -16,7 +16,7 @@ using json = nlohmann::json;
 
 /// Manages HMAC-SHA256 based session tokens for secure SWAIG tool calls.
 ///
-/// Token format (Python parity, `core/security/session_manager.py`): the token
+/// Token format: the token
 /// is the base64url-encoding of the 5 dot-joined fields
 /// ``{call_id}.{function_name}.{expiry}.{nonce}.{signature}`` where
 /// ``signature = hex(hmac_sha256("{call_id}:{function_name}:{expiry}:{nonce}"))``
@@ -76,7 +76,7 @@ class SessionManager {
   [[nodiscard]] bool validate_tool_token(std::string_view function_name, std::string_view token,
                                          std::string_view call_id) const;
 
-  // ── Session lifecycle (Python parity) ────────────────────────────
+  // ── Session lifecycle ────────────────────────────
   //
   // The reference SessionManager is stateless w.r.t. sessions; this port
   // keeps a REAL per-call metadata store (like the Ruby/Java/TS ports) so

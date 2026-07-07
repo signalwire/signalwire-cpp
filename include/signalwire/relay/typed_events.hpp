@@ -1,15 +1,15 @@
 // Copyright (c) 2025 SignalWire
 // SPDX-License-Identifier: MIT
 //
-// Typed RELAY event wrappers — Python parity with signalwire.relay.event.
+// Typed RELAY event wrappers — matching signalwire.relay.event.
 // Each class wraps the raw ``params`` dict from a ``signalwire.event`` message
 // and exposes the event-specific fields the Python dataclasses expose. All are
 // optional conveniences over the raw dict (which stays accessible via ``params``).
 //
 // This header is INTENTIONALLY separate from relay_event.hpp (which carries the
-// port's transport-side CallEvent/ComponentEvent/DialEvent structs used by the
+// transport-level CallEvent/ComponentEvent/DialEvent structs used by the
 // RelayClient) — these live in namespace ``signalwire::relay::events`` and are
-// the Python-canonical typed surface routed to ``signalwire.relay.event``.
+// the canonical typed event surface.
 #pragma once
 
 #include <nlohmann/json.hpp>
@@ -128,7 +128,7 @@ struct RecordEvent : public RelayEvent {
     e.control_id = p.value("control_id", std::string());
     e.state = p.value("state", std::string());
     // url/duration/size FALLBACK from the nested record{} then flat params
-    // (Python parity: RecordEvent.from_payload —
+    // (Corresponds to RecordEvent.from_payload —
     // ``rec.get("url", p.get("url", ""))`` etc.). Without this, a RecordEvent
     // decodes with an empty url/duration/size.
     const json rec = p.contains("record") && p["record"].is_object() ? p["record"] : json::object();
@@ -145,10 +145,10 @@ struct CollectEvent : public RelayEvent {
   std::string control_id;
   std::string state;
   /// The collect result is a structured object (e.g.
-  /// ``{"type":"digit","params":{"digits":"1234"}}``), not a scalar — Python
-  /// parity: ``result: dict``. Reading it as a string dropped the payload.
+  /// ``{"type":"digit","params":{"digits":"1234"}}``), not a scalar — the
+  /// reference records ``result: dict``. Reading it as a string drops the payload.
   json result = json::object();
-  /// Tri-state: absent (nullopt), true, or false — Python parity
+  /// Tri-state: absent (nullopt), true, or false — matches Python
   /// ``final: bool | None``.
   std::optional<bool> final;
   [[nodiscard]] static CollectEvent from_payload(const json& payload) {

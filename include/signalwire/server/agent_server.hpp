@@ -50,7 +50,7 @@ class AgentServer {
   /// Enable static file serving from a directory
   AgentServer& set_static_dir(const std::string& dir);
 
-  // ---- Python-parity surface (signalwire.agent_server.AgentServer) --------
+  // ---- Public surface (signalwire.agent_server.AgentServer) --------
   // Python names for the operations above, so the cross-language surface lines
   // up. These are the canonical spellings; the *_agent / *_sip_username / etc.
   // forms are the C++-idiomatic aliases retained for existing callers.

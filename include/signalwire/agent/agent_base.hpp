@@ -62,8 +62,8 @@ struct LanguageConfig {
   std::string model;
   /// Speech fillers spoken for natural pacing. Emitted as
   /// ``speech_fillers`` when both speech+function fillers are set, or as
-  /// the deprecated ``fillers`` key when only one kind is present (parity
-  /// with the Python reference add_language filler handling).
+  /// the deprecated ``fillers`` key when only one kind is present, matching
+  /// the reference add_language filler handling.
   std::vector<std::string> speech_fillers;
   /// Filler phrases spoken while a function call is in flight. Emitted as
   /// ``function_fillers`` when paired with speech_fillers.
@@ -97,7 +97,7 @@ struct LanguageConfig {
       j["fillers"] = function_fillers;
     }
     // Only emit the params key when non-empty so we don't pollute
-    // SWML with empty objects (parity with Python's
+    // SWML with empty objects (matches Python's
     // ``if params:`` check).
     if (params.is_object() && !params.empty()) {
       j["params"] = params;
@@ -186,7 +186,7 @@ class AgentBase : public swml::Service {
 
   /// Read-only snapshot of the agent's POM as a ``PromptObjectModel``.
   ///
-  /// Python parity: ``agent.pom`` instance attribute (agent_base.py
+  /// Corresponds to ``agent.pom`` instance attribute (agent_base.py
   /// line 209). Returns ``std::nullopt`` when ``use_pom`` is false
   /// (mirroring Python's ``self.pom = None``); otherwise returns a
   /// freshly built ``signalwire::pom::PromptObjectModel`` whose
@@ -316,7 +316,7 @@ class AgentBase : public swml::Service {
 
   /// Mint a per-call SWAIG-function token via the agent's SessionManager.
   ///
-  /// Python parity: ``state_mixin.StateMixin._create_tool_token`` —
+  /// Corresponds to ``state_mixin.StateMixin._create_tool_token`` —
   /// delegates to ``SessionManager::create_token`` and returns an empty
   /// string on any thrown exception (Python catches all exceptions and
   /// returns "" on error).
@@ -327,7 +327,7 @@ class AgentBase : public swml::Service {
   /// the function is not registered, when the SessionManager rejects the
   /// token, or on any underlying exception.
   ///
-  /// Python parity: ``state_mixin.StateMixin.validate_tool_token`` —
+  /// Corresponds to ``state_mixin.StateMixin.validate_tool_token`` —
   /// rejects unknown function names up-front and swallows exceptions.
   [[nodiscard]] bool validate_tool_token(const std::string& function_name, const std::string& token,
                                          const std::string& call_id) const;
@@ -342,7 +342,7 @@ class AgentBase : public swml::Service {
   /// ``add_pattern_hint(hint, pattern, replace, ignore_case=False)``: appends
   /// a ``{hint, pattern, replace, ignore_case}`` object to the hints list
   /// (not a bare string), which renders into the SWML ``ai.hints`` array.
-  /// No-op unless hint, pattern, and replace are all non-empty (parity).
+  /// No-op unless hint, pattern, and replace are all non-empty.
   AgentBase& add_pattern_hint(const std::string& hint, const std::string& pattern,
                               const std::string& replace, bool ignore_case = false);
   AgentBase& add_language(const LanguageConfig& lang);
@@ -355,7 +355,7 @@ class AgentBase : public swml::Service {
   /// removes the params key (treated as unset). No-op if ``code``
   /// isn't found among previously-added languages.
   ///
-  /// Python parity: ``AIConfigMixin.set_language_params`` (029ca6f).
+  /// Corresponds to ``AIConfigMixin.set_language_params`` (029ca6f).
   AgentBase& set_language_params(const std::string& code, const json& params);
 
   /// Read the per-language ``params`` dict for a previously-added
@@ -363,7 +363,7 @@ class AgentBase : public swml::Service {
   /// when params were never set on that language — no exception
   /// path, mirroring Python's ``None`` return.
   ///
-  /// Python parity: ``AIConfigMixin.get_language_params`` (029ca6f).
+  /// Corresponds to ``AIConfigMixin.get_language_params`` (029ca6f).
   [[nodiscard]] std::optional<json> get_language_params(const std::string& code) const;
 
   /// Configure ASR-driven multilingual mode (Mode B). Emits a top-level
@@ -374,7 +374,7 @@ class AgentBase : public swml::Service {
   /// A non-object / empty config is ignored (leaves the mode unset),
   /// mirroring Python's ``if config and isinstance(config, dict)``.
   ///
-  /// Python parity: ``AIConfigMixin.set_multilingual``.
+  /// Corresponds to ``AIConfigMixin.set_multilingual``.
   AgentBase& set_multilingual(const json& config);
 
   AgentBase& add_pronunciation(const std::string& replace_val, const std::string& with_val,
@@ -481,7 +481,7 @@ class AgentBase : public swml::Service {
   // to the string overloads above via skills::skill_name_value(), so the
   // enum and the bare string load the IDENTICAL skill — the enum just adds
   // call-site typo checking + autocompletion. The string overloads stay the
-  // canonical surface (parity with Python's bare str + custom skills); these
+  // canonical surface (matches Python's bare str + custom skills); these
   // are an idiomatic C++ addition (see PORT_ADDITIONS.md).
   AgentBase& add_skill(skills::SkillName skill_name, const json& params = json::object());
   AgentBase& remove_skill(skills::SkillName skill_name);
@@ -513,7 +513,7 @@ class AgentBase : public swml::Service {
   AgentBase& clear_swaig_query_params();
   AgentBase& enable_debug_routes(bool enable = true);
 
-  // ---- Python-parity surface ----------------------------------------------
+  // ---- Public surface ----------------------------------------------
 
   /// Agent name (Python: ``get_name``). Alias of the inherited ``name()``.
   [[nodiscard]] std::string get_name() const { return name(); }
@@ -556,7 +556,7 @@ class AgentBase : public swml::Service {
   const std::string& auth_password() const { return auth_pass_; }
 
   // ========================================================================
-  // Webhook Signature Validation (porting-sdk/webhooks.md)
+  // Webhook Signature Validation (the SignalWire webhook signature spec)
   //
   // When ``signing_key`` is set, the agent server auto-mounts the
   // webhook validator on POST `/`, `/swaig`, and `/post_prompt`. Unsigned
@@ -616,7 +616,7 @@ class AgentBase : public swml::Service {
 
   /// Auto-detect (or force via ``mode``) the serverless platform and dispatch
   /// the request to the matching handler, returning the ``(status, headers,
-  /// body)`` response. Oracle-matching entry point for Python
+  /// body)`` response. Canonical entry point for Python
   /// ``ServerlessMixin.handle_serverless_request(event, context, mode)``:
   /// ``mode`` empty = auto-detect via get_execution_mode, selecting
   /// lambda / google_cloud_function / azure_function / cgi. Delegates to the
@@ -761,7 +761,7 @@ class AgentBase : public swml::Service {
   // Security
   security::SessionManager session_manager_;
 
-  // Webhook signature validation (porting-sdk/webhooks.md)
+  // Webhook signature validation (the SignalWire webhook signature spec)
   // When set, the server auto-mounts the validator on POST `/`,
   // `/swaig`, and `/post_prompt`. Resolution order:
   //   explicit set_signing_key(...) > SIGNALWIRE_SIGNING_KEY env > none

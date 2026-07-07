@@ -35,7 +35,7 @@ SWAIGFunction::SWAIGFunction(std::string name, SwaigFunctionHandler handler,
       is_typed_handler_(is_typed_handler),
       extra_swaig_fields_(extra_swaig_fields.is_null() ? json::object()
                                                        : std::move(extra_swaig_fields)),
-      // Mark as external if webhook_url is provided (Python parity).
+      // Mark as external if webhook_url is provided.
       is_external_(webhook_url_.has_value()) {}
 
 json SWAIGFunction::call(const json& args, const json& raw_data) const {
@@ -48,7 +48,7 @@ json SWAIGFunction::operator()(const json& args, const json& raw_data) const {
 
 json SWAIGFunction::execute(const json& args, const std::optional<json>& raw_data) const {
   try {
-    // Raw data is mandatory but tolerate null for robustness (Python parity).
+    // Raw data is mandatory but tolerate null for robustness.
     const json raw = raw_data.has_value() && !raw_data->is_null() ? *raw_data : json::object();
 
     json result = handler_ ? handler_(args, raw) : json(nullptr);

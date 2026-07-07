@@ -24,7 +24,7 @@ class WeatherApiSkill : public SkillBase {
 
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
 
-  /// Python parity: ``WeatherApiSkill.get_tools`` — the SWAIG tool defs this
+  /// Corresponds to ``WeatherApiSkill.get_tools`` — the SWAIG tool defs this
   /// skill contributes (DataMap-backed).
   std::vector<json> get_tools() const { return get_datamap_functions(); }
 

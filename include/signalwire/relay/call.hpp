@@ -104,7 +104,7 @@ class Call {
   /// serial/parallel device array; ``options`` carries the optional bridge
   /// knobs (``ringback``, ``tag``, ``max_duration``, ``max_price_per_minute``,
   /// ``status_url``, or any extra) merged into the ``calling.connect`` frame —
-  /// Python parity: ``Call.connect(devices, *, ringback=…, tag=…,
+  /// Corresponds to ``Call.connect(devices, *, ringback=…, tag=…,
   /// max_duration=…, **kwargs)``. Without ``options`` these knobs never reached
   /// the wire.
   Action connect(const json& devices, const json& options = json::object());
@@ -141,7 +141,7 @@ class Call {
   Action join_room(const std::string& name);
   Action execute_swml(const json& swml);
 
-  // ── Additional call-control methods (Python/Java parity) ──────────
+  // ── Additional call-control methods ──────────
   // Each builds the RELAY frame and sends it through the existing
   // execute_simple plumbing (client-less callers still get a resolved
   // Action). Optional descriptors default to json::object() so only the

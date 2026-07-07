@@ -12,12 +12,12 @@ namespace skills {
 /// `AgentBase::add_skill()` (and `remove_skill()` / `has_skill()`) accept this
 /// `enum class` OR a `std::string`. The enum gives editor autocompletion and
 /// makes a typo fail at the call site — a bare string like `"datetiem"` only
-/// fails at runtime, on the server. The string overload keeps parity with the
+/// fails at runtime, on the server. The string overload matches the
 /// Python reference (which uses a bare `str`) and still allows custom /
 /// third-party skills that aren't built in.
 ///
 ///     agent.add_skill(SkillName::Datetime);   // typed, autocompleted
-///     agent.add_skill("datetime");            // string still works (parity)
+///     agent.add_skill("datetime");            // string still works
 ///     agent.add_skill("my_custom_skill");     // open set: custom skills ok
 ///
 /// Members mirror the 18 built-in skills' registered `skill_name()` values

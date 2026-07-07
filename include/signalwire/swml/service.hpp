@@ -69,21 +69,21 @@ class Service {
   const std::string& auth_password() const { return auth_pass_; }
 
   // ========================================================================
-  // AuthMixin parity (Python: signalwire.core.mixins.auth_mixin)
+  // AuthMixin (mirrors Python: signalwire.core.mixins.auth_mixin)
   // ========================================================================
 
   /// Validate provided basic-auth credentials against the configured ones
   /// using a constant-time comparison.
-  /// Python parity: ``AuthMixin.validate_basic_auth(username, password)``.
+  /// Corresponds to ``AuthMixin.validate_basic_auth(username, password)``.
   [[nodiscard]] bool validate_basic_auth(const std::string& username,
                                          const std::string& password) const;
 
   /// Get (user, password) — Python-canonical name.
-  /// Python parity: ``AuthMixin.get_basic_auth_credentials``.
+  /// Corresponds to ``AuthMixin.get_basic_auth_credentials``.
   [[nodiscard]] std::pair<std::string, std::string> get_basic_auth_credentials() const;
 
   /// Get (user, password, source) where source is one of "provided",
-  /// "environment", or "generated". Python parity:
+  /// "environment", or "generated". Corresponds to
   /// ``AuthMixin.get_basic_auth_credentials(include_source=True)``.
   [[nodiscard]] std::tuple<std::string, std::string, std::string>
   get_basic_auth_credentials_with_source() const;
@@ -156,7 +156,7 @@ class Service {
   [[nodiscard]] json render_swml() const;
 
   // ========================================================================
-  // Document-lifecycle helpers (Python parity: SWMLService.*)
+  // Document-lifecycle helpers (Corresponds to SWMLService.*)
   // ========================================================================
 
   /// Add a named section to the document (Python:
@@ -251,26 +251,26 @@ class Service {
   [[nodiscard]] std::vector<std::string> list_tool_names() const;
 
   // ========================================================================
-  // ToolRegistry parity (Python: signalwire.core.agent.tools.registry)
+  // ToolRegistry (mirrors Python: signalwire.core.agent.tools.registry)
   // ========================================================================
 
   /// Whether a SWAIG function with the given name is registered.
-  /// Python parity: ``ToolRegistry.has_function``.
+  /// Corresponds to ``ToolRegistry.has_function``.
   [[nodiscard]] bool has_function(const std::string& name) const;
 
   /// Get a registered SWAIG function definition by name.
   /// Returns nullptr when no such function is registered.
-  /// Python parity: ``ToolRegistry.get_function``.
+  /// Corresponds to ``ToolRegistry.get_function``.
   [[nodiscard]] const swaig::ToolDefinition* get_function(const std::string& name) const;
 
   /// Snapshot of all registered SWAIG functions keyed by name.
   /// Returned by value so subsequent registrations don't mutate the
-  /// snapshot. Python parity: ``ToolRegistry.get_all_functions``.
+  /// snapshot. Corresponds to ``ToolRegistry.get_all_functions``.
   [[nodiscard]] std::map<std::string, swaig::ToolDefinition> get_all_functions() const;
 
   /// Remove a registered SWAIG function. Returns true when the
   /// function was found and removed; false when it wasn't registered.
-  /// Python parity: ``ToolRegistry.remove_function``.
+  /// Corresponds to ``ToolRegistry.remove_function``.
   [[nodiscard]] bool remove_function(const std::string& name);
 
   /// Build the introspect payload for the registered tools as a JSON string
@@ -307,7 +307,7 @@ class Service {
   /// caller owns the returned Server and can `listen()` on it directly, front
   /// it behind its own TLS/proxy, or copy its handlers into a parent server.
   ///
-  /// Python parity: WebMixin.as_router / SWMLService.as_router — the
+  /// Corresponds to WebMixin.as_router / SWMLService.as_router — the
   /// cross-port "embed my routes in a host app" unit (Python returns a FastAPI
   /// APIRouter, Go returns an http.Handler; C++ returns a populated
   /// httplib::Server).
@@ -333,7 +333,7 @@ class Service {
   /// non-null JSON with modifications to merge into the rendered
   /// document.
   ///
-  /// Python parity: WebMixin.on_request(request_data, callback_path).
+  /// Corresponds to WebMixin.on_request(request_data, callback_path).
   /// The Python third `request` argument is FastAPI-specific and
   /// intentionally not mirrored on the cross-language API.
   virtual std::optional<json> on_request(
@@ -343,7 +343,7 @@ class Service {
   /// Customization point for subclasses to modify SWML based on
   /// request data. Default returns std::nullopt (no modification).
   ///
-  /// Python parity: WebMixin.on_swml_request(request_data, callback_path).
+  /// Corresponds to WebMixin.on_swml_request(request_data, callback_path).
   virtual std::optional<json> on_swml_request(
       const std::optional<json>& request_data = std::nullopt,
       const std::optional<std::string>& callback_path = std::nullopt);

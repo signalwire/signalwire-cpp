@@ -130,7 +130,7 @@ json ConfigLoader::substitute_string(const std::string& value) const {
   }
   result.append(value, last, value.size() - last);
 
-  // Coerce to native JSON types (Python parity).
+  // Coerce to native JSON types.
   std::string lowered = to_lower(result);
   if (lowered == "true") {
     return json(true);

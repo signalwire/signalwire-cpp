@@ -39,7 +39,7 @@ class SkillManager {
   /// List loaded skills
   [[nodiscard]] std::vector<std::string> list_loaded() const;
 
-  // ---- Python-parity surface (signalwire.core.skill_manager.SkillManager) --
+  // ---- Public surface (signalwire.core.skill_manager.SkillManager) --
 
   /// Whether a skill is loaded (Python: ``has_skill``). Alias of is_loaded.
   [[nodiscard]] bool has_skill(const std::string& skill_name) const {

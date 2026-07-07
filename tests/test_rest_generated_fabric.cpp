@@ -815,10 +815,10 @@ TEST(rest_mock_gen_fabric_ai_agents_list_addresses_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_call_flows_listaddresses_ok) {
+TEST(rest_mock_gen_fabric_call_flows_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_call_flow_addresses", 200, json::object());
-  (void)(client.fabric().call_flows.listAddresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -830,13 +830,13 @@ TEST(rest_mock_gen_fabric_call_flows_listaddresses_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_call_flows_listaddresses_err) {
+TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_call_flow_addresses", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().call_flows.listAddresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -967,10 +967,10 @@ TEST(rest_mock_gen_fabric_call_flows_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_conference_rooms_listaddresses_ok) {
+TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_conference_room_addresses", 200, json::object());
-  (void)(client.fabric().conference_rooms.listAddresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().conference_rooms.list_addresses("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -982,13 +982,13 @@ TEST(rest_mock_gen_fabric_conference_rooms_listaddresses_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_conference_rooms_listaddresses_err) {
+TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_conference_room_addresses", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().conference_rooms.listAddresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().conference_rooms.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -1157,10 +1157,10 @@ TEST(rest_mock_gen_fabric_cxml_applications_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_cxml_applications_listaddresses_ok) {
+TEST(rest_mock_gen_fabric_cxml_applications_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_cxml_application_addresses", 200, json::object());
-  (void)(client.fabric().cxml_applications.listAddresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().cxml_applications.list_addresses("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -1172,13 +1172,13 @@ TEST(rest_mock_gen_fabric_cxml_applications_listaddresses_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_cxml_applications_listaddresses_err) {
+TEST(rest_mock_gen_fabric_cxml_applications_list_addresses_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_cxml_application_addresses", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().cxml_applications.listAddresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().cxml_applications.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2335,10 +2335,10 @@ TEST(rest_mock_gen_fabric_resources_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_resources_listaddresses_ok) {
+TEST(rest_mock_gen_fabric_resources_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_resource_addresses", 200, json::object());
-  (void)(client.fabric().resources.listAddresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().resources.list_addresses("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -2350,13 +2350,13 @@ TEST(rest_mock_gen_fabric_resources_listaddresses_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_resources_listaddresses_err) {
+TEST(rest_mock_gen_fabric_resources_list_addresses_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_resource_addresses", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().resources.listAddresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().resources.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

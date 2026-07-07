@@ -93,7 +93,7 @@ std::string strip_slashes(const std::string& s) {
   return s.substr(b, e - b + 1);
 }
 
-// Lambda basic-auth check over the event headers (Python parity:
+// Lambda basic-auth check over the event headers (Corresponds to
 // AuthMixin._check_lambda_auth). Returns true only for a valid Basic header.
 bool check_lambda_auth(agent::AgentBase& agent, const json& event) {
   if (!event.is_object() || !event.contains("headers")) {
@@ -120,7 +120,7 @@ bool check_lambda_auth(agent::AgentBase& agent, const json& event) {
   return agent.validate_basic_auth(decoded.substr(0, colon), decoded.substr(colon + 1));
 }
 
-// The 401 auth challenge (Python parity: AuthMixin._send_lambda_auth_challenge).
+// The 401 auth challenge (Corresponds to AuthMixin._send_lambda_auth_challenge).
 ServerlessResponse lambda_auth_challenge() {
   return ServerlessResponse{401,
                             {{"WWW-Authenticate", "Basic realm=\"SignalWire Agent\""},
@@ -129,7 +129,7 @@ ServerlessResponse lambda_auth_challenge() {
 }
 
 // Execute a SWAIG function in serverless context and return the JSON-encoded
-// result (Python parity: ServerlessMixin._execute_swaig_function). Validates the
+// result (Corresponds to ServerlessMixin._execute_swaig_function). Validates the
 // function-name format and existence exactly as the reference does.
 std::string execute_serverless_swaig(agent::AgentBase& agent, const std::string& function_name,
                                      const json& args, const json& raw_data) {
@@ -209,7 +209,7 @@ ServerlessResponse handle_lambda(agent::AgentBase& agent, const json& event, con
                                                    ? headers_from_json(event["headers"])
                                                    : std::map<std::string, std::string>{};
 
-  // Lambda-mode auth + SWAIG dispatch (Python parity:
+  // Lambda-mode auth + SWAIG dispatch (Corresponds to
   // ServerlessMixin.handle_serverless_request lambda branch). The event's
   // rawPath is agent-RELATIVE: "swaig" (function in body) or "{function_name}"
   // dispatches a SWAIG function directly; root/other renders SWML. This is why

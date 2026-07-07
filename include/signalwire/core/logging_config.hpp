@@ -55,8 +55,8 @@ void reset_logging_configuration();
  * singleton (see ``signalwire::get_logger``); this helper guarantees it has
  * been configured before use and returns the configured state.
  *
- * @param name Logical logger name (recorded for parity; the C++ Logger is a
- *   process singleton so the name is advisory).
+ * @param name Logical logger name (recorded for API compatibility; the C++
+ *   Logger is a process singleton so the name is advisory).
  */
 bool get_logger(const std::string& name);
 

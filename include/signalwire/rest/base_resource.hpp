@@ -17,10 +17,8 @@
 // operation / command / set_* / sub-collection methods; the shared CRUD verbs
 // live here so the emitted headers stay thin.
 //
-// These live in ``signalwire::rest::generated`` so they do not collide with the
-// legacy hand ``signalwire::rest::CrudResource`` (2-arg, PATCH-only) that the
-// pre-generated client used; the generated subclasses resolve the unqualified
-// base name here first.
+// These live in ``signalwire::rest::generated``; the generated subclasses
+// resolve the unqualified base name here first.
 
 namespace signalwire {
 namespace rest {

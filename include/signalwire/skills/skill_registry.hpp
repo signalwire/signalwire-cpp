@@ -135,7 +135,7 @@ class SkillRegistry {
 
   /// Returns the registered external skill directories.
   /// Mirrors Python's ``SkillRegistry._external_paths`` (private list,
-  /// exposed here as a public accessor for parity-test inspection — C++
+  /// exposed here as a public accessor for test inspection — C++
   /// has no convention for protected attributes that tests can poke).
   [[nodiscard]] std::vector<std::string> external_paths() const {
     std::lock_guard<std::mutex> lock(mutex_);

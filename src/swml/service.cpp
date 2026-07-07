@@ -363,7 +363,7 @@ std::tuple<int, std::map<std::string, std::string>, std::string> Service::handle
   const std::string callback_path = path_from_url(url);
   if (method == "POST" && request_body.is_object() && !request_body.empty()) {
     // Match the request path against the registered (already-normalized)
-    // callback paths, allowing for the service route prefix (Python parity:
+    // callback paths, allowing for the service route prefix (Corresponds to
     // ``_callback_path_for_url`` matches ``normalized == cb OR
     // normalized.endswith(cb)``). So a callback registered at "/sip" fires for
     // a request to "/swml/sip".
@@ -394,7 +394,7 @@ void Service::reset_document() { document_ = Document(); }
 void Service::manual_set_proxy_url(const std::string& proxy_url) { manual_proxy_url_ = proxy_url; }
 
 void Service::register_routing_callback(RoutingCallback callback, const std::string& path) {
-  // Normalize the path for consistent lookup (Python parity:
+  // Normalize the path for consistent lookup (Corresponds to
   // ``SWMLService.register_routing_callback`` — ``path.rstrip("/")`` then
   // prepend a leading "/" if absent). So "/sip/" -> "/sip", "voice" -> "/voice".
   std::string normalized = path;
@@ -434,8 +434,7 @@ std::string Service::extract_sip_username(const json& request_body) {
     return "";
   }
   std::string to = call["to"].get<std::string>();
-  // Python parity (SWMLService.extract_sip_username): three branches on the
-  // 'to' URI scheme.
+  // Extract the SIP username with three branches on the 'to' URI scheme.
   //   - "sip:username@domain" -> username portion (before the first '@'; the
   //     whole remainder when there is no '@', mirroring Python's split("@",1)[0])
   //   - "tel:+1234567890"     -> the number after "tel:"

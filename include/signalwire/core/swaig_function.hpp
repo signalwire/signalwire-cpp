@@ -57,7 +57,7 @@ class SWAIGFunction {
                 std::vector<std::string> required = {}, bool is_typed_handler = false,
                 json extra_swaig_fields = json::object());
 
-  // ---- Accessors (parity with Python instance attributes) ----
+  // ---- Accessors (matches Python instance attributes) ----
   [[nodiscard]] const std::string& name() const { return name_; }
   [[nodiscard]] const std::string& description() const { return description_; }
   [[nodiscard]] const json& parameters() const { return parameters_; }
@@ -80,7 +80,7 @@ class SWAIGFunction {
 
   /// Execute the function: invoke the handler and coerce its return value into
   /// a FunctionResult dict. On any exception, logs and returns a generic
-  /// non-leaking error message (parity with the reference's try/except).
+  /// non-leaking error message (matches the reference's try/except).
   [[nodiscard]] json execute(const json& args,
                              const std::optional<json>& raw_data = std::nullopt) const;
 
@@ -90,7 +90,7 @@ class SWAIGFunction {
   /// installed, SKIPS validation (returns (true, [])). C++ has no bundled
   /// JSON-Schema validator, so this performs the always-available built-in
   /// check: the schema's `required` list plus each declared property's `type`
-  /// (parity with the Java port's built-in fallback). Passes when no properties
+  /// (matches the Java port's built-in fallback). Passes when no properties
   /// are declared.
   [[nodiscard]] ArgsValidationResult validate_args(const json& args) const;
 

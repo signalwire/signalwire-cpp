@@ -88,7 +88,7 @@ class SecurityConfig {
   /// Log the current security configuration (never logs secrets).
   void log_config(const std::string& service_name) const;
 
-  // Accessors (parity with the Python public attributes).
+  // Accessors (matches the Python public attributes).
   [[nodiscard]] bool ssl_enabled() const { return ssl_enabled_; }
   [[nodiscard]] const std::optional<std::string>& ssl_cert_path() const { return ssl_cert_path_; }
   [[nodiscard]] const std::optional<std::string>& ssl_key_path() const { return ssl_key_path_; }

@@ -80,7 +80,7 @@ struct Message {
   /// message is already terminal the callback fires immediately.
   void on_completed(CompletedCallback cb);
 
-  // ---- Python-parity surface (signalwire.relay.message.Message) ----------
+  // ---- Public surface (signalwire.relay.message.Message) ----------
 
   /// Whether the message has reached a terminal state (Python: ``is_done``).
   [[nodiscard]] bool is_done() const { return is_terminal(); }

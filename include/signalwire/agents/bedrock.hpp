@@ -20,7 +20,7 @@ using json = nlohmann::json;
 /// into the prompt object (Bedrock carries voice + inference inside ``prompt``,
 /// not as sibling fields).
 ///
-/// Python parity: ``signalwire.agents.bedrock.BedrockAgent``.
+/// Corresponds to ``signalwire.agents.bedrock.BedrockAgent``.
 class BedrockAgent : public agent::AgentBase {
  public:
   explicit BedrockAgent(const std::string& name = "bedrock_agent",

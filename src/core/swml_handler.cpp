@@ -9,7 +9,7 @@ namespace signalwire {
 namespace core {
 
 namespace {
-// Top-level AI keys that live outside the params object (Python parity).
+// Top-level AI keys that live outside the params object.
 bool is_top_level_ai_key(const std::string& key) {
   return key == "languages" || key == "hints" || key == "pronounce" || key == "global_data";
 }

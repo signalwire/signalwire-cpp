@@ -83,7 +83,7 @@ enum class CallbackMethod { Get, Post };
 // (`raise ValueError` on a miss), so a typo only fails at runtime on the
 // server. The typed `enum class` makes the typo fail at the call site with
 // editor autocompletion, while the bare-`std::string` overloads stay canonical
-// (parity with Python's bare `str`). The `*_value()` helpers are the single
+// (matches Python's bare `str`). The `*_value()` helpers are the single
 // normalization point — the enum overload routes its wire string into the
 // EXACT string method, so the emitted SWML is byte-identical.
 //
@@ -168,7 +168,7 @@ enum class Codec { Pcmu, Pcma };
 ///
 /// `JoinConferenceOptions::beep = ConferenceBeep::OnEnter;` and
 /// `... = "onEnter";` both compile and resolve to the same wire string; the
-/// open-string path keeps parity with Python's bare `str` (the validation in
+/// open-string path matches Python's bare `str` (the validation in
 /// `join_conference` then rejects out-of-set strings exactly as Python does).
 /// Templated on the enum type plus its `*_value()` mapper so one definition
 /// covers all four sets.
@@ -308,7 +308,7 @@ class FunctionResult {
 
   FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
 
-  /// Join an ad-hoc audio conference (SWML `join_conference`). Full parity
+  /// Join an ad-hoc audio conference (SWML `join_conference`). Full support
   /// with Python `core/function_result.py`: 18 optional params past `name`,
   /// 7 validations, and simple (bare-name) vs full-object emission.
   ///

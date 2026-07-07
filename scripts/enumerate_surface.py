@@ -462,8 +462,8 @@ CALLBACK_TYPEDEFS_AS_CALLABLE: set[str] = {
 # back so the diff lines up.
 _METHOD_RENAMES: dict[str, str] = {
     "delete_": "delete",
-    # HttpClient (and the legacy CrudResource) spell the DELETE verb ``del`` —
-    # ``delete`` is a C++ keyword; the Python reference records ``delete``.
+    # HttpClient spells the DELETE verb ``del`` — ``delete`` is a C++ keyword;
+    # the Python reference records ``delete``.
     "del": "delete",
     # BedrockAgent's C++ ``repr()`` is Python's ``__repr__`` (C++ has no dunder
     # convention; the method is the same string-representation contract).

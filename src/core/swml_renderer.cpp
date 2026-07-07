@@ -125,7 +125,7 @@ std::string SwmlRenderer::render_function_response_swml(
       if (!action.is_object()) {
         continue;
       }
-      // First recognized action verb wins (precedence order, Python parity).
+      // First recognized action verb wins (precedence order).
       if (action.contains("play")) {
         service.document().add_verb("play", action.at("play"));
       } else if (action.contains("hangup")) {

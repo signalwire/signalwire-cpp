@@ -55,7 +55,7 @@ SWMLBuilder& SWMLBuilder::ai(std::optional<std::string> prompt_text, std::option
     config["SWAIG"] = *swaig;
   }
 
-  // Merge any additional kwargs (parity with Python's config.update(kwargs)).
+  // Merge any additional kwargs (matches Python's config.update(kwargs)).
   if (kwargs.is_object()) {
     for (auto it = kwargs.begin(); it != kwargs.end(); ++it) {
       config[it.key()] = it.value();

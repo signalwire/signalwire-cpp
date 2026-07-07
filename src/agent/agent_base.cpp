@@ -46,7 +46,7 @@ AgentBase::AgentBase(const std::string& name, const std::string& route, const st
     }
   }
 
-  // Webhook signature validation (porting-sdk/webhooks.md):
+  // Webhook signature validation (the SignalWire webhook signature spec):
   // pick up SIGNALWIRE_SIGNING_KEY at construction time as a fallback;
   // explicit set_signing_key(...) wins. The actual route mounting + the
   // "disabled" warning is emitted at serve() time so callers who set
@@ -402,7 +402,7 @@ AgentBase& AgentBase::add_hints(const std::vector<std::string>& hints) {
 
 AgentBase& AgentBase::add_pattern_hint(const std::string& hint, const std::string& pattern,
                                        const std::string& replace, bool ignore_case) {
-  // Structured pattern hint (Python parity): append the full object, not a
+  // Structured pattern hint: append the full object, not a
   // bare string. No-op unless hint/pattern/replace are all provided.
   if (!hint.empty() && !pattern.empty() && !replace.empty()) {
     hints_.push_back(json{
@@ -1115,7 +1115,7 @@ AgentBase& AgentBase::set_auth(const std::string& username, const std::string& p
 }
 
 // ============================================================================
-// Webhook Signature Validation (porting-sdk/webhooks.md)
+// Webhook Signature Validation (the SignalWire webhook signature spec)
 // ============================================================================
 
 AgentBase& AgentBase::set_signing_key(const std::string& key) {
@@ -1622,7 +1622,7 @@ std::unique_ptr<AgentBase> AgentBase::clone() const { return std::make_unique<Ag
 utils::ServerlessResponse AgentBase::handle_serverless_request(const json& event,
                                                                const json& context,
                                                                const std::string& mode) {
-  // Oracle-matching instance entry point; the per-platform dispatch lives in
+  // Canonical instance entry point; the per-platform dispatch lives in
   // signalwire::utils (handle_lambda / _gcf / _azure / _cgi).
   return utils::handle_serverless_request(*this, event, context, mode);
 }
@@ -1820,7 +1820,7 @@ void AgentBase::setup_routes(httplib::Server& server) {
     base.pop_back();
   }
 
-  // Webhook signature validation (porting-sdk/webhooks.md):
+  // Webhook signature validation (the SignalWire webhook signature spec):
   // when signing_key is set, wrap POST handlers with the validator;
   // when unset, log a one-time warning matching the Python reference
   // and let unsigned POSTs through.

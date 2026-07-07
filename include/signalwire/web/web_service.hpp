@@ -43,7 +43,7 @@ class WebService {
   /// Construct a WebService.
   ///
   /// Mirrors the Python reference constructor surface. `config_file` is accepted
-  /// for signature parity; config-file loading (SecurityConfig / ConfigLoader)
+  /// for signature compatibility; config-file loading (SecurityConfig / ConfigLoader)
   /// is out of scope for this class and is a no-op here.
   explicit WebService(int port = 8002,
                       std::optional<std::map<std::string, std::string>> directories = std::nullopt,

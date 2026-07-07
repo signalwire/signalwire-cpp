@@ -8,7 +8,7 @@ namespace core {
 
 namespace {
 
-// Resolve a TOP-LEVEL section by title (parity with Python's ``_sections``
+// Resolve a TOP-LEVEL section by title (matches Python's ``_sections``
 // dict, which is keyed only by top-level section titles). Deliberately does
 // NOT recurse into subsections — unlike ``PromptObjectModel::find_section`` —
 // so ``has_section``/``get_section``/auto-vivification only ever see the

@@ -33,7 +33,7 @@ class Action {
   const std::string& control_id() const { return state_->control_id; }
   const std::string& state() const;
   [[nodiscard]] bool completed() const;
-  /// Python parity: ``Action.is_done`` — whether the action has finished.
+  /// Corresponds to ``Action.is_done`` — whether the action has finished.
   [[nodiscard]] bool is_done() const { return completed(); }
   const json& result() const;
   const std::string& call_id() const { return state_->call_id; }

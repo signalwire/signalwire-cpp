@@ -58,7 +58,7 @@ class SWMLBuilder {
                   std::optional<json> swaig = std::nullopt, const json& kwargs = json::object());
 
   /// Add a 'play' verb to the main section. Throws std::invalid_argument if
-  /// neither url nor urls is provided (Python parity).
+  /// neither url nor urls is provided.
   SWMLBuilder& play(std::optional<std::string> url = std::nullopt,
                     std::optional<std::vector<std::string>> urls = std::nullopt,
                     std::optional<double> volume = std::nullopt,

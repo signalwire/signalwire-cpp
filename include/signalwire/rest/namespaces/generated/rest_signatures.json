@@ -159,7 +159,7 @@
         "required": true
       }
     ],
-    "CallFlows::listAddresses": [
+    "CallFlows::listVersions": [
       {
         "name": "id",
         "kind": "positional",
@@ -174,7 +174,7 @@
         "default": {}
       }
     ],
-    "CallFlows::listVersions": [
+    "CallFlows::list_addresses": [
       {
         "name": "id",
         "kind": "positional",
@@ -1265,7 +1265,7 @@
         "required": true
       }
     ],
-    "ConferenceRooms::listAddresses": [
+    "ConferenceRooms::list_addresses": [
       {
         "name": "id",
         "kind": "positional",
@@ -1326,7 +1326,7 @@
         "default": {}
       }
     ],
-    "CxmlApplications::listAddresses": [
+    "CxmlApplications::list_addresses": [
       {
         "name": "id",
         "kind": "positional",
@@ -1987,7 +1987,7 @@
         "default": {}
       }
     ],
-    "GenericResources::listAddresses": [
+    "GenericResources::list_addresses": [
       {
         "name": "id",
         "kind": "positional",

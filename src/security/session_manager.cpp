@@ -169,7 +169,7 @@ std::string SessionManager::create_token(const std::string& function_name,
   int64_t expiry = current_timestamp() + expiry_seconds;
   std::string nonce = token_hex(8);  // 16 hex chars, matches secrets.token_hex(8)
 
-  // Sign the call_id-first colon-joined message (Python parity).
+  // Sign the call_id-first colon-joined message.
   std::string message = call_id + ":" + function_name + ":" + std::to_string(expiry) + ":" + nonce;
   std::string sig_raw = hmac_sha256(message);
   std::vector<uint8_t> sig_bytes(sig_raw.begin(), sig_raw.end());
@@ -183,7 +183,7 @@ std::string SessionManager::create_token(const std::string& function_name,
 
 bool SessionManager::validate_token(std::string_view token, std::string_view function_name,
                                     std::string_view call_id) const {
-  // Reject validation when no call_id is provided (Python parity).
+  // Reject validation when no call_id is provided.
   if (call_id.empty()) {
     return false;
   }

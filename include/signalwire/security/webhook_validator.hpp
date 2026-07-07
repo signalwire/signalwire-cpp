@@ -14,7 +14,7 @@
 
 /// SignalWire webhook signature validation.
 ///
-/// Implements both schemes from porting-sdk/webhooks.md:
+/// Implements both schemes from the SignalWire webhook signature spec:
 ///
 /// - Scheme A (RELAY/SWML/JSON): hex(HMAC-SHA1(key, url + raw_body))
 /// - Scheme B (Compat/cXML form): base64(HMAC-SHA1(key, url + sortedFormParams))
@@ -57,7 +57,7 @@ using ParamsOrBody = std::variant<std::string, FormParams>;
 /// @param url         Full URL SignalWire POSTed to (scheme, host,
 ///                    optional port, path, query) — must match what the
 ///                    platform saw, see the URL-reconstruction section
-///                    of porting-sdk/webhooks.md.
+///                    of the SignalWire webhook signature spec.
 /// @param raw_body    Raw request body bytes as a UTF-8 string, BEFORE
 ///                    any JSON / form parsing. Re-serialized JSON breaks
 ///                    Scheme A.
@@ -88,9 +88,8 @@ bool ValidateRequest(std::string_view signing_key, std::string_view signature, s
 /// response body text.
 using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, std::string>;
 
-/// Framework-free webhook-validation decision core (porting-sdk
-/// ``webhooks.md`` + HIDDEN_SURFACE_AUDIT Pass 1). This is the decomposed
-/// shape every port exposes so users can validate a signed inbound
+/// Framework-free webhook-validation decision core. This is the decomposed
+/// shape the SDK exposes so users can validate a signed inbound
 /// request WITHOUT depending on a specific HTTP framework — the
 /// cpp-httplib ``WrapWithSignatureValidation`` middleware is a thin
 /// PORT_ADDITION idiom built on top of this.
@@ -99,13 +98,12 @@ using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, s
 /// alias) out of ``headers``, then runs ``ValidateWebhookSignature``
 /// against ``url`` + ``body``.
 ///
-/// @param method      HTTP method (e.g. ``"POST"``). Accepted for shape
-///                    parity with the cross-port contract; the SignalWire
-///                    signing scheme does not sign the method.
+/// @param method      HTTP method (e.g. ``"POST"``). Accepted for a uniform
+///                    signature; the SignalWire signing scheme does not sign
+///                    the method.
 /// @param url         Full URL SignalWire POSTed to — must match what the
-///                    platform saw (see the URL-reconstruction section of
-///                    porting-sdk/webhooks.md). The caller reconstructs it
-///                    (proxy-aware) before calling this core.
+///                    platform saw (reconstruct it proxy-aware before calling
+///                    this core).
 /// @param headers     Request headers as a case-insensitively-looked-up
 ///                    map; the signature header is read from here.
 /// @param body        Raw request body bytes as a UTF-8 string, BEFORE any
@@ -121,9 +119,9 @@ using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, s
 /// @throws std::invalid_argument when ``signing_key`` is empty.
 ///
 /// The return type is spelled out structurally (rather than via the
-/// ``ValidationResponse`` alias) so the cross-port signature enumerator
-/// resolves it to the canonical ``optional<tuple<int,dict<string,string>,
-/// string>>`` shape the oracle records for ``webhook_middleware.validate``.
+/// ``ValidationResponse`` alias): an ``optional<tuple<int,
+/// dict<string,string>, string>>`` — nullopt when valid, else the
+/// ``(status, headers, body)`` rejection triple.
 std::optional<std::tuple<int, std::map<std::string, std::string>, std::string>> Validate(
     std::string_view method, std::string_view url,
     const std::map<std::string, std::string>& headers, std::string_view body,

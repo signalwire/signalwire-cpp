@@ -50,7 +50,6 @@ register_customer_route: user-defined helper in Python routing example
 register_product_route: user-defined helper in Python routing example
 register_default_tools: Python-only skill helper
 reset_document: Python SWMLService helper; C++ rebuilds the document per render
-schedule_follow_up: user-defined helper in Python example
 list_all_skill_sources: Python skill-registry diagnostic
 validate_env_vars: Python skill base-class helper
 validate_packages: Python skill base-class helper

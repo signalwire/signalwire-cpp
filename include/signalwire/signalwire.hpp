@@ -8,11 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "signalwire/agent/agent_base.hpp"
 #include "signalwire/contexts/contexts.hpp"
 #include "signalwire/datamap/datamap.hpp"
 #include "signalwire/logging.hpp"
 #include "signalwire/rest/rest_client.hpp"
 #include "signalwire/security/session_manager.hpp"
+#include "signalwire/server/agent_server.hpp"
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/swaig/function_result.hpp"

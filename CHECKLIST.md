@@ -360,7 +360,6 @@ Port every one of these. Each must contain code examples in the target language,
 - [ ] swml_service_guide.md
 - [ ] web_service.md
 - [ ] cloud_functions_guide.md
-- [ ] mcp_gateway_reference.md
 - [ ] mcp_integration.md
 
 Skip: search_*.md (4 files), bedrock_agent.md, livekit_comparison.md, pipecat_comparison.md

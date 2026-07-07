@@ -262,7 +262,6 @@ Guides are also available in the [`docs/`](docs/) directory:
 
 - [Skills System](docs/skills_system.md) -- built-in skills and the modular framework
 - [Third-Party Skills](docs/third_party_skills.md) -- creating and publishing custom skills
-- [MCP Gateway](docs/mcp_gateway_reference.md) -- Model Context Protocol integration
 
 ### Deployment
 

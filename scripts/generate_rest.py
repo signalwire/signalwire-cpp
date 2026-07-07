@@ -107,6 +107,54 @@ def repo_root() -> Path:
 
 
 # ---------------------------------------------------------------------------
+# SDK-surface policy overlay (the single source; NOT wire truth).
+# ---------------------------------------------------------------------------
+# porting-sdk/rest-apis/x-sdk-overlay.yaml is the ONE authoritative place that says which
+# spec fields the SDKs hide (dropped from the surface) or deprecate (emitted-but-flagged).
+# It is a policy overlay, NOT markup in the (often vendored) specs, so the same field is
+# governed once and applied wherever it surfaces (schema.json $defs/AIParams + the
+# calling/fabric REST projections + the SWML-verb structs). Each rule is (field, scope-or-
+# None): scope=None matches in every schema; scope="SchemaName" matches only inside the SPEC
+# schema (the $defs / components.schemas key) of that name — NOT the C++ struct name we emit.
+_overlay_cache: "dict[str, set[tuple[str, str | None]]] | None" = None
+
+
+def _load_overlay() -> "dict[str, set[tuple[str, str | None]]]":
+    global _overlay_cache
+    if _overlay_cache is None:
+        def rules(key: str, data: dict) -> "set[tuple[str, str | None]]":
+            out: set[tuple[str, str | None]] = set()
+            for entry in data.get(key) or []:
+                if isinstance(entry, dict) and entry.get("field"):
+                    out.add((entry["field"], entry.get("scope")))
+            return out
+        path = resolve_porting_sdk() / "rest-apis" / "x-sdk-overlay.yaml"
+        data = yaml.safe_load(path.read_text()) if path.is_file() else {}
+        data = data or {}
+        _overlay_cache = {"hidden": rules("hidden", data), "deprecated": rules("deprecated", data)}
+    return _overlay_cache
+
+
+def _overlay_match(rules: "set[tuple[str, str | None]]", field: str, schema_name: "str | None") -> bool:
+    # A rule matches when its field equals `field` AND (it is unscoped OR its scope equals
+    # the containing SPEC schema name). `schema_name` is the schema's name as it appears in
+    # the spec (the $defs / components.schemas key) — NOT the C++ struct name we later emit —
+    # so the scope value is identical across all ports.
+    for rf, scope in rules:
+        if rf == field and (scope is None or scope == schema_name):
+            return True
+    return False
+
+
+def _overlay_hidden(field: str, schema_name: "str | None" = None) -> bool:
+    return _overlay_match(_load_overlay()["hidden"], field, schema_name)
+
+
+def _overlay_deprecated(field: str, schema_name: "str | None" = None) -> bool:
+    return _overlay_match(_load_overlay()["deprecated"], field, schema_name)
+
+
+# ---------------------------------------------------------------------------
 # Base loading (x-sdk-bases; §2).
 # ---------------------------------------------------------------------------
 
@@ -1239,7 +1287,8 @@ def _methodless_field_type(psc: dict) -> str:
 
 
 def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
-                           source_desc: str, regen_cmd: str) -> str:
+                           source_desc: str, regen_cmd: str,
+                           schema_name: "str | None" = None) -> str:
     """Emit one method-less C++ data struct under an arbitrary nested namespace
     path, carrying one typed member per snake wire key + a trailing ``json extras``.
     Shared by the REST wire-type emitter and the SWML-verbs / relay-protocol / SWAIG
@@ -1247,7 +1296,12 @@ def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
     records these method-less on the SURFACE (and its signature oracle records a
     method-less class only for its class-typed fields, handled by the enumerator).
     A wire key that is a C++ keyword / non-identifier is escaped (wire key preserved
-    only in the doc comment; a read struct has no serialiser here)."""
+    only in the doc comment; a read struct has no serialiser here).
+
+    ``schema_name`` is the field's containing SPEC schema name (the $defs /
+    components.schemas key), passed to the x-sdk-overlay policy check — NOT the C++
+    ``name`` we emit. Overlay-hidden fields are dropped from the surface entirely
+    (still on the wire); overlay-deprecated fields are emitted with ``[[deprecated]]``."""
     lines: list[str] = [
         "// Copyright (c) 2025 SignalWire",
         "// SPDX-License-Identifier: MIT",
@@ -1279,13 +1333,19 @@ def emit_methodless_struct(ns_segments: list[str], name: str, properties: dict,
     # comments + wraps long lines exactly as clang-format, so this stays layout-agnostic.
     used: set[str] = set()
     for wire_key, psc in (properties or {}).items():
+        # SDK-surface policy from the single overlay (rest-apis/x-sdk-overlay.yaml),
+        # matched against the SPEC schema name — NOT markup in the (often vendored) specs.
+        if _overlay_hidden(wire_key, schema_name):
+            # hidden: drop from the SDK surface entirely (still on the wire).
+            continue
         ident = snake_ident(wire_key)
         while ident in used or ident == "extras":
             ident += "_"
         used.add(ident)
         cpp_t = _methodless_field_type(psc if isinstance(psc, dict) else {})
         note = "" if ident == wire_key else f"  // wire key: {wire_key}"
-        lines.append(f"  std::optional<{cpp_t}> {ident};{note}")
+        dep = "[[deprecated]] " if _overlay_deprecated(wire_key, schema_name) else ""
+        lines.append(f"  {dep}std::optional<{cpp_t}> {ident};{note}")
     lines.append("  json extras = json::object();")
     lines.append("};")
     lines.append("")
@@ -1383,6 +1443,7 @@ def emit_types(psdk: Path, outs: dict) -> None:
                         f"Generated REST wire type for the {ns_key!r} namespace "
                         f"(components/schemas {raw_name!r}).",
                         "generate_rest.py",
+                        schema_name=raw_name,
                     )
 
 

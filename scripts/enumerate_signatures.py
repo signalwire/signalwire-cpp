@@ -1019,7 +1019,7 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
 # (if present). Method declarations (which contain ``(``) are excluded before
 # this regex is applied.
 _GEN_FIELD_RE = re.compile(
-    r"^\s+[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
+    r"^\s+(?:\[\[[^\]]*\]\]\s*)?[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
 )
 _WIRE_KEY_RE = re.compile(r"wire key:\s*(\S+)")
 

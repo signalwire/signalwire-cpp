@@ -123,20 +123,21 @@ def build_outputs(psdk: Path) -> dict:
     outs: dict = {}
     emitted_names: set = set()
 
-    def emit(name: str, props: dict, desc: str) -> None:
+    def emit(name: str, props: dict, desc: str, schema_name: "str | None" = None) -> None:
         if name in emitted_names:
             return
         emitted_names.add(name)
         fn = "/".join(SWML_VERBS_SUBDIR) + f"/{GR.snake(name)}.hpp"
         outs[fn] = GR.emit_methodless_struct(SWML_VERBS_NS, name, props, desc,
-                                             "generate_swml_verbs.py")
+                                             "generate_swml_verbs.py",
+                                             schema_name=schema_name)
 
     # 1. One data struct per OBJECT $defs schema.
     for raw_name, node in defs.items():
         if not isinstance(node, dict) or not GR.is_object_schema(node):
             continue
         emit(GR.type_name(raw_name), node.get("properties") or {},
-             f"schema.json $defs schema {raw_name!r}.")
+             f"schema.json $defs schema {raw_name!r}.", schema_name=raw_name)
 
     # 2. One <Verb>Config struct per flattenable SWMLMethod.anyOf verb.
     sm = defs.get("SWMLMethod")

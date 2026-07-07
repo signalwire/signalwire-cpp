@@ -35,8 +35,6 @@ struct AIParams {
   std::optional<std::string> attention_timeout_prompt;
   std::optional<json> asr_diarize;
   std::optional<json> asr_speaker_affinity;
-  std::optional<json> audible_debug;
-  std::optional<json> audible_latency;
   std::optional<std::string> background_file;
   std::optional<json> background_file_loops;
   std::optional<json> background_file_volume;
@@ -47,7 +45,6 @@ struct AIParams {
   std::optional<std::string> barge_match_string;
   std::optional<json> barge_min_words;
   std::optional<json> barge_functions;
-  std::optional<json> cache_mode;
   std::optional<std::string> conscience;
   std::optional<json> convo;
   std::optional<std::string> conversation_id;
@@ -59,7 +56,6 @@ struct AIParams {
   std::optional<std::string> digit_terminators;
   std::optional<json> digit_timeout;
   std::optional<json> end_of_speech_timeout;
-  std::optional<json> enable_accounting;
   std::optional<json> enable_thinking;
   std::optional<json> enable_vision;
   std::optional<json> energy_level;
@@ -78,7 +74,7 @@ struct AIParams {
   std::optional<json> input_poll_freq;
   std::optional<json> interrupt_on_noise;
   std::optional<std::string> interrupt_prompt;
-  std::optional<json> languages_enabled;
+  [[deprecated]] std::optional<json> languages_enabled;
   std::optional<std::string> local_tz;
   std::optional<json> llm_diarize_aware;
   std::optional<json> max_emotion;
@@ -107,7 +103,6 @@ struct AIParams {
   std::optional<json> transfer_summary;
   std::optional<json> turn_detection_timeout;
   std::optional<std::string> tts_number_format;
-  std::optional<json> verbose_logs;
   std::optional<std::string> video_listening_file;
   std::optional<std::string> video_idle_file;
   std::optional<std::string> video_talking_file;

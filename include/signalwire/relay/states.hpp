@@ -16,7 +16,7 @@ namespace relay {
 // `relay/constants.py` / `relay/constants.hpp`) with stringly predicates
 // (`is_answered`, `is_ended`, `is_delivered`, …). These are KNOWABLE closed
 // sets, so a statically-typed port should expose them as `enum class`
-// ALONGSIDE the existing string accessors (parity), per the floor-not-ceiling
+// ALONGSIDE the existing string accessors, per the floor-not-ceiling
 // rule.
 //
 // ★ THREE SEPARATE VOCABULARIES that must NEVER be conflated — each mirrors a

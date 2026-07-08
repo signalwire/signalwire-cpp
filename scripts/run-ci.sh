@@ -4,6 +4,14 @@
 # Same script invoked locally (`bash scripts/run-ci.sh`) AND by the
 # GitHub Actions workflow. No drift between local and CI behavior.
 #
+# Canonical FMT/LINT/TEST entry points (self-bootstrapping, run from any CWD):
+#   * FMT   -> scripts/run-format.sh  (clang-format -i / --dry-run -Werror)
+#   * LINT  -> scripts/run-lint.sh    (clang-tidy curated set)
+#   * TEST  -> scripts/run-tests.sh   (cmake build + run_tests; host mode)
+# All three (and this run-ci) source scripts/_env.sh for the clang-18 (llvm@18)
+# PATH bootstrap. Do NOT invoke clang-format/clang-tidy/run_tests directly —
+# these scripts are the single documented entry points.
+#
 # Gates (in order, fail-fast):
 #   1. cmake --build build --target run_tests emit_corpus + ./build/run_tests
 #                                         — language test runner
@@ -54,7 +62,22 @@ set -u
 set -o pipefail
 
 PORT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+mkdir -p "$PORT_ROOT/.sw-tmp"  # repo-local CI scratch (never /tmp)
 PORT_NAME="signalwire-cpp"
+
+# Shared tool-environment bootstrap — the SAME _env.sh the canonical
+# run-format.sh / run-lint.sh / run-tests.sh source. It prepends clang-18
+# (llvm@18) to PATH so the FMT gate's clang-format, the LINT gate's clang-tidy
+# fallback, AND the Python REST/type generators (which shell to clang-format via
+# scripts/_cpp_fmt.py) all resolve clang-18 no matter the caller's shell, and it
+# fails loud if clang-format 18 is unresolvable. _env.sh runs with `set -e`; run-ci
+# manages gate exit codes manually via run_gate, so restore run-ci's own shell
+# options (-u -o pipefail, NO -e) immediately after sourcing.
+# shellcheck source=scripts/_env.sh
+source "$PORT_ROOT/scripts/_env.sh"
+set +e
+set -u
+set -o pipefail
 
 # --- OpenSSL-3.0 build routing ------------------------------------------------
 SWCPP_CONTAINER="${SWCPP_CONTAINER:-swcpp}"
@@ -125,6 +148,31 @@ PORTING_SDK_DIR="$(resolve_porting_sdk)" || {
     exit 2
 }
 
+# signalwire-python checkout used as the ORACLE side of the Layer-D BEHAVIORAL-*
+# gates (diff_port_<surface>.py builds the golden by importing signalwire-python).
+# Resolved the SAME way porting-sdk's diff_port_emission._resolve_python_sdk does:
+# $PYTHON_SDK env wins (CI sets it), else adjacency ($PORT_ROOT/../signalwire-python
+# — the layout used both locally and in the cross-port workflow). Passed explicitly
+# to each differ via --python-sdk so the gate never depends on `signalwire` already
+# being importable from the caller's ambient environment.
+resolve_python_sdk() {
+    if [ -n "${PYTHON_SDK:-}" ] && [ -d "$PYTHON_SDK/signalwire" ]; then
+        echo "$PYTHON_SDK"
+        return 0
+    fi
+    if [ -d "$PORT_ROOT/../signalwire-python/signalwire" ]; then
+        (cd "$PORT_ROOT/../signalwire-python" && pwd)
+        return 0
+    fi
+    return 1
+}
+
+PYTHON_SDK_DIR="$(resolve_python_sdk)" || {
+    echo "FATAL: signalwire-python not found (needed as the BEHAVIORAL-* oracle)." >&2
+    echo "       (expected $PORT_ROOT/../signalwire-python or \$PYTHON_SDK env var)" >&2
+    exit 2
+}
+
 FAILED_GATES=""
 
 run_gate() {
@@ -161,14 +209,16 @@ echo "==> TEST build mode: $BUILD_MODE"
 
 # In-container path to this repo (repo parent is mounted at /src by convention).
 SWCPP_CONTAINER_REPO="${SWCPP_CONTAINER_REPO:-/src/$PORT_NAME}"
-SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"
+SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container-internal path (docker /tmp, not host)
 
 # Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
 # BUILD_MODE. Each branch produces the same observable result: a built run_tests
 # (+ emit_corpus, reused by the EMISSION gate; + emit_skills, reused by the
-# SKILL-CONTRACT gate) and run_tests' exit code. The two dump binaries are built
-# here too so the downstream gates don't reconfigure the tree (and so the host /
-# exec modes leave ready-to-run binaries).
+# SKILL-CONTRACT gate; + the five Layer-D dump binaries wire_dump/swml_dump/
+# state_dump/http_dump/wire_relay_dump, reused by the BEHAVIORAL-* gates) and
+# run_tests' exit code. The dump binaries are built here too so the downstream
+# gates don't reconfigure the tree (and so the host / exec modes leave
+# ready-to-run binaries).
 test_gate() {
     case "$BUILD_MODE" in
         host)
@@ -176,13 +226,21 @@ test_gate() {
                 echo "[BOOTSTRAP] cmake -S . -B build (initial configure)"
                 cmake -S . -B build || return 1
             fi
-            cmake --build build --target run_tests emit_corpus emit_skills -j && ./build/run_tests
+            # Build the two downstream-gate dump binaries (emit_corpus for
+            # EMISSION, emit_skills for SKILL-CONTRACT) here so those gates find
+            # them ready, then delegate the run_tests build+run to the CANONICAL
+            # scripts/run-tests.sh (self-bootstrapping, host mode). run-tests.sh
+            # rebuilds run_tests (a near-no-op since it was just built) and runs
+            # the full suite.
+            cmake --build build --target emit_corpus emit_skills \
+                wire_dump swml_dump state_dump http_dump wire_relay_dump -j || return 1
+            bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -191,7 +249,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -232,6 +290,43 @@ emission_gate() {
     python3 "$PORTING_SDK_DIR/scripts/diff_port_emission.py" --dump-cmd "$dump_cmd"
 }
 
+# BEHAVIORAL-<SURFACE> gates (Layer D): run each surface's dump binary and diff its
+# observed behavior against the signalwire-python oracle
+# (porting-sdk/scripts/diff_port_<surface>.py + tools/<surface>_dump.cpp). Locks
+# the 64 cross-port behaviors so they can never silently regress. Same BUILD_MODE
+# dump-cmd routing as the EMISSION gate: for host/exec the binary persists
+# (`./build/<surface>_dump` / a docker-exec into the running container); for the
+# throwaway run: mode the container vanishes after test_gate, so the dump-cmd is a
+# self-contained docker run that (re)builds the target with logs on stderr and
+# execs it so ONLY the JSON reaches stdout. The dumps already emit pure JSON on
+# stdout (logs go to stderr) regardless of ambient SIGNALWIRE_LOG_* env.
+behavioral_gate() {
+    local surface="$1"  # wire | swml | state | http | wire_relay
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)
+            dump_cmd="$PORT_ROOT/build/${surface}_dump"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/${surface}_dump"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                 && cmake --build $SWCPP_CONTAINER_BUILD --target ${surface}_dump -j\$(nproc) 1>&2 \
+                 && exec $SWCPP_CONTAINER_BUILD/${surface}_dump'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_${surface}.py" \
+        --port cpp \
+        --python-sdk "$PYTHON_SDK_DIR" \
+        --dump-cmd "$dump_cmd"
+}
+
 # SURFACE-FRESH gate: prove the committed port_surface.json (Layer B) still
 # matches a fresh regeneration. run-ci otherwise gates only Layer A
 # (diff_port_signatures.py over port_signatures.json), so the surface can rot
@@ -245,16 +340,31 @@ emission_gate() {
 # regenerates byte-for-byte modulo the generated_from git-sha. We snapshot the
 # committed copy, regenerate in place, diff modulo provenance via
 # check_surface_freshness.py, then restore the working copy.
+# Cache of the freshly-regenerated port_surface.json so SURFACE-FRESH and
+# SURFACE-DIFF (which both otherwise re-run enumerate_surface.py from scratch)
+# share ONE regeneration. The enumerator is deterministic on a clean tree, so a
+# single regen serves both gates. The path is derived INSIDE each gate from
+# $PORT_ROOT (not a shared top-level var) so the gates stay self-contained when a
+# harness like porting-sdk's sw-verify sources only the function definitions and
+# calls one gate directly. Cache lives under the repo-local .sw-tmp (gitignored) —
+# never /tmp.
+_fresh_surface_cache_path() { echo "$PORT_ROOT/.sw-tmp/fresh_port_surface.json"; }
+
 surface_fresh_gate() {
+    local cache; cache="$(_fresh_surface_cache_path)"
+    mkdir -p "$(dirname "$cache")"
+    rm -f "$cache"
     # 1. snapshot the committed surface (fallback cp if not tracked at HEAD).
-    if ! git show HEAD:port_surface.json > /tmp/committed_surface.json 2>/dev/null; then
-        cp port_surface.json /tmp/committed_surface.json || return 1
+    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface.json" 2>/dev/null; then
+        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface.json" || return 1
     fi
-    # 2. regenerate in place via the same host enumerator the SIGNATURES gate uses.
+    # 2. regenerate in place via the same host enumerator the SIGNATURES gate
+    #    uses, caching the fresh copy for SURFACE-DIFF to reuse.
     python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    cp port_surface.json "$cache" 2>/dev/null || true
     # 3. compare committed vs fresh, ignoring the volatile generated_from sha.
     python3 "$PORTING_SDK_DIR/scripts/check_surface_freshness.py" \
-        --committed /tmp/committed_surface.json --fresh port_surface.json
+        --committed "$PORT_ROOT/.sw-tmp/committed_surface.json" --fresh port_surface.json
     local rc=$?
     # 4. always restore the working copy (regen rewrote the git-sha provenance).
     git checkout -- port_surface.json 2>/dev/null
@@ -269,10 +379,21 @@ surface_fresh_gate() {
 # mocks / BUILD_MODE-independent), diffs, then restores the committed copy
 # unconditionally so the gate is side-effect free.
 surface_diff_gate() {
-    if ! git show HEAD:port_surface.json > /tmp/committed_surface_diff.json 2>/dev/null; then
-        cp port_surface.json /tmp/committed_surface_diff.json || return 1
+    # Reuse the fresh surface SURFACE-FRESH already regenerated this run (the
+    # enumerator is deterministic on a clean tree, so a second regen would be
+    # byte-identical). Fall back to regenerating if the cache is absent (e.g.
+    # SURFACE-FRESH was skipped or this gate is run standalone). diff_port_surface
+    # reads the file at ./port_surface.json, so point that at the cached fresh
+    # copy for the diff, then restore the committed working copy.
+    local cache; cache="$(_fresh_surface_cache_path)"
+    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" 2>/dev/null; then
+        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" || return 1
     fi
-    python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    if [ -f "$cache" ]; then
+        cp "$cache" port_surface.json || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    else
+        python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
+    fi
     python3 "$PORTING_SDK_DIR/scripts/diff_port_surface.py" \
         --reference "$PORTING_SDK_DIR/python_surface.json" \
         --port-surface port_surface.json \
@@ -338,7 +459,7 @@ rest_coverage_gate() {
     port="$(pick_free_port)" || { echo "rest_coverage_gate: could not allocate a free port"; return 1; }
     local mock_pkg_parent="$PORTING_SDK_DIR/test_harness/mock_signalwire"
     export PYTHONPATH="$mock_pkg_parent${PYTHONPATH:+:$PYTHONPATH}"
-    local mock_log="/tmp/rest_cov_mock_cpp.$$.log"
+    local mock_log="$PORT_ROOT/.sw-tmp/rest_cov_mock_cpp.$$.log"
     python3 -m mock_signalwire --host 127.0.0.1 --port "$port" --log-level error \
         >"$mock_log" 2>&1 &
     local mock_pid=$!
@@ -444,6 +565,43 @@ spec_parity_gate() {
         --gaps "$PORTING_SDK_DIR/SPEC_IMPLEMENTATION_GAPS.md"
 }
 
+# ROUTE-COLLISION gate: cross-references the route-registry (operation ->
+# (method, path)) with the surface enumeration to find latent route-split /
+# crud-dup / orphan-dto defects. cpp HAS a registry (the route_registry binary),
+# so — unlike ports without one — this gate can run standalone. It is built +
+# run per BUILD_MODE exactly like spec_parity_gate above (host binary / docker
+# exec / throwaway docker run that rebuilds it), then the collision checker
+# reads the registry. The 2 fabric list_addresses route-split entries are the
+# user-approved ROUTE_COLLISION_ALLOW.md exceptions (392bb5b); orphan-dto is
+# report-only inside the gate. Enforcing (no --report-only).
+route_collision_gate() {
+    local reg
+    reg="$(mktemp -t cpp_route_registry.XXXXXX.json)"
+    # shellcheck disable=SC2064
+    trap "rm -f '$reg'" RETURN
+    case "$BUILD_MODE" in
+        host)
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            docker exec "$c" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
+                && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    python3 "$PORTING_SDK_DIR/scripts/route_collision.py" \
+        --port cpp --repo . --registry-json "$reg"
+}
+
 # FMT gate: the C++ format gate (clang-format, config in .clang-format —
 # Google base / 100-col). Source-style only; proven surface/emission-neutral
 # (the libclang SIGNATURES enumerator + the regex SURFACE enumerator are both
@@ -458,28 +616,12 @@ spec_parity_gate() {
 # json.hpp, nlohmann/) and the FetchContent IXWebSocket tree are never touched.
 # clang-format runs on the host regardless of BUILD_MODE (no compiler/SDK
 # needed — it only parses tokens).
-fmt_sources() {
-    find src include tools -type f \
-        \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' -o -name '*.cc' \) \
-        2>/dev/null
-}
+# The FMT gate now delegates to the CANONICAL scripts/run-format.sh (single
+# entry point, self-bootstrapping via _env.sh). LOCAL (CI unset) applies in
+# place; CI ($CI set) passes --check for the read-only dry-run. Same source
+# scope + dual-mode behavior as before, just no longer inlined here.
 fmt_gate() {
-    local files
-    files="$(fmt_sources)"
-    [ -n "$files" ] || { echo "no C++ sources found to format" >&2; return 1; }
-    if [ -n "${CI:-}" ]; then
-        # shellcheck disable=SC2086
-        clang-format --dry-run -Werror $files
-    else
-        # shellcheck disable=SC2086
-        clang-format -i $files
-        if ! git diff --quiet 2>/dev/null; then
-            echo "    (FMT auto-applied formatting to your working tree — review & stage)"
-        fi
-        # A residual issue -i can't fix must still fail the gate.
-        # shellcheck disable=SC2086
-        clang-format --dry-run -Werror $files
-    fi
+    bash "$PORT_ROOT/scripts/run-format.sh" ${CI:+--check}
 }
 
 # LINT gate: the C++ lint gate (clang-tidy, curated check set in .clang-tidy
@@ -501,93 +643,12 @@ fmt_gate() {
 # generates a dedicated `build-tidy` compile_commands using THAT toolchain's
 # matching clang so headers always resolve, reusing it if already present.
 # $SWCPP_TIDY_BUILD overrides the build dir.
-resolve_clang_tidy() {
-    if [ -n "${SWCPP_CLANG_TIDY:-}" ]; then echo "$SWCPP_CLANG_TIDY"; return 0; fi
-    local c
-    for c in \
-        /opt/homebrew/opt/llvm/bin/clang-tidy \
-        /usr/local/opt/llvm/bin/clang-tidy \
-        clang-tidy; do
-        if command -v "$c" >/dev/null 2>&1 || [ -x "$c" ]; then echo "$c"; return 0; fi
-    done
-    return 1
-}
+# The LINT gate now delegates to the CANONICAL scripts/run-lint.sh (single entry
+# point, self-bootstrapping via _env.sh). The clang-tidy resolution (newest tidy
+# for macOS-SDK parse / $SWCPP_CLANG_TIDY override) + the dedicated build-tidy
+# compile-DB generation now live in that script; run-ci just invokes it.
 lint_gate() {
-    local ct tidy_build cxx cc
-    ct="$(resolve_clang_tidy)" || { echo "no clang-tidy found" >&2; return 1; }
-    tidy_build="${SWCPP_TIDY_BUILD:-}"
-    if [ -z "$tidy_build" ]; then
-        # clang-tidy must read a CLANG-generated compile DB. Reuse an existing
-        # build-tidy (clang-built by construction below); otherwise generate one
-        # with the clang matching the chosen clang-tidy. Do NOT fall back to the
-        # plain build/ dir — the TEST gate builds that with g++ (CI) whose
-        # compile_commands carries g++-specific flags + system-header paths that
-        # clang-tidy can't parse as C++17 (it falls back to a pre-C++17 parse,
-        # yielding bogus "no template named 'optional'" / "decomposition
-        # declarations are a C++17 extension" errors). Always use clang's DB.
-        if [ -f build-tidy/compile_commands.json ]; then
-            tidy_build="build-tidy"
-        else
-            cxx="$(dirname "$ct")/clang++"; cc="$(dirname "$ct")/clang"
-            # When clang-tidy resolved to a bare name on PATH, dirname is "." and
-            # the sibling clang++/clang may not exist there — fall back to the
-            # PATH-resolved clang++/clang so CMake still gets a clang compiler.
-            [ -x "$cxx" ] || cxx="$(command -v clang++ || true)"
-            [ -x "$cc" ] || cc="$(command -v clang || true)"
-            local cmake_args=(-S . -B build-tidy -DCMAKE_EXPORT_COMPILE_COMMANDS=ON)
-            [ -n "$cxx" ] && cmake_args+=(-DCMAKE_CXX_COMPILER="$cxx")
-            [ -n "$cc" ] && cmake_args+=(-DCMAKE_C_COMPILER="$cc")
-            cmake "${cmake_args[@]}" >&2 || return 1
-            tidy_build="build-tidy"
-        fi
-    fi
-    local files
-    files="$(find src include -name '*.cpp')"
-    [ -n "$files" ] || { echo "no C++ sources found to lint" >&2; return 1; }
-
-    # clang-tidy parallelizes trivially per-TU but the single-invocation form
-    # above runs every TU SERIALLY — historically ~68% of the whole CI gate run.
-    # Fan the SAME checks / config / scope / zero-findings bar across all cores.
-    # IDENTICAL behavior, only the parallelism changes:
-    #   * same compile DB ($tidy_build), same --header-filter, same .clang-tidy
-    #     (WarningsAsErrors:'*' => any finding is a nonzero-exit error),
-    #   * same source set (the `find src include -name '*.cpp'` list); the files
-    #     are passed to run-clang-tidy as path regexes so only those 55 TUs from
-    #     the compile DB are analysed (NOT the test/example TUs it also contains).
-    local jobs
-    jobs="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)"
-
-    # LLVM's official driver reads the same -p compile DB, applies the repo
-    # .clang-tidy, and fans TUs across -j cores. It is a SEPARATE script that
-    # internally shells out to a `clang-tidy` binary; we MUST force it to use the
-    # SAME resolved $ct (-clang-tidy-binary) so the macOS/version handling in
-    # resolve_clang_tidy() still applies and a DIFFERENT system clang-tidy can't
-    # sneak in (which would resurface the libc++ parse problems). Look for it as
-    # a sibling of the resolved $ct FIRST (same toolchain), then on PATH.
-    local rct ctdir
-    ctdir="$(dirname "$ct")"
-    rct=""
-    if [ -x "$ctdir/run-clang-tidy" ]; then rct="$ctdir/run-clang-tidy"
-    elif [ -x "$ctdir/run-clang-tidy.py" ]; then rct="$ctdir/run-clang-tidy.py"
-    elif command -v run-clang-tidy >/dev/null 2>&1; then rct="run-clang-tidy"
-    elif command -v run-clang-tidy.py >/dev/null 2>&1; then rct="run-clang-tidy.py"
-    fi
-
-    if [ -n "$rct" ]; then
-        # shellcheck disable=SC2086
-        "$rct" -p "$tidy_build" -j "$jobs" -quiet \
-            -clang-tidy-binary "$ct" \
-            -header-filter='signalwire-cpp/(src|include)/' \
-            $files
-        return $?
-    fi
-
-    # Robust fallback: parallelize the resolved $ct itself with xargs -P, same
-    # binary / flags / header-filter. xargs returns 123 if ANY child exited
-    # nonzero, so WarningsAsErrors (a finding => clang-tidy nonzero) still fails
-    # the gate. One TU per process (-n1) to match the single-file behavior.
-    echo "$files" | tr '\n' '\0' | xargs -0 -P "$jobs" -n1 \
-        "$ct" -p "$tidy_build" --header-filter='signalwire-cpp/(src|include)/' --quiet
+    bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
@@ -624,9 +685,79 @@ run_gate "REST-COVERAGE" "every implemented REST route covered success+error (pa
 run_gate "SPEC-PARITY" "implemented REST routes == canonical spec (modulo gaps); deterministic Set B" \
     spec_parity_gate
 
+# Gate 5d: GEN-FRESH — the generated REST resource layer (headers +
+# generated_surface_map.json + rest_signatures.json) must match a fresh
+# regeneration (no hand edits to generated files).
+run_gate "GEN-FRESH" "generated REST layer byte-identical to a fresh regen" \
+    python3 scripts/generate_rest.py --check
+
+# Gate 5d-2: GEN-FRESH-TYPES — the generated read-side TYPE surface (item D/H)
+# must match a fresh regeneration. Three generators feed distinct modules:
+#   generate_swml_verbs.py     -> core/swml_verbs_generated (schema.json $defs)
+#   generate_relay_protocol.py -> relay/protocol_types_generated (relay-protocol/)
+#   generate_swaig_payloads.py -> core/{post_prompt,swaig_request,swaig_actions}_generated
+# (The <ns>_types_generated REST wire types are covered by generate_rest.py --check.)
+run_gate "GEN-FRESH-SWML" "generated SWML-verb type surface byte-identical to a fresh regen" \
+    python3 scripts/generate_swml_verbs.py --check
+run_gate "GEN-FRESH-RELAY" "generated RELAY-protocol type surface byte-identical to a fresh regen" \
+    python3 scripts/generate_relay_protocol.py --check
+run_gate "GEN-FRESH-SWAIG" "generated SWAIG read-side payload surface byte-identical to a fresh regen" \
+    python3 scripts/generate_swaig_payloads.py --check
+
+# Gate 5e: GEN-FRESH-TESTS — the generated full-mock REST wire-test suite
+# (item E) must match a fresh regen from the route_registry plan. route_registry
+# was built by the SPEC-PARITY gate above; build it here too for host mode so the
+# gate is self-contained, then run it into a temp plan and diff the test files.
+gen_fresh_tests_gate() {
+    case "$BUILD_MODE" in
+        host)
+            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            local reg
+            reg="$(mktemp -t cpp_rest_test_plan.XXXXXX.json)"
+            # shellcheck disable=SC2064
+            trap "rm -f '$reg'" RETURN
+            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
+            python3 "$PORT_ROOT/scripts/generate_rest_tests.py" --check --registry-json "$reg"
+            ;;
+        *)
+            # Container modes: build + run route_registry in-container, then check.
+            local reg
+            reg="$(mktemp -t cpp_rest_test_plan.XXXXXX.json)"
+            # shellcheck disable=SC2064
+            trap "rm -f '$reg'" RETURN
+            case "$BUILD_MODE" in
+                exec:*)
+                    docker exec "${BUILD_MODE#exec:}" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1 ;;
+                run:*)
+                    docker run --rm -v "$(dirname "$PORT_ROOT")":/src "${BUILD_MODE#run:}" bash -c "
+                        cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                        && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
+                        && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1 ;;
+            esac
+            python3 "$PORT_ROOT/scripts/generate_rest_tests.py" --check --registry-json "$reg"
+            ;;
+    esac
+}
+run_gate "GEN-FRESH-TESTS" "generated REST wire-test suite byte-identical to a fresh regen" \
+    gen_fresh_tests_gate
+
 # Gate 6: emission — byte-compare FunctionResult serialisation vs Python oracle
 run_gate "EMISSION" "diff_port_emission vs python to_dict() (81-entry corpus)" \
     emission_gate
+
+# Gate 6b: BEHAVIORAL-* (Layer D) — diff each surface's dump against the python
+# oracle so the 64 cross-port behaviors can never silently regress. Dump binaries
+# built in the TEST gate; each differ builds its golden from signalwire-python.
+run_gate "BEHAVIORAL-WIRE" "diff_port_wire vs python oracle (Layer D)" \
+    behavioral_gate wire
+run_gate "BEHAVIORAL-SWML" "diff_port_swml vs python oracle (Layer D)" \
+    behavioral_gate swml
+run_gate "BEHAVIORAL-STATE" "diff_port_state vs python oracle (Layer D)" \
+    behavioral_gate state
+run_gate "BEHAVIORAL-HTTP" "diff_port_http vs python oracle (Layer D)" \
+    behavioral_gate http
+run_gate "BEHAVIORAL-WIRE-RELAY" "diff_port_wire_relay vs python oracle (Layer D)" \
+    behavioral_gate wire_relay
 
 # Gate 7: FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
@@ -668,6 +799,88 @@ run_gate "SWAIG-CLI" "swaig-test shared mini-contract (verbs/serverless-reject/d
         --require-url-model \
         --default-action-argv='http://user:pass@127.0.0.1:1/' \
         --no-serverless-argv='http://user:pass@127.0.0.1:1/|--simulate-serverless|lambda|--list-tools'
+
+# Gate 13: SWAIG-COVERAGE — the C++ FunctionResult must expose every engine
+# response action (swaig-specs/swaig-response.yaml) or allowlist it with sign-off
+# (SWAIG_PIPELINE §5). The shared checker's C++ scraper (_sdk_emits_cpp, keyed on
+# the .cpp suffix) captures ONLY top-level action keys — the fluent add_action(),
+# direct single-action object-literal pushes, and subscript-set keys of a var
+# pushed onto actions_ — NOT nested payload keys. 2 gaps are signed-off
+# allowlisted (back_to_back_functions, user_event).
+run_gate "SWAIG-COVERAGE" "FunctionResult exposes every engine response action" \
+    python3 "$PORTING_SDK_DIR/scripts/swaig_coverage.py" \
+        --check \
+        --emission "$PORT_ROOT/src/swaig/function_result.cpp"
+
+# --- Day-one deterministic gates (blocking, non-report-only) ------------------
+# Six shared porting-sdk gates that police docs/metadata/artifact hygiene. All
+# pure Python, host-side, BUILD_MODE-blind (no compiler / no mocks). Wired here
+# with run_gate exactly like the sibling python gates above so they BLOCK CI.
+#
+# ARTIFACT-DENY runs in git-ls-files PROXY mode: cpp has no CPack/install target
+# and no standard package-list tool, so there is no authoritative published-file
+# listing to feed `--listing -`. The proxy scans `git ls-files` and passes via
+# the port's committed ARTIFACT_DENY_ALLOW.md. (Authoritative --listing mode is
+# used by ports whose package tool emits a real file list; cpp is proxy-mode.)
+
+# Gate 14: DOC-LANG-PURITY — no python-verbatim docs in a non-python port
+run_gate "DOC-LANG-PURITY" "no python-verbatim docs in a non-python port" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_lang_purity.py" --port cpp --repo .
+
+# Gate 15: DOC-LINKS — every relative markdown link resolves to a tracked file
+run_gate "DOC-LINKS" "every relative markdown link resolves to a tracked file" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_links.py" --port cpp --repo .
+
+run_gate "README-INCLUDE" "doc code blocks are byte-identical to their gate-compiled fixture regions" \
+    python3 "$PORTING_SDK_DIR/scripts/readme_include.py" --port cpp --repo .
+
+# Gate 16: ROOT-HYGIENE — no audit/scratch clutter tracked at repo root
+#          (allowlist ROOT_HYGIENE_ALLOW.md)
+run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlist ROOT_HYGIENE_ALLOW.md)" \
+    python3 "$PORTING_SDK_DIR/scripts/root_hygiene.py" --port cpp --repo .
+
+# Gate 17: IGNORE-LEDGER-VERIFY — no laundered false-absence entries in
+#          DOC_AUDIT_IGNORE.md
+run_gate "IGNORE-LEDGER-VERIFY" "no laundered false-absence entries in DOC_AUDIT_IGNORE.md" \
+    python3 "$PORTING_SDK_DIR/scripts/ignore_ledger_verify.py" --port cpp --repo .
+
+# Gate 18: META-CONSISTENT — package metadata consistency
+run_gate "META-CONSISTENT" "package metadata consistency" \
+    python3 "$PORTING_SDK_DIR/scripts/meta_consistent.py" --port cpp --repo .
+
+# Gate 19: ARTIFACT-DENY — no porting artifacts in the shipped package
+#          (git-ls-files proxy; cpp has no CPack/install listing)
+run_gate "ARTIFACT-DENY" "no porting artifacts in the PUBLISHED package (git ls-files proxy)" \
+    python3 "$PORTING_SDK_DIR/scripts/artifact_deny.py" --port cpp --repo .
+
+# --- Expansion gates (Tier 5 / release; blocking, non-report-only) ------------
+# Five more shared porting-sdk gates. The backlog is burned to zero for cpp and
+# the GEN_TYPE_DEGENERACY_ALLOW.md / ROUTE_COLLISION_ALLOW.md allowlists are
+# user-approved, so all five pass enforcing. Four are pure host-side Python
+# (BUILD_MODE-blind); ROUTE-COLLISION needs the route_registry binary and so is
+# built + run per BUILD_MODE via route_collision_gate above. SEMVER-DIFF is NOT
+# wired (HELD pending the user's version-bump decision).
+
+# Gate 20: GEN-TYPE-DEGENERACY — generated typed surface isn't all loose aliases
+run_gate "GEN-TYPE-DEGENERACY" "generated types aren't degenerate loose aliases / private-in-public (allowlist honored)" \
+    python3 "$PORTING_SDK_DIR/scripts/gen_type_degeneracy.py" --port cpp --repo .
+
+# Gate 21: PUBLIC-JARGON — no internal porting jargon in public doc comments
+run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comments" \
+    python3 "$PORTING_SDK_DIR/scripts/public_jargon.py" --port cpp --repo .
+
+# Gate 22: ROUTE-COLLISION — no route-split / crud-dup (registry-driven; allowlist honored)
+run_gate "ROUTE-COLLISION" "no route-split/crud-dup between registry + surface (ROUTE_COLLISION_ALLOW.md honored)" \
+    route_collision_gate
+
+# Gate 23: GEN-IDIOM — generated code is NOT lint-excluded (runs through clang-tidy)
+run_gate "GEN-IDIOM" "generated code is not lint-excluded from the idiom linter" \
+    python3 "$PORTING_SDK_DIR/scripts/gen_idiom.py" --port cpp --repo .
+
+# Gate 24: RELEASE-FRESH — publish workflow runs the gates BEFORE publishing
+#          (cpp HAS a publish workflow: release.yml, gates-before-publish)
+run_gate "RELEASE-FRESH" "publish workflow runs gates before publishing" \
+    python3 "$PORTING_SDK_DIR/scripts/release_fresh.py" --port cpp --repo .
 
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"

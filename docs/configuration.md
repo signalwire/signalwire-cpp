@@ -1,5 +1,17 @@
 # Configuration Guide
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/core/config_loader.hpp>
+#include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+```
+
 This guide explains the unified configuration system available in SignalWire AI Agents SDK.
 
 ## Overview
@@ -9,19 +21,16 @@ All SignalWire services (SWML-based agents, Search, MCP Gateway) now support opt
 ## Quick Start
 
 ### Zero Configuration (Default)
-```python
-# Works exactly as before - no config needed
-agent = MyAgent()
-agent.run()
+```cpp
+// Works with no config file needed
+agent.serve();
 ```
 
 ### With Configuration File
-```python
-# Automatically detects config.json if present
-agent = MyAgent()
-
-# Or specify a config file
-agent = MyAgent(config_file="production_config.json")
+```cpp
+// Load a config file explicitly via ConfigLoader
+signalwire::core::ConfigLoader loader(std::vector<std::string>{"production_config.json"});
+json config = loader.get_config();
 ```
 
 ## Configuration Files
@@ -272,42 +281,45 @@ After (Option 3 - Mix config and env vars):
 
 ### Loading Configuration
 
-```python
-from signalwire.core.config_loader import ConfigLoader
+```cpp
+// Load config
+signalwire::core::ConfigLoader loader(std::vector<std::string>{"my_config.json"});
+if (loader.has_config()) {
+    json config = loader.get_config();
 
-# Load config
-loader = ConfigLoader(["my_config.json"])
-if loader.has_config():
-    config = loader.get_config()
-    
-    # Get specific value with substitution
-    port = loader.get("service.port", default=3000)
-    
-    # Get entire section
-    security = loader.get_section("security")
+    // Get a specific value with ${VAR|default} substitution
+    json port = loader.get("service.port", 3000);
+
+    // Get an entire section
+    json security = loader.get_section("security");
+}
 ```
 
 ### Using with Services
 
-```python
-# SWML Service
-from signalwire import AgentBase
+```cpp
+// SWML Service (AgentBase): load config with ConfigLoader and apply it.
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/core/config_loader.hpp>
 
-class MyAgent(AgentBase):
-    def __init__(self):
-        # Auto-detects config.json if present
-        super().__init__(name="my-agent", config_file="agent_config.json")
+using namespace signalwire;
+using json = nlohmann::json;
 
-# Search Service
-from signalwire.search import SearchService
-
-service = SearchService(config_file="search_config.json")
-
-# MCP Gateway
-from mcp_gateway.gateway_service import MCPGateway
-
-gateway = MCPGateway(config_path="mcp_config.json")
+class MyAgent : public agent::AgentBase {
+public:
+    MyAgent() : AgentBase("my-agent") {
+        core::ConfigLoader loader(
+            std::vector<std::string>{"agent_config.json"});
+        if (loader.has_config()) {
+            json security = loader.get_section("security");
+            // apply loaded settings as needed
+        }
+    }
+};
 ```
+
+> The standalone search service and MCP Gateway are Python-only components and
+> are not part of the C++ port.
 
 ## Troubleshooting
 

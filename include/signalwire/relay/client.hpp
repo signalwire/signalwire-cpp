@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -19,12 +20,31 @@
 #include "signalwire/relay/constants.hpp"
 #include "signalwire/relay/message.hpp"
 #include "signalwire/relay/relay_event.hpp"
+#include "signalwire/relay/typed_events.hpp"
 #include "signalwire/relay/websocket.hpp"
 
 namespace signalwire {
 namespace relay {
 
 using json = nlohmann::json;
+
+/// Error returned by the RELAY server (Python: ``relay.client.RelayError``).
+/// Carries the server-supplied JSON-RPC error ``code`` + ``message``.
+class RelayError : public std::runtime_error {
+ public:
+  RelayError(int code, const std::string& message)
+      : std::runtime_error("RELAY error " + std::to_string(code) + ": " + message) {
+    code_ = code;
+    message_ = message;
+  }
+
+  [[nodiscard]] int code() const { return code_; }
+  [[nodiscard]] const std::string& message() const { return message_; }
+
+ private:
+  int code_ = 0;
+  std::string message_;
+};
 
 /// Callback for inbound calls
 using InboundCallHandler = std::function<void(Call&)>;
@@ -123,6 +143,19 @@ class RelayClient {
   // Context management
   void subscribe(const std::vector<std::string>& contexts);
   void unsubscribe(const std::vector<std::string>& contexts);
+
+  /// Subscribe to additional contexts for inbound events (Python:
+  /// ``RelayClient.receive``). Sends ``signalwire.receive`` on the assigned
+  /// protocol so inbound calls on ``contexts`` start being delivered; can be
+  /// called after ``connect()`` to add contexts without reconnecting. Thin
+  /// Python-named alias of ``subscribe``.
+  void receive(const std::vector<std::string>& contexts) { subscribe(contexts); }
+
+  /// Unsubscribe from contexts for inbound events (Python:
+  /// ``RelayClient.unreceive``). Sends ``signalwire.unreceive`` to stop
+  /// receiving inbound calls on ``contexts``. Thin Python-named alias of
+  /// ``unsubscribe``.
+  void unreceive(const std::vector<std::string>& contexts) { unsubscribe(contexts); }
 
   // Accessors
   const RelayConfig& config() const { return config_; }

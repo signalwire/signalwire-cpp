@@ -118,6 +118,15 @@ std::vector<std::string> SkillManager::list_loaded() const {
   return names;
 }
 
+SkillBase* SkillManager::get_skill(const std::string& skill_name) const {
+  for (const auto& ls : loaded_skills_) {
+    if (ls.name == skill_name) {
+      return ls.instance.get();
+    }
+  }
+  return nullptr;
+}
+
 void SkillManager::cleanup_all() {
   for (auto& ls : loaded_skills_) {
     ls.instance->cleanup();

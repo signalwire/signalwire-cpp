@@ -46,10 +46,10 @@ TEST(rest_mock_addresses_list) {
 TEST(rest_mock_addresses_create) {
     auto client = mocktest::make_client();
     auto body = client.addresses().create({
-        {"address_type", "commercial"},
-        {"first_name", "Ada"},
-        {"last_name", "Lovelace"},
-        {"country", "US"},
+        .country = "US",
+        .first_name = "Ada",
+        .last_name = "Lovelace",
+        .address_type = "commercial",
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -161,7 +161,7 @@ TEST(rest_mock_short_codes_get) {
 
 TEST(rest_mock_short_codes_update) {
     auto client = mocktest::make_client();
-    auto body = client.short_codes().update("sc-1", {{"name", "Marketing SMS"}});
+    auto body = client.short_codes().update("sc-1", {.name = "Marketing SMS"});
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
     auto j = mocktest::journal_last();
@@ -179,10 +179,12 @@ TEST(rest_mock_short_codes_update) {
 TEST(rest_mock_imported_numbers_create) {
     auto client = mocktest::make_client();
     auto body = client.imported_numbers().create({
-        {"number", "+15551234567"},
-        {"sip_username", "alice"},
-        {"sip_password", "secret"},
-        {"sip_proxy", "sip.example.com"},
+        .number = "+15551234567",
+        .extras = {
+            {"sip_username", "alice"},
+            {"sip_password", "secret"},
+            {"sip_proxy", "sip.example.com"},
+        },
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -203,9 +205,9 @@ TEST(rest_mock_imported_numbers_create) {
 TEST(rest_mock_mfa_call) {
     auto client = mocktest::make_client();
     auto body = client.mfa().call({
-        {"to", "+15551234567"},
-        {"from_", "+15559876543"},
-        {"message", "Your code is {code}"},
+        .to = "+15551234567",
+        .message = "Your code is {code}",
+        .extras = {{"from_", "+15559876543"}},
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -227,8 +229,8 @@ TEST(rest_mock_mfa_call) {
 TEST(rest_mock_sip_profile_update) {
     auto client = mocktest::make_client();
     auto body = client.sip_profile().update({
-        {"domain", "myco.sip.signalwire.com"},
-        {"default_codecs", json::array({"PCMU", "PCMA"})},
+        .default_codecs = json::array({"PCMU", "PCMA"}),
+        .extras = {{"domain", "myco.sip.signalwire.com"}},
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("domain") || body.contains("default_codecs"));
@@ -249,7 +251,7 @@ TEST(rest_mock_sip_profile_update) {
 
 TEST(rest_mock_number_groups_list_memberships) {
     auto client = mocktest::make_client();
-    auto body = client.number_groups().list_memberships("ng-1", {{"page_size", "10"}});
+    auto body = client.number_groups().listMemberships("ng-1", {{"page_size", "10"}});
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -266,7 +268,7 @@ TEST(rest_mock_number_groups_list_memberships) {
 
 TEST(rest_mock_number_groups_delete_membership) {
     auto client = mocktest::make_client();
-    auto body = client.number_groups().delete_membership("mem-1");
+    auto body = client.number_groups().deleteMembership("mem-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -283,7 +285,7 @@ TEST(rest_mock_number_groups_delete_membership) {
 
 TEST(rest_mock_project_tokens_update) {
     auto client = mocktest::make_client();
-    auto body = client.project().tokens.update("tok-1", {{"name", "renamed-token"}});
+    auto body = client.project().tokens.update("tok-1", {.name = "renamed-token"});
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
     auto j = mocktest::journal_last();
@@ -313,7 +315,7 @@ TEST(rest_mock_project_tokens_delete) {
 
 TEST(rest_mock_datasphere_get_chunk) {
     auto client = mocktest::make_client();
-    auto body = client.datasphere().documents.get_chunk("doc-1", "chunk-99");
+    auto body = client.datasphere().documents.getChunk("doc-1", "chunk-99");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
     auto j = mocktest::journal_last();
@@ -329,7 +331,7 @@ TEST(rest_mock_datasphere_get_chunk) {
 
 TEST(rest_mock_queues_get_member) {
     auto client = mocktest::make_client();
-    auto body = client.queues().get_member("q-1", "mem-7");
+    auto body = client.queues().getMember("q-1", "mem-7");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("queue_id") || body.contains("call_id"));
     auto j = mocktest::journal_last();

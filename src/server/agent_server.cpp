@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/server/agent_server.hpp"
 
+#include <algorithm>
+
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/agent/agent_base.hpp"
@@ -10,6 +12,12 @@
 
 namespace signalwire {
 namespace server {
+
+namespace {
+// Forward-declared so the SIP-mapping members defined above the anonymous-
+// namespace definition can normalize routes to a leading "/".
+std::string normalize_route(const std::string& route);
+}  // namespace
 
 AgentServer::AgentServer(const std::string& host, int port) : host_(host), port_(port) {
   std::string env_port = get_env("PORT", "");
@@ -65,12 +73,108 @@ AgentServer& AgentServer::map_sip_username(const std::string& username, const st
     get_logger().warn("Invalid SIP username: " + username);
     return *this;
   }
-  sip_routes_[username] = route;
+  // Store the mapping under the LOWERCASED username, with the route normalized
+  // to a leading "/" — Corresponds to AgentServer.register_sip_username stores
+  // ``self._sip_username_mapping[username.lower()] = route`` and lookups
+  // case-fold. Without lowercasing, a "Bob"/"BOB"/"bob" lookup misses.
+  std::string key = username;
+  std::transform(key.begin(), key.end(), key.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  sip_routes_[key] = normalize_route(route);
   return *this;
+}
+
+std::string AgentServer::lookup_sip_route(const std::string& username) const {
+  // Case-fold on lookup (Corresponds to AgentServer._lookup_sip_route uses
+  // ``username.lower()``). Returns "" when no mapping exists.
+  std::string key = username;
+  std::transform(key.begin(), key.end(), key.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = sip_routes_.find(key);
+  return it != sip_routes_.end() ? it->second : std::string{};
+}
+
+std::map<std::string, std::string> AgentServer::get_sip_username_mapping() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return sip_routes_;
 }
 
 AgentServer& AgentServer::set_static_dir(const std::string& dir) {
   static_dir_ = dir;
+  return *this;
+}
+
+// ---- Public surface -------------------------------------------------
+
+namespace {
+std::string normalize_route(const std::string& route) {
+  std::string r = route;
+  if (r.empty() || r.front() != '/') {
+    r = "/" + r;
+  }
+  return r;
+}
+}  // namespace
+
+AgentServer& AgentServer::register_(std::shared_ptr<agent::AgentBase> agent,
+                                    const std::string& route) {
+  // Python: route=None -> use the agent's own route.
+  std::string effective = route.empty() ? agent->route() : route;
+  return register_agent(std::move(agent), effective);
+}
+
+bool AgentServer::unregister(const std::string& route) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return agents_.erase(normalize_route(route)) > 0;
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<agent::AgentBase>>> AgentServer::get_agents()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<std::pair<std::string, std::shared_ptr<agent::AgentBase>>> out;
+  out.reserve(agents_.size());
+  for (const auto& [route, agent] : agents_) {
+    out.emplace_back(route, agent);
+  }
+  return out;
+}
+
+std::shared_ptr<agent::AgentBase> AgentServer::get_agent(const std::string& route) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = agents_.find(normalize_route(route));
+  return it == agents_.end() ? nullptr : it->second;
+}
+
+AgentServer& AgentServer::setup_sip_routing(const std::string& route, bool auto_map) {
+  sip_routing_ = true;
+  sip_route_ = normalize_route(route);
+  sip_auto_map_ = auto_map;
+  return *this;
+}
+
+AgentServer& AgentServer::register_sip_username(const std::string& username,
+                                                const std::string& route) {
+  return map_sip_username(username, route);
+}
+
+AgentServer& AgentServer::serve_static_files(const std::string& directory,
+                                             const std::string& route) {
+  static_dir_ = directory;
+  static_route_ = normalize_route(route);
+  return *this;
+}
+
+AgentServer& AgentServer::register_global_routing_callback(GlobalRoutingCallback callback_fn,
+                                                           const std::string& path) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::string normalized = normalize_route(path);
+  // Strip a trailing slash (except the bare root), mirroring Python's rstrip.
+  if (normalized.size() > 1 && normalized.back() == '/') {
+    normalized.pop_back();
+  }
+  routing_callbacks_.emplace_back(normalized, std::move(callback_fn));
+  get_logger().info("Registered global routing callback at " + normalized);
   return *this;
 }
 
@@ -148,7 +252,10 @@ void AgentServer::setup_routes(httplib::Server& server) {
         return;
       }
 
-      auto it = sip_routes_.find(username);
+      std::string sip_key = username;
+      std::transform(sip_key.begin(), sip_key.end(), sip_key.begin(),
+                     [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      auto it = sip_routes_.find(sip_key);
       if (it != sip_routes_.end()) {
         res.set_content(json::object({{"route", it->second}}).dump(), "application/json");
       } else {

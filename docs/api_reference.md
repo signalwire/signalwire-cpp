@@ -5,7 +5,7 @@ This document provides a comprehensive reference for all public APIs in the Sign
 ## Table of Contents
 
 1. [AgentBase Class](#agentbase-class) - Core agent functionality
-2. [SwaigFunctionResult Class](#swaigfunctionresult-class) - SWAIG (SignalWire AI Gateway) function response handling
+2. [FunctionResult Class](#functionresult-class) - SWAIG (SignalWire AI Gateway) function response handling
 3. [DataMap Class](#datamap-class) - Serverless API tools that execute on SignalWire's servers
 4. [Context System](#context-system) - Structured workflows
 5. [State Management](#state-management) - Persistent state
@@ -16,127 +16,126 @@ This document provides a comprehensive reference for all public APIs in the Sign
 
 ## AgentBase Class
 
-The `AgentBase` class is the foundation for creating AI agents. It extends `SWMLService` (the base class for generating SWML -- SignalWire Markup Language -- documents) and provides comprehensive functionality for building conversational AI agents.
+The `agent::AgentBase` class is the foundation for creating AI agents. It extends `swml::Service` (the base class for generating SWML -- SignalWire Markup Language -- documents) and provides comprehensive functionality for building conversational AI agents.
+
+The header to include is:
+
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/skills/skill_base.hpp>
+#include <signalwire/skills/skill_name.hpp>
+#include <signalwire/skills/skill_registry.hpp>
+#include <signalwire/utils/serverless.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
+signalwire::datamap::DataMap data_map("tool");
+```
+
+In your own code you would write `using namespace signalwire;` so `agent::`, `swaig::`,
+and `datamap::` are in scope; the examples below spell the namespaces out in full.
 
 ### Constructor
 
-```python
-AgentBase(
-    name: str,
-    route: str = "/",
-    host: str = "0.0.0.0",
-    port: int = 3000,
-    basic_auth: Optional[Tuple[str, str]] = None,
-    use_pom: bool = True,
-    token_expiry_secs: int = 3600,
-    auto_answer: bool = True,
-    record_call: bool = False,
-    record_format: str = "mp4",
-    record_stereo: bool = True,
-    default_webhook_url: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    native_functions: Optional[List[str]] = None,
-    schema_path: Optional[str] = None,
-    suppress_logs: bool = False,
-    enable_post_prompt_override: bool = False,
-    check_for_input_override: bool = False,
-    config_file: Optional[str] = None
-)
+<!-- snippet: no-compile constructor signature listing (class-member declaration shown out of class context) -->
+```cpp
+explicit AgentBase(const std::string& name = "agent",
+                   const std::string& route = "/",
+                   const std::string& host = "0.0.0.0",
+                   int port = 3000);
 ```
 
 **Parameters:**
-- `name` (str): Human-readable name for the agent
-- `route` (str): HTTP route path for the agent (default: "/")
-- `host` (str): Host address to bind to (default: "0.0.0.0")
-- `port` (int): Port number to listen on (default: 3000)
-- `basic_auth` (Optional[Tuple[str, str]]): Username/password for HTTP basic auth
-- `use_pom` (bool): Whether to use Prompt Object Model (default: True)
-- `token_expiry_secs` (int): Security token expiration time (default: 3600)
-- `auto_answer` (bool): Automatically answer incoming calls (default: True)
-- `record_call` (bool): Record calls by default (default: False)
-- `record_format` (str): Recording format: "mp4", "wav", "mp3" (default: "mp4")
-- `record_stereo` (bool): Record in stereo (default: True)
-- `default_webhook_url` (Optional[str]): Default webhook URL for functions
-- `agent_id` (Optional[str]): Unique identifier for the agent
-- `native_functions` (Optional[List[str]]): List of native function names to enable
-- `schema_path` (Optional[str]): Path to custom SWML schema file
-- `suppress_logs` (bool): Suppress logging output (default: False)
-- `enable_post_prompt_override` (bool): Allow post-prompt URL override (default: False)
-- `check_for_input_override` (bool): Allow check-for-input URL override (default: False)
-- `config_file` (Optional[str]): Path to JSON configuration file with environment variable substitution support. See [Configuration Guide](configuration.md) for details.
+- `name` (`std::string`): Human-readable name for the agent (default: `"agent"`)
+- `route` (`std::string`): HTTP route path for the agent (default: `"/"`)
+- `host` (`std::string`): Host address to bind to (default: `"0.0.0.0"`)
+- `port` (`int`): Port number to listen on (default: `3000`)
+
+You normally create an agent by subclassing `agent::AgentBase` and configuring it in the constructor:
+
+```cpp
+class MyAgent : public signalwire::agent::AgentBase {
+public:
+    MyAgent() : AgentBase("my-agent", "/agent", "0.0.0.0", 3000) {
+        prompt_add_section("Personality", "You are a helpful assistant.");
+    }
+};
+```
+
+The Prompt Object Model (POM) is enabled by default; toggle it with `set_use_pom(false)`. Recording, native functions, custom schema paths, and webhook URLs are configured after construction via the fluent setters documented below (`set_native_functions`, `set_webhook_url`, etc.) rather than as constructor arguments. Basic auth is set with `set_auth(username, password)`; the webhook signing key with `set_signing_key(key)`.
 
 ### Core Methods
 
 #### Deployment and Execution
 
-##### `run(event=None, context=None, force_mode=None, host=None, port=None)`
-Auto-detects deployment environment and runs the agent appropriately.
-
-**Parameters:**
-- `event`: Event object for serverless environments
-- `context`: Context object for serverless environments  
-- `force_mode` (str): Force specific mode: "server", "lambda", "cgi", "cloud_function"
-- `host` (Optional[str]): Override host address
-- `port` (Optional[int]): Override port number
+##### `run()`
+Start the agent. Auto-detects a serverless environment when one is present (dispatching via `handle_serverless_request`), otherwise serves over HTTP on the constructor's host/port.
 
 **Usage:**
-```python
-# Auto-detect environment
-agent.run()
-
-# Force server mode
-agent.run(force_mode="server", host="localhost", port=8080)
-
-# Lambda handler
-def lambda_handler(event, context):
-    return agent.run(event, context)
+```cpp
+agent.run();  // serve over HTTP, or dispatch a serverless request when detected
 ```
 
-##### `serve(host=None, port=None)`
-Explicitly run as HTTP server using FastAPI/Uvicorn.
+For serverless platforms, dispatch a single request explicitly and inspect the response:
 
-**Parameters:**
-- `host` (Optional[str]): Host address to bind to
-- `port` (Optional[int]): Port number to listen on
+```cpp
+json event = json::object();    // the platform's request event
+json context = json::object();  // the platform's invocation context
+signalwire::utils::ServerlessResponse resp = agent.handle_serverless_request(event, context);
+```
+
+`handle_serverless_request(event, context, mode)` auto-detects the platform (lambda / google_cloud_function / azure_function / cgi) when `mode` is empty, or forces a specific handler when `mode` is set.
+
+##### `serve()`
+Explicitly run as an HTTP server. Binds to the host/port supplied to the constructor.
 
 **Usage:**
-```python
-agent.serve()  # Use constructor defaults
-agent.serve(host="0.0.0.0", port=3000)
+```cpp
+agent.serve();  // use constructor host/port
 ```
+
+Call `stop()` to shut the running server down.
 
 ### Prompt Configuration
 
 #### Text-Based Prompts
 
-##### `set_prompt_text(text: str) -> AgentBase`
-Set the agent's prompt as raw text.
+##### `set_prompt_text(const std::string& text) -> AgentBase&`
+Set the agent's prompt as raw text (switches the agent out of POM mode).
 
 **Parameters:**
-- `text` (str): The complete prompt text
+- `text` (`std::string`): The complete prompt text
 
 **Usage:**
-```python
-agent.set_prompt_text("You are a helpful customer service agent.")
+```cpp
+agent.set_prompt_text("You are a helpful customer service agent.");
 ```
 
-##### `set_post_prompt(text: str) -> AgentBase`
-Set additional text to append after the main prompt.
+##### `set_post_prompt(const std::string& text) -> AgentBase&`
+Set text sent to the AI after the conversation for summary/analysis.
 
 **Parameters:**
-- `text` (str): Text to append after main prompt
+- `text` (`std::string`): The post-prompt text
 
 **Usage:**
-```python
-agent.set_post_prompt("Always be polite and professional.")
+```cpp
+agent.set_post_prompt("Always be polite and professional.");
 ```
 
 #### LLM Parameter Configuration
 
 ##### `set_prompt_llm_params`
 
-```python
-def set_prompt_llm_params(**params) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_prompt_llm_params(const json& params = json::object());
 ```
 Set Language Model parameters for the main prompt. Accepts any parameters which will be passed through to the SignalWire server. The server validates and applies parameters based on the target model's capabilities.
 
@@ -150,21 +149,21 @@ Set Language Model parameters for the main prompt. Accepts any parameters which 
 Note: No defaults are sent unless explicitly set. Invalid parameters for the selected model will be handled/ignored by the server.
 
 **Usage:**
-```python
-# Configure for consistent, professional responses
-agent.set_prompt_llm_params(
-    temperature=0.3,
-    top_p=0.9,
-    barge_confidence=0.7,
-    presence_penalty=0.1,
-    frequency_penalty=0.2
-)
+```cpp
+// Configure for consistent, professional responses
+agent.set_prompt_llm_params({
+    {"temperature", 0.3},
+    {"top_p", 0.9},
+    {"barge_confidence", 0.7},
+    {"presence_penalty", 0.1},
+    {"frequency_penalty", 0.2}
+});
 ```
 
 ##### `set_post_prompt_llm_params`
 
-```python
-def set_post_prompt_llm_params(**params) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_post_prompt_llm_params(const json& params = json::object());
 ```
 Set Language Model parameters for the post-prompt. Accepts any parameters which will be passed through to the SignalWire server. The server validates and applies parameters based on the target model's capabilities.
 
@@ -177,285 +176,250 @@ Set Language Model parameters for the post-prompt. Accepts any parameters which 
 Note: barge_confidence is not applicable to post-prompt. No defaults are sent unless explicitly set.
 
 **Usage:**
-```python
-# Configure for focused summaries
-agent.set_post_prompt_llm_params(
-    temperature=0.2,
-    top_p=0.9
-)
+```cpp
+// Configure for focused summaries
+agent.set_post_prompt_llm_params({
+    {"temperature", 0.2},
+    {"top_p", 0.9}
+});
 ```
 
 #### Structured Prompts (POM)
 
 ##### `prompt_add_section`
 
-```python
-def prompt_add_section(
-    title: str, 
-    body: str = "", 
-    bullets: Optional[List[str]] = None, 
-    numbered: bool = False, 
-    numbered_bullets: bool = False, 
-    subsections: Optional[List[Dict[str, Any]]] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& prompt_add_section(const std::string& title,
+                              const std::string& body = "",
+                              const std::vector<std::string>& bullets = {});
 ```
-Add a structured section to the prompt using Prompt Object Model.
+Add a structured section to the prompt using the Prompt Object Model.
 
 **Parameters:**
-- `title` (str): Section title/heading
-- `body` (str): Main section content (default: "")
-- `bullets` (Optional[List[str]]): List of bullet points
-- `numbered` (bool): Use numbered sections (default: False)
-- `numbered_bullets` (bool): Use numbered bullet points (default: False)
-- `subsections` (Optional[List[Dict]]): Nested subsections
+- `title` (`std::string`): Section title/heading
+- `body` (`std::string`): Main section content (default: `""`)
+- `bullets` (`std::vector<std::string>`): List of bullet points (default: empty)
 
 **Usage:**
-```python
-# Simple section
-agent.prompt_add_section("Role", "You are a customer service representative.")
+```cpp
+// Simple section
+agent.prompt_add_section("Role", "You are a customer service representative.");
 
-# Section with bullets
-agent.prompt_add_section(
-    "Guidelines", 
-    "Follow these principles:",
-    bullets=["Be helpful", "Stay professional", "Listen carefully"]
-)
+// Section with bullets (empty body, then the bullets vector)
+agent.prompt_add_section("Guidelines", "Follow these principles:",
+    {"Be helpful", "Stay professional", "Listen carefully"});
 
-# Numbered bullets
-agent.prompt_add_section(
-    "Process",
-    "Follow these steps:",
-    bullets=["Greet the customer", "Identify their need", "Provide solution"],
-    numbered_bullets=True
-)
+// A process section with ordered steps
+agent.prompt_add_section("Process", "Follow these steps:",
+    {"Greet the customer", "Identify their need", "Provide solution"});
 ```
 
 ##### `prompt_add_to_section`
 
-```python
-def prompt_add_to_section(
-    title: str, 
-    body: Optional[str] = None, 
-    bullet: Optional[str] = None, 
-    bullets: Optional[List[str]] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& prompt_add_to_section(const std::string& title,
+                                 const std::string& body = "",
+                                 const std::vector<std::string>& bullets = {});
 ```
 Add content to an existing prompt section.
 
 **Parameters:**
-- `title` (str): Title of existing section to modify
-- `body` (Optional[str]): Additional body text to append
-- `bullet` (Optional[str]): Single bullet point to add
-- `bullets` (Optional[List[str]]): Multiple bullet points to add
+- `title` (`std::string`): Title of the existing section to modify
+- `body` (`std::string`): Additional body text to append (default: `""`)
+- `bullets` (`std::vector<std::string>`): Bullet points to add (default: empty)
 
 **Usage:**
-```python
-# Add body text to existing section
-agent.prompt_add_to_section("Guidelines", "Remember to always verify customer identity.")
+```cpp
+// Add body text to existing section
+agent.prompt_add_to_section("Guidelines", "Remember to always verify customer identity.");
 
-# Add single bullet
-agent.prompt_add_to_section("Process", bullet="Document the interaction")
-
-# Add multiple bullets
-agent.prompt_add_to_section("Process", bullets=["Follow up", "Close ticket"])
+// Add bullets to an existing section
+agent.prompt_add_to_section("Process", "", {"Document the interaction"});
+agent.prompt_add_to_section("Process", "", {"Follow up", "Close ticket"});
 ```
 
 ##### `prompt_add_subsection`
 
-```python
-def prompt_add_subsection(
-    parent_title: str, 
-    title: str, 
-    body: str = "", 
-    bullets: Optional[List[str]] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& prompt_add_subsection(const std::string& parent_title,
+                                 const std::string& title,
+                                 const std::string& body = "",
+                                 const std::vector<std::string>& bullets = {});
 ```
 Add a subsection to an existing prompt section.
 
 **Parameters:**
-- `parent_title` (str): Title of parent section
-- `title` (str): Subsection title
-- `body` (str): Subsection content (default: "")
-- `bullets` (Optional[List[str]]): Subsection bullet points
+- `parent_title` (`std::string`): Title of the parent section
+- `title` (`std::string`): Subsection title
+- `body` (`std::string`): Subsection content (default: `""`)
+- `bullets` (`std::vector<std::string>`): Subsection bullet points (default: empty)
 
 **Usage:**
-```python
-agent.prompt_add_subsection(
-    "Guidelines",
-    "Escalation Rules", 
+```cpp
+agent.prompt_add_subsection("Guidelines", "Escalation Rules",
     "Escalate when:",
-    bullets=["Customer is angry", "Technical issue beyond scope"]
-)
+    {"Customer is angry", "Technical issue beyond scope"});
 ```
 
 ### Voice and Language Configuration
 
 ##### `add_language`
 
-```python
-def add_language(
-    name: str, 
-    code: str, 
-    voice: str, 
-    speech_fillers: Optional[List[str]] = None, 
-    function_fillers: Optional[List[str]] = None, 
-    engine: Optional[str] = None, 
-    model: Optional[str] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_language(const signalwire::agent::LanguageConfig& lang);
 ```
-Configure voice and language settings for the agent.
+Configure voice and language settings for the agent. `agent::LanguageConfig` is a struct whose fields are `{name, code, voice, engine, model, speech_fillers, function_fillers, params}`; only `name`, `code`, and `voice` are required, and it is brace-initialized at the call site.
 
-**Parameters:**
-- `name` (str): Human-readable language name
-- `code` (str): Language code (e.g., "en-US", "es-ES")
-- `voice` (str): Voice identifier (e.g., "rime.spore", "nova.luna")
-- `speech_fillers` (Optional[List[str]]): Filler phrases during speech processing
-- `function_fillers` (Optional[List[str]]): Filler phrases during function execution
-- `engine` (Optional[str]): TTS engine to use
-- `model` (Optional[str]): AI model to use
+**LanguageConfig fields:**
+- `name` (`std::string`): Human-readable language name
+- `code` (`std::string`): Language code (e.g., `"en-US"`, `"es-ES"`)
+- `voice` (`std::string`): Voice identifier (e.g., `"rime.spore"`, `"nova.luna"`)
+- `engine` (`std::string`): TTS engine to use (optional)
+- `model` (`std::string`): Explicit TTS model name (optional)
+- `speech_fillers` (`std::vector<std::string>`): Filler phrases during speech processing (optional)
+- `function_fillers` (`std::vector<std::string>`): Filler phrases during function execution (optional)
+- `params` (`json`): Per-language engine-specific tuning (optional)
 
 **Usage:**
-```python
-# Basic language setup
-agent.add_language("English", "en-US", "rime.spore")
+```cpp
+// Basic language setup (name, code, voice)
+agent.add_language({"English", "en-US", "rime.spore"});
 
-# With custom fillers
-agent.add_language(
-    "English", 
-    "en-US", 
-    "nova.luna",
-    speech_fillers=["Let me think...", "One moment..."],
-    function_fillers=["Processing...", "Looking that up..."]
-)
+// With an explicit engine and both filler kinds
+signalwire::agent::LanguageConfig lang;
+lang.name = "English";
+lang.code = "en-US";
+lang.voice = "nova.luna";
+lang.speech_fillers = {"Let me think...", "One moment..."};
+lang.function_fillers = {"Processing...", "Looking that up..."};
+agent.add_language(lang);
 ```
 
-##### `set_languages(languages: List[Dict[str, Any]]) -> AgentBase`
-Set multiple language configurations at once.
+##### `set_languages(const std::vector<LanguageConfig>& langs) -> AgentBase&`
+Set multiple language configurations at once, replacing any existing list.
 
 **Parameters:**
-- `languages` (List[Dict]): List of language configuration dictionaries
+- `langs` (`std::vector<LanguageConfig>`): List of language configurations
 
 **Usage:**
-```python
-agent.set_languages([
-    {"name": "English", "code": "en-US", "voice": "rime.spore"},
-    {"name": "Spanish", "code": "es-ES", "voice": "nova.luna"}
-])
+```cpp
+agent.set_languages({
+    {"English", "en-US", "rime.spore"},
+    {"Spanish", "es-ES", "nova.luna"}
+});
+```
+
+Set engine-specific tuning on an already-added language with `set_language_params(code, params)`:
+
+```cpp
+agent.set_language_params("en-US", {{"speed", 1.1}});
 ```
 
 ### Speech Recognition Configuration
 
-##### `add_hint(hint: str) -> AgentBase`
+##### `add_hint(const std::string& hint) -> AgentBase&`
 Add a single speech recognition hint.
 
 **Parameters:**
-- `hint` (str): Word or phrase to improve recognition accuracy
+- `hint` (`std::string`): Word or phrase to improve recognition accuracy
 
 **Usage:**
-```python
-agent.add_hint("SignalWire")
+```cpp
+agent.add_hint("SignalWire");
 ```
 
-##### `add_hints(hints: List[str]) -> AgentBase`
+##### `add_hints(const std::vector<std::string>& hints) -> AgentBase&`
 Add multiple speech recognition hints.
 
 **Parameters:**
-- `hints` (List[str]): List of words/phrases for better recognition
+- `hints` (`std::vector<std::string>`): List of words/phrases for better recognition
 
 **Usage:**
-```python
-agent.add_hints(["SignalWire", "SWML", "API", "webhook", "SIP"])
+```cpp
+agent.add_hints({"SignalWire", "SWML", "API", "webhook", "SIP"});
 ```
 
 ##### `add_pattern_hint`
 
-```python
-def add_pattern_hint(
-    hint: str, 
-    pattern: str, 
-    replace: str, 
-    ignore_case: bool = False
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_pattern_hint(const std::string& hint,
+                            const std::string& pattern,
+                            const std::string& replace,
+                            bool ignore_case = false);
 ```
-Add a pattern-based hint for speech recognition.
+Add a structured pattern-based hint for speech recognition. No-op unless `hint`, `pattern`, and `replace` are all non-empty.
 
 **Parameters:**
-- `hint` (str): The hint phrase
-- `pattern` (str): Regex pattern to match
-- `replace` (str): Replacement text
-- `ignore_case` (bool): Case-insensitive matching (default: False)
+- `hint` (`std::string`): The hint phrase
+- `pattern` (`std::string`): Regex pattern to match
+- `replace` (`std::string`): Replacement text
+- `ignore_case` (`bool`): Case-insensitive matching (default: `false`)
 
 **Usage:**
-```python
-agent.add_pattern_hint(
-    "phone number",
-    r"(\d{3})-(\d{3})-(\d{4})",
-    r"(\1) \2-\3"
-)
+```cpp
+agent.add_pattern_hint("phone number",
+                       "(\\d{3})-(\\d{3})-(\\d{4})",
+                       "(\\1) \\2-\\3");
 ```
 
 ##### `add_pronunciation`
 
-```python
-def add_pronunciation(
-    replace: str, 
-    with_text: str, 
-    ignore_case: bool = False
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_pronunciation(const std::string& replace_val,
+                             const std::string& with_val,
+                             bool ignore_case = false);
 ```
-Add pronunciation rules for text-to-speech.
+Add a pronunciation rule for text-to-speech.
 
 **Parameters:**
-- `replace` (str): Text to replace
-- `with_text` (str): Replacement pronunciation
-- `ignore_case` (bool): Case-insensitive replacement (default: False)
+- `replace_val` (`std::string`): Text to replace
+- `with_val` (`std::string`): Replacement pronunciation
+- `ignore_case` (`bool`): Case-insensitive replacement (default: `false`)
 
 **Usage:**
-```python
-agent.add_pronunciation("API", "A P I")
-agent.add_pronunciation("SWML", "swim-el")
+```cpp
+agent.add_pronunciation("API", "A P I");
+agent.add_pronunciation("SWML", "swim-el");
 ```
 
 ##### `set_pronunciations`
 
-```python
-def set_pronunciations(
-    pronunciations: List[Dict[str, Any]]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_pronunciations(const std::vector<signalwire::agent::Pronunciation>& pronuns);
 ```
-Set multiple pronunciation rules at once.
+Set multiple pronunciation rules at once. `agent::Pronunciation` is a struct with fields `{replace_val, with_val, ignore_case}`.
 
 **Parameters:**
-- `pronunciations` (List[Dict]): List of pronunciation rule dictionaries
+- `pronuns` (`std::vector<Pronunciation>`): List of pronunciation rules
 
 **Usage:**
-```python
-agent.set_pronunciations([
-    {"replace": "API", "with": "A P I"},
-    {"replace": "SWML", "with": "swim-el", "ignore_case": True}
-])
+```cpp
+agent.set_pronunciations({
+    {"API", "A P I", false},
+    {"SWML", "swim-el", true}
+});
 ```
 
 ### AI Parameters Configuration
 
-##### `set_param(key: str, value: Any) -> AgentBase`
+##### `set_param(const std::string& key, const json& value) -> AgentBase&`
 Set a single AI parameter.
 
 **Parameters:**
-- `key` (str): Parameter name
-- `value` (Any): Parameter value
+- `key` (`std::string`): Parameter name
+- `value` (`json`): Parameter value
 
 **Usage:**
-```python
-agent.set_param("ai_model", "gpt-4.1-nano")
-agent.set_param("end_of_speech_timeout", 500)
+```cpp
+agent.set_param("ai_model", "gpt-4.1-nano");
+agent.set_param("end_of_speech_timeout", 500);
 ```
 
-##### `set_params(params: Dict[str, Any]) -> AgentBase`
+##### `set_params(const json& params) -> AgentBase&`
 Set multiple AI parameters at once.
 
 **Parameters:**
-- `params` (Dict[str, Any]): Dictionary of parameter key-value pairs
+- `params` (`json`): Object of parameter key-value pairs
 
 **Common Parameters:**
 - `ai_model`: AI model to use ("gpt-4.1-nano", "gpt-4.1-mini", etc.)
@@ -467,152 +431,135 @@ Set multiple AI parameters at once.
 - `top_p`: Nucleus sampling parameter (0.0 to 1.0)
 
 **Usage:**
-```python
+```cpp
 agent.set_params({
-    "ai_model": "gpt-4.1-nano",
-    "end_of_speech_timeout": 500,
-    "attention_timeout": 15000,
-    "background_file_volume": -20,
-    "temperature": 0.7
-})
+    {"ai_model", "gpt-4.1-nano"},
+    {"end_of_speech_timeout", 500},
+    {"attention_timeout", 15000},
+    {"background_file_volume", -20},
+    {"temperature", 0.7}
+});
 ```
 
 ### Global Data Management
 
-##### `set_global_data(data: Dict[str, Any]) -> AgentBase`
+##### `set_global_data(const json& data) -> AgentBase&`
 Set global data available to the AI and functions.
 
 **Parameters:**
-- `data` (Dict[str, Any]): Global data dictionary
+- `data` (`json`): Global data object
 
 **Usage:**
-```python
+```cpp
 agent.set_global_data({
-    "company_name": "Acme Corp",
-    "support_hours": "9 AM - 5 PM EST",
-    "escalation_number": "+1-555-0123"
-})
+    {"company_name", "Acme Corp"},
+    {"support_hours", "9 AM - 5 PM EST"},
+    {"escalation_number", "+1-555-0123"}
+});
 ```
 
-##### `update_global_data(data: Dict[str, Any]) -> AgentBase`
+##### `update_global_data(const json& data) -> AgentBase&`
 Update existing global data (merge with existing).
 
 **Parameters:**
-- `data` (Dict[str, Any]): Data to merge with existing global data
+- `data` (`json`): Data to merge with existing global data
 
 **Usage:**
-```python
+```cpp
 agent.update_global_data({
-    "current_promotion": "20% off all services",
-    "promotion_expires": "2024-12-31"
-})
+    {"current_promotion", "20% off all services"},
+    {"promotion_expires", "2024-12-31"}
+});
 ```
 
 ### Function Definition
 
 ##### `define_tool`
 
-```python
-def define_tool(
-    name: str,
-    description: str,
-    parameters: Dict[str, Any],
-    handler: Callable,
-    secure: bool = True,
-    fillers: Optional[Dict[str, List[str]]] = None,
-    webhook_url: Optional[str] = None,
-    is_typed_handler: bool = False,
-    **swaig_fields
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& define_tool(const std::string& name,
+                       const std::string& description,
+                       const json& parameters,
+                       signalwire::swaig::ToolHandler handler,
+                       bool secure = false);
+
+// Overload taking a fully-built ToolDefinition
+signalwire::agent::AgentBase& define_tool(const signalwire::swaig::ToolDefinition& tool);
 ```
-Define a custom SWAIG function/tool.
+Define a custom SWAIG function/tool. The handler is a `swaig::ToolHandler`, which is `std::function<swaig::FunctionResult(const json& args, const json& raw_data)>`.
 
 **Parameters:**
-- `name` (str): Function name
-- `description` (str): Function description for AI
-- `parameters` (Dict[str, Any]): JSON schema for function parameters. If omitted when using the decorator and the handler has type-hinted parameters, the schema is inferred automatically from the type hints.
-- `handler` (Callable): Function to execute when called
-- `secure` (bool): Require security token (default: True)
-- `fillers` (Optional[Dict[str, List[str]]]): Language-specific filler phrases
-- `webhook_url` (Optional[str]): Custom webhook URL
-- `**swaig_fields`: Additional SWAIG function properties
+- `name` (`std::string`): Function name
+- `description` (`std::string`): Function description for the AI (prompt engineering — it tells the model WHEN to call the tool)
+- `parameters` (`json`): JSON-Schema object for function parameters
+- `handler` (`swaig::ToolHandler`): Callable executed when the tool is invoked
+- `secure` (`bool`): Require a valid per-call security token (default: `false`)
 
 **Usage:**
-```python
-def get_weather(args, raw_data):
-    location = args.get("location", "Unknown")
-    return SwaigFunctionResult(f"The weather in {location} is sunny and 75°F")
-
-agent.define_tool(
-    name="get_weather",
-    description="Get current weather for a location",
-    parameters={
-        "type": "object",
-        "properties": {
-            "location": {
-                "type": "string",
-                "description": "City name"
-            }
-        },
-        "required": ["location"]
-    },
-    handler=get_weather,
-    fillers={"en-US": ["Checking weather...", "Looking up forecast..."]}
-)
+```cpp
+agent.define_tool("get_weather", "Get current weather for a location",
+    {{"type", "object"}, {"properties", {
+        {"location", {{"type", "string"}, {"description", "City name"}}}
+    }}, {"required", {"location"}}},
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+        (void)raw;
+        std::string location = args.value("location", "Unknown");
+        return signalwire::swaig::FunctionResult("The weather in " + location + " is sunny and 75F");
+    });
 ```
 
-##### `@AgentBase.tool(name=None, **kwargs)` (Class Decorator)
-Decorator for defining tools as class methods.
+##### Building parameter schemas with `swaig::ParameterSchema`
 
-**Parameters:**
-- `name` (Optional[str]): Function name (defaults to method name)
-- `**kwargs`: Same parameters as `define_tool()`
+Writing JSON Schema by hand is error-prone. The `swaig::ParameterSchema` builder produces byte-identical wire JSON via a typed fluent API and converts implicitly to `json`:
 
-When `parameters` is omitted and the handler has type-hinted parameters (beyond `self`), the schema is inferred automatically from the type hints. The description is extracted from the docstring's first line, and per-parameter descriptions come from the `Args:` block.
+```cpp
+auto params = signalwire::swaig::ParameterSchema{}
+    .string("location", "City name")
+    .enum_of("units", {"celsius", "fahrenheit"}, "Temperature units")
+    .required({"location"});
 
-**Usage (explicit schema):**
-```python
-class MyAgent(AgentBase):
-    @AgentBase.tool(
-        description="Get current time",
-        parameters={"type": "object", "properties": {}}
-    )
-    def get_time(self, args, raw_data):
-        import datetime
-        return SwaigFunctionResult(f"Current time: {datetime.datetime.now()}")
+agent.define_tool("get_weather", "Get current weather for a location", params,
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+        (void)raw;
+        return signalwire::swaig::FunctionResult("Weather in " + args.value("location", ""));
+    });
 ```
 
-**Usage (type-hinted, schema inferred):**
-```python
-class MyAgent(AgentBase):
-    @AgentBase.tool(name="get_weather")
-    def get_weather(self, city: str, units: str = "celsius"):
-        """Get the weather forecast.
+The C++ SDK has no method-decorator mechanism. Tools that Python defines as decorated class methods are registered the same way as any other tool — call `define_tool(...)` in the agent's constructor, passing a lambda (or a bound member function) as the handler:
 
-        Args:
-            city: Name of the city
-            units: Temperature units
-        """
-        return SwaigFunctionResult(f"Weather in {city}")
+```cpp
+class MyAgent : public signalwire::agent::AgentBase {
+public:
+    MyAgent() : AgentBase("my-agent", "/agent") {
+        define_tool("get_time", "Get current time",
+            {{"type", "object"}, {"properties", json::object()}},
+            [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+                (void)args; (void)raw;
+                auto t = std::time(nullptr);
+                char buf[32];
+                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&t));
+                return signalwire::swaig::FunctionResult(std::string("Current time: ") + buf);
+            });
+    }
+};
 ```
 
 ##### `register_swaig_function`
 
-```python
-def register_swaig_function(
-    function_dict: Dict[str, Any]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& register_swaig_function(const json& func_def);
 ```
-Register a pre-built SWAIG function dictionary.
+Register a pre-built SWAIG function definition (for example, one produced by `DataMap::to_swaig_function()`).
 
 **Parameters:**
-- `function_dict` (Dict[str, Any]): Complete SWAIG function definition
+- `func_def` (`json`): Complete SWAIG function definition
 
 **Usage:**
-```python
-# Register a DataMap tool
-weather_tool = DataMap('get_weather').webhook('GET', 'https://api.weather.com/...')
-agent.register_swaig_function(weather_tool.to_swaig_function())
+```cpp
+// Register a DataMap tool
+auto weather_tool = signalwire::datamap::DataMap("get_weather")
+    .webhook("GET", "https://api.weather.com/...");
+agent.register_swaig_function(weather_tool.to_swaig_function());
 ```
 
 ### Session Lifecycle Hooks
@@ -620,35 +567,33 @@ agent.register_swaig_function(weather_tool.to_swaig_function())
 SignalWire AI agents support special SWAIG functions that are automatically called at specific points in the conversation lifecycle:
 
 ##### `startup_hook`
-Called when a new conversation/call begins.
+Called when a new conversation/call begins. Implement it as an ordinary tool whose name is exactly `startup_hook`.
 
 **Implementation:**
-```python
-@AgentBase.tool(
-    name="startup_hook",
-    description="Called when a new conversation starts to initialize state",
-    parameters={}
-)
-def startup_hook(self, args, raw_data):
-    call_id = raw_data.get("call_id")
-    # Initialize session resources, load user data, etc.
-    return SwaigFunctionResult("Session initialized")
+```cpp
+agent.define_tool("startup_hook", "Called when a new conversation starts to initialize state",
+    {{"type", "object"}, {"properties", json::object()}},
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+        (void)args;
+        std::string call_id = raw.value("call_id", "");
+        // Initialize session resources, load user data, etc.
+        return signalwire::swaig::FunctionResult("Session initialized");
+    });
 ```
 
 ##### `hangup_hook`
-Called when a conversation/call ends.
+Called when a conversation/call ends. Implement it as an ordinary tool whose name is exactly `hangup_hook`.
 
 **Implementation:**
-```python
-@AgentBase.tool(
-    name="hangup_hook",
-    description="Called when conversation ends to clean up resources",
-    parameters={}
-)
-def hangup_hook(self, args, raw_data):
-    call_id = raw_data.get("call_id")
-    # Clean up resources, save session data, etc.
-    return SwaigFunctionResult("Session ended")
+```cpp
+agent.define_tool("hangup_hook", "Called when conversation ends to clean up resources",
+    {{"type", "object"}, {"properties", json::object()}},
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+        (void)args;
+        std::string call_id = raw.value("call_id", "");
+        // Clean up resources, save session data, etc.
+        return signalwire::swaig::FunctionResult("Session ended");
+    });
 ```
 
 **Common Use Cases:**
@@ -662,17 +607,19 @@ def hangup_hook(self, args, raw_data):
 
 ##### `add_skill`
 
-```python
-def add_skill(
-    skill_name: str, 
-    params: Optional[Dict[str, Any]] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_skill(const std::string& skill_name,
+                     const json& params = json::object());
+
+// Typed-enum overload for the built-in skill closed set
+signalwire::agent::AgentBase& add_skill(signalwire::skills::SkillName skill_name,
+                     const json& params = json::object());
 ```
-Add a modular skill to the agent.
+Add a modular skill to the agent. `params` is an optional JSON object of configuration.
 
 **Parameters:**
-- `skill_name` (str): Name of the skill to add
-- `params` (Optional[Dict[str, Any]]): Skill configuration parameters
+- `skill_name` (`std::string` or `skills::SkillName`): Name of the skill to add
+- `params` (`json`): Skill configuration parameters (default: empty object)
 
 **Available Skills:**
 - `datetime`: Current date/time information
@@ -682,83 +629,84 @@ Add a modular skill to the agent.
 - `native_vector_search`: Local document search
 
 **Usage:**
-```python
-# Simple skill
-agent.add_skill("datetime")
-agent.add_skill("math")
+```cpp
+// Simple skill
+agent.add_skill("datetime");
+agent.add_skill("math");
 
-# Skill with configuration
-agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id",
-    "num_results": 3
-})
+// Typed-enum form (autocompleted, typo-checked) loads the identical skill
+agent.add_skill(signalwire::skills::SkillName::Datetime);
 
-# Multiple instances with different names
+// Skill with configuration
 agent.add_skill("web_search", {
-    "api_key": "your-api-key",
-    "search_engine_id": "general-engine",
-    "tool_name": "search_general"
-})
+    {"api_key", "your-google-api-key"},
+    {"search_engine_id", "your-search-engine-id"},
+    {"num_results", 3}
+});
+
+// Multiple instances with different tool names
+agent.add_skill("web_search", {
+    {"api_key", "your-api-key"},
+    {"search_engine_id", "general-engine"},
+    {"tool_name", "search_general"}
+});
 
 agent.add_skill("web_search", {
-    "api_key": "your-api-key", 
-    "search_engine_id": "news-engine",
-    "tool_name": "search_news"
-})
+    {"api_key", "your-api-key"},
+    {"search_engine_id", "news-engine"},
+    {"tool_name", "search_news"}
+});
 ```
 
-##### `remove_skill(skill_name: str) -> AgentBase`
+##### `remove_skill(const std::string& skill_name) -> AgentBase&`
 Remove a skill from the agent.
 
 **Parameters:**
-- `skill_name` (str): Name of skill to remove
+- `skill_name` (`std::string`): Name of skill to remove
 
 **Usage:**
-```python
-agent.remove_skill("web_search")
+```cpp
+agent.remove_skill("web_search");
 ```
 
-##### `list_skills() -> List[str]`
-Get list of currently added skills.
+##### `list_skills() -> std::vector<std::string>`
+Get the list of currently added skills.
 
 **Returns:**
-- List[str]: Names of active skills
+- `std::vector<std::string>`: Names of active skills
 
 **Usage:**
-```python
-active_skills = agent.list_skills()
-print(f"Active skills: {active_skills}")
+```cpp
+std::vector<std::string> active_skills = agent.list_skills();
 ```
 
-##### `has_skill(skill_name: str) -> bool`
-Check if a skill is currently added.
+##### `has_skill(const std::string& skill_name) -> bool`
+Check whether a skill is currently added.
 
 **Parameters:**
-- `skill_name` (str): Name of skill to check
+- `skill_name` (`std::string`): Name of skill to check
 
 **Returns:**
-- bool: True if skill is active
+- `bool`: `true` if the skill is active
 
 **Usage:**
-```python
-if agent.has_skill("web_search"):
-    print("Web search is available")
+```cpp
+if (agent.has_skill("web_search")) {
+    // Web search is available
+}
 ```
 
 ### Native Functions
 
 ##### `set_native_functions`
 
-```python
-def set_native_functions(
-    function_names: List[str]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_native_functions(const std::vector<std::string>& funcs);
 ```
 Enable specific native SWML functions.
 
 **Parameters:**
-- `function_names` (List[str]): List of native function names to enable
+- `funcs` (`std::vector<std::string>`): List of native function names to enable
 
 **Available Native Functions:**
 - `transfer`: Transfer calls
@@ -768,21 +716,19 @@ Enable specific native SWML functions.
 - `send_sms`: Send SMS messages
 
 **Usage:**
-```python
-agent.set_native_functions(["transfer", "hangup", "send_sms"])
+```cpp
+agent.set_native_functions({"transfer", "hangup", "send_sms"});
 ```
 
 ##### `set_internal_fillers`
 
-```python
-def set_internal_fillers(
-    internal_fillers: Dict[str, Dict[str, List[str]]]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_internal_fillers(const json& fillers);
 ```
 Set custom filler phrases for internal/native SWAIG functions.
 
 **Parameters:**
-- `internal_fillers` (Dict[str, Dict[str, List[str]]]): Function name → language code → filler phrases
+- `fillers` (`json`): Object mapping function name → language code → filler phrases
 
 **Available Internal Functions:**
 - `next_step`: Moving between workflow steps (contexts system)
@@ -793,165 +739,157 @@ Set custom filler phrases for internal/native SWAIG functions.
 - `get_visual_input`: Processing visual data
 
 **Usage:**
-```python
+```cpp
 agent.set_internal_fillers({
-    "next_step": {
-        "en-US": ["Moving to the next step...", "Let's continue..."],
-        "es": ["Pasando al siguiente paso...", "Continuemos..."]
-    },
-    "check_time": {
-        "en-US": ["Let me check the time...", "Getting current time..."]
-    }
-})
+    {"next_step", {
+        {"en-US", {"Moving to the next step...", "Let's continue..."}},
+        {"es", {"Pasando al siguiente paso...", "Continuemos..."}}
+    }},
+    {"check_time", {
+        {"en-US", {"Let me check the time...", "Getting current time..."}}
+    }}
+});
 ```
 
 ##### `add_internal_filler`
 
-```python
-def add_internal_filler(
-    function_name: str, 
-    language_code: str, 
-    fillers: List[str]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_internal_filler(const std::string& function_name,
+                               const std::string& language_code,
+                               const std::vector<std::string>& fillers);
 ```
 Add internal fillers for a specific function and language.
 
 **Parameters:**
-- `function_name` (str): Name of the internal function
-- `language_code` (str): Language code (e.g., "en-US", "es", "fr")
-- `fillers` (List[str]): List of filler phrases
+- `function_name` (`std::string`): Name of the internal function
+- `language_code` (`std::string`): Language code (e.g., `"en-US"`, `"es"`, `"fr"`)
+- `fillers` (`std::vector<std::string>`): List of filler phrases
 
 **Usage:**
-```python
-agent.add_internal_filler("next_step", "en-US", [
+```cpp
+agent.add_internal_filler("next_step", "en-US", {
     "Great! Let's move to the next step...",
     "Perfect! Moving forward..."
-])
+});
 ```
 
 ### Function Includes
 
 ##### `add_function_include`
 
-```python
-def add_function_include(
-    url: str, 
-    functions: List[str], 
-    meta_data: Optional[Dict[str, Any]] = None
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& add_function_include(const json& include);
 ```
-Include external SWAIG functions from another service.
+Include external SWAIG functions from another service. The `include` object carries `url`, `functions`, and optional `meta_data` keys.
 
-**Parameters:**
-- `url` (str): URL of external SWAIG service
-- `functions` (List[str]): List of function names to include
-- `meta_data` (Optional[Dict[str, Any]]): Additional metadata
+**Include object keys:**
+- `url` (string): URL of the external SWAIG service
+- `functions` (array of strings): Function names to include
+- `meta_data` (object, optional): Additional metadata
 
 **Usage:**
-```python
-agent.add_function_include(
-    "https://external-service.com/swaig",
-    ["external_function1", "external_function2"],
-    meta_data={"service": "external", "version": "1.0"}
-)
+```cpp
+agent.add_function_include({
+    {"url", "https://external-service.com/swaig"},
+    {"functions", {"external_function1", "external_function2"}},
+    {"meta_data", {{"service", "external"}, {"version", "1.0"}}}
+});
 ```
 
 ##### `set_function_includes`
 
-```python
-def set_function_includes(
-    includes: List[Dict[str, Any]]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_function_includes(const std::vector<json>& includes);
 ```
 Set multiple function includes at once.
 
 **Parameters:**
-- `includes` (List[Dict[str, Any]]): List of function include configurations
+- `includes` (`std::vector<json>`): List of function-include configurations
 
 **Usage:**
-```python
-agent.set_function_includes([
+```cpp
+agent.set_function_includes({
     {
-        "url": "https://service1.com/swaig",
-        "functions": ["func1", "func2"]
+        {"url", "https://service1.com/swaig"},
+        {"functions", {"func1", "func2"}}
     },
     {
-        "url": "https://service2.com/swaig", 
-        "functions": ["func3"],
-        "meta_data": {"priority": "high"}
+        {"url", "https://service2.com/swaig"},
+        {"functions", {"func3"}},
+        {"meta_data", {{"priority", "high"}}}
     }
-])
+});
 ```
 
 ### Webhook Configuration
 
-##### `set_web_hook_url(url: str) -> AgentBase`
-Set default webhook URL for SWAIG functions.
+##### `set_web_hook_url(const std::string& url) -> AgentBase&`
+Set the default webhook URL for SWAIG functions. (Alias of `set_webhook_url`; the Python spelling splits `web_hook`.)
 
 **Parameters:**
-- `url` (str): Default webhook URL
+- `url` (`std::string`): Default webhook URL
 
 **Usage:**
-```python
-agent.set_web_hook_url("https://myserver.com/webhook")
+```cpp
+agent.set_web_hook_url("https://myserver.com/webhook");
 ```
 
-##### `set_post_prompt_url(url: str) -> AgentBase`
-Set URL for post-prompt processing.
+##### `set_post_prompt_url(const std::string& url) -> AgentBase&`
+Set the URL for post-prompt processing.
 
 **Parameters:**
-- `url` (str): Post-prompt webhook URL
+- `url` (`std::string`): Post-prompt webhook URL
 
 **Usage:**
-```python
-agent.set_post_prompt_url("https://myserver.com/post-prompt")
+```cpp
+agent.set_post_prompt_url("https://myserver.com/post-prompt");
 ```
 
-##### `add_swaig_query_params(params: dict) -> AgentBase`
-Add query parameters to be included in all SWAIG webhook URLs.
+##### `add_swaig_query_param(const std::string& key, const std::string& value)` / `add_swaig_query_params(const json& params)`
+Add query parameters to be included in all SWAIG webhook URLs. `add_swaig_query_param` adds one at a time; `add_swaig_query_params` adds several from a JSON object.
 
 This is useful for preserving dynamic configuration state across SWAIG callbacks. For example, if your dynamic config adds skills based on query parameters, you can pass those same parameters through to the SWAIG webhook so the same configuration is applied.
 
-**Parameters:**
-- `params` (dict): Dictionary of query parameter key-value pairs
-
 **Usage:**
-```python
-# In dynamic config callback, preserve configuration parameters
-def configure_agent(query_params, headers, body, agent):
-    customer_id = query_params.get("customer_id")
-    if customer_id:
-        # Pass through to SWAIG callbacks
-        agent.add_swaig_query_params({"customer_id": customer_id})
-        agent.add_skill("customer_lookup", {"customer_id": customer_id})
-
-agent.set_dynamic_config_callback(configure_agent)
+```cpp
+// In a dynamic config callback, preserve configuration parameters
+agent.set_dynamic_config_callback(
+    [](const std::map<std::string, std::string>& query_params,
+       const json& body, const std::map<std::string, std::string>& headers,
+       signalwire::agent::AgentBase& agent) {
+        (void)body; (void)headers;
+        if (auto it = query_params.find("customer_id"); it != query_params.end()) {
+            // Pass through to SWAIG callbacks
+            agent.add_swaig_query_param("customer_id", it->second);
+            agent.add_skill("customer_lookup", {{"customer_id", it->second}});
+        }
+    });
 ```
 
-##### `clear_swaig_query_params() -> AgentBase`
+##### `clear_swaig_query_params() -> AgentBase&`
 Clear all SWAIG query parameters.
 
 **Usage:**
-```python
-agent.clear_swaig_query_params()
+```cpp
+agent.clear_swaig_query_params();
 ```
 
 ### Debug Events
 
 ##### `enable_debug_events`
 
-```python
-def enable_debug_events(level: int = 1) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& enable_debug_events(bool enable = true);
 ```
 Enable the debug event webhook for this agent. When enabled, the AI module will POST real-time debug events to a `/debug_events` endpoint on this agent during calls. Events are automatically logged via the agent's structured logger and can optionally be handled with a custom callback via `on_debug_event()`.
 
 **Parameters:**
-- `level` (int): Debug event verbosity level. `1` = high-level events (barge, errors, session start/end, step changes). `2+` = adds high-volume events (every LLM request/response, conversation_add). Default: `1`
+- `enable` (`bool`): Enable (`true`) or disable (`false`) debug events. Default: `true`
 
 **Usage:**
-```python
-agent.enable_debug_events()        # level 1 (default)
-agent.enable_debug_events(level=2) # include high-volume events
+```cpp
+agent.enable_debug_events();       // enable
+agent.enable_debug_events(false);  // disable
 ```
 
 **How it works:**
@@ -990,184 +928,189 @@ agent.enable_debug_events(level=2) # include high-volume events
 
 These methods allow you to customize the SWML call flow by inserting verbs at different stages of the call lifecycle.
 
-##### `add_pre_answer_verb(verb_name: str, config: dict) -> AgentBase`
+##### `add_pre_answer_verb(const std::string& verb_name, const json& params) -> AgentBase&`
 Add a verb to run before the call is answered (while still ringing).
 
 **Safe pre-answer verbs:** `transfer`, `execute`, `return`, `label`, `goto`, `request`, `switch`, `cond`, `if`, `eval`, `set`, `unset`, `hangup`, `send_sms`, `sleep`, `stop_record_call`, `stop_denoise`, `stop_tap`
 
 **Parameters:**
-- `verb_name` (str): The SWML verb name
-- `config` (dict): Verb configuration dictionary
+- `verb_name` (`std::string`): The SWML verb name
+- `params` (`json`): Verb configuration object
 
 **Usage:**
-```python
-# Send SMS before answering
+```cpp
+// Send SMS before answering
 agent.add_pre_answer_verb("send_sms", {
-    "to": "+15551234567",
-    "from": "+15559876543",
-    "body": "Incoming call from AI agent"
-})
+    {"to", "+15551234567"},
+    {"from", "+15559876543"},
+    {"body", "Incoming call from AI agent"}
+});
 
-# Set variables before answer
-agent.add_pre_answer_verb("set", {"call_start": "${system.timestamp}"})
+// Set variables before answer
+agent.add_pre_answer_verb("set", {{"call_start", "${system.timestamp}"}});
 ```
 
-##### `add_answer_verb(config: dict = None) -> AgentBase`
+##### `add_answer_verb(const std::string& verb_name, const json& params) -> AgentBase&`
 Configure the answer verb that connects the call.
 
 **Parameters:**
-- `config` (dict, optional): Answer verb configuration (e.g., `{"max_duration": 3600}`)
+- `verb_name` (`std::string`): The SWML verb name (typically `"answer"`)
+- `params` (`json`): Answer verb configuration (e.g., `{{"max_duration", 3600}}`)
 
 **Usage:**
-```python
-# Set maximum call duration to 1 hour
-agent.add_answer_verb({"max_duration": 3600})
+```cpp
+// Set maximum call duration to 1 hour
+agent.add_answer_verb("answer", {{"max_duration", 3600}});
 ```
 
-##### `add_post_answer_verb(verb_name: str, config: dict) -> AgentBase`
+##### `add_post_answer_verb(const std::string& verb_name, const json& params) -> AgentBase&`
 Add a verb to run after the call is answered but before the AI starts.
 
 **Parameters:**
-- `verb_name` (str): The SWML verb name (e.g., "play", "sleep")
-- `config` (dict): Verb configuration dictionary
+- `verb_name` (`std::string`): The SWML verb name (e.g., `"play"`, `"sleep"`)
+- `params` (`json`): Verb configuration object
 
 **Usage:**
-```python
-# Play welcome message before AI starts
+```cpp
+// Play welcome message before AI starts
 agent.add_post_answer_verb("play", {
-    "url": "say:Welcome to our AI assistant. This call may be recorded."
-})
+    {"url", "say:Welcome to our AI assistant. This call may be recorded."}
+});
 
-# Add a brief pause
-agent.add_post_answer_verb("sleep", {"duration": 1})
+// Add a brief pause
+agent.add_post_answer_verb("sleep", {{"duration", 1}});
 ```
 
-##### `add_post_ai_verb(verb_name: str, config: dict) -> AgentBase`
+##### `add_post_ai_verb(const std::string& verb_name, const json& params) -> AgentBase&`
 Add a verb to run after the AI conversation ends.
 
 **Parameters:**
-- `verb_name` (str): The SWML verb name (e.g., "hangup", "transfer", "request")
-- `config` (dict): Verb configuration dictionary
+- `verb_name` (`std::string`): The SWML verb name (e.g., `"hangup"`, `"transfer"`, `"request"`)
+- `params` (`json`): Verb configuration object
 
 **Usage:**
-```python
-# Clean hangup after AI ends
-agent.add_post_ai_verb("hangup", {})
+```cpp
+// Clean hangup after AI ends
+agent.add_post_ai_verb("hangup", json::object());
 
-# Transfer to human after AI conversation
-agent.add_post_ai_verb("transfer", {"to": "+15551234567"})
+// Transfer to human after AI conversation
+agent.add_post_ai_verb("transfer", {{"to", "+15551234567"}});
 
-# Log call completion
+// Log call completion
 agent.add_post_ai_verb("request", {
-    "url": "https://myserver.com/call-complete",
-    "method": "POST"
-})
+    {"url", "https://myserver.com/call-complete"},
+    {"method", "POST"}
+});
 ```
 
-##### `clear_pre_answer_verbs() -> AgentBase`
+##### `clear_pre_answer_verbs() -> AgentBase&`
 Remove all pre-answer verbs.
 
-##### `clear_post_answer_verbs() -> AgentBase`
+##### `clear_post_answer_verbs() -> AgentBase&`
 Remove all post-answer verbs.
 
-##### `clear_post_ai_verbs() -> AgentBase`
+##### `clear_post_ai_verbs() -> AgentBase&`
 Remove all post-AI verbs.
 
 **Method Chaining Example:**
-```python
-agent.add_pre_answer_verb("set", {"source": "ai_agent"}) \
-     .add_answer_verb({"max_duration": 1800}) \
-     .add_post_answer_verb("play", {"url": "say:Hello!"}) \
-     .add_post_ai_verb("hangup", {})
+```cpp
+agent.add_pre_answer_verb("set", {{"source", "ai_agent"}})
+     .add_answer_verb("answer", {{"max_duration", 1800}})
+     .add_post_answer_verb("play", {{"url", "say:Hello!"}})
+     .add_post_ai_verb("hangup", json::object());
 ```
 
 ### Dynamic Configuration
 
 ##### `set_dynamic_config_callback`
 
-```python
-def set_dynamic_config_callback(
-    callback: Callable[[dict, dict, dict, AgentBase], None]
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& set_dynamic_config_callback(signalwire::agent::DynamicConfigCallback cb);
 ```
-Set callback for per-request dynamic configuration.
+Set a callback for per-request dynamic configuration. `agent::DynamicConfigCallback` is `std::function<void(const std::map<std::string,std::string>& query_params, const json& body_params, const std::map<std::string,std::string>& headers, AgentBase& agent_copy)>` — the callback runs fresh for each request and configures a per-request copy of the agent.
 
 **Parameters:**
-- `callback` (Callable): Function that receives (query_params, headers, body, config)
+- `cb` (`DynamicConfigCallback`): Function that receives `(query_params, body_params, headers, agent_copy)`
 
 **Usage:**
-```python
-def configure_agent(query_params, headers, body, config):
-    # Configure based on request
-    if query_params.get("language") == "spanish":
-        config.add_language("Spanish", "es-ES", "nova.luna")
-    
-    # Set customer-specific data
-    customer_id = headers.get("X-Customer-ID")
-    if customer_id:
-        config.set_global_data({"customer_id": customer_id})
+```cpp
+agent.set_dynamic_config_callback(
+    [](const std::map<std::string, std::string>& query_params,
+       const json& body_params,
+       const std::map<std::string, std::string>& headers,
+       signalwire::agent::AgentBase& agent) {
+        (void)body_params;
 
-agent.set_dynamic_config_callback(configure_agent)
+        // Configure based on request
+        if (auto it = query_params.find("language");
+            it != query_params.end() && it->second == "spanish") {
+            agent.add_language({"Spanish", "es-ES", "nova.luna"});
+        }
+
+        // Set customer-specific data
+        if (auto it = headers.find("X-Customer-ID"); it != headers.end()) {
+            agent.set_global_data({{"customer_id", it->second}});
+        }
+    });
 ```
 
 ### SIP Integration
 
 ##### `enable_sip_routing`
 
-```python
-def enable_sip_routing(
-    auto_map: bool = True, 
-    path: str = "/sip"
-) -> AgentBase
+```cpp
+signalwire::agent::AgentBase& enable_sip_routing(bool enable = true);
+signalwire::agent::AgentBase& auto_map_sip_usernames(bool enable = true);
 ```
-Enable SIP-based routing for voice calls.
+Enable SIP-based routing for voice calls. Automatic mapping of SIP usernames from the agent name/route is toggled separately with `auto_map_sip_usernames`.
 
 **Parameters:**
-- `auto_map` (bool): Automatically map SIP usernames (default: True)
-- `path` (str): SIP routing endpoint path (default: "/sip")
+- `enable` (`bool`): Enable (`true`) or disable (`false`) SIP routing. Default: `true`
 
 **Usage:**
-```python
-agent.enable_sip_routing()
+```cpp
+agent.enable_sip_routing(true);
+agent.auto_map_sip_usernames(true);
 ```
 
-##### `register_sip_username(sip_username: str) -> AgentBase`
+##### `register_sip_username(const std::string& username) -> AgentBase&`
 Register a specific SIP username for this agent.
 
 **Parameters:**
-- `sip_username` (str): SIP username to register
+- `username` (`std::string`): SIP username to register
 
 **Usage:**
-```python
-agent.register_sip_username("support")
-agent.register_sip_username("sales")
+```cpp
+agent.register_sip_username("support");
+agent.register_sip_username("sales");
 ```
 
 ##### `register_routing_callback`
 
-```python
-def register_routing_callback(
-    callback_fn: Callable[[Request, Dict[str, Any]], Optional[str]], 
-    path: str = "/sip"
-) -> None
+```cpp
+using RoutingCallback = std::function<std::string(
+    const json& body, const std::map<std::string, std::string>& headers)>;
+
+signalwire::agent::AgentBase& register_routing_callback(RoutingCallback callback,
+                                     const std::string& path = "/");
 ```
-Register custom routing logic for SIP calls.
+Register custom routing logic for inbound requests. The callback receives the parsed request `body` and `headers` and returns the route to dispatch to (empty string = no override).
 
 **Parameters:**
-- `callback_fn` (Callable): Function that returns agent route based on request
-- `path` (str): Routing endpoint path (default: "/sip")
+- `callback` (`RoutingCallback`): Function that returns an agent route based on the request
+- `path` (`std::string`): Routing endpoint path (default: `"/"`)
 
 **Usage:**
-```python
-def route_call(request, body):
-    sip_username = body.get("sip_username")
-    if sip_username == "support":
-        return "/support-agent"
-    elif sip_username == "sales":
-        return "/sales-agent"
-    return None
-
-agent.register_routing_callback(route_call)
+```cpp
+agent.register_routing_callback(
+    [](const json& body, const std::map<std::string, std::string>& headers) -> std::string {
+        (void)headers;
+        std::string sip_username = body.value("sip_username", "");
+        if (sip_username == "support") return "/support-agent";
+        if (sip_username == "sales") return "/sales-agent";
+        return "";  // no override
+    },
+    "/sip");
 ```
 
 ### Utility Methods
@@ -1178,50 +1121,30 @@ Get the agent's name.
 **Returns:**
 - str: Agent name
 
-##### `get_app()`
-Get the FastAPI application instance.
-
-**Returns:**
-- FastAPI: The underlying FastAPI app
-
-##### `as_router() -> APIRouter`
-Get the agent as a FastAPI router for embedding in larger applications.
-
-**Returns:**
-- APIRouter: FastAPI router instance
-
-**Usage:**
-```python
-# Embed agent in larger FastAPI app
-main_app = FastAPI()
-agent_router = agent.as_router()
-main_app.include_router(agent_router, prefix="/agent")
-```
-
 ### Event Handlers
+
+Handlers are registered as `std::function` callbacks via the `on_*` setters rather than by subclass override.
 
 ##### `on_summary`
 
-```python
-def on_summary(
-    summary: Optional[Dict[str, Any]],
-    raw_data: Optional[Dict[str, Any]] = None
-) -> None
+```cpp
+using SummaryCallback = std::function<void(const json& summary, const json& raw_data)>;
+
+signalwire::agent::AgentBase& on_summary(SummaryCallback cb);
 ```
-Override to handle conversation summaries. This callback is triggered when the AI generates a summary based on your `post_prompt` configuration.
+Register a handler for conversation summaries. This callback is triggered when the AI generates a summary based on your `set_post_prompt(...)` configuration.
 
 **Parameters:**
-- `summary` (Optional[Dict[str, Any]]): Parsed summary data (from `post_prompt_data.parsed[0]`)
-- `raw_data` (Optional[Dict[str, Any]]): Complete raw POST data including `post_prompt_data` with both `raw` and `parsed` fields
+- `summary` (`json`): Parsed summary data (from `post_prompt_data.parsed[0]`)
+- `raw_data` (`json`): Complete raw POST data including `post_prompt_data` with both `raw` and `parsed` fields
 
 **Usage:**
-```python
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="summary-agent", route="/agent")
-
-        # Configure post-prompt to request JSON summary
-        self.set_post_prompt("""
+```cpp
+class MyAgent : public signalwire::agent::AgentBase {
+public:
+    MyAgent() : AgentBase("summary-agent", "/agent") {
+        // Configure post-prompt to request JSON summary
+        set_post_prompt(R"(
         Return a JSON summary of the conversation:
         {
             "topic": "MAIN_TOPIC",
@@ -1229,954 +1152,897 @@ class MyAgent(AgentBase):
             "follow_up_needed": true/false,
             "key_points": ["point1", "point2"]
         }
-        """)
+        )");
 
-    def on_summary(self, summary, raw_data):
-        """Handle conversation summaries after call ends"""
-        if summary:
-            # Access parsed JSON fields directly
-            topic = summary.get("topic", "Unknown")
-            satisfied = summary.get("satisfied", False)
+        on_summary([this](const json& summary, const json& raw_data) {
+            if (!summary.is_null()) {
+                // Access parsed JSON fields directly
+                std::string topic = summary.value("topic", "Unknown");
+                bool satisfied = summary.value("satisfied", false);
 
-            print(f"Call about: {topic}, Customer satisfied: {satisfied}")
+                std::cout << "Call about: " << topic
+                          << ", Customer satisfied: " << satisfied << "\n";
 
-            # Save to database, send to CRM, trigger follow-up, etc.
-            if summary.get("follow_up_needed"):
-                self.schedule_follow_up(summary)
+                // Save to database, send to CRM, trigger follow-up, etc.
+                if (summary.value("follow_up_needed", false)) {
+                    // ...your own follow-up logic here (e.g. enqueue a callback)...
+                }
+            }
 
-        # Access raw summary text if needed
-        if raw_data and 'post_prompt_data' in raw_data:
-            raw_text = raw_data['post_prompt_data'].get('raw', '')
-            print(f"Raw summary: {raw_text}")
+            // Access raw summary text if needed
+            if (raw_data.contains("post_prompt_data")) {
+                std::string raw_text = raw_data["post_prompt_data"].value("raw", "");
+                std::cout << "Raw summary: " << raw_text << "\n";
+            }
+        });
+    }
+};
 ```
 
 ##### `on_debug_event`
 
-```python
-def on_debug_event(handler: Callable) -> Callable
+```cpp
+using DebugEventCallback = std::function<void(const json& event)>;
+
+signalwire::agent::AgentBase& on_debug_event(DebugEventCallback cb);
 ```
-Register a handler for debug webhook events. Use as a decorator. Requires `enable_debug_events()` to be called first.
+Register a handler for debug webhook events. Requires `enable_debug_events()` to be called first.
 
-The handler receives:
-- `event_type` (str): The event label (e.g. `"barge"`, `"llm_error"`, `"session_start"`)
-- `data` (dict): The full event payload including `call_id`, `label`, and event-specific fields
+The callback receives the full event payload as a `json` object, including `label` (the event type, e.g. `"barge"`, `"llm_error"`, `"session_start"`), `call_id`, and event-specific fields.
 
-The handler may be sync or async.
+**Usage:**
+```cpp
+class MyAgent : public signalwire::agent::AgentBase {
+public:
+    MyAgent() : AgentBase("debug-agent", "/agent") {
+        enable_debug_events();
 
-**Usage (decorator style):**
-```python
-agent = AgentBase("my_agent")
-agent.enable_debug_events()
-
-@agent.on_debug_event
-def handle_debug(event_type, data):
-    call_id = data.get("call_id")
-    if event_type == "llm_error":
-        print(f"LLM error on call {call_id}: {data.get('event')}")
-    elif event_type == "barge":
-        print(f"Barge after {data.get('barge_elapsed_ms')}ms")
-    elif event_type == "session_end":
-        print(f"Call ended: {data.get('reason')}, duration: {data.get('duration_ms')}ms")
-```
-
-**Usage (subclass style):**
-```python
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="debug-agent", route="/agent")
-        self.enable_debug_events(level=2)
-        self.on_debug_event(self.handle_debug)
-
-    def handle_debug(self, event_type, data):
-        if event_type == "llm_error":
-            self.alert_ops_team(data)
+        on_debug_event([this](const json& event) {
+            std::string label = event.value("label", "");
+            std::string call_id = event.value("call_id", "");
+            if (label == "llm_error") {
+                std::cout << "LLM error on call " << call_id << ": "
+                          << event.value("event", "") << "\n";
+            } else if (label == "barge") {
+                std::cout << "Barge after " << event.value("barge_elapsed_ms", 0) << "ms\n";
+            } else if (label == "session_end") {
+                std::cout << "Call ended: " << event.value("reason", "")
+                          << ", duration: " << event.value("duration_ms", 0) << "ms\n";
+            }
+        });
+    }
+};
 ```
 
 > **Note:** Even without registering a handler, all debug events are automatically logged via the agent's structured logger when `enable_debug_events()` is called.
 
-##### `on_function_call`
+##### Handling function calls
 
-```python
-def on_function_call(
-    name: str,
-    args: Dict[str, Any],
-    raw_data: Optional[Dict[str, Any]] = None
-) -> Any
-```
-Override to handle function calls with custom logic.
+In the C++ SDK each SWAIG function is handled by the `swaig::ToolHandler` lambda you register with `define_tool(...)` — there is no single dispatch-override hook. Register a handler per function and return a `swaig::FunctionResult`:
 
-**Parameters:**
-- `name` (str): Function name being called
-- `args` (Dict[str, Any]): Function arguments
-- `raw_data` (Optional[Dict[str, Any]]): Raw request data
-
-**Returns:**
-- Any: Function result (typically SwaigFunctionResult)
-
-**Usage:**
-```python
-class MyAgent(AgentBase):
-    def on_function_call(self, name, args, raw_data):
-        if name == "get_weather":
-            location = args.get("location")
-            # Custom weather logic
-            return SwaigFunctionResult(f"Weather in {location}: Sunny")
-        return super().on_function_call(name, args, raw_data)
+```cpp
+agent.define_tool(
+    "get_weather", "Look up the weather for a location",
+    json{{"type", "object"},
+         {"properties", {{"location", {{"type", "string"}}}}},
+         {"required", json::array({"location"})}},
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+        (void)raw;
+        std::string location = args.value("location", "");
+        // Custom weather logic
+        return signalwire::swaig::FunctionResult("Weather in " + location + ": Sunny");
+    });
 ```
 
-##### `on_request`
+##### Request customization via dynamic config
 
-```python
-def on_request(
-    request_data: Optional[dict] = None, 
-    callback_path: Optional[str] = None
-) -> Optional[dict]
+The Python `on_request` / `on_swml_request` override hooks have no direct C++ equivalent. To customize the SWML document per request, register a dynamic-config callback with `set_dynamic_config_callback(...)`; it receives the parsed request data and a mutable agent handle you reconfigure before the document is rendered:
+
+```cpp
+agent.set_dynamic_config_callback(
+    [](const std::map<std::string, std::string>& query_params, const json& body_params,
+       const std::map<std::string, std::string>& headers, signalwire::agent::AgentBase& cfg) {
+        (void)query_params;
+        (void)headers;
+        if (body_params.value("tier", "") == "premium") {
+            cfg.prompt_add_section("Tier", "This is a premium customer.");
+        }
+    });
 ```
-Override to handle general requests.
-
-**Parameters:**
-- `request_data` (Optional[dict]): Request data
-- `callback_path` (Optional[str]): Callback path
-
-**Returns:**
-- Optional[dict]: Response modifications
-
-##### `on_swml_request`
-
-```python
-def on_swml_request(
-    request_data: Optional[dict] = None, 
-    callback_path: Optional[str] = None, 
-    request: Optional[Request] = None
-) -> Optional[dict]
-```
-Override to handle SWML generation requests.
-
-**Parameters:**
-- `request_data` (Optional[dict]): Request data
-- `callback_path` (Optional[str]): Callback path  
-- `request` (Optional[Request]): FastAPI request object
-
-**Returns:**
-- Optional[dict]: SWML modifications
 
 ### Authentication
 
-##### `validate_basic_auth(username: str, password: str) -> bool`
-Override to implement custom basic authentication logic.
+##### `set_auth(const std::string& username, const std::string& password) -> AgentBase&`
+Configure HTTP Basic authentication credentials. The agent validates every inbound request against these credentials automatically.
 
 **Parameters:**
-- `username` (str): Username from basic auth
-- `password` (str): Password from basic auth
-
-**Returns:**
-- bool: True if credentials are valid
+- `username` (`std::string`): Basic auth username
+- `password` (`std::string`): Basic auth password
 
 **Usage:**
-```python
-class MyAgent(AgentBase):
-    def validate_basic_auth(self, username, password):
-        # Custom auth logic
-        return username == "admin" and password == "secret"
+```cpp
+agent.set_auth("admin", "secret");
 ```
-
-##### `get_basic_auth_credentials`
-
-```python
-def get_basic_auth_credentials(
-    include_source: bool = False
-) -> Union[Tuple[str, str], Tuple[str, str, str]]
-```
-Get basic auth credentials from environment or constructor.
-
-**Parameters:**
-- `include_source` (bool): Include source information (default: False)
-
-**Returns:**
-- Tuple: (username, password) or (username, password, source)
 
 ### Context System
 
-##### `define_contexts() -> ContextBuilder`
+##### `define_contexts() -> ContextBuilder&`
 Define structured workflow contexts for the agent.
 
 **Returns:**
-- ContextBuilder: Builder for creating contexts and steps
+- `ContextBuilder&`: Builder for creating contexts and steps
 
 **Usage:**
-```python
-contexts = agent.define_contexts()
-contexts.add_context("greeting") \
-    .add_step("welcome", "Welcome! How can I help?") \
-    .on_completion_go_to("main_menu")
+```cpp
+auto& contexts = agent.define_contexts();
 
-contexts.add_context("main_menu") \
-    .add_step("menu", "Choose: 1) Support 2) Sales 3) Billing") \
-    .allow_functions(["transfer_to_support", "transfer_to_sales"])
+auto& greeting = contexts.add_context("greeting");
+greeting.add_step("welcome")
+    .add_section("Task", "Welcome! How can I help?")
+    .set_valid_steps({"menu"});
+
+auto& main_menu = contexts.add_context("main_menu");
+main_menu.add_step("menu")
+    .add_section("Task", "Choose: 1) Support 2) Sales 3) Billing")
+    .set_functions(std::vector<std::string>{"transfer_to_support", "transfer_to_sales"});
 ```
 
-This concludes Part 1 of the API reference covering the AgentBase class. The document will continue with SwaigFunctionResult, DataMap, and other components in subsequent parts.
+This concludes Part 1 of the API reference covering the AgentBase class. The document continues with `swaig::FunctionResult`, DataMap, and other components in subsequent parts.
 
 ---
 
-## SwaigFunctionResult Class
+## FunctionResult Class
 
-The `SwaigFunctionResult` class is used to create structured responses from SWAIG functions. It handles both natural language responses and structured actions that the agent should execute.
+The `swaig::FunctionResult` class is used to create structured responses from SWAIG functions. It handles both natural language responses and structured actions that the agent should execute.
 
 ### Constructor
 
-```python
-SwaigFunctionResult(
-    response: Optional[str] = None, 
-    post_process: bool = False
-)
+<!-- snippet: no-compile constructor signature listing (class-member declaration shown out of class context) -->
+```cpp
+explicit FunctionResult(const std::string& response = "", bool post_process = false);
 ```
 
 **Parameters:**
-- `response` (Optional[str]): Natural language response text for the AI to speak
-- `post_process` (bool): Whether to let AI take another turn before executing actions (default: False)
+- `response` (`std::string`): Natural language response text for the AI to speak
+- `post_process` (`bool`): Whether to let AI take another turn before executing actions (default: `false`)
 
 **Post-processing Behavior:**
-- `post_process=False` (default): Execute actions immediately after AI response
-- `post_process=True`: Let AI respond to user one more time, then execute actions
+- `post_process=false` (default): Execute actions immediately after AI response
+- `post_process=true`: Let AI respond to user one more time, then execute actions
 
 **Usage:**
-```python
-# Simple response
-result = SwaigFunctionResult("The weather is sunny and 75°F")
+```cpp
+// Simple response
+result = signalwire::swaig::FunctionResult("The weather is sunny and 75°F");
 
-# Response with post-processing enabled
-result = SwaigFunctionResult("I'll transfer you now", post_process=True)
+// Response with post-processing enabled
+auto result2 = signalwire::swaig::FunctionResult("I'll transfer you now", /*post_process=*/true);
 
-# Empty response (actions only)
-result = SwaigFunctionResult()
+// Empty response (actions only)
+auto result3 = signalwire::swaig::FunctionResult();
 ```
 
 ### Core Methods
 
 #### Response Configuration
 
-##### `set_response(response: str) -> SwaigFunctionResult`
+##### `set_response(const std::string& response) -> FunctionResult&`
 Set or update the natural language response text.
 
 **Parameters:**
-- `response` (str): The text the AI should speak
+- `response` (`std::string`): The text the AI should speak
 
 **Usage:**
-```python
-result = SwaigFunctionResult()
-result.set_response("I found your order information")
+```cpp
+result = signalwire::swaig::FunctionResult();
+result.set_response("I found your order information");
 ```
 
-##### `set_post_process(post_process: bool) -> SwaigFunctionResult`
+##### `set_post_process(bool pp) -> FunctionResult&`
 Enable or disable post-processing for this result.
 
 **Parameters:**
-- `post_process` (bool): True to let AI respond once more before executing actions
+- `pp` (`bool`): `true` to let AI respond once more before executing actions
 
 **Usage:**
-```python
-result = SwaigFunctionResult("I'll help you with that")
-result.set_post_process(True)  # Let AI handle follow-up questions first
+```cpp
+result = signalwire::swaig::FunctionResult("I'll help you with that");
+result.set_post_process(true);  // Let AI handle follow-up questions first
 ```
 
 #### Action Management
 
-##### `add_action(name: str, data: Any) -> SwaigFunctionResult`
+##### `add_action(const std::string& name, const json& data) -> FunctionResult&`
 Add a structured action to execute.
 
 **Parameters:**
-- `name` (str): Action name/type (e.g., "play", "transfer", "set_global_data")
-- `data` (Any): Action data - can be string, boolean, object, or array
+- `name` (`std::string`): Action name/type (e.g., "play", "transfer", "set_global_data")
+- `data` (`json`): Action data — can be a string, boolean, object, or array
 
 **Usage:**
-```python
-# Simple action with boolean
-result.add_action("hangup", True)
+```cpp
+// Simple action with boolean
+result.add_action("hangup", true);
 
-# Action with string data
-result.add_action("play", "welcome.mp3")
+// Action with string data
+result.add_action("play", "welcome.mp3");
 
-# Action with object data
-result.add_action("set_global_data", {"customer_id": "12345", "status": "verified"})
+// Action with object data
+result.add_action("set_global_data", json{{"customer_id", "12345"}, {"status", "verified"}});
 
-# Action with array data
-result.add_action("send_sms", ["+15551234567", "Your order is ready!"])
+// Action with array data
+result.add_action("send_sms", json::array({"+15551234567", "Your order is ready!"}));
 ```
 
-##### `add_actions(actions: List[Dict[str, Any]]) -> SwaigFunctionResult`
+##### `add_actions(const std::vector<json>& actions) -> FunctionResult&`
 Add multiple actions at once.
 
 **Parameters:**
-- `actions` (List[Dict[str, Any]]): List of action dictionaries
+- `actions` (`std::vector<json>`): List of action objects
 
 **Usage:**
-```python
-result.add_actions([
-    {"play": "hold_music.mp3"},
-    {"set_global_data": {"status": "on_hold"}},
-    {"wait": 5000}
-])
+```cpp
+result.add_actions({
+    json{{"play", "hold_music.mp3"}},
+    json{{"set_global_data", {{"status", "on_hold"}}}},
+    json{{"wait", 5000}}
+});
 ```
 
 ### Call Control Actions
 
 #### Call Transfer and Connection
 
-##### `connect(destination: str, final: bool = True, from_addr: Optional[str] = None) -> SwaigFunctionResult`
+##### `connect(const std::string& destination, bool final = true, const std::string& from_addr = "") -> FunctionResult&`
 Transfer or connect the call to another destination.
 
 **Parameters:**
-- `destination` (str): Phone number, SIP address, or other destination
-- `final` (bool): Permanent transfer (True) vs temporary transfer (False) (default: True)
-- `from_addr` (Optional[str]): Override caller ID
+- `destination` (`std::string`): Phone number, SIP address, or other destination
+- `final` (`bool`): Permanent transfer (`true`) vs temporary transfer (`false`) (default: `true`)
+- `from_addr` (`std::string`): Override caller ID (empty = unchanged)
 
 **Transfer Types:**
-- `final=True`: Permanent transfer - call exits agent completely
-- `final=False`: Temporary transfer - call returns to agent if far end hangs up
+- `final=true`: Permanent transfer — call exits agent completely
+- `final=false`: Temporary transfer — call returns to agent if far end hangs up
 
 **Usage:**
-```python
-# Permanent transfer to phone number
-result.connect("+15551234567", final=True)
+```cpp
+// Permanent transfer to phone number
+result.connect("+15551234567", /*final=*/true);
 
-# Temporary transfer to SIP address with custom caller ID
-result.connect("support@company.com", final=False, from_addr="+15559876543")
+// Temporary transfer to SIP address with custom caller ID
+result.connect("support@company.com", /*final=*/false, "+15559876543");
 
-# Transfer with response
-result = SwaigFunctionResult("Transferring you to our sales team")
-result.connect("sales@company.com")
+// Transfer with response
+auto result2 = signalwire::swaig::FunctionResult("Transferring you to our sales team");
+result2.connect("sales@company.com");
 ```
 
-##### `swml_transfer(dest: str, ai_response: str) -> SwaigFunctionResult`
+##### `swml_transfer(const std::string& dest, const std::string& ai_response, bool final = true) -> FunctionResult&`
 Create a SWML-based transfer with AI response setup.
 
 **Parameters:**
-- `dest` (str): Transfer destination
-- `ai_response` (str): AI response when transfer completes
+- `dest` (`std::string`): Transfer destination
+- `ai_response` (`std::string`): AI response when transfer completes
 
 **Usage:**
-```python
+```cpp
 result.swml_transfer(
-    "+15551234567", 
-    "You've been transferred back to me. How else can I help?"
-)
+    "+15551234567",
+    "You've been transferred back to me. How else can I help?");
 ```
 
-##### `sip_refer(to_uri: str) -> SwaigFunctionResult`
+##### `sip_refer(const std::string& to_uri) -> FunctionResult&`
 Perform a SIP REFER transfer.
 
 **Parameters:**
-- `to_uri` (str): SIP URI to transfer to
+- `to_uri` (`std::string`): SIP URI to transfer to
 
 **Usage:**
-```python
-result.sip_refer("sip:support@company.com")
+```cpp
+result.sip_refer("sip:support@company.com");
 ```
 
 #### Call Management
 
-##### `hangup() -> SwaigFunctionResult`
+##### `hangup() -> FunctionResult&`
 End the call immediately.
 
 **Usage:**
-```python
-result = SwaigFunctionResult("Thank you for calling. Goodbye!")
-result.hangup()
+```cpp
+result = signalwire::swaig::FunctionResult("Thank you for calling. Goodbye!");
+result.hangup();
 ```
 
-##### `hold(timeout: int = 300) -> SwaigFunctionResult`
+##### `hold(int timeout = 300) -> FunctionResult&`
 Put the call on hold.
 
 **Parameters:**
-- `timeout` (int): Hold timeout in seconds (default: 300)
+- `timeout` (`int`): Hold timeout in seconds (default: 300)
 
 **Usage:**
-```python
-result = SwaigFunctionResult("Please hold while I look that up")
-result.hold(timeout=60)
+```cpp
+result = signalwire::swaig::FunctionResult("Please hold while I look that up");
+result.hold(/*timeout=*/60);
 ```
 
-##### `stop() -> SwaigFunctionResult`
+##### `stop() -> FunctionResult&`
 Stop current audio playback or recording.
 
 **Usage:**
-```python
-result.stop()
+```cpp
+result.stop();
 ```
 
 #### Audio Control
 
-##### `say(text: str) -> SwaigFunctionResult`
+##### `say(const std::string& text) -> FunctionResult&`
 Add text for the AI to speak.
 
 **Parameters:**
-- `text` (str): Text to speak
+- `text` (`std::string`): Text to speak
 
 **Usage:**
-```python
-result.say("Please wait while I process your request")
+```cpp
+result.say("Please wait while I process your request");
 ```
 
-##### `play_background_file(filename: str, wait: bool = False) -> SwaigFunctionResult`
+##### `play_background_file(const std::string& filename, bool wait = false) -> FunctionResult&`
 Play an audio file in the background.
 
 **Parameters:**
-- `filename` (str): Audio file path or URL
-- `wait` (bool): Wait for file to finish before continuing (default: False)
+- `filename` (`std::string`): Audio file path or URL
+- `wait` (`bool`): Wait for file to finish before continuing (default: `false`)
 
 **Usage:**
-```python
-# Play hold music in background
-result.play_background_file("hold_music.mp3")
+```cpp
+// Play hold music in background
+result.play_background_file("hold_music.mp3");
 
-# Play announcement and wait for completion
-result.play_background_file("important_announcement.wav", wait=True)
+// Play announcement and wait for completion
+result.play_background_file("important_announcement.wav", /*wait=*/true);
 ```
 
-##### `stop_background_file() -> SwaigFunctionResult`
+##### `stop_background_file() -> FunctionResult&`
 Stop background audio playback.
 
 **Usage:**
-```python
-result.stop_background_file()
+```cpp
+result.stop_background_file();
 ```
 
 ### Data Management Actions
 
-##### `set_global_data(data: Dict[str, Any]) -> SwaigFunctionResult`
-Set global data for the conversation.
+##### `update_global_data(const json& data) -> FunctionResult&`
+Set or merge global data for the conversation. Keys present in `data` are added or overwritten; existing keys not mentioned are preserved.
 
 **Parameters:**
-- `data` (Dict[str, Any]): Global data to set
+- `data` (`json`): Global data to set/merge
 
 **Usage:**
-```python
-result.set_global_data({
-    "customer_id": "12345",
-    "order_status": "shipped",
-    "tracking_number": "1Z999AA1234567890"
-})
-```
-
-##### `update_global_data(data: Dict[str, Any]) -> SwaigFunctionResult`
-Update existing global data (merge with existing).
-
-**Parameters:**
-- `data` (Dict[str, Any]): Data to merge
-
-**Usage:**
-```python
+```cpp
 result.update_global_data({
-    "last_interaction": "2024-01-15T10:30:00Z",
-    "agent_notes": "Customer satisfied with resolution"
-})
+    {"customer_id", "12345"},
+    {"order_status", "shipped"},
+    {"tracking_number", "1Z999AA1234567890"}
+});
+
+// Merge additional fields later in the same result
+result.update_global_data({
+    {"last_interaction", "2024-01-15T10:30:00Z"},
+    {"agent_notes", "Customer satisfied with resolution"}
+});
 ```
 
-##### `remove_global_data(keys: Union[str, List[str]]) -> SwaigFunctionResult`
+##### `remove_global_data(const json& keys) -> FunctionResult&`
 Remove specific keys from global data.
 
 **Parameters:**
-- `keys` (Union[str, List[str]]): Key name or list of key names to remove
+- `keys` (`json`): A single key name (string) or an array of key names to remove
 
 **Usage:**
-```python
-# Remove single key
-result.remove_global_data("temporary_data")
+```cpp
+// Remove single key
+result.remove_global_data("temporary_data");
 
-# Remove multiple keys
-result.remove_global_data(["temp1", "temp2", "cache_data"])
+// Remove multiple keys
+result.remove_global_data(json::array({"temp1", "temp2", "cache_data"}));
 ```
 
-##### `set_metadata(data: Dict[str, Any]) -> SwaigFunctionResult`
+##### `set_metadata(const json& data) -> FunctionResult&`
 Set metadata for the conversation.
 
 **Parameters:**
-- `data` (Dict[str, Any]): Metadata to set
+- `data` (`json`): Metadata to set
 
 **Usage:**
-```python
+```cpp
 result.set_metadata({
-    "call_type": "support",
-    "priority": "high",
-    "department": "technical"
-})
+    {"call_type", "support"},
+    {"priority", "high"},
+    {"department", "technical"}
+});
 ```
 
-##### `remove_metadata(keys: Union[str, List[str]]) -> SwaigFunctionResult`
+##### `remove_metadata(const json& keys) -> FunctionResult&`
 Remove specific metadata keys.
 
 **Parameters:**
-- `keys` (Union[str, List[str]]): Key name or list of key names to remove
+- `keys` (`json`): A single key name (string) or an array of key names to remove
 
 **Usage:**
-```python
-result.remove_metadata(["temporary_flag", "debug_info"])
+```cpp
+result.remove_metadata(json::array({"temporary_flag", "debug_info"}));
 ```
 
 ### AI Behavior Control
 
-##### `set_end_of_speech_timeout(milliseconds: int) -> SwaigFunctionResult`
+##### `set_end_of_speech_timeout(int milliseconds) -> FunctionResult&`
 Adjust how long to wait for speech to end.
 
 **Parameters:**
-- `milliseconds` (int): Timeout in milliseconds
+- `milliseconds` (`int`): Timeout in milliseconds
 
 **Usage:**
-```python
-# Shorter timeout for quick responses
-result.set_end_of_speech_timeout(300)
+```cpp
+// Shorter timeout for quick responses
+result.set_end_of_speech_timeout(300);
 
-# Longer timeout for thoughtful responses
-result.set_end_of_speech_timeout(2000)
+// Longer timeout for thoughtful responses
+result.set_end_of_speech_timeout(2000);
 ```
 
-##### `set_speech_event_timeout(milliseconds: int) -> SwaigFunctionResult`
+##### `set_speech_event_timeout(int milliseconds) -> FunctionResult&`
 Set timeout for speech events.
 
 **Parameters:**
-- `milliseconds` (int): Timeout in milliseconds
+- `milliseconds` (`int`): Timeout in milliseconds
 
 **Usage:**
-```python
-result.set_speech_event_timeout(5000)
+```cpp
+result.set_speech_event_timeout(5000);
 ```
 
-##### `wait_for_user(enabled: Optional[bool] = None, timeout: Optional[int] = None, answer_first: bool = False) -> SwaigFunctionResult`
+##### `wait_for_user(std::optional<bool> enabled = std::nullopt, std::optional<int> timeout = std::nullopt, bool answer_first = false) -> FunctionResult&`
 Control whether to wait for user input.
 
 **Parameters:**
-- `enabled` (Optional[bool]): Enable/disable waiting for user
-- `timeout` (Optional[int]): Timeout in milliseconds
-- `answer_first` (bool): Answer call before waiting (default: False)
+- `enabled` (`std::optional<bool>`): Enable/disable waiting for user
+- `timeout` (`std::optional<int>`): Timeout in milliseconds
+- `answer_first` (`bool`): Answer call before waiting (default: `false`)
 
 **Usage:**
-```python
-# Wait for user input with 10 second timeout
-result.wait_for_user(enabled=True, timeout=10000)
+```cpp
+// Wait for user input with 10 second timeout
+result.wait_for_user(/*enabled=*/true, /*timeout=*/10000);
 
-# Don't wait for user (immediate response)
-result.wait_for_user(enabled=False)
+// Don't wait for user (immediate response)
+result.wait_for_user(/*enabled=*/false);
 ```
 
-##### `toggle_functions(function_toggles: List[Dict[str, Any]]) -> SwaigFunctionResult`
+##### `toggle_functions(const json& function_toggles) -> FunctionResult&`
 Enable or disable specific functions.
 
 **Parameters:**
-- `function_toggles` (List[Dict[str, Any]]): List of function toggle configurations
+- `function_toggles` (`json`): Array of function toggle configurations
 
 **Usage:**
-```python
-result.toggle_functions([
-    {"name": "transfer_to_sales", "enabled": True},
-    {"name": "end_call", "enabled": False},
-    {"name": "escalate", "enabled": True, "timeout": 30000}
-])
+```cpp
+result.toggle_functions(json::array({
+    {{"name", "transfer_to_sales"}, {"enabled", true}},
+    {{"name", "end_call"}, {"enabled", false}},
+    {{"name", "escalate"}, {"enabled", true}, {"timeout", 30000}}
+}));
 ```
 
-##### `enable_functions_on_timeout(enabled: bool = True) -> SwaigFunctionResult`
+##### `enable_functions_on_timeout(bool enabled = true) -> FunctionResult&`
 Control whether functions are enabled when timeout occurs.
 
 **Parameters:**
-- `enabled` (bool): Enable functions on timeout (default: True)
+- `enabled` (`bool`): Enable functions on timeout (default: `true`)
 
 **Usage:**
-```python
-result.enable_functions_on_timeout(False)  # Disable functions on timeout
+```cpp
+result.enable_functions_on_timeout(false);  // Disable functions on timeout
 ```
 
-##### `enable_extensive_data(enabled: bool = True) -> SwaigFunctionResult`
+##### `enable_extensive_data(bool enabled = true) -> FunctionResult&`
 Enable extensive data collection.
 
 **Parameters:**
-- `enabled` (bool): Enable extensive data (default: True)
+- `enabled` (`bool`): Enable extensive data (default: `true`)
 
 **Usage:**
-```python
-result.enable_extensive_data(True)
+```cpp
+result.enable_extensive_data(true);
 ```
 
-##### `update_settings(settings: Dict[str, Any]) -> SwaigFunctionResult`
+##### `update_settings(const json& settings) -> FunctionResult&`
 Update various AI settings.
 
 **Parameters:**
-- `settings` (Dict[str, Any]): Settings to update
+- `settings` (`json`): Settings to update
 
 **Usage:**
-```python
+```cpp
 result.update_settings({
-    "temperature": 0.8,
-    "max_tokens": 150,
-    "end_of_speech_timeout": 800
-})
+    {"temperature", 0.8},
+    {"max_tokens", 150},
+    {"end_of_speech_timeout", 800}
+});
 ```
 
 ### Context and Conversation Control
 
-##### `switch_context(system_prompt: Optional[str] = None, user_prompt: Optional[str] = None, consolidate: bool = False, full_reset: bool = False) -> SwaigFunctionResult`
+##### `switch_context(const std::string& system_prompt = "", const std::string& user_prompt = "", bool consolidate = false, bool full_reset = false) -> FunctionResult&`
 Switch conversation context or reset the conversation.
 
 **Parameters:**
-- `system_prompt` (Optional[str]): New system prompt
-- `user_prompt` (Optional[str]): New user prompt
-- `consolidate` (bool): Consolidate conversation history (default: False)
-- `full_reset` (bool): Completely reset conversation (default: False)
+- `system_prompt` (`std::string`): New system prompt
+- `user_prompt` (`std::string`): New user prompt
+- `consolidate` (`bool`): Consolidate conversation history (default: `false`)
+- `full_reset` (`bool`): Completely reset conversation (default: `false`)
 
 **Usage:**
-```python
-# Switch to technical support context
+```cpp
+// Switch to technical support context
 result.switch_context(
-    system_prompt="You are now a technical support specialist",
-    user_prompt="The customer needs technical help"
-)
+    "You are now a technical support specialist",
+    "The customer needs technical help");
 
-# Reset conversation completely
-result.switch_context(full_reset=True)
+// Reset conversation completely
+result.switch_context("", "", /*consolidate=*/false, /*full_reset=*/true);
 
-# Consolidate conversation history
-result.switch_context(consolidate=True)
+// Consolidate conversation history
+result.switch_context("", "", /*consolidate=*/true);
 ```
 
-##### `simulate_user_input(text: str) -> SwaigFunctionResult`
+##### `simulate_user_input(const std::string& text) -> FunctionResult&`
 Simulate user input for testing or automation.
 
 **Parameters:**
-- `text` (str): Text to simulate as user input
+- `text` (`std::string`): Text to simulate as user input
 
 **Usage:**
-```python
-result.simulate_user_input("I need help with my order")
+```cpp
+result.simulate_user_input("I need help with my order");
 ```
 
 ### Communication Actions
 
-##### `send_sms(to_number: str, from_number: str, body: Optional[str] = None, media: Optional[List[str]] = None, tags: Optional[List[str]] = None, region: Optional[str] = None) -> SwaigFunctionResult`
+##### `send_sms(const std::string& to, const std::string& from, const std::string& body = "", const std::vector<std::string>& media = {}, const std::vector<std::string>& tags = {}, const std::string& region = "") -> FunctionResult&`
 Send an SMS message.
 
 **Parameters:**
-- `to_number` (str): Recipient phone number
-- `from_number` (str): Sender phone number
-- `body` (Optional[str]): SMS message text
-- `media` (Optional[List[str]]): List of media URLs
-- `tags` (Optional[List[str]]): Message tags
-- `region` (Optional[str]): SignalWire region
+- `to` (`std::string`): Recipient phone number
+- `from` (`std::string`): Sender phone number
+- `body` (`std::string`): SMS message text
+- `media` (`std::vector<std::string>`): List of media URLs
+- `tags` (`std::vector<std::string>`): Message tags
+- `region` (`std::string`): SignalWire region
 
 **Usage:**
-```python
-# Simple text message
+```cpp
+// Simple text message
 result.send_sms(
-    to_number="+15551234567",
-    from_number="+15559876543", 
-    body="Your order #12345 has shipped!"
-)
+    "+15551234567",
+    "+15559876543",
+    "Your order #12345 has shipped!");
 
-# Message with media and tags
+// Message with media and tags
 result.send_sms(
-    to_number="+15551234567",
-    from_number="+15559876543",
-    body="Here's your receipt",
-    media=["https://example.com/receipt.pdf"],
-    tags=["receipt", "order_12345"]
-)
+    "+15551234567",
+    "+15559876543",
+    "Here's your receipt",
+    {"https://example.com/receipt.pdf"},
+    {"receipt", "order_12345"});
 ```
 
 ### Recording and Media
 
-##### `record_call(control_id: Optional[str] = None, stereo: bool = False, format: str = "wav", direction: str = "both", terminators: Optional[str] = None, beep: bool = False, input_sensitivity: float = 44.0, initial_timeout: float = 0.0, end_silence_timeout: float = 0.0, max_length: Optional[float] = None, status_url: Optional[str] = None) -> SwaigFunctionResult`
+##### `record_call(const std::string& control_id = "", bool stereo = false, const std::string& format = "wav", const std::string& direction = "both", const std::string& terminators = "", bool beep = false, double input_sensitivity = 44.0, std::optional<double> initial_timeout = std::nullopt, std::optional<double> end_silence_timeout = std::nullopt, std::optional<double> max_length = std::nullopt, const std::string& status_url = "") -> FunctionResult&`
 Start call recording.
 
 **Parameters:**
-- `control_id` (Optional[str]): Unique identifier for this recording
-- `stereo` (bool): Record in stereo (default: False)
-- `format` (str): Recording format: "wav", "mp3", "mp4" (default: "wav")
-- `direction` (str): Recording direction: "both", "inbound", "outbound" (default: "both")
-- `terminators` (Optional[str]): DTMF keys to stop recording
-- `beep` (bool): Play beep before recording (default: False)
-- `input_sensitivity` (float): Input sensitivity level (default: 44.0)
-- `initial_timeout` (float): Initial timeout in seconds (default: 0.0)
-- `end_silence_timeout` (float): End silence timeout in seconds (default: 0.0)
-- `max_length` (Optional[float]): Maximum recording length in seconds
-- `status_url` (Optional[str]): Webhook URL for recording status
+- `control_id` (`std::string`): Unique identifier for this recording
+- `stereo` (`bool`): Record in stereo (default: `false`)
+- `format` (`std::string`): Recording format: "wav", "mp3", "mp4" (default: "wav")
+- `direction` (`std::string`): Recording direction: "both", "inbound", "outbound" (default: "both")
+- `terminators` (`std::string`): DTMF keys to stop recording
+- `beep` (`bool`): Play beep before recording (default: `false`)
+- `input_sensitivity` (`double`): Input sensitivity level (default: 44.0)
+- `initial_timeout` (`std::optional<double>`): Initial timeout in seconds
+- `end_silence_timeout` (`std::optional<double>`): End silence timeout in seconds
+- `max_length` (`std::optional<double>`): Maximum recording length in seconds
+- `status_url` (`std::string`): Webhook URL for recording status
 
 **Usage:**
-```python
-# Basic recording
-result.record_call(format="mp3", direction="both")
+```cpp
+// Basic recording
+result.record_call(/*control_id=*/"", /*stereo=*/false, "mp3", "both");
 
-# Recording with control ID and settings
+// Recording with control ID and settings
 result.record_call(
-    control_id="customer_call_001",
-    stereo=True,
-    format="wav",
-    beep=True,
-    max_length=300.0,
-    terminators="#*"
-)
+    "customer_call_001",
+    /*stereo=*/true,
+    "wav",
+    "both",
+    "#*",
+    /*beep=*/true,
+    /*input_sensitivity=*/44.0,
+    /*initial_timeout=*/std::nullopt,
+    /*end_silence_timeout=*/std::nullopt,
+    /*max_length=*/300.0);
 ```
 
-##### `stop_record_call(control_id: Optional[str] = None) -> SwaigFunctionResult`
+##### `stop_record_call(const std::string& control_id = "") -> FunctionResult&`
 Stop call recording.
 
 **Parameters:**
-- `control_id` (Optional[str]): Control ID of recording to stop
+- `control_id` (`std::string`): Control ID of recording to stop
 
 **Usage:**
-```python
-result.stop_record_call()
-result.stop_record_call(control_id="customer_call_001")
+```cpp
+result.stop_record_call();
+result.stop_record_call("customer_call_001");
 ```
 
 ### Conference and Room Management
 
-##### `join_room(name: str) -> SwaigFunctionResult`
+##### `join_room(const std::string& name) -> FunctionResult&`
 Join a SignalWire room.
 
 **Parameters:**
-- `name` (str): Room name to join
+- `name` (`std::string`): Room name to join
 
 **Usage:**
-```python
-result.join_room("support_room_1")
+```cpp
+result.join_room("support_room_1");
 ```
 
-##### `join_conference(name: str, muted: bool = False, beep: str = "true", start_on_enter: bool = True, end_on_exit: bool = False, wait_url: Optional[str] = None, max_participants: int = 250, record: str = "do-not-record", region: Optional[str] = None, trim: str = "trim-silence", coach: Optional[str] = None, status_callback_event: Optional[str] = None, status_callback: Optional[str] = None, status_callback_method: str = "POST", recording_status_callback: Optional[str] = None, recording_status_callback_method: str = "POST", recording_status_callback_event: str = "completed", result: Optional[Any] = None) -> SwaigFunctionResult`
+##### `join_conference(const std::string& name, bool muted = false, const std::string& beep = "true", bool start_on_enter = true, bool end_on_exit = false, std::optional<std::string> wait_url = std::nullopt, int max_participants = 250, const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt, const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt, std::optional<std::string> status_callback_event = std::nullopt, std::optional<std::string> status_callback = std::nullopt, const std::string& status_callback_method = "POST", std::optional<std::string> recording_status_callback = std::nullopt, const std::string& recording_status_callback_method = "POST", const std::string& recording_status_callback_event = "completed", std::optional<json> result = std::nullopt) -> FunctionResult&`
 Join a conference call.
 
 **Parameters:**
-- `name` (str): Conference name
-- `muted` (bool): Join muted (default: False)
-- `beep` (str): Beep setting: "true", "false", "onEnter", "onExit" (default: "true")
-- `start_on_enter` (bool): Start conference when this participant enters (default: True)
-- `end_on_exit` (bool): End conference when this participant exits (default: False)
-- `wait_url` (Optional[str]): URL for hold music/content
-- `max_participants` (int): Maximum participants (default: 250)
-- `record` (str): Recording setting (default: "do-not-record")
-- `region` (Optional[str]): SignalWire region
-- `trim` (str): Trim setting for recordings (default: "trim-silence")
-- `coach` (Optional[str]): Coach participant identifier
-- `status_callback_event` (Optional[str]): Status callback events
-- `status_callback` (Optional[str]): Status callback URL
-- `status_callback_method` (str): Status callback HTTP method (default: "POST")
-- `recording_status_callback` (Optional[str]): Recording status callback URL
-- `recording_status_callback_method` (str): Recording status callback method (default: "POST")
-- `recording_status_callback_event` (str): Recording status callback events (default: "completed")
+- `name` (`std::string`): Conference name
+- `muted` (`bool`): Join muted (default: `false`)
+- `beep` (`std::string`): Beep setting: "true", "false", "onEnter", "onExit" (default: "true")
+- `start_on_enter` (`bool`): Start conference when this participant enters (default: `true`)
+- `end_on_exit` (`bool`): End conference when this participant exits (default: `false`)
+- `wait_url` (`std::optional<std::string>`): URL for hold music/content
+- `max_participants` (`int`): Maximum participants (default: 250)
+- `record` (`std::string`): Recording setting (default: "do-not-record")
+- `region` (`std::optional<std::string>`): SignalWire region
+- `trim` (`std::string`): Trim setting for recordings (default: "trim-silence")
+- `coach` (`std::optional<std::string>`): Coach participant identifier
+- `status_callback_event` (`std::optional<std::string>`): Status callback events
+- `status_callback` (`std::optional<std::string>`): Status callback URL
+- `status_callback_method` (`std::string`): Status callback HTTP method (default: "POST")
+- `recording_status_callback` (`std::optional<std::string>`): Recording status callback URL
+- `recording_status_callback_method` (`std::string`): Recording status callback method (default: "POST")
+- `recording_status_callback_event` (`std::string`): Recording status callback events (default: "completed")
+
+In C++ the 18 optional parameters can be passed either as flat positional arguments (mirroring the signature above) or via the `JoinConferenceOptions` options-struct overload — `join_conference(const std::string& name, const JoinConferenceOptions& opts)`.
 
 **Usage:**
-```python
-# Basic conference join
-result.join_conference("sales_meeting")
+```cpp
+// Basic conference join
+result.join_conference("sales_meeting");
 
-# Conference with recording and settings
-result.join_conference(
-    name="support_conference",
-    muted=False,
-    beep="onEnter",
-    record="record-from-start",
-    max_participants=10
-)
+// Conference with recording and settings (options-object overload)
+signalwire::swaig::JoinConferenceOptions opts;
+opts.muted = false;
+opts.beep = "onEnter";
+opts.record = "record-from-start";
+opts.max_participants = 10;
+result.join_conference("support_conference", opts);
 ```
 
 ### Payment Processing
 
-##### `pay(payment_connector_url: str, input_method: str = "dtmf", status_url: Optional[str] = None, payment_method: str = "credit-card", timeout: int = 5, max_attempts: int = 1, security_code: bool = True, postal_code: Union[bool, str] = True, min_postal_code_length: int = 0, token_type: str = "reusable", charge_amount: Optional[str] = None, currency: str = "usd", language: str = "en-US", voice: str = "woman", description: Optional[str] = None, valid_card_types: str = "visa mastercard amex", parameters: Optional[List[Dict[str, str]]] = None, prompts: Optional[List[Dict[str, Any]]] = None) -> SwaigFunctionResult`
+##### `pay(const std::string& payment_connector_url, const std::string& input_method = "dtmf", const std::string& status_url = "", const std::string& payment_method = "credit-card", int timeout = 5, int max_attempts = 1, bool security_code = true, const std::string& postal_code = "true", int min_postal_code_length = 0, const std::string& token_type = "reusable", const std::string& charge_amount = "", const std::string& currency = "usd", const std::string& language = "en-US", const std::string& voice = "woman", const std::string& description = "", const std::string& valid_card_types = "visa mastercard amex", const std::vector<json>& parameters = {}, const std::vector<json>& prompts = {}) -> FunctionResult&`
 Process a payment through the call.
 
 **Parameters:**
-- `payment_connector_url` (str): Payment processor webhook URL
-- `input_method` (str): Input method: "dtmf", "speech" (default: "dtmf")
-- `status_url` (Optional[str]): Payment status webhook URL
-- `payment_method` (str): Payment method: "credit-card" (default: "credit-card")
-- `timeout` (int): Input timeout in seconds (default: 5)
-- `max_attempts` (int): Maximum retry attempts (default: 1)
-- `security_code` (bool): Require security code (default: True)
-- `postal_code` (Union[bool, str]): Require postal code (default: True)
-- `min_postal_code_length` (int): Minimum postal code length (default: 0)
-- `token_type` (str): Token type: "reusable", "one-time" (default: "reusable")
-- `charge_amount` (Optional[str]): Amount to charge
-- `currency` (str): Currency code (default: "usd")
-- `language` (str): Language for prompts (default: "en-US")
-- `voice` (str): Voice for prompts (default: "woman")
-- `description` (Optional[str]): Payment description
-- `valid_card_types` (str): Accepted card types (default: "visa mastercard amex")
-- `parameters` (Optional[List[Dict[str, str]]]): Additional parameters
-- `prompts` (Optional[List[Dict[str, Any]]]): Custom prompts
+- `payment_connector_url` (`std::string`): Payment processor webhook URL
+- `input_method` (`std::string`): Input method: "dtmf", "speech" (default: "dtmf")
+- `status_url` (`std::string`): Payment status webhook URL
+- `payment_method` (`std::string`): Payment method: "credit-card" (default: "credit-card")
+- `timeout` (`int`): Input timeout in seconds (default: 5)
+- `max_attempts` (`int`): Maximum retry attempts (default: 1)
+- `security_code` (`bool`): Require security code (default: `true`)
+- `postal_code` (`std::string`): Require postal code (default: "true")
+- `min_postal_code_length` (`int`): Minimum postal code length (default: 0)
+- `token_type` (`std::string`): Token type: "reusable", "one-time" (default: "reusable")
+- `charge_amount` (`std::string`): Amount to charge
+- `currency` (`std::string`): Currency code (default: "usd")
+- `language` (`std::string`): Language for prompts (default: "en-US")
+- `voice` (`std::string`): Voice for prompts (default: "woman")
+- `description` (`std::string`): Payment description
+- `valid_card_types` (`std::string`): Accepted card types (default: "visa mastercard amex")
+- `parameters` (`std::vector<json>`): Additional parameters
+- `prompts` (`std::vector<json>`): Custom prompts
 
 **Usage:**
-```python
-# Basic payment processing
+```cpp
+// Basic payment processing
 result.pay(
-    payment_connector_url="https://payment-processor.com/webhook",
-    charge_amount="29.99",
-    description="Monthly subscription"
-)
-
-# Payment with custom settings
-result.pay(
-    payment_connector_url="https://payment-processor.com/webhook",
-    input_method="speech",
-    timeout=10,
-    max_attempts=3,
-    security_code=True,
-    postal_code=True,
-    charge_amount="149.99",
-    currency="usd",
-    description="Premium service upgrade"
-)
+    "https://payment-processor.com/webhook",
+    /*input_method=*/"dtmf",
+    /*status_url=*/"",
+    /*payment_method=*/"credit-card",
+    /*timeout=*/5,
+    /*max_attempts=*/1,
+    /*security_code=*/true,
+    /*postal_code=*/"true",
+    /*min_postal_code_length=*/0,
+    /*token_type=*/"reusable",
+    /*charge_amount=*/"29.99",
+    /*currency=*/"usd",
+    /*language=*/"en-US",
+    /*voice=*/"woman",
+    /*description=*/"Monthly subscription");
 ```
 
 ### Call Monitoring
 
-##### `tap(uri: str, control_id: Optional[str] = None, direction: str = "both", codec: str = "PCMU", rtp_ptime: int = 20, status_url: Optional[str] = None) -> SwaigFunctionResult`
+##### `tap(const std::string& uri, const std::string& control_id = "", const std::string& direction = "both", const std::string& codec = "PCMU", int rtp_ptime = 20, const std::string& status_url = "") -> FunctionResult&`
 Start call tapping/monitoring.
 
 **Parameters:**
-- `uri` (str): URI to send tapped audio to
-- `control_id` (Optional[str]): Unique identifier for this tap
-- `direction` (str): Tap direction: "both", "inbound", "outbound" (default: "both")
-- `codec` (str): Audio codec: "PCMU", "PCMA", "G722" (default: "PCMU")
-- `rtp_ptime` (int): RTP packet time in milliseconds (default: 20)
-- `status_url` (Optional[str]): Status webhook URL
+- `uri` (`std::string`): URI to send tapped audio to
+- `control_id` (`std::string`): Unique identifier for this tap
+- `direction` (`std::string`): Tap direction: "speak", "hear", "both" (default: "both")
+- `codec` (`std::string`): Audio codec: "PCMU", "PCMA" (default: "PCMU")
+- `rtp_ptime` (`int`): RTP packet time in milliseconds (default: 20)
+- `status_url` (`std::string`): Status webhook URL
 
 **Usage:**
-```python
-# Basic call tapping
-result.tap("sip:monitor@company.com")
+```cpp
+// Basic call tapping
+result.tap("sip:monitor@company.com");
 
-# Tap with specific settings
+// Tap with specific settings
 result.tap(
-    uri="sip:quality@company.com",
-    control_id="quality_monitor_001",
-    direction="both",
-    codec="G722"
-)
+    "sip:quality@company.com",
+    "quality_monitor_001",
+    "both",
+    "PCMA");
 ```
 
-##### `stop_tap(control_id: Optional[str] = None) -> SwaigFunctionResult`
+##### `stop_tap(const std::string& control_id = "") -> FunctionResult&`
 Stop call tapping.
 
 **Parameters:**
-- `control_id` (Optional[str]): Control ID of tap to stop
+- `control_id` (`std::string`): Control ID of tap to stop
 
 **Usage:**
-```python
-result.stop_tap()
-result.stop_tap(control_id="quality_monitor_001")
+```cpp
+result.stop_tap();
+result.stop_tap("quality_monitor_001");
 ```
 
 ### Advanced SWML Execution
 
-##### `execute_swml(swml_content, transfer: bool = False) -> SwaigFunctionResult`
+##### `execute_swml(const json& swml_content, bool transfer = false) -> FunctionResult&`
 Execute custom SWML content.
 
 **Parameters:**
-- `swml_content`: SWML document or content to execute
-- `transfer` (bool): Whether this is a transfer operation (default: False)
+- `swml_content` (`json`): SWML document or content to execute
+- `transfer` (`bool`): Whether this is a transfer operation (default: `false`)
 
 **Usage:**
-```python
-# Execute custom SWML
-custom_swml = {
-    "version": "1.0.0",
-    "sections": {
-        "main": [
-            {"play": {"url": "https://example.com/custom.mp3"}},
-            {"say": {"text": "Custom SWML execution"}}
-        ]
-    }
-}
-result.execute_swml(custom_swml)
+```cpp
+// Execute custom SWML
+json custom_swml = {
+    {"version", "1.0.0"},
+    {"sections", {
+        {"main", json::array({
+            {{"play", {{"url", "https://example.com/custom.mp3"}}}},
+            {{"say", {{"text", "Custom SWML execution"}}}}
+        })}
+    }}
+};
+result.execute_swml(custom_swml);
 ```
 
 ### Utility Methods
 
-##### `to_dict() -> Dict[str, Any]`
-Convert the result to a dictionary for serialization.
+##### `to_json() -> json`
+Convert the result to a JSON object for serialization.
 
 **Returns:**
-- Dict[str, Any]: Dictionary representation of the result
+- `json`: JSON representation of the result
 
 **Usage:**
-```python
-result = SwaigFunctionResult("Hello world")
-result.add_action("play", "music.mp3")
-result_dict = result.to_dict()
-print(result_dict)
-# Output: {"response": "Hello world", "action": [{"play": "music.mp3"}]}
+```cpp
+result = signalwire::swaig::FunctionResult("Hello world");
+result.add_action("play", "music.mp3");
+json result_json = result.to_json();
+std::cout << result_json.dump() << "\n";
+// Output: {"response": "Hello world", "action": [{"play": "music.mp3"}]}
 ```
 
 ### Static Helper Methods
 
-##### `create_payment_prompt(for_situation: str, actions: List[Dict[str, str]], card_type: Optional[str] = None, error_type: Optional[str] = None) -> Dict[str, Any]`
+##### `static create_payment_prompt(const std::string& for_situation, const std::vector<json>& actions, const std::string& card_type = "", const std::string& error_type = "") -> json`
 Create a payment prompt configuration.
 
 **Parameters:**
-- `for_situation` (str): Situation identifier
-- `actions` (List[Dict[str, str]]): List of action configurations
-- `card_type` (Optional[str]): Card type for prompts
-- `error_type` (Optional[str]): Error type for error prompts
+- `for_situation` (`std::string`): Situation identifier
+- `actions` (`std::vector<json>`): List of action configurations
+- `card_type` (`std::string`): Card type for prompts
+- `error_type` (`std::string`): Error type for error prompts
 
 **Usage:**
-```python
-prompt = SwaigFunctionResult.create_payment_prompt(
-    for_situation="card_number",
-    actions=[
-        SwaigFunctionResult.create_payment_action("say", "Please enter your card number")
-    ]
-)
+```cpp
+json prompt = signalwire::swaig::FunctionResult::create_payment_prompt(
+    "card_number",
+    {signalwire::swaig::FunctionResult::create_payment_action("say", "Please enter your card number")});
 ```
 
-##### `create_payment_action(action_type: str, phrase: str) -> Dict[str, str]`
+##### `static create_payment_action(const std::string& action_type, const std::string& phrase) -> json`
 Create a payment action configuration.
 
 **Parameters:**
-- `action_type` (str): Action type
-- `phrase` (str): Action phrase
+- `action_type` (`std::string`): Action type
+- `phrase` (`std::string`): Action phrase
 
 **Usage:**
-```python
-action = SwaigFunctionResult.create_payment_action("say", "Enter your card number")
+```cpp
+json action = signalwire::swaig::FunctionResult::create_payment_action("say", "Enter your card number");
 ```
 
-##### `create_payment_parameter(name: str, value: str) -> Dict[str, str]`
+##### `static create_payment_parameter(const std::string& name, const std::string& value) -> json`
 Create a payment parameter configuration.
 
 **Parameters:**
-- `name` (str): Parameter name
-- `value` (str): Parameter value
+- `name` (`std::string`): Parameter name
+- `value` (`std::string`): Parameter value
 
 **Usage:**
-```python
-param = SwaigFunctionResult.create_payment_parameter("merchant_id", "12345")
+```cpp
+json param = signalwire::swaig::FunctionResult::create_payment_parameter("merchant_id", "12345");
 ```
 
 ### Method Chaining
 
-All methods return `self`, enabling fluent method chaining:
+All action methods return `FunctionResult&`, enabling fluent method chaining:
 
-```python
-result = (SwaigFunctionResult("I'll help you with that")
-    .set_post_process(True)
-    .update_global_data({"status": "helping"})
+```cpp
+result = signalwire::swaig::FunctionResult("I'll help you with that")
+    .set_post_process(true)
+    .update_global_data({{"status", "helping"}})
     .set_end_of_speech_timeout(800)
-    .add_action("play", "thinking.mp3"))
+    .add_action("play", "thinking.mp3");
 
-# Complex workflow
-result = (SwaigFunctionResult("Processing your payment")
-    .set_post_process(True)
-    .update_global_data({"payment_status": "processing"})
+// Complex workflow
+auto result2 = signalwire::swaig::FunctionResult("Processing your payment")
+    .set_post_process(true)
+    .update_global_data({{"payment_status", "processing"}})
     .pay(
-        payment_connector_url="https://payments.com/webhook",
-        charge_amount="99.99",
-        description="Service payment"
-    )
+        "https://payments.com/webhook",
+        /*input_method=*/"dtmf",
+        /*status_url=*/"",
+        /*payment_method=*/"credit-card",
+        /*timeout=*/5,
+        /*max_attempts=*/1,
+        /*security_code=*/true,
+        /*postal_code=*/"true",
+        /*min_postal_code_length=*/0,
+        /*token_type=*/"reusable",
+        /*charge_amount=*/"99.99",
+        /*currency=*/"usd",
+        /*language=*/"en-US",
+        /*voice=*/"woman",
+        /*description=*/"Service payment")
     .send_sms(
-        to_number="+15551234567",
-        from_number="+15559876543",
-        body="Payment confirmation will be sent shortly"
-    ))
+        "+15551234567",
+        "+15559876543",
+        "Payment confirmation will be sent shortly");
 ```
 
-This concludes Part 2 of the API reference covering the SwaigFunctionResult class. The document will continue with DataMap and other components in subsequent parts.
+This concludes Part 2 of the API reference covering the `swaig::FunctionResult` class. The document continues with DataMap and other components in subsequent parts.
 
 ---
 
@@ -2186,91 +2052,94 @@ The `DataMap` class provides a declarative approach to creating SWAIG tools that
 
 ### Constructor
 
-```python
-DataMap(function_name: str)
+<!-- snippet: no-compile constructor signature listing (class-member declaration shown out of class context) -->
+```cpp
+explicit DataMap(const std::string& function_name);
 ```
 
 **Parameters:**
-- `function_name` (str): Name of the SWAIG function this DataMap will create
+- `function_name` (`std::string`): Name of the SWAIG function this DataMap will create
 
 **Usage:**
-```python
-# Create a new DataMap tool
-weather_map = DataMap('get_weather')
-search_map = DataMap('search_docs')
+```cpp
+// Create a new DataMap tool
+auto weather_map = signalwire::datamap::DataMap("get_weather");
+auto search_map = signalwire::datamap::DataMap("search_docs");
 ```
 
 ### Core Configuration Methods
 
 #### Function Metadata
 
-##### `purpose(description: str) -> DataMap`
+##### `purpose(const std::string& desc) -> DataMap&`
 Set the function description/purpose.
 
 **Parameters:**
-- `description` (str): Human-readable description of what this function does
+- `desc` (`std::string`): Human-readable description of what this function does
 
 **Usage:**
-```python
-data_map = DataMap('get_weather').purpose('Get current weather information for any city')
+```cpp
+data_map = signalwire::datamap::DataMap("get_weather")
+    .purpose("Get current weather information for any city");
 ```
 
-##### `description(description: str) -> DataMap`
-Alias for `purpose()` - set the function description.
+##### `description(const std::string& desc) -> DataMap&`
+Alias for `purpose()` — set the function description.
 
 **Parameters:**
-- `description` (str): Function description
+- `desc` (`std::string`): Function description
 
 **Usage:**
-```python
-data_map = DataMap('search_api').description('Search our knowledge base for information')
+```cpp
+data_map = signalwire::datamap::DataMap("search_api")
+    .description("Search our knowledge base for information");
 ```
 
 #### Parameter Definition
 
-##### `parameter(name: str, param_type: str, description: str, required: bool = False, enum: Optional[List[str]] = None) -> DataMap`
+##### `parameter(const std::string& name, const std::string& param_type, const std::string& desc, bool required = false, const std::vector<std::string>& enum_values = {}) -> DataMap&`
 Add a function parameter with JSON schema validation.
 
 **Parameters:**
-- `name` (str): Parameter name
-- `param_type` (str): JSON schema type: "string", "number", "boolean", "array", "object"
-- `description` (str): Parameter description for the AI
-- `required` (bool): Whether parameter is required (default: False)
-- `enum` (Optional[List[str]]): List of allowed values for validation
+- `name` (`std::string`): Parameter name
+- `param_type` (`std::string`): JSON schema type: "string", "number", "boolean", "array", "object"
+- `desc` (`std::string`): Parameter description for the AI
+- `required` (`bool`): Whether parameter is required (default: `false`)
+- `enum_values` (`std::vector<std::string>`): List of allowed values for validation
 
 **Usage:**
-```python
-# Required string parameter
-data_map.parameter('location', 'string', 'City name or ZIP code', required=True)
+```cpp
+// Required string parameter
+data_map.parameter("location", "string", "City name or ZIP code", /*required=*/true);
 
-# Optional number parameter
-data_map.parameter('days', 'number', 'Number of forecast days', required=False)
+// Optional number parameter
+data_map.parameter("days", "number", "Number of forecast days", /*required=*/false);
 
-# Enum parameter with allowed values
-data_map.parameter('units', 'string', 'Temperature units', 
-                  enum=['celsius', 'fahrenheit'], required=False)
+// Enum parameter with allowed values
+data_map.parameter("units", "string", "Temperature units",
+                   /*required=*/false, {"celsius", "fahrenheit"});
 
-# Boolean parameter
-data_map.parameter('include_alerts', 'boolean', 'Include weather alerts', required=False)
+// Boolean parameter
+data_map.parameter("include_alerts", "boolean", "Include weather alerts", /*required=*/false);
 
-# Array parameter
-data_map.parameter('categories', 'array', 'Search categories to include')
+// Array parameter
+data_map.parameter("categories", "array", "Search categories to include");
 ```
 
 ### API Integration Methods
 
 #### HTTP Webhook Configuration
 
-##### `webhook(method: str, url: str, headers: Optional[Dict[str, str]] = None, form_param: Optional[str] = None, input_args_as_params: bool = False, require_args: Optional[List[str]] = None) -> DataMap`
+##### `webhook(const std::string& method, const std::string& url, const json& headers = json::object(), const std::string& form_param = "", bool input_args_as_params = false, const std::vector<std::string>& require_args = {}) -> DataMap&`
 Configure an HTTP API call.
 
 **Parameters:**
-- `method` (str): HTTP method: "GET", "POST", "PUT", "DELETE", "PATCH"
-- `url` (str): API endpoint URL (supports `${variable}` substitution)
-- `headers` (Optional[Dict[str, str]]): HTTP headers to send
-- `form_param` (Optional[str]): Send JSON body as single form parameter with this name
-- `input_args_as_params` (bool): Merge function arguments into URL parameters (default: False)
-- `require_args` (Optional[List[str]]): Only execute if these arguments are present
+- `method` (`std::string`): HTTP method: "GET", "POST", "PUT", "DELETE", "PATCH"
+- `url` (`std::string`): API endpoint URL (supports `${variable}` substitution)
+- `headers` (`json`): HTTP headers to send
+- `form_param` (`std::string`): Send JSON body as single form parameter with this name
+- `input_args_as_params` (`bool`): Merge function arguments into URL parameters (default: `false`)
+- `require_args` (`std::vector<std::string>`): Only execute if these arguments are present
 
 **Variable Substitution in URLs:**
 - `${args.parameter_name}`: Function argument values
@@ -2278,110 +2147,109 @@ Configure an HTTP API call.
 - `${meta_data.call_id}`: Call and function metadata
 
 **Usage:**
-```python
-# Simple GET request with parameter substitution
-data_map.webhook('GET', 'https://api.weather.com/v1/current?key=API_KEY&q=${args.location}')
+```cpp
+// Simple GET request with parameter substitution
+data_map.webhook("GET", "https://api.weather.com/v1/current?key=API_KEY&q=${args.location}");
 
-# POST request with authentication headers
+// POST request with authentication headers
 data_map.webhook(
-    'POST', 
-    'https://api.company.com/search',
-    headers={
-        'Authorization': 'Bearer YOUR_TOKEN',
-        'Content-Type': 'application/json'
-    }
-)
+    "POST",
+    "https://api.company.com/search",
+    json{
+        {"Authorization", "Bearer YOUR_TOKEN"},
+        {"Content-Type", "application/json"}
+    });
 
-# Webhook that requires specific arguments
+// Webhook that requires specific arguments
 data_map.webhook(
-    'GET',
-    'https://api.service.com/data?id=${args.customer_id}',
-    require_args=['customer_id']
-)
+    "GET",
+    "https://api.service.com/data?id=${args.customer_id}",
+    json::object(),
+    /*form_param=*/"",
+    /*input_args_as_params=*/false,
+    /*require_args=*/{"customer_id"});
 
-# Use global data for call-related info (NOT credentials)
+// Use global data for call-related info (NOT credentials)
 data_map.webhook(
-    'GET',
-    'https://api.service.com/customer/${global_data.customer_id}/orders',
-    headers={'Authorization': 'Bearer YOUR_API_TOKEN'}  # Use static credentials
-)
+    "GET",
+    "https://api.service.com/customer/${global_data.customer_id}/orders",
+    json{{"Authorization", "Bearer YOUR_API_TOKEN"}});  // Use static credentials
 ```
 
-##### `body(data: Dict[str, Any]) -> DataMap`
-Set the JSON body for POST/PUT requests.
+##### `body(const json& data) -> DataMap&`
+Set the JSON body for the last-added webhook (POST/PUT requests).
 
 **Parameters:**
-- `data` (Dict[str, Any]): JSON body data (supports `${variable}` substitution)
+- `data` (`json`): JSON body data (supports `${variable}` substitution)
 
 **Usage:**
-```python
-# Static body with parameter substitution
+```cpp
+// Static body with parameter substitution
 data_map.body({
-    'query': '${args.search_term}',
-    'limit': 5,
-    'filters': {
-        'category': '${args.category}',
-        'active': True
-    }
-})
+    {"query", "${args.search_term}"},
+    {"limit", 5},
+    {"filters", {
+        {"category", "${args.category}"},
+        {"active", true}
+    }}
+});
 
-# Body with call-related data (NOT sensitive info)
+// Body with call-related data (NOT sensitive info)
 data_map.body({
-    'customer_id': '${global_data.customer_id}',
-    'request_id': '${meta_data.call_id}',
-    'search': '${args.query}'
-})
+    {"customer_id", "${global_data.customer_id}"},
+    {"request_id", "${meta_data.call_id}"},
+    {"search", "${args.query}"}
+});
 ```
 
-##### `params(data: Dict[str, Any]) -> DataMap`
-Set URL query parameters.
+##### `params(const json& data) -> DataMap&`
+Set request params for the last-added webhook (alias for `body`).
 
 **Parameters:**
-- `data` (Dict[str, Any]): Query parameters (supports `${variable}` substitution)
+- `data` (`json`): Query parameters (supports `${variable}` substitution)
 
 **Usage:**
-```python
-# URL parameters with substitution
+```cpp
+// URL parameters with substitution
 data_map.params({
-    'api_key': 'YOUR_API_KEY',
-    'q': '${args.location}',
-    'units': '${args.units}',
-    'lang': 'en'
-})
+    {"api_key", "YOUR_API_KEY"},
+    {"q", "${args.location}"},
+    {"units", "${args.units}"},
+    {"lang", "en"}
+});
 ```
 
 #### Multiple Webhooks and Fallbacks
 
 DataMap supports multiple webhook configurations for fallback scenarios:
 
-```python
-# Primary API with fallback
-data_map = (DataMap('search_with_fallback')
-    .purpose('Search with multiple API fallbacks')
-    .parameter('query', 'string', 'Search query', required=True)
-    
-    # Primary API
-    .webhook('GET', 'https://api.primary.com/search?q=${args.query}')
-    .output(SwaigFunctionResult('Primary result: ${response.title}'))
-    
-    # Fallback API
-    .webhook('GET', 'https://api.fallback.com/search?q=${args.query}')
-    .output(SwaigFunctionResult('Fallback result: ${response.title}'))
-    
-    # Final fallback if all APIs fail
-    .fallback_output(SwaigFunctionResult('Sorry, all search services are currently unavailable'))
-)
+```cpp
+// Primary API with fallback
+data_map = signalwire::datamap::DataMap("search_with_fallback")
+    .purpose("Search with multiple API fallbacks")
+    .parameter("query", "string", "Search query", /*required=*/true)
+
+    // Primary API
+    .webhook("GET", "https://api.primary.com/search?q=${args.query}")
+    .output(signalwire::swaig::FunctionResult("Primary result: ${response.title}"))
+
+    // Fallback API
+    .webhook("GET", "https://api.fallback.com/search?q=${args.query}")
+    .output(signalwire::swaig::FunctionResult("Fallback result: ${response.title}"))
+
+    // Final fallback if all APIs fail
+    .fallback_output(signalwire::swaig::FunctionResult("Sorry, all search services are currently unavailable"));
 ```
 
 ### Response Processing
 
 #### Basic Output
 
-##### `output(result: SwaigFunctionResult) -> DataMap`
-Set the response template for successful API calls.
+##### `output(const swaig::FunctionResult& result) -> DataMap&`
+Set the response template for the most recent webhook.
 
 **Parameters:**
-- `result` (SwaigFunctionResult): Response template with variable substitution
+- `result` (`swaig::FunctionResult`): Response template with variable substitution
 
 **Variable Substitution in Outputs:**
 - `${response.field}`: API response fields
@@ -2391,66 +2259,64 @@ Set the response template for successful API calls.
 - `${global_data.key}`: Call-wide data store (user info, call state)
 
 **Usage:**
-```python
-# Simple response template
-data_map.output(SwaigFunctionResult('Weather in ${args.location}: ${response.current.condition.text}, ${response.current.temp_f}°F'))
+```cpp
+// Simple response with an interpolated string
+data_map.output(signalwire::swaig::FunctionResult(
+    "Weather in ${args.location}: ${response.current.condition.text}, ${response.current.temp_f}°F"));
 
-# Response with actions
+// Response with actions
 data_map.output(
-    SwaigFunctionResult('Found ${response.total_results} results')
-    .update_global_data({'last_search': '${args.query}'})
-    .add_action('play', 'search_complete.mp3')
-)
+    signalwire::swaig::FunctionResult("Found ${response.total_results} results")
+    .update_global_data({{"last_search", "${args.query}"}})
+    .add_action("play", "search_complete.mp3"));
 
-# Complex response with nested data
-data_map.output(
-    SwaigFunctionResult('Order ${response.order.id} status: ${response.order.status}. Estimated delivery: ${response.order.delivery.estimated_date}')
-)
+// Complex response with nested data
+data_map.output(signalwire::swaig::FunctionResult(
+    "Order ${response.order.id} status: ${response.order.status}. "
+    "Estimated delivery: ${response.order.delivery.estimated_date}"));
 ```
 
-##### `fallback_output(result: SwaigFunctionResult) -> DataMap`
+##### `fallback_output(const swaig::FunctionResult& result) -> DataMap&`
 Set the response when all webhooks fail.
 
 **Parameters:**
-- `result` (SwaigFunctionResult): Fallback response
+- `result` (`swaig::FunctionResult`): Fallback response
 
 **Usage:**
-```python
+```cpp
 data_map.fallback_output(
-    SwaigFunctionResult('Sorry, the service is temporarily unavailable. Please try again later.')
-    .add_action('play', 'service_unavailable.mp3')
-)
+    signalwire::swaig::FunctionResult("Sorry, the service is temporarily unavailable. Please try again later.")
+    .add_action("play", "service_unavailable.mp3"));
 ```
 
 #### Array Processing
 
-##### `foreach(foreach_config: Union[str, Dict[str, Any]]) -> DataMap`
+##### `foreach(const json& foreach_config) -> DataMap&`
 Process array responses by iterating over elements.
 
 **Parameters:**
-- `foreach_config` (Union[str, Dict]): Array path or configuration object
+- `foreach_config` (`json`): Array path (string) or configuration object
 
 **Simple Array Processing:**
-```python
-# Process array of search results
-data_map = (DataMap('search_docs')
-    .webhook('GET', 'https://api.docs.com/search?q=${args.query}')
-    .foreach('${response.results}')  # Iterate over results array
-    .output(SwaigFunctionResult('Found: ${foreach.title} - ${foreach.summary}'))
-)
+```cpp
+// Process array of search results
+data_map = signalwire::datamap::DataMap("search_docs")
+    .webhook("GET", "https://api.docs.com/search?q=${args.query}")
+    .foreach("${response.results}")  // Iterate over results array
+    .output(signalwire::swaig::FunctionResult("Found: ${foreach.title} - ${foreach.summary}"));
 ```
 
 **Advanced Array Processing:**
-```python
-# Complex foreach configuration
-data_map.foreach({
-    'array': '${response.items}',
-    'limit': 3,  # Process only first 3 items
-    'filter': {
-        'field': 'status',
-        'value': 'active'
-    }
-})
+```cpp
+// Complex foreach configuration
+data_map.foreach(json{
+    {"array", "${response.items}"},
+    {"limit", 3},  // Process only first 3 items
+    {"filter", {
+        {"field", "status"},
+        {"value", "active"}
+    }}
+});
 ```
 
 **Foreach Variable Access:**
@@ -2463,47 +2329,43 @@ data_map.foreach({
 
 #### Expression Matching
 
-##### `expression(test_value: str, pattern: Union[str, Pattern], output: SwaigFunctionResult, nomatch_output: Optional[SwaigFunctionResult] = None) -> DataMap`
+##### `expression(const std::string& test_value, const std::string& pattern, const swaig::FunctionResult& output, const swaig::FunctionResult* nomatch_output = nullptr) -> DataMap&`
 Add pattern-based responses without API calls.
 
 **Parameters:**
-- `test_value` (str): Template string to test against pattern
-- `pattern` (Union[str, Pattern]): Regex pattern or compiled Pattern object
-- `output` (SwaigFunctionResult): Response when pattern matches
-- `nomatch_output` (Optional[SwaigFunctionResult]): Response when pattern doesn't match
+- `test_value` (`std::string`): Template string to test against pattern
+- `pattern` (`std::string`): Regex pattern
+- `output` (`swaig::FunctionResult`): Response when pattern matches
+- `nomatch_output` (`const swaig::FunctionResult*`): Response when pattern doesn't match (optional; `nullptr` for none)
 
 **Usage:**
-```python
-# Command-based responses
-control_map = (DataMap('file_control')
-    .purpose('Control file playback')
-    .parameter('command', 'string', 'Playback command', required=True)
-    .parameter('filename', 'string', 'File to control')
-    
-    # Start commands
+```cpp
+// Command-based responses
+auto control_map = signalwire::datamap::DataMap("file_control")
+    .purpose("Control file playback")
+    .parameter("command", "string", "Playback command", /*required=*/true)
+    .parameter("filename", "string", "File to control")
+
+    // Start commands
     .expression(
-        '${args.command}', 
-        r'start|play|begin',
-        SwaigFunctionResult('Starting playback')
-        .add_action('start_playback', {'file': '${args.filename}'})
-    )
-    
-    # Stop commands
+        "${args.command}",
+        "start|play|begin",
+        signalwire::swaig::FunctionResult("Starting playback")
+        .add_action("start_playback", json{{"file", "${args.filename}"}}))
+
+    // Stop commands
     .expression(
-        '${args.command}',
-        r'stop|pause|halt',
-        SwaigFunctionResult('Stopping playback')
-        .add_action('stop_playback', True)
-    )
-    
-    # Volume commands
+        "${args.command}",
+        "stop|pause|halt",
+        signalwire::swaig::FunctionResult("Stopping playback")
+        .add_action("stop_playback", true))
+
+    // Volume commands
     .expression(
-        '${args.command}',
-        r'volume (\d+)',
-        SwaigFunctionResult('Setting volume to ${match.1}')
-        .add_action('set_volume', '${match.1}')
-    )
-)
+        "${args.command}",
+        "volume (\\d+)",
+        signalwire::swaig::FunctionResult("Setting volume to ${match.1}")
+        .add_action("set_volume", "${match.1}"));
 ```
 
 **Pattern Matching Variables:**
@@ -2513,240 +2375,194 @@ control_map = (DataMap('file_control')
 
 ### Error Handling
 
-##### `error_keys(keys: List[str]) -> DataMap`
+##### `error_keys(const std::vector<std::string>& keys) -> DataMap&`
 Specify response fields that indicate errors.
 
 **Parameters:**
-- `keys` (List[str]): List of field names that indicate API errors
+- `keys` (`std::vector<std::string>`): List of field names that indicate API errors
 
 **Usage:**
-```python
-# Treat these response fields as errors
-data_map.error_keys(['error', 'error_message', 'status_code'])
+```cpp
+// Treat these response fields as errors
+data_map.error_keys({"error", "error_message", "status_code"});
 
-# If API returns {"error": "Not found"}, DataMap will treat this as an error
+// If API returns {"error": "Not found"}, DataMap will treat this as an error
 ```
 
-##### `global_error_keys(keys: List[str]) -> DataMap`
+##### `global_error_keys(const std::vector<std::string>& keys) -> DataMap&`
 Set global error keys for all webhooks in this DataMap.
 
 **Parameters:**
-- `keys` (List[str]): Global error field names
+- `keys` (`std::vector<std::string>`): Global error field names
 
 **Usage:**
-```python
-data_map.global_error_keys(['error', 'message', 'code'])
+```cpp
+data_map.global_error_keys({"error", "message", "code"});
 ```
 
 ### Advanced Configuration
 
-##### `webhook_expressions(expressions: List[Dict[str, Any]]) -> DataMap`
+##### `webhook_expressions(const std::vector<json>& expressions) -> DataMap&`
 Add expression-based webhook selection.
 
 **Parameters:**
-- `expressions` (List[Dict[str, Any]]): List of expression configurations
+- `expressions` (`std::vector<json>`): List of expression configurations
 
 **Usage:**
-```python
-# Different APIs based on input
-data_map.webhook_expressions([
-    {
-        'test': '${args.type}',
-        'pattern': 'weather',
-        'webhook': {
-            'method': 'GET',
-            'url': 'https://weather-api.com/current?q=${args.location}'
-        }
+```cpp
+// Different APIs based on input
+data_map.webhook_expressions({
+    json{
+        {"test", "${args.type}"},
+        {"pattern", "weather"},
+        {"webhook", {
+            {"method", "GET"},
+            {"url", "https://weather-api.com/current?q=${args.location}"}
+        }}
     },
-    {
-        'test': '${args.type}',
-        'pattern': 'news',
-        'webhook': {
-            'method': 'GET', 
-            'url': 'https://news-api.com/search?q=${args.query}'
-        }
+    json{
+        {"test", "${args.type}"},
+        {"pattern", "news"},
+        {"webhook", {
+            {"method", "GET"},
+            {"url", "https://news-api.com/search?q=${args.query}"}
+        }}
     }
-])
+});
 ```
 
 ### Complete DataMap Examples
 
 #### Simple Weather API
 
-```python
-weather_tool = (DataMap('get_weather')
-    .purpose('Get current weather information')
-    .parameter('location', 'string', 'City name or ZIP code', required=True)
-    .parameter('units', 'string', 'Temperature units', enum=['celsius', 'fahrenheit'])
-    .webhook('GET', 'https://api.weather.com/v1/current?key=API_KEY&q=${args.location}&units=${args.units}')
-    .output(SwaigFunctionResult('Weather in ${args.location}: ${response.current.condition.text}, ${response.current.temp_f}°F'))
-    .error_keys(['error'])
-)
+```cpp
+auto weather_tool = signalwire::datamap::DataMap("get_weather")
+    .purpose("Get current weather information")
+    .parameter("location", "string", "City name or ZIP code", /*required=*/true)
+    .parameter("units", "string", "Temperature units", /*required=*/false, {"celsius", "fahrenheit"})
+    .webhook("GET", "https://api.weather.com/v1/current?key=API_KEY&q=${args.location}&units=${args.units}")
+    .output(signalwire::swaig::FunctionResult(
+        "Weather in ${args.location}: ${response.current.condition.text}, ${response.current.temp_f}°F"))
+    .error_keys({"error"});
 
-# Register with agent
-agent.register_swaig_function(weather_tool.to_swaig_function())
+// Register with agent
+agent.register_swaig_function(weather_tool.to_swaig_function());
 ```
 
 #### Search with Array Processing
 
-```python
-search_tool = (DataMap('search_knowledge')
-    .purpose('Search company knowledge base')
-    .parameter('query', 'string', 'Search query', required=True)
-    .parameter('category', 'string', 'Search category', enum=['docs', 'faq', 'policies'])
+```cpp
+auto search_tool = signalwire::datamap::DataMap("search_knowledge")
+    .purpose("Search company knowledge base")
+    .parameter("query", "string", "Search query", /*required=*/true)
+    .parameter("category", "string", "Search category", /*required=*/false, {"docs", "faq", "policies"})
     .webhook(
-        'POST', 
-        'https://api.company.com/search',
-        headers={'Authorization': 'Bearer TOKEN'}
-    )
+        "POST",
+        "https://api.company.com/search",
+        json{{"Authorization", "Bearer TOKEN"}})
     .body({
-        'query': '${args.query}',
-        'category': '${args.category}',
-        'limit': 5
+        {"query", "${args.query}"},
+        {"category", "${args.category}"},
+        {"limit", 5}
     })
-    .foreach('${response.results}')
-    .output(SwaigFunctionResult('Found: ${foreach.title} - ${foreach.summary}'))
-    .fallback_output(SwaigFunctionResult('Search service is temporarily unavailable'))
-)
+    .foreach("${response.results}")
+    .output(signalwire::swaig::FunctionResult("Found: ${foreach.title} - ${foreach.summary}"))
+    .fallback_output(signalwire::swaig::FunctionResult("Search service is temporarily unavailable"));
 ```
 
 #### Command Processing (No API)
 
-```python
-control_tool = (DataMap('system_control')
-    .purpose('Control system functions')
-    .parameter('action', 'string', 'Action to perform', required=True)
-    .parameter('target', 'string', 'Target for the action')
-    
-    # Restart commands
+```cpp
+auto no_match = signalwire::swaig::FunctionResult("Please specify a valid action");
+auto control_tool = signalwire::datamap::DataMap("system_control")
+    .purpose("Control system functions")
+    .parameter("action", "string", "Action to perform", /*required=*/true)
+    .parameter("target", "string", "Target for the action")
+
+    // Restart commands
     .expression(
-        '${args.action}',
-        r'restart|reboot',
-        SwaigFunctionResult('Restarting ${args.target}')
-        .add_action('restart_service', {'service': '${args.target}'})
-    )
-    
-    # Status commands
+        "${args.action}",
+        "restart|reboot",
+        signalwire::swaig::FunctionResult("Restarting ${args.target}")
+        .add_action("restart_service", json{{"service", "${args.target}"}}))
+
+    // Status commands
     .expression(
-        '${args.action}',
-        r'status|check',
-        SwaigFunctionResult('Checking status of ${args.target}')
-        .add_action('check_status', {'service': '${args.target}'})
-    )
-    
-    # Default for unrecognized commands
+        "${args.action}",
+        "status|check",
+        signalwire::swaig::FunctionResult("Checking status of ${args.target}")
+        .add_action("check_status", json{{"service", "${args.target}"}}))
+
+    // Default for unrecognized commands
     .expression(
-        '${args.action}',
-        r'.*',
-        SwaigFunctionResult('Unknown command: ${args.action}'),
-        nomatch_output=SwaigFunctionResult('Please specify a valid action')
-    )
-)
+        "${args.action}",
+        ".*",
+        signalwire::swaig::FunctionResult("Unknown command: ${args.action}"),
+        &no_match);
 ```
 
 ### Conversion and Registration
 
-##### `to_swaig_function() -> Dict[str, Any]`
-Convert the DataMap to a SWAIG function dictionary for registration.
+##### `to_swaig_function() -> json`
+Convert the DataMap to a SWAIG function definition for registration.
 
 **Returns:**
-- Dict[str, Any]: Complete SWAIG function definition
+- `json`: Complete SWAIG function definition
 
 **Usage:**
-```python
-# Build DataMap
-weather_map = DataMap('get_weather').purpose('Get weather').parameter('location', 'string', 'City', required=True)
+```cpp
+// Build DataMap
+auto weather_map = signalwire::datamap::DataMap("get_weather")
+    .purpose("Get weather")
+    .parameter("location", "string", "City", /*required=*/true);
 
-# Convert to SWAIG function and register
-swaig_function = weather_map.to_swaig_function()
-agent.register_swaig_function(swaig_function)
+// Convert to SWAIG function and register
+json swaig_function = weather_map.to_swaig_function();
+agent.register_swaig_function(swaig_function);
 ```
 
-### Convenience Functions
+### Building Common Patterns
 
-The SDK provides helper functions for common DataMap patterns:
+The C++ SDK does not ship the Python module-level `create_simple_api_tool` / `create_expression_tool` helpers. Build the same tools directly with the fluent `datamap::DataMap` builder:
 
-##### `create_simple_api_tool(name: str, url: str, response_template: str, parameters: Optional[Dict[str, Dict]] = None, method: str = "GET", headers: Optional[Dict[str, str]] = None, body: Optional[Dict[str, Any]] = None, error_keys: Optional[List[str]] = None) -> DataMap`
+**Simple API integration tool:**
+```cpp
+auto weather = signalwire::datamap::DataMap("get_weather")
+    .parameter("location", "string", "City name", /*required=*/true)
+    .webhook("GET", "https://api.weather.com/v1/current?key=API_KEY&q=${location}")
+    .output(signalwire::swaig::FunctionResult(
+        "Weather in ${location}: ${response.current.condition.text}"));
 
-Create a simple API integration tool.
-
-**Parameters:**
-- `name` (str): Function name
-- `url` (str): API endpoint URL
-- `response_template` (str): Response template string
-- `parameters` (Optional[Dict[str, Dict]]): Parameter definitions
-- `method` (str): HTTP method (default: "GET")
-- `headers` (Optional[Dict[str, str]]): HTTP headers
-- `body` (Optional[Dict[str, Any]]): Request body
-- `error_keys` (Optional[List[str]]): Error field names
-
-**Usage:**
-```python
-from signalwire.core.data_map import create_simple_api_tool
-
-weather = create_simple_api_tool(
-    name='get_weather',
-    url='https://api.weather.com/v1/current?key=API_KEY&q=${location}',
-    response_template='Weather in ${location}: ${response.current.condition.text}',
-    parameters={
-        'location': {
-            'type': 'string', 
-            'description': 'City name', 
-            'required': True
-        }
-    }
-)
-
-agent.register_swaig_function(weather.to_swaig_function())
+agent.register_swaig_function(weather.to_swaig_function());
 ```
 
-##### `create_expression_tool(name: str, patterns: Dict[str, Tuple[str, SwaigFunctionResult]], parameters: Optional[Dict[str, Dict]] = None) -> DataMap`
+**Pattern-based tool without API calls:**
+```cpp
+auto file_control = signalwire::datamap::DataMap("file_control")
+    .parameter("command", "string", "Playback command", /*required=*/true)
+    .expression("${args.command}", "start.*",
+                signalwire::swaig::FunctionResult().add_action("start_playback", true))
+    .expression("${args.command}", "stop.*",
+                signalwire::swaig::FunctionResult().add_action("stop_playback", true));
 
-Create a pattern-based tool without API calls.
-
-**Parameters:**
-- `name` (str): Function name
-- `patterns` (Dict[str, Tuple[str, SwaigFunctionResult]]): Pattern mappings
-- `parameters` (Optional[Dict[str, Dict]]): Parameter definitions
-
-**Usage:**
-```python
-from signalwire.core.data_map import create_expression_tool
-
-file_control = create_expression_tool(
-    name='file_control',
-    patterns={
-        r'start.*': ('${args.command}', SwaigFunctionResult().add_action('start_playback', True)),
-        r'stop.*': ('${args.command}', SwaigFunctionResult().add_action('stop_playback', True))
-    },
-    parameters={
-        'command': {
-            'type': 'string',
-            'description': 'Playback command',
-            'required': True
-        }
-    }
-)
-
-agent.register_swaig_function(file_control.to_swaig_function())
+agent.register_swaig_function(file_control.to_swaig_function());
 ```
 
 ### Method Chaining
 
-All DataMap methods return `self`, enabling fluent method chaining:
+All DataMap methods return `DataMap&`, enabling fluent method chaining:
 
-```python
-complete_tool = (DataMap('comprehensive_search')
-    .purpose('Comprehensive search with fallbacks')
-    .parameter('query', 'string', 'Search query', required=True)
-    .parameter('category', 'string', 'Search category', enum=['all', 'docs', 'faq'])
-    .webhook('GET', 'https://primary-api.com/search?q=${args.query}&cat=${args.category}')
-    .output(SwaigFunctionResult('Primary: ${response.title}'))
-    .webhook('GET', 'https://backup-api.com/search?q=${args.query}')
-    .output(SwaigFunctionResult('Backup: ${response.title}'))
-    .fallback_output(SwaigFunctionResult('All search services unavailable'))
-    .error_keys(['error', 'message'])
-)
+```cpp
+auto complete_tool = signalwire::datamap::DataMap("comprehensive_search")
+    .purpose("Comprehensive search with fallbacks")
+    .parameter("query", "string", "Search query", /*required=*/true)
+    .parameter("category", "string", "Search category", /*required=*/false, {"all", "docs", "faq"})
+    .webhook("GET", "https://primary-api.com/search?q=${args.query}&cat=${args.category}")
+    .output(signalwire::swaig::FunctionResult("Primary: ${response.title}"))
+    .webhook("GET", "https://backup-api.com/search?q=${args.query}")
+    .output(signalwire::swaig::FunctionResult("Backup: ${response.title}"))
+    .fallback_output(signalwire::swaig::FunctionResult("All search services unavailable"))
+    .error_keys({"error", "message"});
 ```
 
 This concludes Part 3 of the API reference covering the DataMap class. The document will continue with Context System and other components in subsequent parts. 
@@ -2763,72 +2579,62 @@ The `ContextBuilder` is accessed via `agent.define_contexts()` and provides the 
 
 #### Getting Started
 
-```python
-# Access the context builder
-contexts = agent.define_contexts()
+```cpp
+// Access the context builder
+auto& contexts = agent.define_contexts();
 
-# Create contexts and steps
-contexts.add_context("greeting") \
-    .add_step("welcome") \
-    .set_text("Welcome! How can I help you today?") \
-    .set_step_criteria("User has stated their need") \
-    .set_valid_steps(["next"])
+// Create contexts and steps
+contexts.add_context("greeting")
+    .add_step("welcome")
+    .set_text("Welcome! How can I help you today?")
+    .set_step_criteria("User has stated their need")
+    .set_valid_steps({"next"});
 ```
 
-##### `add_context(name: str) -> Context`
+##### `add_context(const std::string& name) -> Context&`
 Create a new context in the workflow.
 
 **Parameters:**
-- `name` (str): Unique context name
+- `name` (`std::string`): Unique context name
 
 **Returns:**
-- Context: Context object for method chaining
+- `Context&`: Context object for method chaining
 
 **Usage:**
-```python
-# Create multiple contexts
-greeting_context = contexts.add_context("greeting")
-main_menu_context = contexts.add_context("main_menu")
-support_context = contexts.add_context("support")
+```cpp
+auto& contexts = agent.define_contexts();
+
+// Create multiple contexts
+auto& greeting_context = contexts.add_context("greeting");
+auto& main_menu_context = contexts.add_context("main_menu");
+auto& support_context = contexts.add_context("support");
 ```
 
 ### Context Class
 
-The Context class represents a conversation context containing multiple steps with enhanced features:
+The `Context` class represents a conversation context containing multiple steps. Its principal methods (all return `Context&` for chaining unless noted):
 
-```python
-class Context:
-    def add_step(self, name: str) -> Step
-        """Create a new step in this context"""
-    
-    def set_valid_contexts(self, contexts: List[str]) -> Context
-        """Set which contexts can be accessed from this context"""
-        
-    # Context entry parameters (for context switching behavior)
-    def set_post_prompt(self, post_prompt: str) -> Context
-        """Override agent's post prompt when this context is active"""
-    
-    def set_system_prompt(self, system_prompt: str) -> Context
-        """Trigger context switch with new system instructions (makes this a Context Switch Context)"""
-        
-    def set_consolidate(self, consolidate: bool) -> Context
-        """Whether to consolidate conversation history when entering this context"""
-        
-    def set_full_reset(self, full_reset: bool) -> Context
-        """Whether to do complete system prompt replacement vs injection"""
-        
-    def set_user_prompt(self, user_prompt: str) -> Context
-        """User message to inject when entering this context for AI context"""
-    
-    # Context prompts (guidance for all steps in context)
-    def set_prompt(self, prompt: str) -> Context
-        """Set simple string prompt that applies to all steps in this context"""
-        
-    def add_section(self, title: str, body: str) -> Context
-        """Add POM-style section to context prompt"""
-        
-    def add_bullets(self, title: str, bullets: List[str]) -> Context
-        """Add POM-style bullet section to context prompt"""
+<!-- snippet: no-compile class-shape reference (member-signature listing with elided defaults, not standalone code) -->
+```cpp
+class Context {
+    // Create a new step in this context (returns Step&)
+    Step& add_step(const std::string& name, const std::string& task = "", /* ... */);
+
+    // Set which contexts can be accessed from this context
+    Context& set_valid_contexts(const std::vector<std::string>& ctxs);
+
+    // Context entry parameters (for context-switching behavior)
+    Context& set_post_prompt(const std::string& pp);      // Override agent's post prompt
+    Context& set_system_prompt(const std::string& sp);    // Trigger a context switch
+    Context& set_consolidate(bool c);                     // Consolidate history on entry
+    Context& set_full_reset(bool fr);                     // Full replacement vs injection
+    Context& set_user_prompt(const std::string& up);      // Inject a user message on entry
+
+    // Context prompts (guidance for all steps in the context)
+    Context& set_prompt(const std::string& prompt);       // Simple string prompt
+    Context& add_section(const std::string& title, const std::string& body);
+    Context& add_bullets(const std::string& title, const std::vector<std::string>& bullets);
+};
 ```
 
 **Context Types:**
@@ -2840,24 +2646,26 @@ class Context:
 
 #### Usage Examples
 
-```python
-# Workflow container context (just organizes steps)
-main_context = contexts.add_context("main")
-main_context.set_prompt("Follow standard customer service protocols")
+```cpp
+auto& contexts = agent.define_contexts();
 
-# Context switch context (changes AI behavior)  
-billing_context = contexts.add_context("billing")
-billing_context.set_system_prompt("You are now a billing specialist") \
-    .set_consolidate(True) \
-    .set_user_prompt("Customer needs billing assistance") \
-    .add_section("Department", "Billing Department") \
-    .add_bullets("Services", ["Account inquiries", "Payments", "Refunds"])
+// Workflow container context (just organizes steps)
+auto& main_context = contexts.add_context("main");
+main_context.set_prompt("Follow standard customer service protocols");
 
-# Full reset context (complete conversation reset)
-manager_context = contexts.add_context("manager") 
-manager_context.set_system_prompt("You are a senior manager") \
-    .set_full_reset(True) \
-    .set_consolidate(True)
+// Context switch context (changes AI behavior)
+auto& billing_context = contexts.add_context("billing");
+billing_context.set_system_prompt("You are now a billing specialist")
+    .set_consolidate(true)
+    .set_user_prompt("Customer needs billing assistance")
+    .add_section("Department", "Billing Department")
+    .add_bullets("Services", {"Account inquiries", "Payments", "Refunds"});
+
+// Full reset context (complete conversation reset)
+auto& manager_context = contexts.add_context("manager");
+manager_context.set_system_prompt("You are a senior manager")
+    .set_full_reset(true)
+    .set_consolidate(true);
 ```
 
 ---
@@ -2872,253 +2680,270 @@ The Skills System provides modular, reusable capabilities that can be easily add
 Provides current date and time information.
 
 **Parameters:**
-- `timezone` (Optional[str]): Timezone for date/time (default: system timezone)
-- `format` (Optional[str]): Custom date/time format string
+- `timezone` (string, optional): Timezone for date/time (default: system timezone)
+- `format` (string, optional): Custom date/time format string
 
 **Usage:**
-```python
-# Basic datetime skill
-agent.add_skill("datetime")
+```cpp
+// Basic datetime skill
+agent.add_skill("datetime");
 
-# With timezone
-agent.add_skill("datetime", {"timezone": "America/New_York"})
+// With timezone
+agent.add_skill("datetime", {{"timezone", "America/New_York"}});
 
-# With custom format
+// With custom format
 agent.add_skill("datetime", {
-    "timezone": "UTC",
-    "format": "%Y-%m-%d %H:%M:%S %Z"
-})
+    {"timezone", "UTC"},
+    {"format", "%Y-%m-%d %H:%M:%S %Z"}
+});
 ```
 
 #### `math` Skill
 Safe mathematical expression evaluation.
 
 **Parameters:**
-- `precision` (Optional[int]): Decimal precision for results (default: 2)
-- `max_expression_length` (Optional[int]): Maximum expression length (default: 100)
+- `precision` (int, optional): Decimal precision for results (default: 2)
+- `max_expression_length` (int, optional): Maximum expression length (default: 100)
 
 **Usage:**
-```python
-# Basic math skill
-agent.add_skill("math")
+```cpp
+// Basic math skill
+agent.add_skill("math");
 
-# With custom precision
-agent.add_skill("math", {"precision": 4})
+// With custom precision
+agent.add_skill("math", {{"precision", 4}});
 ```
 
 #### `web_search` Skill
 Google Custom Search API integration with web scraping.
 
 **Parameters:**
-- `api_key` (str): Google Custom Search API key (required)
-- `search_engine_id` (str): Google Custom Search Engine ID (required)
-- `num_results` (Optional[int]): Number of results to return (default: 3)
-- `tool_name` (Optional[str]): Custom tool name for multiple instances
-- `delay` (Optional[float]): Delay between requests in seconds
-- `no_results_message` (Optional[str]): Custom message when no results found
+- `api_key` (string, required): Google Custom Search API key
+- `search_engine_id` (string, required): Google Custom Search Engine ID
+- `num_results` (int, optional): Number of results to return (default: 3)
+- `tool_name` (string, optional): Custom tool name for multiple instances
+- `delay` (number, optional): Delay between requests in seconds
+- `no_results_message` (string, optional): Custom message when no results found
 
 **Usage:**
-```python
-# Basic web search
+```cpp
+// Basic web search
 agent.add_skill("web_search", {
-    "api_key": "your-google-api-key",
-    "search_engine_id": "your-search-engine-id"
-})
+    {"api_key", "your-google-api-key"},
+    {"search_engine_id", "your-search-engine-id"}
+});
 
-# Multiple search instances
+// Multiple search instances
 agent.add_skill("web_search", {
-    "api_key": "your-api-key",
-    "search_engine_id": "general-engine-id",
-    "tool_name": "search_general",
-    "num_results": 5
-})
+    {"api_key", "your-api-key"},
+    {"search_engine_id", "general-engine-id"},
+    {"tool_name", "search_general"},
+    {"num_results", 5}
+});
 
 agent.add_skill("web_search", {
-    "api_key": "your-api-key",
-    "search_engine_id": "news-engine-id",
-    "tool_name": "search_news",
-    "num_results": 3,
-    "delay": 0.5
-})
+    {"api_key", "your-api-key"},
+    {"search_engine_id", "news-engine-id"},
+    {"tool_name", "search_news"},
+    {"num_results", 3},
+    {"delay", 0.5}
+});
 ```
 
 #### `datasphere` Skill
 SignalWire DataSphere knowledge search integration.
 
 **Parameters:**
-- `space_name` (str): DataSphere space name (required)
-- `project_id` (str): DataSphere project ID (required)
-- `token` (str): DataSphere access token (required)
-- `document_id` (Optional[str]): Specific document to search
-- `tool_name` (Optional[str]): Custom tool name for multiple instances
-- `count` (Optional[int]): Number of results to return (default: 3)
-- `tags` (Optional[List[str]]): Filter by document tags
+- `space_name` (string, required): DataSphere space name
+- `project_id` (string, required): DataSphere project ID
+- `token` (string, required): DataSphere access token
+- `document_id` (string, optional): Specific document to search
+- `tool_name` (string, optional): Custom tool name for multiple instances
+- `count` (int, optional): Number of results to return (default: 3)
+- `tags` (array of string, optional): Filter by document tags
 
 **Usage:**
-```python
-# Basic DataSphere search
+```cpp
+// Basic DataSphere search
 agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project",
-    "token": "my-token"
-})
+    {"space_name", "my-space"},
+    {"project_id", "my-project"},
+    {"token", "my-token"}
+});
 
-# Multiple DataSphere instances
+// Multiple DataSphere instances
 agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project",
-    "token": "my-token",
-    "document_id": "drinks-menu",
-    "tool_name": "search_drinks",
-    "count": 5
-})
+    {"space_name", "my-space"},
+    {"project_id", "my-project"},
+    {"token", "my-token"},
+    {"document_id", "drinks-menu"},
+    {"tool_name", "search_drinks"},
+    {"count", 5}
+});
 
 agent.add_skill("datasphere", {
-    "space_name": "my-space",
-    "project_id": "my-project", 
-    "token": "my-token",
-    "tool_name": "search_policies",
-    "tags": ["HR", "Policies"]
-})
+    {"space_name", "my-space"},
+    {"project_id", "my-project"},
+    {"token", "my-token"},
+    {"tool_name", "search_policies"},
+    {"tags", json::array({"HR", "Policies"})}
+});
 ```
 
 #### `native_vector_search` Skill
 Local document search with vector similarity and keyword search.
 
 **Parameters:**
-- `index_path` (str): Path to search index file (required)
-- `tool_name` (Optional[str]): Custom tool name (default: "search_documents")
-- `max_results` (Optional[int]): Maximum results to return (default: 5)
-- `similarity_threshold` (Optional[float]): Minimum similarity score 0.0-1.0 (default: 0.0). Higher values are stricter, lower values are more permissive. Typical range: 0.2-0.4 for all-MiniLM-L6-v2, 0.3-0.5 for all-mpnet-base-v2
+- `index_path` (string, required): Path to search index file
+- `tool_name` (string, optional): Custom tool name (default: "search_documents")
+- `max_results` (int, optional): Maximum results to return (default: 5)
+- `similarity_threshold` (number, optional): Minimum similarity score 0.0-1.0 (default: 0.0). Higher values are stricter, lower values are more permissive. Typical range: 0.2-0.4 for all-MiniLM-L6-v2, 0.3-0.5 for all-mpnet-base-v2
 
 **Usage:**
-```python
-# Basic local search
+```cpp
+// Basic local search
 agent.add_skill("native_vector_search", {
-    "index_path": "./knowledge.swsearch"
-})
+    {"index_path", "./knowledge.swsearch"}
+});
 
-# With custom settings
+// With custom settings
 agent.add_skill("native_vector_search", {
-    "index_path": "./docs.swsearch",
-    "tool_name": "search_docs",
-    "max_results": 10,
-    "similarity_threshold": 0.25
-})
+    {"index_path", "./docs.swsearch"},
+    {"tool_name", "search_docs"},
+    {"max_results", 10},
+    {"similarity_threshold", 0.25}
+});
 ```
 
 ### Creating Custom Skills
 
 #### Skill Structure
 
-Create a new skill by extending `SkillBase`:
+Create a new skill by extending `skills::SkillBase` and overriding its virtual methods:
 
-```python
-from signalwire.core.skill_base import SkillBase
-from signalwire.core.data_map import DataMap
-from signalwire.core.function_result import SwaigFunctionResult
+```cpp
+#include <signalwire/signalwire.hpp>
 
-class CustomSkill(SkillBase):
-    SKILL_NAME = "custom_skill"
-    SKILL_DESCRIPTION = "Description of what this skill does"
-    SKILL_VERSION = "1.0.0"
-    REQUIRED_PACKAGES = ["requests"]  # Python packages needed
-    REQUIRED_ENV_VARS = ["API_KEY"]   # Environment variables needed
-    
-    def setup(self) -> bool:
-        """Validate and store configuration"""
-        if not self.params.get("api_key"):
-            self.logger.error("api_key parameter is required")
-            return False
-        
-        self.api_key = self.params["api_key"]
-        return True
-    
-    def register_tools(self) -> None:
-        """Register skill functions"""
-        # DataMap-based tool
-        tool = (DataMap("custom_function")
+using namespace signalwire;
+using json = nlohmann::json;
+
+class CustomSkill : public signalwire::skills::SkillBase {
+ public:
+    std::string skill_name() const override { return "custom_skill"; }
+    std::string skill_description() const override {
+        return "Description of what this skill does";
+    }
+    std::string skill_version() const override { return "1.0.0"; }
+    std::vector<std::string> required_env_vars() const override { return {"API_KEY"}; }
+
+    // Validate and store configuration
+    bool setup(const json& params) override {
+        api_key_ = params.value("api_key", "");
+        return !api_key_.empty();
+    }
+
+    // DataMap-based skills expose their functions via get_datamap_functions()
+    std::vector<json> get_datamap_functions() const override {
+        auto tool = signalwire::datamap::DataMap("custom_function")
             .description("Custom API integration")
-            .parameter("query", "string", "Search query", required=True)
-            .webhook("GET", f"https://api.example.com/search?key={self.api_key}&q=${{args.query}}")
-            .output(SwaigFunctionResult("Found: ${{response.title}}"))
-        )
-        
-        self.agent.register_swaig_function(tool.to_swaig_function())
-    
-    def get_hints(self) -> List[str]:
-        """Speech recognition hints"""
-        return ["custom search", "find information"]
-    
-    def get_global_data(self) -> Dict[str, Any]:
-        """Global data for DataMap"""
-        return {"skill_version": self.SKILL_VERSION}
-    
-    def get_prompt_sections(self) -> List[Dict[str, Any]]:
-        """Prompt sections to add"""
-        return [{
-            "title": "Custom Search Capability",
-            "body": "You can search our custom database for information.",
-            "bullets": ["Use the custom_function to search", "Results are real-time"]
-        }]
+            .parameter("query", "string", "Search query", /*required=*/true)
+            .webhook("GET", "https://api.example.com/search?key=" + api_key_ + "&q=${args.query}")
+            .output(signalwire::swaig::FunctionResult("Found: ${response.title}"));
+        return {tool.to_swaig_function()};
+    }
+
+    // Function-handler skills return ToolDefinitions here instead
+    std::vector<signalwire::swaig::ToolDefinition> register_tools() override { return {}; }
+
+    // Speech recognition hints
+    std::vector<std::string> get_hints() const override {
+        return {"custom search", "find information"};
+    }
+
+    // Global data for DataMap substitution
+    json get_global_data() const override {
+        return json{{"skill_version", skill_version()}};
+    }
+
+    // Prompt sections to add
+    std::vector<signalwire::skills::SkillPromptSection> get_prompt_sections() const override {
+        return {{"Custom Search Capability",
+                 "You can search our custom database for information.",
+                 {"Use the custom_function to search", "Results are real-time"}}};
+    }
+
+ private:
+    std::string api_key_;
+};
 ```
 
 #### Skill Registration
 
-Skills are automatically discovered from the `signalwire/skills/` directory. To register a custom skill:
+Register the skill's class with the `skills::SkillRegistry` (the `REGISTER_SKILL` macro wires up a factory keyed on `skill_name()`), then attach an instance to an agent by name with `add_skill(...)`:
 
-1. Create directory: `signalwire/skills/your_skill/`
-2. Add `__init__.py`, `skill.py`, and `README.md`
-3. Implement your skill class in `skill.py`
-4. The skill will be automatically available
+<!-- snippet: no-compile references CustomSkill, the reader's SkillBase subclass defined in the preceding example (cross-block) -->
+```cpp
+// At file scope: auto-register the factory with the global registry.
+REGISTER_SKILL(CustomSkill)
+
+// Elsewhere: attach an instance to an agent by name.
+agent.add_skill("custom_skill", {{"api_key", "your-api-key"}});
+```
+
+Equivalently, register a factory lambda directly:
+<!-- snippet: no-compile references CustomSkill, the reader's SkillBase subclass defined in the preceding example (cross-block) -->
+```cpp
+signalwire::skills::SkillRegistry::instance().register_skill(
+    "custom_skill",
+    []() -> std::unique_ptr<signalwire::skills::SkillBase> { return std::make_unique<CustomSkill>(); });
+```
 
 ---
 
 ## Utility Classes
 
-### SWAIGFunction Class
+### ToolDefinition Struct
 
-Represents a SWAIG function definition with metadata and validation.
+Represents a SWAIG function (tool) definition with its metadata and handler. This is the C++ equivalent of the Python `SWAIGFunction`.
 
-#### Constructor
+#### Fields
 
-```python
-SWAIGFunction(
-    function: str,
-    description: str,
-    parameters: Dict[str, Any],
-    **kwargs
-)
+```cpp
+struct ToolDefinition {
+    std::string name;          // Function name
+    std::string description;   // Function description
+    json parameters;           // JSON schema for parameters
+    signalwire::swaig::ToolHandler handler;// Lambda invoked when the function is called
+    bool secure = false;       // Require request signing
+
+    // Render to the SWAIG function JSON format (for inclusion in SWML)
+    json to_swaig_json(const std::string& web_hook_url = "") const;
+};
 ```
-
-**Parameters:**
-- `function` (str): Function name
-- `description` (str): Function description
-- `parameters` (Dict[str, Any]): JSON schema for parameters
-- `**kwargs`: Additional SWAIG properties
 
 #### Usage
 
-```python
-from signalwire.core.swaig_function import SWAIGFunction
+Usually you construct tools through `agent.define_tool(...)`, but you can also build a `ToolDefinition` directly and register it:
 
-# Create SWAIG function
-swaig_func = SWAIGFunction(
-    function="get_weather",
-    description="Get current weather",
-    parameters={
-        "type": "object",
-        "properties": {
-            "location": {"type": "string", "description": "City name"}
-        },
-        "required": ["location"]
-    },
-    secure=True,
-    fillers={"en-US": ["Checking weather..."]}
-)
+```cpp
+signalwire::swaig::ToolDefinition tool;
+tool.name = "get_weather";
+tool.description = "Get current weather";
+tool.parameters = {
+    {"type", "object"},
+    {"properties", {
+        {"location", {{"type", "string"}, {"description", "City name"}}}
+    }},
+    {"required", json::array({"location"})}
+};
+tool.secure = true;
+tool.handler = [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+    (void)raw;
+    return signalwire::swaig::FunctionResult("Checking weather for " + args.value("location", "") + "...");
+};
 
-# Register with agent
-agent.register_swaig_function(swaig_func.to_dict())
+// Register with agent
+agent.define_tool(tool);
 ```
 
 ### SWMLService Class
@@ -3127,34 +2952,47 @@ Base class providing SWML document generation and HTTP service capabilities. `Ag
 
 #### Key Methods
 
-##### `get_swml_document() -> Dict[str, Any]`
-Generate the complete SWML document for the service.
+##### `render_swml() -> std::string`
+Render the complete SWML document for the service as a JSON string.
 
-##### `handle_request(request_data: Dict[str, Any]) -> Dict[str, Any]`
-Handle incoming HTTP requests and generate appropriate responses.
+##### `document() -> swml::Document&`
+Access the underlying SWML document being built.
 
 ### Dynamic Configuration
 
-The dynamic configuration callback receives the agent instance directly, allowing you to configure it based on request data.
+The dynamic configuration callback receives a mutable agent handle directly, allowing you to configure it based on request data.
 
 **Usage:**
-```python
-def dynamic_config(query_params, body_params, headers, agent):
-    # Configure based on request
-    if query_params.get("lang") == "es":
-        agent.add_language("Spanish", "es-ES", "nova.luna")
-    
-    # Customer-specific configuration
-    customer_id = headers.get("X-Customer-ID")
-    if customer_id:
-        agent.set_global_data({"customer_id": customer_id})
-        agent.prompt_add_section("Customer Context", f"You are helping customer {customer_id}")
-    
-    # Add skills dynamically
-    if query_params.get("enable_search") == "true":
-        agent.add_skill("web_search", {"provider": "google"})
+```cpp
+auto dynamic_config = [](const std::map<std::string, std::string>& query_params,
+                         const json& body_params,
+                         const std::map<std::string, std::string>& headers,
+                         signalwire::agent::AgentBase& cfg) {
+    (void)body_params;
 
-agent.set_dynamic_config_callback(dynamic_config)
+    // Configure based on request
+    auto lang_it = query_params.find("lang");
+    if (lang_it != query_params.end() && lang_it->second == "es") {
+        signalwire::agent::LanguageConfig es{"Spanish", "es-ES", "nova.luna"};
+        cfg.add_language(es);
+    }
+
+    // Customer-specific configuration
+    auto cust_it = headers.find("X-Customer-ID");
+    if (cust_it != headers.end()) {
+        const std::string& customer_id = cust_it->second;
+        cfg.set_global_data({{"customer_id", customer_id}});
+        cfg.prompt_add_section("Customer Context", "You are helping customer " + customer_id);
+    }
+
+    // Add skills dynamically
+    auto search_it = query_params.find("enable_search");
+    if (search_it != query_params.end() && search_it->second == "true") {
+        cfg.add_skill("web_search", {{"provider", "google"}});
+    }
+};
+
+agent.set_dynamic_config_callback(dynamic_config);
 ```
 
 ---
@@ -3185,20 +3023,21 @@ The SDK supports various environment variables for configuration:
 
 ### Usage
 
-```python
-import os
+```cpp
+#include <cstdlib>
+#include <signalwire/agent/agent_base.hpp>
 
-# Set environment variables
-os.environ["SWML_BASIC_AUTH_USER"] = "admin"
-os.environ["SWML_BASIC_AUTH_PASSWORD"] = "secret"
-os.environ["GOOGLE_SEARCH_API_KEY"] = "your-api-key"
+// Set environment variables (or set them in the shell before launch)
+setenv("SWML_BASIC_AUTH_USER", "admin", 1);
+setenv("SWML_BASIC_AUTH_PASSWORD", "secret", 1);
+setenv("GOOGLE_SEARCH_API_KEY", "your-api-key", 1);
 
-# Agent will automatically use these
-agent = AgentBase("My Agent")
+// Agent will automatically use these
+signalwire::agent::AgentBase agent("My Agent");
 agent.add_skill("web_search", {
-    "search_engine_id": "your-engine-id"
-    # api_key will be read from environment
-})
+    {"search_engine_id", "your-engine-id"}
+    // api_key will be read from the environment
+});
 ```
 
 ---
@@ -3207,136 +3046,143 @@ agent.add_skill("web_search", {
 
 Here's a comprehensive example using multiple SDK components:
 
-```python
-from signalwire import AgentBase, SwaigFunctionResult, DataMap
+```cpp
+#include <signalwire/signalwire.hpp>
+#include <signalwire/agent/agent_base.hpp>
+#include <iostream>
 
-class ComprehensiveAgent(AgentBase):
-    def __init__(self):
-        super().__init__(
-            name="Comprehensive Agent",
-            auto_answer=True,
-            record_call=True
-        )
-        
-        # Configure voice and language
-        self.add_language("English", "en-US", "rime.spore",
-                         speech_fillers=["Let me check...", "One moment..."])
-        
-        # Add speech recognition hints
-        self.add_hints(["SignalWire", "customer service", "technical support"])
-        
-        # Configure AI parameters
-        self.set_params({
-            "ai_model": "gpt-4.1-nano",
-            "end_of_speech_timeout": 800,
-            "temperature": 0.7
-        })
-        
-        # Add skills
-        self.add_skill("datetime")
-        self.add_skill("math")
-        self.add_skill("web_search", {
-            "api_key": "your-google-api-key",
-            "search_engine_id": "your-engine-id",
-            "num_results": 3
-        })
-        
-        # Set up structured workflow
-        self._setup_contexts()
-        
-        # Add custom tools
-        self._register_custom_tools()
-        
-        # Set global data
-        self.set_global_data({
-            "company_name": "Acme Corp",
-            "support_hours": "9 AM - 5 PM EST",
-            "version": "2.0"
-        })
-    
-    def _setup_contexts(self):
-        """Set up structured workflow contexts"""
-        contexts = self.define_contexts()
-        
-        # Greeting context
-        greeting = contexts.add_context("greeting")
-        greeting.add_step("welcome") \
-            .set_text("Hello! Welcome to Acme Corp support. How can I help you today?") \
-            .set_step_criteria("Customer has explained their issue") \
-            .set_valid_steps(["next"])
-        
-        greeting.add_step("categorize") \
-            .add_section("Current Task", "Categorize the customer's request") \
-            .add_bullets("Categories", [
+using namespace signalwire;
+using json = nlohmann::json;
+
+class ComprehensiveAgent : public signalwire::agent::AgentBase {
+ public:
+    ComprehensiveAgent() : AgentBase("Comprehensive Agent", "/") {
+        // Configure voice and language
+        signalwire::agent::LanguageConfig english{"English", "en-US", "rime.spore"};
+        english.speech_fillers = {"Let me check...", "One moment..."};
+        add_language(english);
+
+        // Add speech recognition hints
+        add_hints({"SignalWire", "customer service", "technical support"});
+
+        // Configure AI parameters
+        set_params({
+            {"ai_model", "gpt-4.1-nano"},
+            {"end_of_speech_timeout", 800},
+            {"temperature", 0.7}
+        });
+
+        // Add skills
+        add_skill("datetime");
+        add_skill("math");
+        add_skill("web_search", {
+            {"api_key", "your-google-api-key"},
+            {"search_engine_id", "your-engine-id"},
+            {"num_results", 3}
+        });
+
+        // Set up structured workflow
+        setup_contexts();
+
+        // Add custom tools
+        register_custom_tools();
+
+        // Set global data
+        set_global_data({
+            {"company_name", "Acme Corp"},
+            {"support_hours", "9 AM - 5 PM EST"},
+            {"version", "2.0"}
+        });
+
+        // Handle conversation summaries
+        on_summary([](const json& summary, const json& raw_data) {
+            (void)raw_data;
+            std::cout << "Conversation completed: " << summary.dump() << "\n";
+            // Could save to database, send notifications, etc.
+        });
+
+        // Transfer-to-billing tool
+        define_tool(
+            "transfer_to_billing", "Transfer call to billing department",
+            json{{"type", "object"}, {"properties", json::object()}},
+            [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
+                (void)args;
+                (void)raw;
+                return signalwire::swaig::FunctionResult("Transferring you to our billing department")
+                    .update_global_data({{"last_action", "transfer_to_billing"}})
+                    .connect("billing@company.com", /*final=*/false);
+            });
+    }
+
+ private:
+    void setup_contexts() {
+        auto& contexts = define_contexts();
+
+        // Greeting context
+        auto& greeting = contexts.add_context("greeting");
+        greeting.add_step("welcome")
+            .set_text("Hello! Welcome to Acme Corp support. How can I help you today?")
+            .set_step_criteria("Customer has explained their issue")
+            .set_valid_steps({"categorize"});
+
+        greeting.add_step("categorize")
+            .add_section("Current Task", "Categorize the customer's request")
+            .add_bullets("Categories", {
                 "Technical issue - use diagnostic tools",
                 "Billing question - transfer to billing",
                 "General inquiry - handle directly"
-            ]) \
-            .set_functions(["transfer_to_billing", "run_diagnostics"]) \
-            .set_step_criteria("Request categorized and action taken")
-        
-        # Technical support context
-        tech = contexts.add_context("technical_support")
-        tech.add_step("diagnose") \
-            .set_text("Let me run some diagnostics to identify the issue.") \
-            .set_functions(["run_diagnostics", "check_system_status"]) \
-            .set_step_criteria("Diagnostics completed") \
-            .set_valid_steps(["resolve"])
-        
-        tech.add_step("resolve") \
-            .set_text("Based on the diagnostics, here's how we'll fix this.") \
-            .set_functions(["apply_fix", "schedule_technician"]) \
-            .set_step_criteria("Issue resolved or escalated")
-    
-    def _register_custom_tools(self):
-        """Register custom DataMap tools"""
-        
-        # Customer lookup tool
-        lookup_tool = (DataMap("lookup_customer")
-            .description("Look up customer information")
-            .parameter("customer_id", "string", "Customer ID", required=True)
-            .webhook("GET", "https://api.company.com/customers/${args.customer_id}",
-                    headers={"Authorization": "Bearer YOUR_TOKEN"})
-            .output(SwaigFunctionResult("Customer: ${response.name}, Status: ${response.status}"))
-            .error_keys(["error"])
-        )
-        
-        self.register_swaig_function(lookup_tool.to_swaig_function())
-        
-        # System control tool
-        control_tool = (DataMap("system_control")
-            .description("Control system functions")
-            .parameter("action", "string", "Action to perform", required=True)
-            .parameter("target", "string", "Target system")
-            .expression("${args.action}", r"restart|reboot",
-                       SwaigFunctionResult("Restarting ${args.target}")
-                       .add_action("restart_system", {"target": "${args.target}"}))
-            .expression("${args.action}", r"status|check",
-                       SwaigFunctionResult("Checking ${args.target} status")
-                       .add_action("check_status", {"target": "${args.target}"}))
-        )
-        
-        self.register_swaig_function(control_tool.to_swaig_function())
-    
-    @AgentBase.tool(
-        description="Transfer call to billing department",
-        parameters={"type": "object", "properties": {}}
-    )
-    def transfer_to_billing(self, args, raw_data):
-        """Transfer to billing with state tracking"""
-        return (SwaigFunctionResult("Transferring you to our billing department")
-                .update_global_data({"last_action": "transfer_to_billing"})
-                .connect("billing@company.com", final=False))
-    
-    def on_summary(self, summary, raw_data):
-        """Handle conversation summaries"""
-        print(f"Conversation completed: {summary}")
-        # Could save to database, send notifications, etc.
+            })
+            .set_functions(std::vector<std::string>{"transfer_to_billing", "run_diagnostics"})
+            .set_step_criteria("Request categorized and action taken");
 
-# Run the agent
-if __name__ == "__main__":
-    agent = ComprehensiveAgent()
-    agent.run()
+        // Technical support context
+        auto& tech = contexts.add_context("technical_support");
+        tech.add_step("diagnose")
+            .set_text("Let me run some diagnostics to identify the issue.")
+            .set_functions(std::vector<std::string>{"run_diagnostics", "check_system_status"})
+            .set_step_criteria("Diagnostics completed")
+            .set_valid_steps({"resolve"});
+
+        tech.add_step("resolve")
+            .set_text("Based on the diagnostics, here's how we'll fix this.")
+            .set_functions(std::vector<std::string>{"apply_fix", "schedule_technician"})
+            .set_step_criteria("Issue resolved or escalated");
+    }
+
+    void register_custom_tools() {
+        // Customer lookup tool
+        auto lookup_tool = signalwire::datamap::DataMap("lookup_customer")
+            .description("Look up customer information")
+            .parameter("customer_id", "string", "Customer ID", /*required=*/true)
+            .webhook("GET", "https://api.company.com/customers/${args.customer_id}",
+                     json{{"Authorization", "Bearer YOUR_TOKEN"}})
+            .output(signalwire::swaig::FunctionResult("Customer: ${response.name}, Status: ${response.status}"))
+            .error_keys({"error"});
+
+        register_swaig_function(lookup_tool.to_swaig_function());
+
+        // System control tool
+        auto control_tool = signalwire::datamap::DataMap("system_control")
+            .description("Control system functions")
+            .parameter("action", "string", "Action to perform", /*required=*/true)
+            .parameter("target", "string", "Target system")
+            .expression("${args.action}", "restart|reboot",
+                        signalwire::swaig::FunctionResult("Restarting ${args.target}")
+                        .add_action("restart_system", json{{"target", "${args.target}"}}))
+            .expression("${args.action}", "status|check",
+                        signalwire::swaig::FunctionResult("Checking ${args.target} status")
+                        .add_action("check_status", json{{"target", "${args.target}"}}));
+
+        register_swaig_function(control_tool.to_swaig_function());
+    }
+};
+
+// Run the agent
+int main() {
+    ComprehensiveAgent agent;
+    agent.run();
+    return 0;
+}
 ```
 
 This concludes the complete API reference for the SignalWire AI Agents SDK. The SDK provides a comprehensive framework for building sophisticated AI agents with modular capabilities, structured workflows, persistent state, and deployment across multiple environments.

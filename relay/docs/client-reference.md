@@ -5,22 +5,35 @@
 `RelayClient` is constructed from explicit parameters, from a `RelayConfig`
 struct, or from the environment:
 
+<!-- snippet-setup -->
 ```cpp
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/call.hpp>
+#include <signalwire/relay/message.hpp>
+#include <signalwire/relay/relay_event.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::relay::RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+```
+
+```cpp
+#include <signalwire/relay/client.hpp>
 // From individual parameters (project, token, host, contexts)
-RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+signalwire::relay::RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
 
 // From a config struct
-RelayConfig config;
+signalwire::relay::RelayConfig config;
 config.project = "project-id";
 config.token = "api-token";
 config.host = "example.signalwire.com";
 config.contexts = {"default"};
 config.max_active_calls = 1000;
 config.max_connections = 1;
-RelayClient client2(config);
+signalwire::relay::RelayClient client2(config);
 
 // From SIGNALWIRE_PROJECT_ID / SIGNALWIRE_API_TOKEN / SIGNALWIRE_SPACE
-auto client3 = RelayClient::from_env();
+auto client3 = signalwire::relay::RelayClient::from_env();
 ```
 
 `RelayConfig` fields: `project`, `token`, `host` (default `relay.signalwire.com`),
@@ -56,7 +69,7 @@ Register the inbound call handler.
 `InboundCallHandler = std::function<void(Call&)>`.
 
 ```cpp
-client.on_call([](Call& call) {
+client.on_call([](signalwire::relay::Call& call) {
     call.answer();
 });
 ```
@@ -73,7 +86,7 @@ thrown on timeout).
 - `max_duration` -- max call duration in seconds (omitted when 0)
 
 ```cpp
-Call call = client.dial({{
+signalwire::relay::Call call = client.dial({{
     {{"type", "phone"}, {"params", {{"to_number", "+15551234567"}, {"from_number", "+15559876543"}}}}
 }});
 ```
@@ -84,7 +97,7 @@ Register the inbound message handler.
 `InboundMessageHandler = std::function<void(const Message&)>`.
 
 ```cpp
-client.on_message([](const Message& message) {
+client.on_message([](const signalwire::relay::Message& message) {
     std::cout << "SMS from " << message.from << ": " << message.body << "\n";
 });
 ```

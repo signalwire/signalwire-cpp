@@ -6,7 +6,12 @@
 #include <openssl/rand.h>
 
 #include <algorithm>
+#include <cctype>
+#include <csignal>
+#include <map>
+#include <optional>
 #include <set>
+#include <tuple>
 
 #include "httplib.h"
 #include "server/tls_server.hpp"
@@ -41,7 +46,7 @@ AgentBase::AgentBase(const std::string& name, const std::string& route, const st
     }
   }
 
-  // Webhook signature validation (porting-sdk/webhooks.md):
+  // Webhook signature validation (the SignalWire webhook signature spec):
   // pick up SIGNALWIRE_SIGNING_KEY at construction time as a fallback;
   // explicit set_signing_key(...) wins. The actual route mounting + the
   // "disabled" warning is emitted at serve() time so callers who set
@@ -76,6 +81,7 @@ AgentBase::AgentBase(const AgentBase& other) {
   function_includes_ = other.function_includes_;
   hints_ = other.hints_;
   languages_ = other.languages_;
+  multilingual_ = other.multilingual_;
   pronunciations_ = other.pronunciations_;
   ai_params_ = other.ai_params_;
   global_data_ = other.global_data_;
@@ -330,6 +336,33 @@ swaig::FunctionResult AgentBase::on_function_call(const std::string& name, const
 
 std::vector<std::string> AgentBase::list_tools() const { return tool_order_; }
 
+AgentBase& AgentBase::define_tools(const std::vector<swaig::ToolDefinition>& tools) {
+  for (const auto& tool : tools) {
+    define_tool(tool);
+  }
+  return *this;
+}
+
+AgentBase& AgentBase::register_routing_callback(RoutingCallback callback, const std::string& path) {
+  routing_callbacks_[path] = std::move(callback);
+  return *this;
+}
+
+void AgentBase::setup_graceful_shutdown() {
+  // Register process signal handlers that stop the running HTTP server so an
+  // in-flight request drains before the process exits. Mirrors Python's
+  // WebMixin.setup_graceful_shutdown (SIGINT/SIGTERM -> server.stop()).
+  static AgentBase* g_shutdown_target = nullptr;
+  g_shutdown_target = this;
+  auto handler = [](int /*signum*/) {
+    if (g_shutdown_target != nullptr) {
+      g_shutdown_target->stop();
+    }
+  };
+  std::signal(SIGINT, handler);
+  std::signal(SIGTERM, handler);
+}
+
 std::string AgentBase::create_tool_token(const std::string& tool_name,
                                          const std::string& call_id) const {
   try {
@@ -367,9 +400,14 @@ AgentBase& AgentBase::add_hints(const std::vector<std::string>& hints) {
   return *this;
 }
 
-AgentBase& AgentBase::add_pattern_hint(const std::string& pattern) {
-  // Pattern hints are treated the same as regular hints
-  hints_.push_back(pattern);
+AgentBase& AgentBase::add_pattern_hint(const std::string& hint, const std::string& pattern,
+                                       const std::string& replace, bool ignore_case) {
+  // Structured pattern hint: append the full object, not a
+  // bare string. No-op unless hint/pattern/replace are all provided.
+  if (!hint.empty() && !pattern.empty() && !replace.empty()) {
+    hints_.push_back(json{
+        {"hint", hint}, {"pattern", pattern}, {"replace", replace}, {"ignore_case", ignore_case}});
+  }
   return *this;
 }
 
@@ -396,6 +434,15 @@ AgentBase& AgentBase::set_language_params(const std::string& code, const json& p
       }
       break;
     }
+  }
+  return *this;
+}
+
+AgentBase& AgentBase::set_multilingual(const json& config) {
+  // Mirror Python's ``if config and isinstance(config, dict)``: only a
+  // non-empty object configures the mode; anything else is ignored.
+  if (config.is_object() && !config.empty()) {
+    multilingual_ = config;
   }
   return *this;
 }
@@ -460,6 +507,10 @@ AgentBase& AgentBase::update_global_data(const json& data) {
     global_data_[k] = v;
   }
   return *this;
+}
+
+json AgentBase::get_global_data() const {
+  return global_data_.is_object() ? global_data_ : json::object();
 }
 
 AgentBase& AgentBase::set_native_functions(const std::vector<std::string>& funcs) {
@@ -593,12 +644,30 @@ AgentBase& AgentBase::set_function_includes(const std::vector<json>& includes) {
 }
 
 AgentBase& AgentBase::set_prompt_llm_params(const json& params) {
-  prompt_llm_params_ = params;
+  // MERGE, don't replace (Python: self._prompt_llm_params.update(params) —
+  // ai_config_mixin.py:669). Two calls with distinct keys must accumulate both.
+  if (!prompt_llm_params_.is_object()) {
+    prompt_llm_params_ = json::object();
+  }
+  if (params.is_object()) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      prompt_llm_params_[it.key()] = it.value();
+    }
+  }
   return *this;
 }
 
 AgentBase& AgentBase::set_post_prompt_llm_params(const json& params) {
-  post_prompt_llm_params_ = params;
+  // MERGE, don't replace (Python: self._post_prompt_llm_params.update(params) —
+  // ai_config_mixin.py:703).
+  if (!post_prompt_llm_params_.is_object()) {
+    post_prompt_llm_params_ = json::object();
+  }
+  if (params.is_object()) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      post_prompt_llm_params_[it.key()] = it.value();
+    }
+  }
   return *this;
 }
 
@@ -933,6 +1002,39 @@ json AgentBase::handle_mcp_request(const json& body) {
 
 AgentBase& AgentBase::enable_sip_routing(bool enable) {
   sip_routing_enabled_ = enable;
+  if (!enable) {
+    return *this;
+  }
+
+  // Register a routing callback at /sip that CONSULTS the registered SIP
+  // usernames (mirrors Python AgentBase.enable_sip_routing /
+  // sip_routing_callback). The callback extracts the SIP username from the
+  // request body and, like Python/Go, returns an empty route in both the
+  // matched and unmatched cases (a matched username is already handled by this
+  // agent, so normal SWML rendering continues — no redirect). The point is
+  // that the mapping is now CONSULTED over the served /sip path, not merely
+  // stored: the served endpoint reaches this callback and extracts the
+  // username, instead of 404-ing.
+  register_routing_callback(
+      [this](const json& body, const std::map<std::string, std::string>&) -> std::string {
+        std::string sip_username = signalwire::swml::Service::extract_sip_username(body);
+        if (!sip_username.empty()) {
+          std::string lowered = sip_username;
+          std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::tolower);
+          bool matched = std::find(sip_usernames_.begin(), sip_usernames_.end(), lowered) !=
+                         sip_usernames_.end();
+          get_logger().info((matched ? "sip_username_matched: " : "sip_username_not_matched: ") +
+                            sip_username);
+        }
+        // Matched or not, routing continues (empty route -> render SWML).
+        return "";
+      },
+      "/sip");
+
+  // Auto-map common usernames (mirrors Python enable_sip_routing's auto_map=True
+  // default): derive + register usernames from the agent name/route.
+  auto_map_sip_usernames(true);
+
   return *this;
 }
 
@@ -943,12 +1045,61 @@ AgentBase& AgentBase::register_sip_username(const std::string& username) {
     get_logger().warn("Invalid SIP username format: " + username);
     return *this;
   }
-  sip_usernames_.push_back(username);
+  // Store lower-cased (mirrors Python's self._sip_usernames.add(username.lower()))
+  // so the /sip routing callback's case-insensitive match works.
+  std::string lowered = username;
+  std::transform(lowered.begin(), lowered.end(), lowered.begin(), ::tolower);
+  if (std::find(sip_usernames_.begin(), sip_usernames_.end(), lowered) == sip_usernames_.end()) {
+    sip_usernames_.push_back(lowered);
+  }
   return *this;
 }
 
+std::vector<std::string> AgentBase::get_sip_usernames() const { return sip_usernames_; }
+
 AgentBase& AgentBase::auto_map_sip_usernames(bool enable) {
   auto_map_sip_ = enable;
+  if (!enable) {
+    return *this;
+  }
+
+  // Mirror Python auto_map_sip_usernames: derive SIP usernames from the agent
+  // name and route (lower-cased, stripped to [a-z0-9_]) and register them so
+  // they are actually consulted by the /sip routing callback.
+  auto clean = [](std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    std::string out;
+    for (char c : s) {
+      if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+        out.push_back(c);
+      }
+    }
+    return out;
+  };
+
+  std::string clean_name = clean(name_);
+  if (!clean_name.empty()) {
+    register_sip_username(clean_name);
+  }
+
+  std::string clean_route = clean(route_);
+  if (!clean_route.empty() && clean_route != clean_name) {
+    register_sip_username(clean_route);
+  }
+
+  // Register a no-vowels variation of the name when it is long enough.
+  if (clean_name.size() > 3) {
+    std::string no_vowels;
+    for (char c : clean_name) {
+      if (c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u') {
+        no_vowels.push_back(c);
+      }
+    }
+    if (no_vowels != clean_name && no_vowels.size() > 2) {
+      register_sip_username(no_vowels);
+    }
+  }
+
   return *this;
 }
 
@@ -964,7 +1115,7 @@ AgentBase& AgentBase::set_auth(const std::string& username, const std::string& p
 }
 
 // ============================================================================
-// Webhook Signature Validation (porting-sdk/webhooks.md)
+// Webhook Signature Validation (the SignalWire webhook signature spec)
 // ============================================================================
 
 AgentBase& AgentBase::set_signing_key(const std::string& key) {
@@ -1151,6 +1302,34 @@ std::string AgentBase::detect_proxy_url(const std::map<std::string, std::string>
   return "http://" + host_ + ":" + std::to_string(port_);
 }
 
+std::string AgentBase::get_full_url(bool include_auth) const {
+  // Base: an explicitly-set proxy URL if present, else the local host:port.
+  std::string base = proxy_url_ ? *proxy_url_ : ("http://" + host_ + ":" + std::to_string(port_));
+  while (!base.empty() && base.back() == '/') {
+    base.pop_back();
+  }
+  std::string r = route();
+  if (r.empty() || r == "/") {
+    r = "";
+  } else if (r.front() != '/') {
+    r = "/" + r;
+  }
+  std::string url = base + r;
+  if (include_auth) {
+    auto creds = get_basic_auth_credentials();
+    const std::string& user = creds.first;
+    const std::string& pass = creds.second;
+    if (!user.empty() && !pass.empty()) {
+      // Insert credentials after the scheme: scheme://user:pass@rest
+      auto sep = url.find("://");
+      if (sep != std::string::npos) {
+        url = url.substr(0, sep + 3) + user + ":" + pass + "@" + url.substr(sep + 3);
+      }
+    }
+  }
+  return url;
+}
+
 json AgentBase::build_swaig_functions(const std::string& webhook_url) const {
   json functions = json::array();
 
@@ -1224,6 +1403,12 @@ json AgentBase::build_ai_verb(const std::string& webhook_url) const {
     ai["languages"] = langs;
   }
 
+  // Multilingual (Mode B) — top-level ``multilingual`` object. Emitted
+  // independently of ``languages``; the server prefers it when both exist.
+  if (multilingual_.is_object() && !multilingual_.empty()) {
+    ai["multilingual"] = multilingual_;
+  }
+
   // Pronunciations
   if (!pronunciations_.empty()) {
     json pronuns = json::array();
@@ -1295,6 +1480,99 @@ json AgentBase::render_swml_for_request(const std::map<std::string, std::string>
   return render_swml_internal(headers);
 }
 
+// ---------------------------------------------------------------------------
+// Framework-free request-dispatch primitives (Python:
+// AgentBase.handle_request). File-local helpers mirror SWMLService's, but the
+// render path is AgentBase's request-aware render_swml_for_request.
+// ---------------------------------------------------------------------------
+namespace {
+
+std::string agent_header_lookup(const std::map<std::string, std::string>& headers,
+                                const std::string& name) {
+  auto exact = headers.find(name);
+  if (exact != headers.end()) {
+    return exact->second;
+  }
+  std::string want = name;
+  std::transform(want.begin(), want.end(), want.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  for (const auto& kv : headers) {
+    std::string key = kv.first;
+    std::transform(key.begin(), key.end(), key.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (key == want) {
+      return kv.second;
+    }
+  }
+  return "";
+}
+
+std::string agent_path_from_url(const std::string& url) {
+  std::string path = url;
+  auto scheme = path.find("://");
+  if (scheme != std::string::npos) {
+    auto slash = path.find('/', scheme + 3);
+    path = (slash == std::string::npos) ? std::string("/") : path.substr(slash);
+  }
+  auto q = path.find_first_of("?#");
+  if (q != std::string::npos) {
+    path = path.substr(0, q);
+  }
+  std::string trimmed = path;
+  while (!trimmed.empty() && trimmed.front() == '/') {
+    trimmed.erase(trimmed.begin());
+  }
+  while (!trimmed.empty() && trimmed.back() == '/') {
+    trimmed.pop_back();
+  }
+  return "/" + trimmed;
+}
+
+}  // namespace
+
+std::tuple<int, std::map<std::string, std::string>, std::string> AgentBase::handle_request(
+    const std::string& method, const std::string& url,
+    const std::map<std::string, std::string>& headers, const std::optional<json>& body) {
+  init_auth();
+
+  const json request_body = body.value_or(json::object());
+
+  // Basic-auth over the passed header map.
+  bool authorized = false;
+  std::string auth_header = agent_header_lookup(headers, "Authorization");
+  if (auth_header.size() >= 7 && auth_header.substr(0, 6) == "Basic ") {
+    std::string decoded = signalwire::base64_decode(auth_header.substr(6));
+    auto colon = decoded.find(':');
+    if (colon != std::string::npos) {
+      std::string user = decoded.substr(0, colon);
+      std::string pass = decoded.substr(colon + 1);
+      authorized = signalwire::timing_safe_compare(user, auth_user_) &&
+                   signalwire::timing_safe_compare(pass, auth_pass_);
+    }
+  }
+  if (!authorized) {
+    return {401, {{"WWW-Authenticate", "Basic"}}, R"({"error":"Unauthorized"})"};
+  }
+
+  // Routing callback: only for POST with a non-empty parsed body and a callback
+  // registered for the request's path. A returned non-empty route -> 307.
+  const std::string callback_path = agent_path_from_url(url);
+  if (method == "POST" && request_body.is_object() && !request_body.empty()) {
+    auto cb = routing_callbacks_.find(callback_path);
+    if (cb != routing_callbacks_.end() && cb->second) {
+      std::string route = cb->second(request_body, headers);
+      if (!route.empty()) {
+        return {307, {{"Location", route}}, ""};
+      }
+    }
+  }
+
+  // Render SWML via AgentBase's request-aware path (empty query params, the
+  // parsed body as body params, the request headers for proxy detection).
+  json swml = render_swml_for_request({}, request_body, headers);
+  return {200, {}, swml.dump()};
+}
+
 // Private helper to actually render
 json AgentBase::render_swml_internal(const std::map<std::string, std::string>& headers) const {
   std::string base_url = detect_proxy_url(headers);
@@ -1330,10 +1608,24 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
     doc.main().add_verb(v);
   }
 
-  return doc.to_json();
+  json swml = doc.to_json();
+  transform_swml(swml);
+  return swml;
+}
+
+void AgentBase::transform_swml(json&) const {
+  // Default: no transform. Subclasses (e.g. BedrockAgent) override.
 }
 
 std::unique_ptr<AgentBase> AgentBase::clone() const { return std::make_unique<AgentBase>(*this); }
+
+utils::ServerlessResponse AgentBase::handle_serverless_request(const json& event,
+                                                               const json& context,
+                                                               const std::string& mode) {
+  // Canonical instance entry point; the per-platform dispatch lives in
+  // signalwire::utils (handle_lambda / _gcf / _azure / _cgi).
+  return utils::handle_serverless_request(*this, event, context, mode);
+}
 
 // ============================================================================
 // HTTP Handlers
@@ -1384,17 +1676,15 @@ bool AgentBase::validate_auth(const httplib::Request& req, httplib::Response& re
 
 void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Response& res) {
   add_security_headers(res);
-  if (!validate_auth(req, res)) {
-    return;
-  }
 
-  // Extract query params
-  std::map<std::string, std::string> query_params;
-  for (const auto& p : req.params) {
-    query_params[p.first] = p.second;
-  }
+  // Thin framework adapter: extract (method, url, headers, body) from the
+  // httplib request and DELEGATE the auth/routing-307/render-200 decision to the
+  // decomposed core handle_request(). Do NOT re-implement auth or render here —
+  // the served path must produce the same 401/307/200 the primitive does,
+  // including the routing-callback redirect (previously skipped on this path).
 
-  // Extract headers
+  // Headers lowercased so detect_proxy_url()'s x-forwarded-* lookups resolve;
+  // handle_request()'s Authorization lookup is case-insensitive either way.
   std::map<std::string, std::string> headers;
   for (const auto& h : req.headers) {
     std::string lower_key = h.first;
@@ -1402,19 +1692,26 @@ void AgentBase::handle_swml_request(const httplib::Request& req, httplib::Respon
     headers[lower_key] = h.second;
   }
 
-  // Parse body
-  json body_params = json::object();
+  // Parse body (best-effort: a malformed body is non-fatal -> empty object).
+  std::optional<json> body_params;
   if (!req.body.empty()) {
     try {
       body_params = json::parse(req.body);
     } catch (const std::exception& e) {
-      // best-effort: malformed body is non-fatal; proceed with empty params
       (void)e;
     }
   }
 
-  json swml = render_swml_for_request(query_params, body_params, headers);
-  res.set_content(swml.dump(), "application/json");
+  auto [status, resp_headers, resp_body] =
+      handle_request(req.method, req.path, headers, body_params);
+
+  res.status = status;
+  for (const auto& kv : resp_headers) {
+    res.set_header(kv.first, kv.second);
+  }
+  // A 307 redirect carries an empty body and only the Location header; a 200
+  // carries the rendered SWML; a 401 carries the JSON error + WWW-Authenticate.
+  res.set_content(resp_body, "application/json");
 }
 
 void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Response& res) {
@@ -1523,7 +1820,7 @@ void AgentBase::setup_routes(httplib::Server& server) {
     base.pop_back();
   }
 
-  // Webhook signature validation (porting-sdk/webhooks.md):
+  // Webhook signature validation (the SignalWire webhook signature spec):
   // when signing_key is set, wrap POST handlers with the validator;
   // when unset, log a one-time warning matching the Python reference
   // and let unsigned POSTs through.
@@ -1568,6 +1865,28 @@ void AgentBase::setup_routes(httplib::Server& server) {
       });
   server.Get(base, swml_get);
   server.Post(base, swml_post);
+
+  // Mount any registered routing-callback paths (e.g. "/sip" from
+  // enable_sip_routing) so the served path reaches handle_request() and
+  // CONSULTS the callback, mirroring Python's WebMixin routing-callback routes.
+  // Without this the callback would be stored-but-unreachable (a POST to /sip
+  // 404s). The GET/POST both delegate to handle_swml_request -> handle_request,
+  // which runs the callback (POST + non-empty body) and renders SWML otherwise.
+  for (const auto& [cb_path, cb] : routing_callbacks_) {
+    (void)cb;
+    if (cb_path == base || cb_path.empty()) {
+      continue;  // base route already mounted above
+    }
+    security::HttpHandler cb_get = [this](const httplib::Request& req, httplib::Response& res) {
+      handle_swml_request(req, res);
+    };
+    security::HttpHandler cb_post =
+        wrap_post([this](const httplib::Request& req, httplib::Response& res) {
+          handle_swml_request(req, res);
+        });
+    server.Get(cb_path, cb_get);
+    server.Post(cb_path, cb_post);
+  }
 
   // SWAIG endpoint — POST signature-validated when key is set.
   std::string swaig_path = base + (base.back() == '/' ? "" : "/") + "swaig";

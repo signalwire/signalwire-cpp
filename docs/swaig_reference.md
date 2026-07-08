@@ -4,10 +4,16 @@ SWAIG (SignalWire AI Gateway) is the platform's AI tool-calling system -- it con
 
 Every action method returns `FunctionResult&` (a reference to `*this`), so calls chain fluently. The class is constructed and returned from a `swaig::ToolHandler`:
 
+<!-- snippet-setup -->
 ```cpp
+#include <signalwire/agent/agent_base.hpp>
 #include <signalwire/swaig/function_result.hpp>
-
-using namespace signalwire;
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
+signalwire::swaig::FunctionResult result("ok");
 ```
 
 ## Core Methods
@@ -18,8 +24,8 @@ using namespace signalwire;
 Creates a new result object with optional response text and post-processing behavior.
 
 ```cpp
-swaig::FunctionResult r1("Hello, I'll help you with that");
-swaig::FunctionResult r2("Processing request...", /*post_process=*/true);
+signalwire::swaig::FunctionResult r1("Hello, I'll help you with that");
+signalwire::swaig::FunctionResult r2("Processing request...", /*post_process=*/true);
 ```
 
 #### `set_response(response)`
@@ -108,15 +114,15 @@ Build custom prompts and parameters with the static helpers:
 ```cpp
 // Create payment actions
 std::vector<json> welcome = {
-    swaig::FunctionResult::create_payment_action("Say", "Welcome to our payment system"),
-    swaig::FunctionResult::create_payment_action("Say", "Please enter your credit card number")
+    signalwire::swaig::FunctionResult::create_payment_action("Say", "Welcome to our payment system"),
+    signalwire::swaig::FunctionResult::create_payment_action("Say", "Please enter your credit card number")
 };
-json card_prompt = swaig::FunctionResult::create_payment_prompt("payment-card-number", welcome);
+json card_prompt = signalwire::swaig::FunctionResult::create_payment_prompt("payment-card-number", welcome);
 
 // Create payment parameters
 std::vector<json> params = {
-    swaig::FunctionResult::create_payment_parameter("customer_id", "12345"),
-    swaig::FunctionResult::create_payment_parameter("order_id", "ORD-789")
+    signalwire::swaig::FunctionResult::create_payment_parameter("customer_id", "12345"),
+    signalwire::swaig::FunctionResult::create_payment_parameter("order_id", "ORD-789")
 };
 ```
 
@@ -139,7 +145,7 @@ result.record_call("support_call_001", /*stereo=*/true, "mp3", "both");
 A typed overload accepts the `RecordFormat` and `RecordDirection` enums in place of the string `format`/`direction`, for call-site typo checking:
 
 ```cpp
-result.record_call("voicemail", false, swaig::RecordFormat::Wav, swaig::RecordDirection::Speak);
+result.record_call("voicemail", false, signalwire::swaig::RecordFormat::Wav, signalwire::swaig::RecordDirection::Speak);
 ```
 
 **Core parameters:**
@@ -189,10 +195,10 @@ Join an ad-hoc audio conference. There are two overloads: a flat positional over
 result.join_conference("my_conference");
 
 // Options-bag overload — set only the fields you need
-swaig::JoinConferenceOptions opts;
-opts.record = swaig::ConferenceRecord::RecordFromStart;
+signalwire::swaig::JoinConferenceOptions opts;
+opts.record = signalwire::swaig::ConferenceRecord::RecordFromStart;
 opts.max_participants = 50;
-opts.beep = swaig::ConferenceBeep::OnEnter;
+opts.beep = signalwire::swaig::ConferenceBeep::OnEnter;
 result.join_conference("customer_support_conf", opts);
 ```
 
@@ -213,7 +219,7 @@ A typed overload accepts the `TapDirection` and `Codec` enums. Note the tap dire
 
 ```cpp
 result.tap("wss://monitoring.example.com/audio", "compliance_tap",
-           swaig::TapDirection::Speak, swaig::Codec::Pcmu);
+           signalwire::swaig::TapDirection::Speak, signalwire::swaig::Codec::Pcmu);
 ```
 
 #### `stop_tap(control_id = "")`
@@ -387,11 +393,11 @@ Remove or replace the tool_call + tool_result pair from the LLM's conversation h
 
 ```cpp
 // Remove entirely — LLM won't see this function was called
-swaig::FunctionResult r1("Done.");
+signalwire::swaig::FunctionResult r1("Done.");
 r1.replace_in_history(true);
 
 // Replace with a friendly assistant message instead of tool artifacts
-swaig::FunctionResult r2("Profile saved.");
+signalwire::swaig::FunctionResult r2("Profile saved.");
 r2.replace_in_history("I've saved your profile information.");
 ```
 
@@ -514,15 +520,15 @@ result.rpc_ai_message("call-abc-123", "A new ticket was created for you.", "syst
 All action methods return `*this`, enabling fluent chaining:
 
 ```cpp
-swaig::FunctionResult result =
-    swaig::FunctionResult("Processing your request", /*post_process=*/true)
+signalwire::swaig::FunctionResult my_result =
+    signalwire::swaig::FunctionResult("Processing your request", /*post_process=*/true)
         .update_global_data({{"status", "processing"}})
         .play_background_file("processing.wav", /*wait=*/true)
         .set_end_of_speech_timeout(2500);
 
 // Transfer example
-swaig::FunctionResult transfer =
-    swaig::FunctionResult("Let me transfer you to billing")
+signalwire::swaig::FunctionResult transfer =
+    signalwire::swaig::FunctionResult("Let me transfer you to billing")
         .set_metadata({{"transfer_reason", "billing_inquiry"}})
         .update_global_data({{"last_action", "transfer_to_billing"}})
         .connect("+15551234567", /*final=*/true);

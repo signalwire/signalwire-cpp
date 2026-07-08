@@ -70,10 +70,23 @@ static std::vector<TestCase>& get_tests() {
 // Original test files
 #include "test_swml.cpp"
 #include "test_swml_service_swaig.cpp"
+#include "test_swml_handler.cpp"
+#include "test_swaig_function.cpp"
+#include "test_swml_builder.cpp"
+#include "test_swml_renderer.cpp"
+#include "test_web_service.cpp"
 #include "test_function_result.cpp"
 #include "test_parameter_schema.cpp"
+#include "test_type_inference.cpp"
+#include "test_handle_request.cpp"
+#include "test_served_routing.cpp"
+#include "test_tier2_behavioral.cpp"
 #include "test_media_enums.cpp"
 #include "test_security.cpp"
+#include "test_security_config.cpp"
+#include "test_config_loader.cpp"
+#include "test_auth_handler.cpp"
+#include "test_pom_builder.cpp"
 #include "test_datamap.cpp"
 #include "test_contexts.cpp"
 #include "test_agent.cpp"
@@ -125,11 +138,15 @@ static std::vector<TestCase>& get_tests() {
 #include "test_prefab_receptionist.cpp"
 #include "test_prefab_faqbot.cpp"
 #include "test_prefab_concierge.cpp"
+#include "test_prefab_tools.cpp"
+#include "test_bedrock_agent.cpp"
 
 // RELAY split test files
 #include "test_relay_call.cpp"
 #include "test_relay_action.cpp"
+#include "test_relay_actions_subclasses.cpp"
 #include "test_relay_event.cpp"
+#include "test_relay_typed_events.cpp"
 #include "test_relay_message.cpp"
 #include "test_tts_gender_enum.cpp"
 #include "test_relay_states.cpp"
@@ -159,23 +176,28 @@ static std::vector<TestCase>& get_tests() {
 // Mock-server-backed REST tests (translated from
 // signalwire-python/tests/unit/rest/*.py). These hit the local
 // mock_signalwire HTTP server on port 8772.
-#include "test_rest_mock_compat_calls_streams.cpp"
-#include "test_rest_mock_compat_messages_faxes.cpp"
-#include "test_rest_mock_compat_phone_numbers.cpp"
 #include "test_rest_mock_calling.cpp"
 #include "test_rest_mock_small.cpp"
-#include "test_rest_mock_compat_accounts.cpp"
-#include "test_rest_mock_compat_misc.cpp"
-#include "test_rest_mock_compat_conferences.cpp"
-#include "test_rest_mock_compat_queues.cpp"
-#include "test_rest_mock_compat_tokens.cpp"
-#include "test_rest_mock_compat_recordings_transcriptions.cpp"
 #include "test_rest_mock_video.cpp"
 #include "test_rest_mock_fabric.cpp"
 #include "test_rest_mock_logs.cpp"
 #include "test_rest_mock_registry.cpp"
 #include "test_rest_mock_pagination.cpp"
-#include "test_rest_full_coverage.cpp"
+// Generated full-mock REST wire-test suite (item E) — success+error per
+// canonical route, superseding the hand-written test_rest_full_coverage.cpp.
+// Regenerate with scripts/generate_rest_tests.py; GEN-FRESH-TESTS gated.
+#include "test_rest_generated_calling.cpp"
+#include "test_rest_generated_chat.cpp"
+#include "test_rest_generated_datasphere.cpp"
+#include "test_rest_generated_fabric.cpp"
+#include "test_rest_generated_fax.cpp"
+#include "test_rest_generated_logs.cpp"
+#include "test_rest_generated_message.cpp"
+#include "test_rest_generated_project.cpp"
+#include "test_rest_generated_pubsub.cpp"
+#include "test_rest_generated_relay_rest.cpp"
+#include "test_rest_generated_video.cpp"
+#include "test_rest_generated_voice.cpp"
 
 // TLS capability tests (template: signalwire-go b6b2b6d). Prove the SDK does
 // REAL, certificate-verified TLS: REST https:// + RELAY wss:// against the

@@ -1,9 +1,27 @@
 // Copyright (c) 2025 SignalWire
 // SPDX-License-Identifier: MIT
+#include <algorithm>
+#include <cctype>
+
 #include "signalwire/prefabs/prefabs.hpp"
 
 namespace signalwire {
 namespace prefabs {
+
+namespace {
+bool iequals(const std::string& a, const std::string& b) {
+  if (a.size() != b.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+}  // namespace
 
 ConciergeAgent::ConciergeAgent(const std::string& name, const std::string& route,
                                const std::string& host, int port)
@@ -18,6 +36,7 @@ ConciergeAgent::ConciergeAgent(const std::string& name, const std::string& route
 }
 
 ConciergeAgent& ConciergeAgent::set_venue_name(const std::string& venue_name) {
+  venue_name_ = venue_name;
   prompt_add_to_section("Personality", "\nYou work at " + venue_name + ".");
   update_global_data(json::object({{"venue_name", venue_name}}));
   return *this;
@@ -39,8 +58,37 @@ ConciergeAgent& ConciergeAgent::set_amenities(const std::vector<json>& amenities
     bullets.push_back(bullet);
   }
 
+  amenities_.assign(amenities.begin(), amenities.end());
   update_global_data(json::object({{"amenities", amenity_data}}));
   prompt_add_section("Available Amenities", "", bullets);
+
+  // Define availability + directions tools bound to the member handlers
+  // (ported from the Java ConciergeAgent check_availability / get_directions).
+  define_tool(
+      "check_availability", "Check availability of an amenity or service",
+      json::object(
+          {{"type", "object"},
+           {"properties",
+            json::object({{"amenity",
+                           json::object({{"type", "string"}, {"description", "Amenity to check"}})},
+                          {"date", json::object({{"type", "string"},
+                                                 {"description", "Date to check (YYYY-MM-DD)"}})},
+                          {"time", json::object({{"type", "string"},
+                                                 {"description", "Time to check (HH:MM)"}})}})},
+           {"required", json::array({"amenity"})}}),
+      [this](const json& args, const json& raw) { return check_availability(args, raw); });
+
+  define_tool(
+      "get_directions", "Get directions to a specific location or amenity",
+      json::object(
+          {{"type", "object"},
+           {"properties",
+            json::object(
+                {{"location", json::object({{"type", "string"},
+                                            {"description",
+                                             "The location or amenity to get directions to"}})}})},
+           {"required", json::array({"location"})}}),
+      [this](const json& args, const json& raw) { return get_directions(args, raw); });
 
   // Define tool to check amenity availability
   define_tool(
@@ -80,6 +128,64 @@ ConciergeAgent& ConciergeAgent::set_amenities(const std::vector<json>& amenities
                                      "'. Please check the available amenities.");
       });
 
+  return *this;
+}
+
+swaig::FunctionResult ConciergeAgent::check_availability(const json& args, const json&) {
+  std::string amenity_name = args.value("amenity", "");
+  std::string date = args.value("date", "today");
+  std::string time = args.value("time", "now");
+
+  for (const auto& amenity : amenities_) {
+    if (iequals(amenity_name, amenity.value("name", ""))) {
+      std::string reply = amenity_name;
+      reply += " is available on ";
+      reply += date;
+      reply += " at ";
+      reply += time;
+      reply += ". Would you like to make a reservation?";
+      return swaig::FunctionResult(reply);
+    }
+  }
+
+  std::vector<std::string> names;
+  names.reserve(amenities_.size());
+  for (const auto& amenity : amenities_) {
+    names.push_back(amenity.value("name", ""));
+  }
+  std::string joined;
+  for (size_t i = 0; i < names.size(); ++i) {
+    if (i) {
+      joined += ", ";
+    }
+    joined += names[i];
+  }
+  return swaig::FunctionResult("I'm sorry, we don't offer " + amenity_name + " at " + venue_name_ +
+                               ". Our available amenities are: " + joined + ".");
+}
+
+swaig::FunctionResult ConciergeAgent::get_directions(const json& args, const json&) {
+  std::string location = args.value("location", "");
+
+  for (const auto& amenity : amenities_) {
+    if (iequals(location, amenity.value("name", "")) && amenity.contains("location")) {
+      std::string amenity_location = amenity["location"].get<std::string>();
+      std::string reply = "The ";
+      reply += location;
+      reply += " is located at ";
+      reply += amenity_location;
+      reply += ". From the main entrance, follow the signs to ";
+      reply += amenity_location;
+      reply += ".";
+      return swaig::FunctionResult(reply);
+    }
+  }
+  return swaig::FunctionResult("I don't have specific directions to " + location +
+                               ". You can ask our staff at the front desk for assistance.");
+}
+
+ConciergeAgent& ConciergeAgent::on_summary(agent::SummaryCallback cb) {
+  AgentBase::on_summary(std::move(cb));
   return *this;
 }
 

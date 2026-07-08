@@ -43,6 +43,7 @@ cmake .. && make -j$(nproc)
 
 Each agent is a self-contained microservice that generates [SWML](docs/swml_service_guide.md) (SignalWire Markup Language) and handles [SWAIG](docs/swaig_reference.md) (SignalWire AI Gateway) tool calls. The SignalWire platform runs the entire AI pipeline (STT, LLM, TTS) -- your agent just defines the behavior.
 
+<!-- include: examples/quickstart_agent.cpp#agent -->
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
 #include <ctime>
@@ -120,6 +121,7 @@ See [examples/README.md](examples/README.md) for the full list organized by cate
 
 Real-time call control and messaging over WebSocket. The RELAY client connects to SignalWire via the Blade protocol and gives you imperative control over live phone calls and SMS/MMS.
 
+<!-- include: examples/quickstart_relay.cpp#relay -->
 ```cpp
 #include <signalwire/relay/client.hpp>
 
@@ -154,6 +156,7 @@ See the **[RELAY documentation](relay/README.md)** for the full guide, API refer
 
 Synchronous REST client for managing SignalWire resources and controlling calls over HTTP. No WebSocket required.
 
+<!-- include: examples/quickstart_rest.cpp#rest -->
 ```cpp
 #include <signalwire/rest/rest_client.hpp>
 
@@ -165,11 +168,13 @@ int main() {
 
     auto agents = client.fabric().ai_agents.list();
     auto call   = client.calling().dial({
-        {"to", "+15551234567"}, {"from", "+15559876543"},
-        {"url", "https://example.com/handler"}
+        .from = "+15559876543", .to = "+15551234567",
+        .url = "https://example.com/handler",
     });
     auto numbers = client.phone_numbers().search({{"area_code", "512"}});
-    auto results = client.datasphere().documents.search({{"query_string", "billing policy"}});
+    auto results = client.datasphere().documents.search({
+        .query_string = "billing policy",
+    });
 }
 ```
 
@@ -296,8 +301,21 @@ Guides are also available in the [`docs/`](docs/) directory:
 
 ## Testing
 
+Test, lint, and format go through the canonical self-bootstrapping scripts under
+`scripts/` — the single entry points. They resolve the C++ toolchain (clang-18 /
+llvm@18 for clang-format & clang-tidy) themselves and run from any directory:
+
 ```bash
-# Build and run the test suite
+bash scripts/run-tests.sh            # build + run the full test suite
+bash scripts/run-tests.sh agent      # run a subset (filter passed to run_tests)
+bash scripts/run-format.sh           # format the tree in place (clang-format -i)
+bash scripts/run-format.sh --check   # verify-only formatting check (CI mode)
+bash scripts/run-lint.sh             # clang-tidy curated lint set
+```
+
+You can still build + run directly:
+
+```bash
 mkdir build && cd build
 cmake .. && make -j$(nproc)
 ./run_tests
@@ -308,7 +326,8 @@ ctest -R relay
 ctest -R rest
 ```
 
-The test suite contains 258 tests covering all components.
+The test suite contains 258 tests covering all components. The full local-and-CI
+gate runner is `bash scripts/run-ci.sh`.
 
 ## License
 

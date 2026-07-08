@@ -40,12 +40,18 @@ TEST(aiconfig_add_multiple_hints) {
 }
 
 TEST(aiconfig_add_pattern_hint) {
+    // add_pattern_hint attaches a STRUCTURED hint object (not a bare string).
     AgentBase agent;
-    agent.add_pattern_hint("^[0-9]+$");
+    agent.add_pattern_hint("USD", "^[0-9]+$", "dollars", true);
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
     ASSERT_EQ(ai["hints"].size(), 1u);
-    ASSERT_EQ(ai["hints"][0].get<std::string>(), "^[0-9]+$");
+    const json& h = ai["hints"][0];
+    ASSERT_TRUE(h.is_object());
+    ASSERT_EQ(h["hint"].get<std::string>(), "USD");
+    ASSERT_EQ(h["pattern"].get<std::string>(), "^[0-9]+$");
+    ASSERT_EQ(h["replace"].get<std::string>(), "dollars");
+    ASSERT_EQ(h["ignore_case"].get<bool>(), true);
     return true;
 }
 
@@ -63,7 +69,7 @@ TEST(aiconfig_no_hints_not_in_swml) {
 
 TEST(aiconfig_add_language) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "rachel", "", ""});
+    agent.add_language({"English", "en-US", "rachel"});
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
     ASSERT_TRUE(ai.contains("languages"));
@@ -76,10 +82,10 @@ TEST(aiconfig_add_language) {
 
 TEST(aiconfig_set_languages_replaces) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "rachel", "", ""});
+    agent.add_language({"English", "en-US", "rachel"});
     agent.set_languages({
-        {"Spanish", "es-ES", "isabella", "", ""},
-        {"French", "fr-FR", "jean", "", ""}
+        {"Spanish", "es-ES", "isabella"},
+        {"French", "fr-FR", "jean"}
     });
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
@@ -91,7 +97,7 @@ TEST(aiconfig_set_languages_replaces) {
 
 TEST(aiconfig_language_with_engine) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "alloy", "openai", ""});
+    agent.add_language({"English", "en-US", "alloy", "openai"});
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
     ASSERT_EQ(ai["languages"][0]["engine"].get<std::string>(), "openai");
@@ -109,7 +115,7 @@ TEST(aiconfig_language_with_engine) {
 
 TEST(aiconfig_add_language_with_params_attaches_params) {
     AgentBase agent;
-    LanguageConfig lc{"English", "en-US", "josh", "elevenlabs", "",
+    LanguageConfig lc{"English", "en-US", "josh", "elevenlabs", "", {}, {},
                       json::object({{"stability", 0.5}, {"similarity_boost", 0.75}})};
     agent.add_language(lc);
     json swml = agent.render_swml();
@@ -122,7 +128,7 @@ TEST(aiconfig_add_language_with_params_attaches_params) {
 
 TEST(aiconfig_add_language_without_params_omits_key) {
     AgentBase agent;
-    agent.add_language({"French", "fr-FR", "fr-FR-Neural2-A", "", ""});
+    agent.add_language({"French", "fr-FR", "fr-FR-Neural2-A"});
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
     ASSERT_FALSE(ai["languages"][0].contains("params"));
@@ -131,7 +137,7 @@ TEST(aiconfig_add_language_without_params_omits_key) {
 
 TEST(aiconfig_add_language_with_empty_params_omits_key) {
     AgentBase agent;
-    LanguageConfig lc{"French", "fr-FR", "v", "", "", json::object()};
+    LanguageConfig lc{"French", "fr-FR", "v", "", "", {}, {}, json::object()};
     agent.add_language(lc);
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
@@ -141,7 +147,7 @@ TEST(aiconfig_add_language_with_empty_params_omits_key) {
 
 TEST(aiconfig_get_language_params_returns_set_dict) {
     AgentBase agent;
-    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    LanguageConfig lc{"English", "en-US", "v", "", "", {}, {}, json::object({{"a", 1}})};
     agent.add_language(lc);
     auto got = agent.get_language_params("en-US");
     ASSERT_TRUE(got.has_value());
@@ -151,7 +157,7 @@ TEST(aiconfig_get_language_params_returns_set_dict) {
 
 TEST(aiconfig_get_language_params_returns_nullopt_when_unset) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.add_language({"English", "en-US", "v"});
     auto got = agent.get_language_params("en-US");
     ASSERT_FALSE(got.has_value());
     return true;
@@ -166,7 +172,7 @@ TEST(aiconfig_get_language_params_returns_nullopt_for_unknown_code) {
 
 TEST(aiconfig_set_language_params_replaces_existing) {
     AgentBase agent;
-    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    LanguageConfig lc{"English", "en-US", "v", "", "", {}, {}, json::object({{"a", 1}})};
     agent.add_language(lc);
     agent.set_language_params("en-US", json::object({{"b", 2}}));
     auto got = agent.get_language_params("en-US");
@@ -178,7 +184,7 @@ TEST(aiconfig_set_language_params_replaces_existing) {
 
 TEST(aiconfig_set_language_params_adds_when_unset) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.add_language({"English", "en-US", "v"});
     agent.set_language_params("en-US", json::object({{"c", 3}}));
     auto got = agent.get_language_params("en-US");
     ASSERT_TRUE(got.has_value());
@@ -188,7 +194,7 @@ TEST(aiconfig_set_language_params_adds_when_unset) {
 
 TEST(aiconfig_set_language_params_empty_object_removes_key) {
     AgentBase agent;
-    LanguageConfig lc{"English", "en-US", "v", "", "", json::object({{"a", 1}})};
+    LanguageConfig lc{"English", "en-US", "v", "", "", {}, {}, json::object({{"a", 1}})};
     agent.add_language(lc);
     agent.set_language_params("en-US", json::object());
     auto got = agent.get_language_params("en-US");
@@ -202,7 +208,7 @@ TEST(aiconfig_set_language_params_empty_object_removes_key) {
 
 TEST(aiconfig_set_language_params_unknown_code_is_noop) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.add_language({"English", "en-US", "v"});
     agent.set_language_params("zh-CN", json::object({{"a", 1}}));
     // The known language remains untouched.
     auto got = agent.get_language_params("en-US");
@@ -212,8 +218,72 @@ TEST(aiconfig_set_language_params_unknown_code_is_noop) {
 
 TEST(aiconfig_set_language_params_returns_self_for_chaining) {
     AgentBase agent;
-    agent.add_language({"English", "en-US", "v", "", ""});
+    agent.add_language({"English", "en-US", "v"});
     AgentBase& ret = agent.set_language_params("en-US", json::object({{"a", 1}}));
+    ASSERT_TRUE(&ret == &agent);
+    return true;
+}
+
+// ========================================================================
+// Multilingual (Mode B) — set_multilingual(config) -> top-level "multilingual"
+// ========================================================================
+
+TEST(aiconfig_set_multilingual_emits_wire_key) {
+    AgentBase agent;
+    json cfg = json::object({
+        {"languages", json::array({"en", "es"})},
+        {"start_language", "en"},
+        {"min_switch_words", 2},
+    });
+    agent.set_multilingual(cfg);
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai.contains("multilingual"));
+    ASSERT_EQ(ai["multilingual"], cfg);
+    return true;
+}
+
+TEST(aiconfig_no_multilingual_not_in_swml) {
+    AgentBase agent;
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_empty_object_ignored) {
+    AgentBase agent;
+    agent.set_multilingual(json::object());
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_non_object_ignored) {
+    AgentBase agent;
+    agent.set_multilingual(json("not-a-dict"));
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_FALSE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_coexists_with_languages) {
+    // multilingual and languages both emit; server prefers multilingual.
+    AgentBase agent;
+    agent.add_language({"English", "en-US", "rachel", "", ""});
+    agent.set_multilingual(json::object({{"start_language", "en"}}));
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai.contains("languages"));
+    ASSERT_TRUE(ai.contains("multilingual"));
+    return true;
+}
+
+TEST(aiconfig_set_multilingual_returns_self_for_chaining) {
+    AgentBase agent;
+    AgentBase& ret = agent.set_multilingual(json::object({{"start_language", "en"}}));
     ASSERT_TRUE(&ret == &agent);
     return true;
 }
@@ -418,5 +488,83 @@ TEST(aiconfig_on_debug_event_callback_set) {
     bool called = false;
     agent.on_debug_event([&](const json&) { called = true; });
     ASSERT_FALSE(called);
+    return true;
+}
+
+// ========================================================================
+// Contract 8: AI/LLM structured add_pattern_hint / add_language (#74)
+// ========================================================================
+// Python (ai_config mixin): add_pattern_hint attaches a STRUCTURED hint
+// {hint, pattern, replace, ignore_case} (not a bare string); add_language
+// carries engine + model + fillers (list) into the rendered SWML
+// ai.languages entry. A degraded impl drops the structure / the
+// engine/model/fillers. This test sets a hint WITH replacements + a language
+// WITH engine+model+fillers, renders, and asserts every field survives.
+
+TEST(contract8_structured_pattern_hint_and_language) {
+    AgentBase agent;
+
+    // Structured pattern hint with a replacement.
+    agent.add_pattern_hint("dollars", "\\$([0-9]+)", "$1 dollars", true);
+
+    // Language carrying engine + model + both filler kinds.
+    LanguageConfig lc;
+    lc.name = "English";
+    lc.code = "en-US";
+    lc.voice = "josh";
+    lc.engine = "elevenlabs";
+    lc.model = "eleven_turbo_v2_5";
+    lc.speech_fillers = {"um", "let me think"};
+    lc.function_fillers = {"one moment", "checking"};
+    agent.add_language(lc);
+
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+
+    // --- Structured hint survives (not a bare string) ---
+    ASSERT_TRUE(ai.contains("hints"));
+    ASSERT_EQ(ai["hints"].size(), 1u);
+    const json& h = ai["hints"][0];
+    ASSERT_TRUE(h.is_object());
+    ASSERT_EQ(h["hint"].get<std::string>(), "dollars");
+    ASSERT_EQ(h["pattern"].get<std::string>(), "\\$([0-9]+)");
+    ASSERT_EQ(h["replace"].get<std::string>(), "$1 dollars");
+    ASSERT_EQ(h["ignore_case"].get<bool>(), true);
+
+    // --- Language engine/model/fillers survive ---
+    ASSERT_TRUE(ai.contains("languages"));
+    const json& l = ai["languages"][0];
+    ASSERT_EQ(l["name"].get<std::string>(), "English");
+    ASSERT_EQ(l["code"].get<std::string>(), "en-US");
+    ASSERT_EQ(l["voice"].get<std::string>(), "josh");
+    ASSERT_EQ(l["engine"].get<std::string>(), "elevenlabs");
+    ASSERT_EQ(l["model"].get<std::string>(), "eleven_turbo_v2_5");
+    // Both filler kinds present -> the two explicit keys (python parity).
+    ASSERT_TRUE(l.contains("speech_fillers"));
+    ASSERT_TRUE(l.contains("function_fillers"));
+    ASSERT_EQ(l["speech_fillers"].size(), 2u);
+    ASSERT_EQ(l["speech_fillers"][0].get<std::string>(), "um");
+    ASSERT_EQ(l["function_fillers"][0].get<std::string>(), "one moment");
+    return true;
+}
+
+// Only one filler kind -> deprecated combined "fillers" key (python parity).
+TEST(contract8_single_filler_kind_uses_deprecated_key) {
+    AgentBase agent;
+    LanguageConfig lc;
+    lc.name = "French";
+    lc.code = "fr-FR";
+    lc.voice = "jean";
+    lc.speech_fillers = {"euh", "voyons"};
+    agent.add_language(lc);
+
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    const json& l = ai["languages"][0];
+    ASSERT_FALSE(l.contains("speech_fillers"));
+    ASSERT_FALSE(l.contains("function_fillers"));
+    ASSERT_TRUE(l.contains("fillers"));
+    ASSERT_EQ(l["fillers"].size(), 2u);
+    ASSERT_EQ(l["fillers"][0].get<std::string>(), "euh");
     return true;
 }

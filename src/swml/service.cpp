@@ -4,13 +4,18 @@
 #include <openssl/rand.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <iostream>
+#include <map>
+#include <optional>
 #include <regex>
+#include <tuple>
 
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/common.hpp"
+#include "signalwire/core/swml_handler.hpp"
 
 namespace signalwire {
 namespace swml {
@@ -69,7 +74,7 @@ Service& Service::set_auth(const std::string& username, const std::string& passw
   return *this;
 }
 
-void Service::init_auth() {
+void Service::init_auth() const {
   if (auth_initialized_) {
     return;
   }
@@ -104,6 +109,10 @@ bool Service::timing_safe_compare(const std::string& a, const std::string& b) {
 }
 
 bool Service::validate_basic_auth(const std::string& username, const std::string& password) const {
+  // Lazily resolve credentials (from env or a generated password) so an auth
+  // check works from any entry point — a serverless dispatch validates auth
+  // without a prior serve()/as_router() having called init_auth().
+  init_auth();
   return timing_safe_compare(username, auth_user_) && timing_safe_compare(password, auth_pass_);
 }
 
@@ -248,6 +257,200 @@ Service& Service::sleep(int milliseconds) {
 json Service::render_swml() const { return on_render_swml(); }
 
 json Service::on_render_swml() const { return document_.to_json(); }
+
+bool Service::add_section(const std::string& section_name) {
+  if (document_.has_section(section_name)) {
+    return false;
+  }
+  // Section() creates the section on first access.
+  document_.section(section_name);
+  return true;
+}
+
+Service& Service::add_verb_to_section(const std::string& section_name, const std::string& verb_name,
+                                      const json& config) {
+  document_.add_verb_to_section(section_name, verb_name, config);
+  return *this;
+}
+
+std::string Service::render_document() const { return render_swml().dump(); }
+
+// ---------------------------------------------------------------------------
+// Framework-free request-dispatch primitives (Python:
+// SWMLService.handle_request / _handle_request_core). Shared helpers below are
+// file-local so AgentBase's override can reuse the same decode/derive logic.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Case-insensitive lookup of a header value from a plain header map. Returns an
+// empty string when the header is absent (headers may be lower- or mixed-case
+// depending on the caller).
+std::string header_lookup(const std::map<std::string, std::string>& headers,
+                          const std::string& name) {
+  auto exact = headers.find(name);
+  if (exact != headers.end()) {
+    return exact->second;
+  }
+  std::string want = name;
+  std::transform(want.begin(), want.end(), want.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  for (const auto& kv : headers) {
+    std::string key = kv.first;
+    std::transform(key.begin(), key.end(), key.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (key == want) {
+      return kv.second;
+    }
+  }
+  return "";
+}
+
+// Derive the request path from a full URL or bare path (Python:
+// _callback_path_for_url uses urlparse(url).path). Strips scheme+authority and
+// any query/fragment, then normalizes to a single leading slash.
+std::string path_from_url(const std::string& url) {
+  std::string path = url;
+  auto scheme = path.find("://");
+  if (scheme != std::string::npos) {
+    auto slash = path.find('/', scheme + 3);
+    path = (slash == std::string::npos) ? std::string("/") : path.substr(slash);
+  }
+  auto q = path.find_first_of("?#");
+  if (q != std::string::npos) {
+    path = path.substr(0, q);
+  }
+  // Normalize: strip surrounding slashes, re-add a single leading one.
+  std::string trimmed = path;
+  while (!trimmed.empty() && trimmed.front() == '/') {
+    trimmed.erase(trimmed.begin());
+  }
+  while (!trimmed.empty() && trimmed.back() == '/') {
+    trimmed.pop_back();
+  }
+  return "/" + trimmed;
+}
+
+}  // namespace
+
+std::tuple<int, std::map<std::string, std::string>, std::string> Service::handle_request(
+    const std::string& method, const std::string& url,
+    const std::map<std::string, std::string>& headers, const std::optional<json>& body) {
+  // Ensure basic-auth credentials exist (the FastAPI path resolves these on
+  // serve()/as_router(); the primitive path must resolve them too).
+  init_auth();
+
+  const json request_body = body.value_or(json::object());
+
+  // Basic-auth over the passed header map (mirror validate_auth's decode +
+  // timing-safe compare, but framework-free). On any failure -> 401.
+  bool authorized = false;
+  std::string auth_header = header_lookup(headers, "Authorization");
+  if (auth_header.size() >= 7 && auth_header.substr(0, 6) == "Basic ") {
+    std::string decoded = signalwire::base64_decode(auth_header.substr(6));
+    auto colon = decoded.find(':');
+    if (colon != std::string::npos) {
+      std::string user = decoded.substr(0, colon);
+      std::string pass = decoded.substr(colon + 1);
+      authorized = timing_safe_compare(user, auth_user_) && timing_safe_compare(pass, auth_pass_);
+    }
+  }
+  if (!authorized) {
+    return {401, {{"WWW-Authenticate", "Basic"}}, R"({"error":"Unauthorized"})"};
+  }
+
+  // Routing callback: only for POST with a non-empty parsed body and a callback
+  // registered for the request's path. A returned non-empty route -> 307.
+  const std::string callback_path = path_from_url(url);
+  if (method == "POST" && request_body.is_object() && !request_body.empty()) {
+    // Match the request path against the registered (already-normalized)
+    // callback paths, allowing for the service route prefix (Corresponds to
+    // ``_callback_path_for_url`` matches ``normalized == cb OR
+    // normalized.endswith(cb)``). So a callback registered at "/sip" fires for
+    // a request to "/swml/sip".
+    const RoutingCallback* matched = nullptr;
+    for (const auto& [cb_path, cb_fn] : routing_callbacks_) {
+      const bool ends_with = callback_path.size() >= cb_path.size() &&
+                             callback_path.compare(callback_path.size() - cb_path.size(),
+                                                   cb_path.size(), cb_path) == 0;
+      if (cb_fn && (callback_path == cb_path || ends_with)) {
+        matched = &cb_fn;
+        break;
+      }
+    }
+    if (matched != nullptr) {
+      std::string route = (*matched)(request_body, headers);
+      if (!route.empty()) {
+        return {307, {{"Location", route}}, ""};
+      }
+    }
+  }
+
+  // Otherwise render the SWML document.
+  return {200, {}, render_document()};
+}
+
+void Service::reset_document() { document_ = Document(); }
+
+void Service::manual_set_proxy_url(const std::string& proxy_url) { manual_proxy_url_ = proxy_url; }
+
+void Service::register_routing_callback(RoutingCallback callback, const std::string& path) {
+  // Normalize the path for consistent lookup (Corresponds to
+  // ``SWMLService.register_routing_callback`` — ``path.rstrip("/")`` then
+  // prepend a leading "/" if absent). So "/sip/" -> "/sip", "voice" -> "/voice".
+  std::string normalized = path;
+  while (!normalized.empty() && normalized.back() == '/') {
+    normalized.pop_back();
+  }
+  if (normalized.empty() || normalized.front() != '/') {
+    normalized = "/" + normalized;
+  }
+  routing_callbacks_[normalized] = std::move(callback);
+}
+
+std::vector<std::string> Service::get_routing_callback_paths() const {
+  std::vector<std::string> paths;
+  paths.reserve(routing_callbacks_.size());
+  for (const auto& [path, cb] : routing_callbacks_) {
+    paths.push_back(path);
+  }
+  std::sort(paths.begin(), paths.end());  // std::map is sorted, but be explicit
+  return paths;
+}
+
+void Service::register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler) {
+  if (handler) {
+    verb_handlers_.push_back(std::move(handler));
+  }
+}
+
+std::string Service::extract_sip_username(const json& request_body) {
+  // Mirror Python: pull call.to, expect a SIP URI (sip:user@host) and return
+  // the username portion. Returns "" when absent/unparseable.
+  if (!request_body.is_object() || !request_body.contains("call")) {
+    return "";
+  }
+  const auto& call = request_body["call"];
+  if (!call.is_object() || !call.contains("to") || !call["to"].is_string()) {
+    return "";
+  }
+  std::string to = call["to"].get<std::string>();
+  // Extract the SIP username with three branches on the 'to' URI scheme.
+  //   - "sip:username@domain" -> username portion (before the first '@'; the
+  //     whole remainder when there is no '@', mirroring Python's split("@",1)[0])
+  //   - "tel:+1234567890"     -> the number after "tel:"
+  //   - otherwise             -> the whole 'to' field verbatim
+  const std::string sip_scheme = "sip:";
+  const std::string tel_scheme = "tel:";
+  if (to.rfind(sip_scheme, 0) == 0) {
+    std::string rest = to.substr(sip_scheme.size());
+    auto at = rest.find('@');
+    return at == std::string::npos ? rest : rest.substr(0, at);
+  }
+  if (to.rfind(tel_scheme, 0) == 0) {
+    return to.substr(tel_scheme.size());
+  }
+  return to;
+}
 
 json Service::render_main_swml(const httplib::Request&) const { return on_render_swml(); }
 
@@ -481,14 +684,39 @@ void Service::setup_routes(httplib::Server& server) {
   // Subclass extension hook (AgentBase adds /post_prompt, /mcp).
   register_additional_routes(server);
 
-  // Main SWML endpoint
+  // Main SWML endpoint — thin adapter over the decomposed handle_request()
+  // core so the served path enforces the same auth/routing-307/render-200
+  // decision the primitive does (the routing-callback redirect was previously
+  // skipped here). Extract (method, url, headers, body); marshal the returned
+  // (status, headers, body) triple back, including the 307 Location and the
+  // 401 WWW-Authenticate.
   auto swml_handler = [this](const httplib::Request& req, httplib::Response& res) {
     add_security_headers(res);
-    if (!validate_auth(req, res)) {
-      return;
+
+    std::map<std::string, std::string> headers;
+    for (const auto& h : req.headers) {
+      std::string lower_key = h.first;
+      std::transform(lower_key.begin(), lower_key.end(), lower_key.begin(), ::tolower);
+      headers[lower_key] = h.second;
     }
-    json swml = render_main_swml(req);
-    res.set_content(swml.dump(), "application/json");
+
+    std::optional<json> body_params;
+    if (!req.body.empty()) {
+      try {
+        body_params = json::parse(req.body);
+      } catch (const std::exception& e) {
+        (void)e;
+      }
+    }
+
+    auto [status, resp_headers, resp_body] =
+        handle_request(req.method, req.path, headers, body_params);
+
+    res.status = status;
+    for (const auto& kv : resp_headers) {
+      res.set_header(kv.first, kv.second);
+    }
+    res.set_content(resp_body, "application/json");
   };
   server.Get(route_, swml_handler);
   server.Post(route_, swml_handler);
@@ -538,6 +766,21 @@ void Service::serve() {
     get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                        " -- is the port already in use?");
   }
+}
+
+std::shared_ptr<httplib::Server> Service::as_router() {
+  // Ensure auth is resolved so the mounted routes enforce the same basic-auth
+  // the standalone serve() path does.
+  init_auth();
+
+  // A fresh Server populated with this service's routes but NOT bound to any
+  // port. In cpp-httplib the Server IS the mountable route-handler unit; the
+  // caller embeds it in their host app (listen on it, front it with TLS, or
+  // lift its handlers into a parent server). Mirrors serve()'s setup_routes
+  // registration exactly, minus the listen().
+  auto router = std::make_shared<httplib::Server>();
+  setup_routes(*router);
+  return router;
 }
 
 void Service::stop() {

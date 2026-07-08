@@ -100,7 +100,14 @@ class Call {
                     Gender gender, const std::string& voice = "", double volume = 0.0);
   Action prompt_audio(const std::string& url, const json& collect, double volume = 0.0);
   Action collect(const json& params, const std::string& control_id = "");
-  Action connect(const json& devices);
+  /// Bridge the call to one or more destinations. ``devices`` is the nested
+  /// serial/parallel device array; ``options`` carries the optional bridge
+  /// knobs (``ringback``, ``tag``, ``max_duration``, ``max_price_per_minute``,
+  /// ``status_url``, or any extra) merged into the ``calling.connect`` frame —
+  /// Corresponds to ``Call.connect(devices, *, ringback=…, tag=…,
+  /// max_duration=…, **kwargs)``. Without ``options`` these knobs never reached
+  /// the wire.
+  Action connect(const json& devices, const json& options = json::object());
   Action disconnect();
   Action detect(const json& params, const std::string& control_id = "");
   // Typed detect convenience wrappers (mirror Python's detect_digit/
@@ -134,8 +141,67 @@ class Call {
   Action join_room(const std::string& name);
   Action execute_swml(const json& swml);
 
+  // ── Additional call-control methods ──────────
+  // Each builds the RELAY frame and sends it through the existing
+  // execute_simple plumbing (client-less callers still get a resolved
+  // Action). Optional descriptors default to json::object() so only the
+  // keys the caller supplies ride the wire.
+
+  /// Send a user-defined event on the call (calling.user_event). The
+  /// event payload rides as `event` when non-empty.
+  Action user_event(const std::string& event = "");
+  /// SIP REFER with a device descriptor + optional extra params
+  /// (calling.refer). Distinct from `sip_refer`, which builds the device
+  /// from a bare to-URI.
+  Action refer(const json& device, const json& params = json::object());
+  /// Start echo on the call (calling.echo).
+  Action echo(const json& params = json::object());
+  /// Enable denoise on the call (calling.denoise).
+  Action denoise();
+  /// Disable denoise on the call (calling.denoise.stop).
+  Action denoise_stop();
+  /// Bind a digit sequence to a method (calling.bind_digit).
+  Action bind_digit(const std::string& digits, const std::string& bind_method,
+                    const json& params = json::object());
+  /// Clear digit bindings, optionally scoped to a realm
+  /// (calling.clear_digit_bindings).
+  Action clear_digit_bindings(const std::string& realm = "");
+  /// Enter a queue (calling.queue.enter).
+  Action queue_enter(const std::string& queue_name, const json& params = json::object());
+  /// Leave a queue (calling.queue.leave).
+  Action queue_leave(const std::string& queue_name, const json& params = json::object());
+  /// Leave the current conference (calling.leave_conference).
+  Action leave_conference(const std::string& conference_id = "");
+  /// Leave the current room (calling.leave_room).
+  Action leave_room();
+  /// AI helpers.
+  Action ai_hold(const json& params = json::object());
+  Action ai_unhold(const json& params = json::object());
+  Action ai_message(const json& params = json::object());
+  /// Start Amazon Bedrock AI on the call. RULES §4: calling.ai + a Bedrock
+  /// engine routes to a DEDICATED `calling.amazon_bedrock` RPC, so this
+  /// emits that wire method rather than `calling.ai`.
+  Action amazon_bedrock(const json& params = json::object());
+  /// Pass on an inbound call offer (calling.pass). Named `pass_` because
+  /// `pass` is not a C++ keyword but the reserved-word rename convention is
+  /// applied for cross-language consistency (wire method stays `pass`).
+  Action pass_();
+
   // Event handling
   void on_event(CallEventHandler handler);
+  /// Register an event handler (Python/Java `on`). Alias of on_event — the
+  /// unified name the reference exposes.
+  void on(CallEventHandler handler) { on_event(std::move(handler)); }
+  /// Block until the call reaches `target_state` (one of the
+  /// CALL_STATE_* values), returning true on reaching it (or already at/past
+  /// it) and false on timeout. Python/Java `wait_for`. Backed by the same
+  /// lifecycle-rank machinery as wait_for_answered/ringing/ending.
+  /// [[nodiscard]] for the same reason as those: ignoring reached-vs-timeout
+  /// is always a bug.
+  [[nodiscard]] bool wait_for(const std::string& target_state, int timeout_ms = 0);
+  /// Python `__repr__` — a compact debug string `Call(id=..., state=...,
+  /// direction=...)`. Named `repr()` (the reserved-name rename of the dunder).
+  [[nodiscard]] std::string repr() const;
   // [[nodiscard]]: the return value is the whole point of a wait — it tells
   // you whether the call actually reached the terminal state vs. timed out.
   // Silently dropping it (then acting as if the call ended) is a bug.

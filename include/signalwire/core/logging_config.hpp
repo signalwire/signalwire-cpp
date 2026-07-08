@@ -30,6 +30,44 @@ namespace logging_config {
  */
 std::string get_execution_mode();
 
+/**
+ * Configure the SDK logging system once, globally, from environment
+ * variables (idempotent). Mirrors Python's
+ * ``signalwire.core.logging_config.configure_logging``. Reads
+ * ``SIGNALWIRE_LOG_MODE`` (off/stderr/default/auto) and
+ * ``SIGNALWIRE_LOG_LEVEL`` and applies them to the process logger. Safe to
+ * call repeatedly; only the first call takes effect until
+ * ``reset_logging_configuration`` is invoked.
+ */
+void configure_logging();
+
+/**
+ * Reset the one-shot logging-configured flag so a subsequent
+ * ``configure_logging`` call re-reads the environment. Mirrors Python's
+ * ``reset_logging_configuration`` (useful when env vars change at runtime).
+ */
+void reset_logging_configuration();
+
+/**
+ * Return whether ``configure_logging`` has already run (the internal flag).
+ * Ensures the logger is configured on first access, mirroring Python's
+ * ``get_logger`` single-entry-point behavior. The C++ logger is a process
+ * singleton (see ``signalwire::get_logger``); this helper guarantees it has
+ * been configured before use and returns the configured state.
+ *
+ * @param name Logical logger name (recorded for API compatibility; the C++
+ *   Logger is a process singleton so the name is advisory).
+ */
+bool get_logger(const std::string& name);
+
+/**
+ * Strip control characters (to prevent log injection) from ``value``.
+ * Mirrors Python's ``strip_control_chars`` structlog processor, reduced to
+ * the value-sanitizing core: removes ASCII control chars except ``\t``,
+ * ``\n`` and ``\r``.
+ */
+std::string strip_control_chars(const std::string& value);
+
 }  // namespace logging_config
 }  // namespace core
 }  // namespace signalwire

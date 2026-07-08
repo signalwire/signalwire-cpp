@@ -3,6 +3,10 @@
 // contract that lets sidecar / non-agent verbs reuse the SWAIG dispatch
 // surface that previously lived only on AgentBase.
 
+#include <chrono>
+#include <thread>
+
+#include "httplib.h"
 #include "signalwire/swml/service.hpp"
 #include "signalwire/swaig/function_result.hpp"
 
@@ -176,5 +180,65 @@ TEST(service_extract_introspect_payload_finds_json_between_sentinels) {
 TEST(service_extract_introspect_payload_returns_empty_when_markers_missing) {
     ASSERT_EQ(Service::extract_introspect_payload("no markers anywhere"), std::string());
     ASSERT_EQ(Service::extract_introspect_payload("__SWAIG_TOOLS_BEGIN__\n{}"), std::string());
+    return true;
+}
+
+// as_router() — the cross-port "embed my routes in a host app" capability.
+// Python's WebMixin.as_router / SWMLService.as_router return a mountable
+// FastAPI APIRouter; C++ returns a std::shared_ptr<httplib::Server> populated
+// with the service's routes but NOT bound to any port, for the caller to embed.
+TEST(service_as_router_returns_mountable_unpopulated_server) {
+    Service svc;
+    svc.set_name("router-svc");
+    auto router = svc.as_router();
+    // A real, valid, mountable Server (not null, not yet listening).
+    ASSERT_TRUE(router != nullptr);
+    ASSERT_TRUE(router->is_valid());
+    ASSERT_FALSE(router->is_running());
+    // Each call hands out a fresh unit the caller owns.
+    auto second = svc.as_router();
+    ASSERT_NE(router.get(), second.get());
+    return true;
+}
+
+TEST(service_as_router_registers_the_services_routes) {
+    // Prove the returned Server actually carries the service's routes by
+    // mounting it on a free ephemeral port and driving it with an httplib
+    // client — the same "embed into a host" path a caller uses. Free-port
+    // discipline (MOCK_TEST_HARNESS): bind_to_any_port, never a fixed port.
+    Service svc;
+    svc.set_name("mounted-svc");
+
+    auto router = svc.as_router();
+    int port = router->bind_to_any_port("127.0.0.1");
+    ASSERT_TRUE(port > 0);
+
+    std::thread server_thread([&router]() { router->listen_after_bind(); });
+    // Wait for the server to accept connections.
+    for (int i = 0; i < 100 && !router->is_running(); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    bool health_ok = false;
+    bool swaig_ok = false;
+    {
+        httplib::Client cli("127.0.0.1", port);
+        cli.set_connection_timeout(2, 0);
+        // /health is registered by setup_routes and needs no auth.
+        auto health = cli.Get("/health");
+        health_ok = (health != nullptr && health->status == 200);
+        // GET /swaig is registered by setup_routes and returns SWML (200)
+        // once the service's basic-auth credentials are supplied.
+        auto creds = svc.get_basic_auth_credentials();
+        cli.set_basic_auth(creds.first, creds.second);
+        auto swaig = cli.Get("/swaig");
+        swaig_ok = (swaig != nullptr && swaig->status == 200);
+    }
+
+    router->stop();
+    server_thread.join();
+
+    ASSERT_TRUE(health_ok);
+    ASSERT_TRUE(swaig_ok);
     return true;
 }

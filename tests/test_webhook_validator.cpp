@@ -14,8 +14,11 @@
 #include <openssl/sha.h>
 #include <fstream>
 #include <iomanip>
+#include <map>
+#include <optional>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -355,5 +358,75 @@ TEST(webhook_scheme_b_form_concat_matches_canonical_signing_string) {
     ASSERT_TRUE(expected == VEC_B_EXPECTED);
     // And the validator must accept it
     ASSERT_TRUE(ValidateRequest(key, expected, url, ParamsOrBody{vec_b_params()}));
+    return true;
+}
+
+// ===========================================================================
+// Decomposed framework-free validation core — Validate(method, url, headers,
+// body, signing_key) -> optional<(status, headers, body)>. This is the
+// cross-port shape from porting-sdk/webhooks.md + HIDDEN_SURFACE_AUDIT Pass 1
+// (the same decision core dotnet ships as WebhookValidationMiddleware.Validate
+// and Python as webhook_middleware.validate). None => pass; a (403,...) triple
+// => reject. The cpp-httplib WrapWithSignatureValidation wrapper is idiom on
+// top of this.
+// ===========================================================================
+
+TEST(webhook_validate_core_valid_signature_returns_nullopt) {
+    // Vector A signature in the SignalWire header -> valid -> let it through.
+    std::map<std::string, std::string> headers{
+        {"X-SignalWire-Signature", VEC_A_EXPECTED},
+    };
+    auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+    ASSERT_FALSE(result.has_value());  // nullopt == pass
+    return true;
+}
+
+TEST(webhook_validate_core_bad_signature_returns_403_triple) {
+    std::map<std::string, std::string> headers{
+        {"X-SignalWire-Signature", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"},
+    };
+    auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(std::get<0>(*result), 403);
+    // No branch-leaking body detail.
+    ASSERT_EQ(std::get<2>(*result), std::string("Forbidden"));
+    return true;
+}
+
+TEST(webhook_validate_core_missing_signature_returns_403_triple) {
+    std::map<std::string, std::string> headers{};  // no signature header
+    auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+    ASSERT_TRUE(result.has_value());
+    ASSERT_EQ(std::get<0>(*result), 403);
+    return true;
+}
+
+TEST(webhook_validate_core_honors_x_twilio_signature_alias) {
+    // Same valid Vector A signature, but delivered under the legacy
+    // X-Twilio-Signature alias — the compat scheme must honor it.
+    std::map<std::string, std::string> headers{
+        {"X-Twilio-Signature", VEC_A_EXPECTED},
+    };
+    auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+    ASSERT_FALSE(result.has_value());  // nullopt == pass
+    return true;
+}
+
+TEST(webhook_validate_core_header_lookup_is_case_insensitive) {
+    // Proxies vary header casing; the lookup must be case-insensitive.
+    std::map<std::string, std::string> headers{
+        {"x-signalwire-signature", VEC_A_EXPECTED},
+    };
+    auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+    ASSERT_FALSE(result.has_value());
+    return true;
+}
+
+TEST(webhook_validate_core_empty_signing_key_throws) {
+    // Missing signing key is a programming error, not a validation failure.
+    std::map<std::string, std::string> headers{
+        {"X-SignalWire-Signature", VEC_A_EXPECTED},
+    };
+    ASSERT_THROWS(Validate("POST", VEC_A_URL, headers, VEC_A_BODY, ""));
     return true;
 }

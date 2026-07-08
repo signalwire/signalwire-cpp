@@ -18,11 +18,11 @@
 //   * YAML  via ``to_yaml`` / ``from_yaml`` (minimal in-tree YAML I/O — POM
 //     content is always a list of dicts whose values are strings, bools, or
 //     lists; no anchors, tags, or free-form scalars to handle).
-//   * Markdown via ``render_markdown`` — exact byte-parity with Python's
+//   * Markdown via ``render_markdown`` — exact byte-for-byte with Python's
 //     ``Section.render_markdown`` / ``PromptObjectModel.render_markdown``.
-//   * XML  via ``render_xml`` — exact byte-parity with Python's renderers.
+//   * XML  via ``render_xml`` — exact byte-for-byte with Python's renderers.
 //
-// Parity contract: rendered output strings match Python verbatim (including
+// Rendering contract: output strings match the reference verbatim (including
 // trailing newlines, joiners, and section/bullet numbering rules). The C++
 // tests in ``tests/test_pom.cpp`` are written from those Python outputs.
 #pragma once

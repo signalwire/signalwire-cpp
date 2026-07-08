@@ -32,6 +32,56 @@ class WikipediaSearchSkill : public SkillBase {
     return true;
   }
 
+  /// Search Wikipedia for ``query`` and return a formatted titles+snippets
+  /// string (Corresponds to ``WikipediaSearchSkill.search_wiki``). Empty query
+  /// or no hits returns the configured no-results message.
+  std::string search_wiki(const std::string& query) const {
+    if (query.empty()) {
+      return no_results_msg_;
+    }
+    // Wikipedia API root — base host overridable via WIKIPEDIA_BASE_URL (used by
+    // the audit fixture). The path is always `/w/api.php` so the audit's
+    // path-substring match succeeds even when pointed at a loopback fixture.
+    std::string base = get_env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org");
+    while (!base.empty() && base.back() == '/') {
+      base.pop_back();
+    }
+    std::ostringstream url;
+    url << base << "/w/api.php"
+        << "?action=query&list=search&format=json"
+        << "&srlimit=" << num_results_ << "&srsearch=" << url_encode(query);
+
+    auto resp = http_get(url.str());
+    if (resp.status == 0) {
+      return "Wikipedia transport error: " + resp.error;
+    }
+    if (resp.status < 200 || resp.status >= 300) {
+      return "Wikipedia HTTP " + std::to_string(resp.status) + ": " + resp.body;
+    }
+
+    json parsed;
+    try {
+      parsed = json::parse(resp.body);
+    } catch (const json::parse_error& e) {
+      return std::string("Wikipedia response parse error: ") + e.what();
+    }
+
+    std::ostringstream out;
+    out << "Wikipedia search for '" << query << "':\n";
+    bool any = false;
+    if (parsed.contains("query") && parsed["query"].contains("search") &&
+        parsed["query"]["search"].is_array()) {
+      for (const auto& hit : parsed["query"]["search"]) {
+        out << "- " << hit.value("title", "") << ": " << hit.value("snippet", "") << "\n";
+        any = true;
+      }
+    }
+    if (!any) {
+      return no_results_msg_;
+    }
+    return out.str();
+  }
+
   std::vector<swaig::ToolDefinition> register_tools() override {
     return {define_tool(
         "search_wiki", "Search Wikipedia for information about a topic and get article summaries",
@@ -41,56 +91,7 @@ class WikipediaSearchSkill : public SkillBase {
               json::object({{"query", json::object({{"type", "string"},
                                                     {"description", "Topic to search"}})}})}}),
         [this](const json& args, const json&) -> swaig::FunctionResult {
-          std::string query = args.value("query", "");
-          if (query.empty()) {
-            return swaig::FunctionResult(no_results_msg_);
-          }
-
-          // Wikipedia API root — base host overridable via
-          // WIKIPEDIA_BASE_URL (used by the audit fixture). The
-          // path portion is always `/w/api.php` so the audit's
-          // path-substring match succeeds even when pointed at a
-          // loopback fixture.
-          std::string base = get_env("WIKIPEDIA_BASE_URL", "https://en.wikipedia.org");
-          while (!base.empty() && base.back() == '/') {
-            base.pop_back();
-          }
-          std::ostringstream url;
-          url << base << "/w/api.php"
-              << "?action=query&list=search&format=json"
-              << "&srlimit=" << num_results_ << "&srsearch=" << url_encode(query);
-
-          auto resp = http_get(url.str());
-          if (resp.status == 0) {
-            return swaig::FunctionResult("Wikipedia transport error: " + resp.error);
-          }
-          if (resp.status < 200 || resp.status >= 300) {
-            return swaig::FunctionResult("Wikipedia HTTP " + std::to_string(resp.status) + ": " +
-                                         resp.body);
-          }
-
-          json parsed;
-          try {
-            parsed = json::parse(resp.body);
-          } catch (const json::parse_error& e) {
-            return swaig::FunctionResult(std::string("Wikipedia response parse error: ") +
-                                         e.what());
-          }
-
-          std::ostringstream out;
-          out << "Wikipedia search for '" << query << "':\n";
-          bool any = false;
-          if (parsed.contains("query") && parsed["query"].contains("search") &&
-              parsed["query"]["search"].is_array()) {
-            for (const auto& hit : parsed["query"]["search"]) {
-              out << "- " << hit.value("title", "") << ": " << hit.value("snippet", "") << "\n";
-              any = true;
-            }
-          }
-          if (!any) {
-            return swaig::FunctionResult(no_results_msg_);
-          }
-          return swaig::FunctionResult(out.str());
+          return swaig::FunctionResult(search_wiki(args.value("query", "")));
         })};
   }
 

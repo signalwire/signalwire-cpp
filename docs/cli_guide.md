@@ -1123,18 +1123,27 @@ The CLI tool supports testing three types of webhook functions:
 
 ### External Webhook Functions
 
-External webhook functions are automatically detected when a function has a `webhook_url` parameter and are tested by making HTTP requests to the external service:
+External webhook functions delegate to an external HTTP service instead of running a local handler. In the C++ SDK these are expressed as a `datamap::DataMap` tool whose `webhook(...)` targets the external URL; the CLI detects the webhook and tests it by making a real HTTP request to that service:
 
-```python
-@AgentBase.tool(
-    name="get_weather",
-    description="Get weather from external service",
-    parameters={"location": {"type": "string"}},
-    webhook_url="https://weather-api.example.com/current"
-)
-def get_weather_external(self, args, raw_data):
-    # This function body is never called for external webhooks
-    pass
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/datamap/datamap.hpp>
+
+using namespace signalwire;
+
+int main() {
+    signalwire::agent::AgentBase agent("my-agent");
+
+    auto dm = datamap::DataMap("get_weather")
+        .purpose("Get weather from external service")
+        .parameter("location", "string", "City or location")
+        .webhook("GET", "https://weather-api.example.com/current?location=${args.location}")
+        .output(swaig::FunctionResult("Weather: ${response.summary}"));
+
+    // Register it on the agent; there is no local handler — the request is
+    // served by the external service the webhook points at.
+    agent.register_swaig_function(dm.to_swaig_function());
+}
 ```
 
 **Testing External Webhooks:**
@@ -2224,20 +2233,21 @@ sw-search search docs.swsearch "API reference" --count 3 --verbose
 sw-search remote http://localhost:8001/search "query" --index-name docs
 ```
 
-For complete documentation on the search system, see [Search Overview](search_overview.md).
-
 ---
 
 ## Installation
 
-All CLI tools are included when you install the SignalWire Agents SDK:
+The C++ SDK is built from source as a static library (`libsignalwire.a`); the CLI
+tools ship with it. Build the library and the `swaig-test` tool with the project's
+scripts (see the build section of `CLAUDE.md`):
 
 ```bash
-pip install signalwire-agents
-
-# For search functionality
-pip install signalwire-agents[search]
+mkdir -p build && cd build && cmake .. && make -j$(nproc)
+# swaig-test is provided at bin/swaig-test
 ```
+
+The `swaig-test` tool probes a running agent over HTTP (it takes the agent's URL),
+so no Python interpreter or package install is required.
 
 ## Getting Help
 

@@ -311,7 +311,7 @@ struct LatencyParams {
   if (scraped.empty()) {
     // Time ran out or every page failed/was below threshold. Fall back to
     // CSE snippets so we return SOMETHING useful before the kernel webhook
-    // timeout fires (Python parity).
+    // timeout fires.
     return format_snippet_results(query, candidates, num_results);
   }
 

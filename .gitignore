@@ -4,3 +4,14 @@ __pycache__/
 
 # Claude Code local session settings (not part of the SDK)
 .claude/
+
+# sw-verify repo-local scratch
+.sw-tmp/
+
+# Foreign-toolchain (php) config accidentally committed into the C++ repo
+.php-cs-fixer.cache
+.php-cs-fixer.dist.php
+.php-cs-fixer.php
+
+# Test scratch fixtures (config-loader probe outputs) — not source
+.sw-test-tmp/

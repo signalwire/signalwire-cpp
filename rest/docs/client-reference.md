@@ -5,15 +5,26 @@
 `RestClient` is constructed from a space hostname, project ID, and token, or
 from the environment:
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/rest/rest_client.hpp>
+#include <signalwire/rest/http_client.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+
+using json = nlohmann::json;
+signalwire::rest::RestClient client("example-space", "project-id", "api-token");
+```
+
 ```cpp
 // Explicit (space, project_id, token)
-RestClient client("example.signalwire.com", "your-project-id", "your-api-token");
+signalwire::rest::RestClient explicit_client("example.signalwire.com", "your-project-id", "your-api-token");
 
 // From SIGNALWIRE_SPACE / SIGNALWIRE_PROJECT_ID / SIGNALWIRE_API_TOKEN
-auto from_env_client = RestClient::from_env();
+auto from_env_client = signalwire::rest::RestClient::from_env();
 
 // Explicit base URL (e.g. pointing at a loopback fixture in tests)
-auto with_url = RestClient::with_base_url("http://127.0.0.1:8080", "project-id", "token");
+auto with_url = signalwire::rest::RestClient::with_base_url("http://127.0.0.1:8080", "project-id", "token");
 ```
 
 Authentication uses HTTP Basic Auth (`project_id:token`). The read-only
@@ -86,18 +97,13 @@ See **[calling.md](calling.md)**.
 | `client.project()` | API token management |
 | `client.pubsub()` | PubSub token creation |
 | `client.chat()` | Chat token creation |
-| `client.compat()` | Twilio-compatible LAML API |
 
 ## Error Handling
 
 ```cpp
-#include <signalwire/rest/rest_client.hpp>
-
-using namespace signalwire::rest;
-
 try {
     auto agent = client.fabric().ai_agents.get("bad-id");
-} catch (const SignalWireRestError& e) {
+} catch (const signalwire::rest::SignalWireRestError& e) {
     std::cerr << e.status() << "\n";  // 404
     std::cerr << e.what() << "\n";    // error message
     std::cerr << e.body() << "\n";    // raw response body
@@ -120,7 +126,7 @@ try {
 responses lazily, following `links.next` until exhausted:
 
 ```cpp
-PaginatedIterator it(client.http_client(), "/api/fabric/resources/ai_agents");
+signalwire::rest::PaginatedIterator it(client.http_client(), "/api/fabric/resources/ai_agents");
 while (it.has_next()) {
     auto item = it.next();
     // ...

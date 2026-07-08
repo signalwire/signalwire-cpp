@@ -153,8 +153,9 @@ def _find_libclang() -> str | None:
         "/usr/lib/x86_64-linux-gnu/libclang-17.so.1",
         "/usr/lib/x86_64-linux-gnu/libclang-16.so.1",
         "/usr/lib/x86_64-linux-gnu/libclang-15.so.1",
-        # Local-dev fallback (the historic hardcode).
-        "/home/devuser/.local/lib/python3.12/site-packages/clang/native/libclang.so",
+        # Local-dev fallback: the clang python bindings' bundled native lib,
+        # derived from $HOME so it is machine-agnostic.
+        str(Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"),
     ):
         if Path(cand).is_file():
             return cand
@@ -167,9 +168,8 @@ from clang.cindex import CursorKind, Index, TranslationUnit
 
 HERE = Path(__file__).resolve().parent
 PORT_ROOT = HERE.parent
-PSDK = (PORT_ROOT.parent / "porting-sdk").resolve()
-if not PSDK.is_dir():
-    PSDK = Path("/usr/local/home/devuser/src/porting-sdk")
+PSDK = Path(os.environ["PORTING_SDK_DIR"]).resolve() if os.environ.get("PORTING_SDK_DIR") \
+    else (PORT_ROOT.parent / "porting-sdk").resolve()
 
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
@@ -796,6 +796,20 @@ def collect(
         out_modules[py_module].setdefault("functions", {})
         out_modules[py_module]["functions"][fname] = sig
 
+    # webhook_middleware.validate: the Python oracle marks the trailing
+    # ``signing_key`` argument keyword-only (``*, signing_key``). C++ has no
+    # keyword-only parameters, but its signature is otherwise identical
+    # (method, url, headers, body, signing_key). Mark the trailing param
+    # ``keyword`` so the decomposed webhook-validation core compares EQUAL
+    # to the oracle — the difference is Python's call-site sugar, not a
+    # contract divergence (porting-sdk webhooks.md + HIDDEN_SURFACE_AUDIT).
+    _wm = out_modules.get("signalwire.core.security.webhook_middleware", {})
+    _validate_sig = _wm.get("functions", {}).get("validate")
+    if _validate_sig and _validate_sig.get("params"):
+        _last = _validate_sig["params"][-1]
+        if _last.get("name") == "signing_key":
+            _last["kind"] = "keyword"
+
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a
     # corresponding trailing positional ``nlohmann::json``-typed (i.e.
@@ -818,6 +832,50 @@ def collect(
     # less-precise type representation, not a different one.
     _project_callable_shape(out_modules)
 
+    # REST SIDECAR unfold + base-verb projection (item B adoption). The
+    # generated REST resource methods take an idiomatic options-struct param
+    # (``const CreateParams& p``) that libclang reflects as ONE opaque param,
+    # and INHERIT their base CRUD verbs (list/get/create/update/delete_) from
+    # base_resource.hpp bases — which libclang does NOT surface on the subclass.
+    # The generator emits the canonical per-method param records into
+    # ``rest_signatures.json`` (keyed ``Class::method``), matching the Python
+    # oracle's per-class *declared*-method recording (griffe records only the
+    # subclass's own overrides, not inherited base methods). Projecting every
+    # sidecar record onto its generated class handles BOTH the typed-param
+    # unfold AND the base-verb presence in one pass. Idiom via emit+sidecar,
+    # never omission (RULES §2, L10).
+    _apply_rest_sidecar(out_modules)
+
+    # SWML gen-payload getter projection (item D). The generated read-side
+    # payload structs under include/signalwire/core/swml_verbs_generated/*.hpp
+    # (AIParams, AIObject, UserSWAIGFunction, Webhook, …) are METHOD-LESS PODs:
+    # one ``std::optional<T>`` data member per snake wire key. The Python oracle
+    # records the SAME wire keys as zero-arg PROPERTY-GETTER methods on these
+    # classes. libclang only surfaces CXX_METHOD/CONSTRUCTOR cursors, so the
+    # struct's fields never reach ``methods_out`` and the whole class is dropped
+    # (``if not methods_out: continue``) — every oracle getter then reads as
+    # missing-port DRIFT. Project each public data-member FIELD as a zero-arg
+    # getter so the field-vs-getter SHAPE reconciles (the surface side already
+    # reconciles these as method-less on both sides — SURFACE-DIFF green — so
+    # this is the analogous signature-side projection). Idiom via the enumerator,
+    # NEVER omission (RULES §2). Reserved-word field renames (``default_`` /
+    # ``enum_``) carry a ``// wire key: <name>`` comment the parser honours, so
+    # the getter lands on the oracle's wire-keyed name.
+    _project_gen_payload_getters(out_modules)
+
+    # RELAY concrete call-action control-method projection. The oracle records
+    # the control methods (stop/pause/resume/volume/start_input_timers) directly
+    # on each CONCRETE action (PlayAction/RecordAction/CollectAction/…). The C++
+    # port flattens them onto the unified ``signalwire.relay.action.Action`` and
+    # each concrete subclass inherits them (macro
+    # ``SIGNALWIRE_RELAY_ACTION_SUBCLASS``); libclang surfaces the macro-generated
+    # subclasses but not the inherited methods. Project each concrete action's
+    # oracle-required control methods, reusing the unified Action's real
+    # signatures, so the concrete-action control surface MATCHES the reference
+    # (idiom via the enumerator; the void-vs-dict return is the documented
+    # cpp_unified_action idiom, tracked in PORT_SIGNATURE_OMISSIONS).
+    _project_relay_action_subclasses(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -838,6 +896,287 @@ def collect(
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
     }, failures
+
+
+def _load_rest_sidecar() -> dict:
+    """Load the generator's rest_signatures.json (Class::method -> [records])."""
+    sc = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+          / "generated" / "rest_signatures.json")
+    if not sc.is_file():
+        return {}
+    return json.loads(sc.read_text()).get("methods", {})
+
+
+def _generated_class_modules() -> dict[str, str]:
+    """Map each generated resource/container CLASS -> its python module, from
+    generated_surface_map.json (the same source enumerate_surface projects)."""
+    smap = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+            / "generated" / "generated_surface_map.json")
+    if not smap.is_file():
+        return {}
+    return json.loads(smap.read_text())
+
+
+def _generated_container_members() -> dict[str, list[str]]:
+    """Parse the generated namespace-container headers for their public resource
+    member fields (FabricNamespace { AiAgents ai_agents; ... }) so the client
+    tree's accessor surface can be projected onto the oracle shape."""
+    gen_dir = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
+               / "generated")
+    out: dict[str, list[str]] = {}
+    import re as _re
+    for hdr in gen_dir.glob("*Namespace.hpp"):
+        src = hdr.read_text()
+        m = _re.search(r"class (\w+Namespace)\s*\{(.*?)\n\};", src, _re.S)
+        if not m:
+            continue
+        cls, body = m.group(1), m.group(2)
+        # public data members: ``<TypeName> <member>;`` at 2-space indent.
+        members = _re.findall(r"^\s{2}([A-Z]\w+)\s+([a-z_]\w*);", body, _re.M)
+        out[cls] = [mem for _t, mem in members]
+    return out
+
+
+def _apply_rest_sidecar(out_modules: dict) -> None:
+    """Project the generator's per-method param records onto each generated REST
+    resource class, unfolding the reflected options-struct param into the
+    oracle's exploded keyword params AND materialising inherited base CRUD verbs
+    the C++ subclass doesn't declare (list/get/create/update/delete_).
+
+    Each sidecar record is ALREADY in the oracle's param shape
+    (``{name, kind, type, required}``); the method's params become
+    ``[{self}] + records`` and its return is ``any`` (the methods all return
+    ``json``, which the diff treats as compatible with the oracle's typed
+    ``*Response`` classes). The C++ sidecar key uses the native method spelling
+    (``listAddresses``/``delete_``); canonicalise it exactly as ``collect`` does
+    (camel_to_snake + _METHOD_RENAMES) so it lands on the oracle name.
+    """
+    sidecar = _load_rest_sidecar()
+    if not sidecar:
+        return
+    class_mod = _generated_class_modules()
+
+    # Group sidecar entries by class.
+    by_class: dict[str, dict[str, list]] = {}
+    for key, records in sidecar.items():
+        if "::" not in key:
+            continue
+        cls, native = key.split("::", 1)
+        canon = _METHOD_RENAMES.get(camel_to_snake(native), camel_to_snake(native))
+        by_class.setdefault(cls, {})[canon] = records
+
+    for cls, methods in by_class.items():
+        mod = class_mod.get(cls)
+        if mod is None:
+            # A generated resource with a sidecar entry MUST be in the surface
+            # map; a miss means the map is stale — fail loud rather than drift.
+            raise SystemExit(
+                f"enumerate_signatures: sidecar class {cls!r} not in "
+                f"generated_surface_map.json (regenerate the REST layer)")
+        out_modules.setdefault(mod, {"classes": {}})
+        cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
+        for canon, records in methods.items():
+            cls_entry["methods"][canon] = {
+                "params": [{"name": "self", "kind": "self"}] + [dict(r) for r in records],
+                "returns": "any",
+            }
+        # Ensure a constructor is present (POD resource: implicit default ctor).
+        cls_entry["methods"].setdefault("__init__", {
+            "params": [{"name": "self", "kind": "self"}],
+            "returns": "void",
+        })
+
+    # Client-tree container accessors: the Python oracle records each namespace
+    # container's resource members (FabricNamespace.ai_agents, ...) as zero-arg
+    # accessor methods; the C++ containers expose them as public MEMBER FIELDS,
+    # which libclang does not surface. Project each container's fields as
+    # zero-arg methods (returns ``any`` — the diff treats it as compatible with
+    # the oracle's ``class:<Resource>`` return).
+    for cls, members in _generated_container_members().items():
+        mod = class_mod.get(cls)
+        if mod is None:
+            raise SystemExit(
+                f"enumerate_signatures: container {cls!r} not in "
+                f"generated_surface_map.json (regenerate the REST layer)")
+        out_modules.setdefault(mod, {"classes": {}})
+        cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
+        for member in members:
+            cls_entry["methods"].setdefault(member, {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "any",
+            })
+        cls_entry["methods"].setdefault("__init__", {
+            "params": [{"name": "self", "kind": "self"},
+                       {"name": "http", "type": "any", "required": True}],
+            "returns": "void",
+        })
+
+
+# A public data-member declaration inside one of the generated payload structs,
+# with the optional trailing ``// wire key: <name>`` comment the generator emits
+# for reserved-word-avoidance renames (``default_``/``enum_`` → ``default``/
+# ``enum``). Group 1 = the C++ field identifier, group 2 = the wire-key comment
+# (if present). Method declarations (which contain ``(``) are excluded before
+# this regex is applied.
+_GEN_FIELD_RE = re.compile(
+    r"^\s+(?:\[\[[^\]]*\]\]\s*)?[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
+)
+_WIRE_KEY_RE = re.compile(r"wire key:\s*(\S+)")
+
+
+def _gen_payload_ns_to_module() -> dict[str, str]:
+    """The generated read-side payload namespaces this projection covers, from
+    the surface enumerator's authoritative ``GENERATED_PAYLOAD_NS`` map
+    (``signalwire::core::swml_verbs_generated`` → the Python module, etc.). The
+    header directory for each is the namespace with ``::`` → ``/`` under
+    ``include/``. Import (don't hardcode) so a new payload namespace registered
+    for the surface side is automatically covered here too."""
+    from enumerate_surface import GENERATED_PAYLOAD_NS  # type: ignore
+    return dict(GENERATED_PAYLOAD_NS)
+
+
+def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
+    """Parse the generated payload headers under ``payload_dir`` for each
+    struct's public data-member fields, mapped to their WIRE-KEY name (honouring
+    the ``// wire key:`` comment on reserved-word-avoidance renames). Returns
+    ``{StructName: [wire_field, …]}``.
+
+    These structs are one-per-file, flat, and method-less (a POD DTO: one
+    ``std::optional<T>`` member per wire key plus an open ``extras`` member),
+    so a line-oriented parse is exact — verified to reproduce the oracle's
+    getter set 1:1. Lines containing ``(`` are skipped so no accidental method /
+    initializer is read as a field.
+    """
+    out: dict[str, list[str]] = {}
+    if not payload_dir.is_dir():
+        return out
+    for hdr in sorted(payload_dir.glob("*.hpp")):
+        src = hdr.read_text(encoding="utf-8")
+        for sm in re.finditer(r"struct\s+(\w+)\s*\{(.*?)\n\};", src, re.S):
+            cls, body = sm.group(1), sm.group(2)
+            fields: list[str] = []
+            for line in body.splitlines():
+                if "(" in line:  # a method / initializer, not a data member
+                    continue
+                m = _GEN_FIELD_RE.match(line)
+                if not m:
+                    continue
+                ident, comment = m.group(1), m.group(2) or ""
+                wk = _WIRE_KEY_RE.search(comment)
+                fields.append(wk.group(1) if wk else ident)
+            if fields:
+                out.setdefault(cls, []).extend(fields)
+    return out
+
+
+# Oracle-recorded control methods per concrete RELAY call-action (mirrors
+# enumerate_surface.RELAY_ACTION_CONTROL_METHODS). Every concrete subclass
+# inherits these from the unified C++ Action.
+_RELAY_ACTION_CONTROL_METHODS: dict[str, list[str]] = {
+    "PlayAction": ["stop", "pause", "resume", "volume"],
+    "RecordAction": ["stop", "pause", "resume"],
+    "CollectAction": ["stop", "pause", "resume", "volume", "start_input_timers"],
+    "StandaloneCollectAction": ["stop", "start_input_timers"],
+    "DetectAction": ["stop"],
+    "FaxAction": ["stop"],
+    "PayAction": ["stop"],
+    "StreamAction": ["stop"],
+    "TapAction": ["stop"],
+    "TranscribeAction": ["stop"],
+    "AIAction": ["stop"],
+}
+
+
+def _project_relay_action_subclasses(out_modules: dict) -> None:
+    """Project each concrete RELAY call-action's control-method signatures onto
+    ``signalwire.relay.call.<Subclass>``, reusing the unified C++
+    ``signalwire.relay.action.Action`` method signatures.
+
+    The oracle records stop/pause/resume/volume/start_input_timers on each
+    concrete action; the C++ port flattens them onto one Action that every
+    subclass inherits (macro ``SIGNALWIRE_RELAY_ACTION_SUBCLASS`` — libclang sees
+    the subclass but not the inherited methods). Project the oracle-required set
+    per subclass, only where the unified Action genuinely defines that method
+    (never inventing surface). The subclass ``__init__`` is already surfaced by
+    libclang via the inherited ctor.
+    """
+    action_cls = (
+        out_modules.get("signalwire.relay.action", {})
+        .get("classes", {})
+        .get("Action", {})
+        .get("methods", {})
+    )
+    if not action_cls:
+        return
+    call_mod = out_modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": {}})
+    call_classes = call_mod.setdefault("classes", {})
+    for sub, methods in _RELAY_ACTION_CONTROL_METHODS.items():
+        entry = call_classes.setdefault(sub, {"methods": {}})
+        for m in methods:
+            if m in action_cls:  # only if the C++ Action truly defines it
+                entry["methods"][m] = action_cls[m]
+
+
+def _project_gen_payload_getters(out_modules: dict) -> None:
+    """Project the generated payload structs' data-member FIELDS as zero-arg
+    property-getter methods so they match the Python oracle's getter shape,
+    across ALL generated read-side payload namespaces (swml_verbs_generated,
+    post_prompt_generated, swaig_request_generated, …).
+
+    The C++ port implements each wire key as a ``std::optional<T>`` FIELD on a
+    method-less POD struct; libclang surfaces no method for it, so without this
+    projection every one of the oracle's getters reads as missing-port DRIFT
+    even though the field IS implemented. This is field-vs-getter SHAPE idiom,
+    reconciled via the enumerator (RULES §2) — the analogue of the surface
+    enumerator force-registering these as method-less types (empty member list
+    on both sides → SURFACE-DIFF green).
+
+    Only project a field whose wire-key name the oracle records as a getter for
+    that class. Port-only data members the reference does not expose as a
+    property (e.g. the open ``extras`` member, and the wire keys Python's
+    payload class simply doesn't surface) are NOT projected — projecting them
+    would invent method surface the reference lacks. Each getter is emitted with
+    the oracle's zero-arg shape and an ``any`` return (``types_compatible``
+    treats ``any`` as compatible with the oracle's typed ``union<…>`` /
+    ``class:…`` getter returns), matching the container-accessor projection in
+    ``_apply_rest_sidecar``.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    for ns, module in _gen_payload_ns_to_module().items():
+        ref_classes = ref.get("modules", {}).get(module, {}).get("classes", {})
+        if not ref_classes:
+            # No oracle getters recorded for this payload module — nothing to
+            # project (its structs, if any, are method-less on both sides).
+            continue
+        payload_dir = PORT_ROOT / "include" / Path(*ns.split("::"))
+        struct_fields = _gen_payload_struct_fields(payload_dir)
+        if not struct_fields:
+            continue
+        mod_entry = out_modules.setdefault(module, {"classes": {}})
+        mod_entry.setdefault("classes", {})
+        for cls, fields in struct_fields.items():
+            ref_cls = ref_classes.get(cls)
+            if not ref_cls:
+                continue
+            oracle_getters = {
+                m for m in ref_cls.get("methods", {}) if m != "__init__"
+            }
+            present = [f for f in fields if f in oracle_getters]
+            if not present:
+                continue
+            cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
+            for field in present:
+                cls_entry["methods"].setdefault(field, {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                })
+            # Method-less POD: implicit default constructor is available.
+            cls_entry["methods"].setdefault("__init__", {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "void",
+            })
 
 
 def _project_kwargs_shape(out_modules: dict) -> None:
@@ -1101,15 +1440,60 @@ def main() -> int:
             if Path(gcc_inc).is_dir():
                 parse_args.append(f"-I{gcc_inc}")
                 break
-    for header in headers:
-        try:
-            tu = index.parse(str(header), args=parse_args, options=TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
-        except Exception as e:
-            print(f"skip {header}: {e}", file=sys.stderr)
-            continue
+    # Parse options. PARSE_SKIP_FUNCTION_BODIES: the enumerator only reads
+    # DECLARATIONS (cursor kinds / is_definition() / parameter types + tokens),
+    # never a method's body, so telling libclang to skip bodies removes the bulk
+    # of the per-TU parse cost (3-10x) with zero effect on emitted output. We do
+    # NOT use PARSE_DETAILED_PROCESSING_RECORD: it only builds the preprocessing
+    # (macro/include) record, which nothing here consults — default-value
+    # detection reads AST tokens via arg.get_tokens(), independent of that record
+    # — so dropping it is a further speedup that leaves the output unchanged.
+    _parse_opts = TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+
+    # Single umbrella TU. The per-header approach re-parsed the whole macOS SDK +
+    # libc++ once PER header (~1000+ headers) — the SIGNATURES gate's ~27-minute
+    # cost. Instead, synthesize one in-memory TU that ``#include``s every header
+    # and parse it ONCE, so the SDK/libc++ headers parse a single time. Each
+    # header carries ``#pragma once`` so multiple include paths reaching the same
+    # header are collapsed. walk_translation_unit's file_filter still restricts
+    # the emitted cursors to declarations physically defined under include/, so
+    # the output is identical to the per-header union (collect() already merges a
+    # class that surfaced from more than one TU). We drive the umbrella off an
+    # in-memory unsaved-file so nothing is written to disk. If the single-TU
+    # parse fails outright or yields nothing (e.g. an unexpected redefinition),
+    # fall back to the per-header loop so the gate never silently under-reports.
+    umbrella_lines = [f'#include "{h.relative_to(args.include)}"' for h in headers]
+    umbrella_src = "\n".join(umbrella_lines) + "\n"
+    umbrella_name = str(args.include / "__sw_enum_umbrella__.cpp")
+    single_tu_ok = False
+    try:
+        tu = index.parse(
+            umbrella_name,
+            args=parse_args,
+            unsaved_files=[(umbrella_name, umbrella_src)],
+            options=_parse_opts,
+        )
         cls_entries, fn_entries = walk_translation_unit(tu, args.include)
-        raw_entries.extend(cls_entries)
-        raw_free_functions.extend(fn_entries)
+        if cls_entries:
+            raw_entries.extend(cls_entries)
+            raw_free_functions.extend(fn_entries)
+            single_tu_ok = True
+    except Exception as e:
+        print(f"enumerate_signatures: single-TU parse failed ({e}); "
+              f"falling back to per-header", file=sys.stderr)
+
+    if not single_tu_ok:
+        raw_entries.clear()
+        raw_free_functions.clear()
+        for header in headers:
+            try:
+                tu = index.parse(str(header), args=parse_args, options=_parse_opts)
+            except Exception as e:
+                print(f"skip {header}: {e}", file=sys.stderr)
+                continue
+            cls_entries, fn_entries = walk_translation_unit(tu, args.include)
+            raw_entries.extend(cls_entries)
+            raw_free_functions.extend(fn_entries)
 
     canonical, failures = collect(raw_entries, aliases, raw_free_functions)
     if failures:

@@ -14,8 +14,8 @@ using json = nlohmann::json;
 // Device — the {type, params} object passed as a raw json map across the RELAY
 // calling methods that target an endpoint: connect / refer / dial / tap.
 //
-// Grounded in `porting-sdk/relay-protocol/calling.{dial,connect,refer}.params.json`
-// (extracted from switchblade `PublicCall*Params.cs`): each device is an object
+// Grounded in the RELAY calling protocol schema for dial/connect/refer: each
+// device is an object
 // with a REQUIRED string `type` discriminant (e.g. "phone", "sip", "webrtc")
 // and an open `params` object whose keys depend on `type`. The schema is
 // `additionalProperties:true` and does NOT enumerate the `type` values, so we
@@ -24,7 +24,7 @@ using json = nlohmann::json;
 // the hand-written `{{"type",...},{"params",...}}` map produces.
 //
 // Additive idiom (PORT_ADDITIONS.md): the raw-`json` connect/dial/refer/tap
-// overloads stay canonical (parity with Python's nested dict/list). `Device`
+// overloads stay canonical (matches Python's nested dict/list). `Device`
 // is a typed convenience for assembling that map with a named field instead of
 // stringly keys — `Device{"phone", {{"to_number", to}}}` reads better than the
 // brace-soup and can't typo the two top-level keys.

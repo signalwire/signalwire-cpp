@@ -48,5 +48,10 @@ ReceptionistAgent& ReceptionistAgent::set_transfer_message(const std::string& ms
   return *this;
 }
 
+ReceptionistAgent& ReceptionistAgent::on_summary(agent::SummaryCallback cb) {
+  AgentBase::on_summary(std::move(cb));
+  return *this;
+}
+
 }  // namespace prefabs
 }  // namespace signalwire

@@ -148,9 +148,16 @@ Action Call::hangup(const std::string& reason) {
   return execute_simple("end", p);
 }
 
-Action Call::connect(const json& devices) {
+Action Call::connect(const json& devices, const json& options) {
   json p;
   p["devices"] = devices;
+  // Merge the optional bridge knobs (ringback/tag/max_duration/…) into the
+  // frame — Corresponds to Call.connect passes them through into params.
+  if (options.is_object()) {
+    for (auto it = options.begin(); it != options.end(); ++it) {
+      p[it.key()] = it.value();
+    }
+  }
   return execute_simple("connect", p);
 }
 
@@ -185,6 +192,96 @@ Action Call::join_room(const std::string& name) {
   p["name"] = name;
   return execute_simple("join_room", p);
 }
+
+// ── Additional call-control methods ────────────
+
+Action Call::user_event(const std::string& event) {
+  json p;
+  if (!event.empty()) {
+    p["event"] = event;
+  }
+  return execute_simple("user_event", p);
+}
+
+Action Call::refer(const json& device, const json& params) {
+  json p = params.is_object() ? params : json::object();
+  p["device"] = device;
+  return execute_simple("refer", p);
+}
+
+Action Call::echo(const json& params) {
+  json p = params.is_object() ? params : json::object();
+  return execute_simple("echo", p);
+}
+
+Action Call::denoise() { return execute_simple("denoise"); }
+
+Action Call::denoise_stop() { return execute_simple("denoise.stop"); }
+
+Action Call::bind_digit(const std::string& digits, const std::string& bind_method,
+                        const json& params) {
+  json p = params.is_object() ? params : json::object();
+  p["digits"] = digits;
+  p["bind_method"] = bind_method;
+  return execute_simple("bind_digit", p);
+}
+
+Action Call::clear_digit_bindings(const std::string& realm) {
+  json p;
+  if (!realm.empty()) {
+    p["realm"] = realm;
+  }
+  return execute_simple("clear_digit_bindings", p);
+}
+
+Action Call::queue_enter(const std::string& queue_name, const json& params) {
+  json p = params.is_object() ? params : json::object();
+  p["control_id"] = generate_uuid();
+  p["queue_name"] = queue_name;
+  return execute_simple("queue.enter", p);
+}
+
+Action Call::queue_leave(const std::string& queue_name, const json& params) {
+  json p = params.is_object() ? params : json::object();
+  p["control_id"] = generate_uuid();
+  p["queue_name"] = queue_name;
+  return execute_simple("queue.leave", p);
+}
+
+Action Call::leave_conference(const std::string& conference_id) {
+  json p;
+  if (!conference_id.empty()) {
+    p["conference_id"] = conference_id;
+  }
+  return execute_simple("leave_conference", p);
+}
+
+Action Call::leave_room() { return execute_simple("leave_room"); }
+
+Action Call::ai_hold(const json& params) {
+  json p = params.is_object() ? params : json::object();
+  return execute_simple("ai_hold", p);
+}
+
+Action Call::ai_unhold(const json& params) {
+  json p = params.is_object() ? params : json::object();
+  return execute_simple("ai_unhold", p);
+}
+
+Action Call::ai_message(const json& params) {
+  json p = params.is_object() ? params : json::object();
+  return execute_simple("ai_message", p);
+}
+
+Action Call::amazon_bedrock(const json& params) {
+  json p = params.is_object() ? params : json::object();
+  // RULES §4: a Bedrock engine routes to the dedicated calling.amazon_bedrock
+  // RPC, NOT calling.ai. execute_simple prepends "calling." so we pass the
+  // bare wire method name.
+  return execute_simple("amazon_bedrock", p);
+}
+
+Action Call::pass_() { return execute_simple("pass"); }
 
 Action Call::send_digits(const std::string& digits) {
   json p;
@@ -572,6 +669,14 @@ bool Call::wait_for_ringing(int timeout_ms) {
 }
 
 bool Call::wait_for_ending(int timeout_ms) { return wait_for_state(CALL_STATE_ENDING, timeout_ms); }
+
+bool Call::wait_for(const std::string& target_state, int timeout_ms) {
+  return wait_for_state(target_state, timeout_ms);
+}
+
+std::string Call::repr() const {
+  return "Call(id=" + s_->call_id + ", state=" + s_->state + ", direction=" + s_->direction + ")";
+}
 
 void Call::update_state(const std::string& new_state) {
   {

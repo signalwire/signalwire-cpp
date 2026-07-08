@@ -270,14 +270,12 @@ void RelayClient::send_response(const std::string& id, const json& result) {
 }
 
 json RelayClient::execute(const std::string& method, const json& params) {
-  json full_params = params;
-  if (!config_.project.empty()) {
-    full_params["project_id"] = config_.project;
-  }
-  if (!protocol_.empty()) {
-    full_params["protocol"] = protocol_;
-  }
-  return send_request(method, full_params);
+  // Send the params VERBATIM. The reference (Python relay.client.execute) does
+  // NOT inject project_id/protocol into calling frames — the `protocol` is a
+  // connect-handshake field, and project identity is carried by the session /
+  // the token, not re-sent per RPC. Injecting them here polluted every frame
+  // with phantom keys the wire spec (and the reference) doesn't carry.
+  return send_request(method, params);
 }
 
 void RelayClient::on_ws_message(const std::string& message) {

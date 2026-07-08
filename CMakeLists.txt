@@ -1,7 +1,21 @@
 cmake_minimum_required(VERSION 3.16)
-project(signalwire VERSION 2.0.1 LANGUAGES CXX)
+project(signalwire VERSION 2.0.1
+        HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
+        LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# ccache — compiler-cache launcher, availability-gated so its ABSENCE is a
+# strict no-op (the build never fails for a missing ccache). When present it
+# wraps the C/C++ compiler invocations and makes warm (unchanged-source)
+# rebuilds near-instant. Declared as a dev dependency in scripts/_env.sh (local
+# brew hint) and the porting-sdk cross-port.yml cpp matrix install step.
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
+endif()
 
 # Header-only deps
 include_directories(${CMAKE_SOURCE_DIR}/deps)
@@ -34,7 +48,14 @@ FetchContent_MakeAvailable(ixwebsocket)
 # All sources
 file(GLOB_RECURSE SOURCES "src/*.cpp")
 
-add_library(signalwire STATIC ${SOURCES})
+# SHARED (not STATIC) so the published/installed library carries its transitive
+# link dependencies (OpenSSL, ixwebsocket, zlib, and on Apple the CoreFoundation/
+# Security frameworks) as recorded DT_NEEDED / load-command entries. That is what
+# lets a downstream consumer link with a bare `-lsignalwire` (no need to re-list
+# every private dep) — a static archive cannot convey those, so a plain
+# `g++ … -lsignalwire` against a static build fails to resolve OpenSSL/ixwebsocket
+# symbols (PACKAGE-SMOKE #92). The internal tools/tests below link it the same way.
+add_library(signalwire SHARED ${SOURCES})
 # cpp-httplib TLS enabled — requires OpenSSL 3.0+ (build with a 3.0+ toolchain;
 # OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
 # httplib::SSLServer for the webhook server (in-process TLS termination).
@@ -64,6 +85,59 @@ target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE
 # public surface AND out of the signature enumerator (which scans include/
 # only). Consumers never see them.
 target_include_directories(signalwire PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Record the shared library's own ABSOLUTE installed location as its runtime name
+# so a consumer that links it with a bare `-lsignalwire` (no rpath, no
+# LD_LIBRARY_PATH) still finds it at load time from wherever it was installed.
+#   macOS: INSTALL_NAME_DIR bakes an absolute install-name (LC_ID_DYLIB) instead
+#          of the default `@rpath/…` (which a plain consumer has no LC_RPATH for),
+#          so the consumer's load command is the absolute dylib path.
+#   ELF:   bake an ABSOLUTE SONAME (`-Wl,-soname,<abs>`) so the consumer's
+#          DT_NEEDED is the absolute .so path — ld.so loads it directly without a
+#          DT_RPATH/RUNPATH or LD_LIBRARY_PATH on the consumer side.
+# Uses the absolute libdir so the value is correct regardless of CMAKE_INSTALL_PREFIX.
+include(GNUInstallDirs)
+set_target_properties(signalwire PROPERTIES
+    INSTALL_NAME_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
+if(NOT APPLE AND NOT WIN32)
+    target_link_options(signalwire PRIVATE
+        "LINKER:-soname,${CMAKE_INSTALL_FULL_LIBDIR}/libsignalwire.so")
+endif()
+
+# ── Install rules ────────────────────────────────────────────────────────────
+# What a consumer gets from `cmake --install` (or `--build --target install`):
+# the built shared library into <prefix>/lib and every PUBLIC header into
+# <prefix>/include, so `g++ -I<prefix>/include -L<prefix>/lib -lsignalwire`
+# compiles, links, AND runs against nothing but the installed artifact. Without
+# these the package ships nothing (PACKAGE-SMOKE #92). Only the public library +
+# headers are installed — the internal audit/dump tools (emit_corpus /
+# emit_skills / route_registry / *_dump), run_tests, and the examples are
+# intentionally NOT installed; they're build-time verification programs, not part
+# of the package.
+
+# The library -> <prefix>/lib (libsignalwire.{so,dylib}) / <prefix>/bin on Windows.
+install(TARGETS signalwire
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Public headers -> <prefix>/include/signalwire/... (preserves the include tree
+# so `#include <signalwire/rest/rest_client.hpp>` resolves from the install).
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/signalwire
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# Vendored header-only deps the PUBLIC headers pull in (`<nlohmann/json.hpp>`,
+# httplib.h) -> <prefix>/include, so a consumer that only has -I<prefix>/include
+# still resolves them. deps/ is on the build's include path (line ~22); shipping
+# it makes the installed headers self-contained. deps/nlohmann/json.hpp is a
+# RELATIVE symlink to ../json.hpp; install(DIRECTORY) copies it as-is, and since
+# deps/json.hpp is installed too the link still resolves in the install tree
+# (<prefix>/include/nlohmann/json.hpp -> ../json.hpp == <prefix>/include/json.hpp).
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/deps/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING
+        PATTERN "*.h"
+        PATTERN "*.hpp")
 
 # Tests
 enable_testing()
@@ -109,6 +183,31 @@ target_link_libraries(emit_skills signalwire)
 # alongside emit_corpus/emit_skills so the SPEC-PARITY gate has a ready binary.
 add_executable(route_registry tools/route_registry.cpp)
 target_link_libraries(route_registry signalwire)
+
+# ── Layer-D per-surface dump programs ────────────────────────────────────────
+# One dump per behavioral surface for the porting-sdk per-surface differs
+# (porting-sdk/scripts/diff_port_{wire,swml,state,http,wire_relay}.py). Each
+# builds the shared corpus natively, emits {case_id -> observable-artifact} as
+# one canonical JSON object on stdout, and the differ byte-compares it against
+# the Python oracle. Mirror the Go reference dumps
+# (signalwire-go/cmd/{wire,swml,state,http,wire-relay}-dump).
+add_executable(wire_dump tools/wire_dump.cpp)
+target_link_libraries(wire_dump signalwire)
+
+add_executable(swml_dump tools/swml_dump.cpp)
+target_link_libraries(swml_dump signalwire)
+
+add_executable(state_dump tools/state_dump.cpp)
+target_link_libraries(state_dump signalwire)
+
+add_executable(http_dump tools/http_dump.cpp)
+target_link_libraries(http_dump signalwire)
+
+# wire_relay_dump links the RELAY client + stands up an in-process mock WS
+# server (IXWebSocket) to capture the frames the client sends. It uses the
+# IXWebSocket server headers directly, so link ixwebsocket explicitly.
+add_executable(wire_relay_dump tools/wire_relay_dump.cpp)
+target_link_libraries(wire_relay_dump signalwire ixwebsocket)
 
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that

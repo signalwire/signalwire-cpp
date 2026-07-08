@@ -11,6 +11,7 @@
 #include <set>
 #include <shared_mutex>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include "signalwire/swaig/tool_definition.hpp"
 #include "signalwire/swml/document.hpp"
 #include "signalwire/swml/service.hpp"
+#include "signalwire/utils/serverless.hpp"
 
 namespace httplib {
 class Server;
@@ -54,7 +56,18 @@ struct LanguageConfig {
   std::string code;
   std::string voice;
   std::string engine;
-  std::string fillers;
+  /// Explicit model name (e.g. "eleven_turbo_v2_5", "arcana"). Emitted as
+  /// the language object's ``model`` key only when non-empty — matches the
+  /// Python reference (add_language ``model=`` kwarg).
+  std::string model;
+  /// Speech fillers spoken for natural pacing. Emitted as
+  /// ``speech_fillers`` when both speech+function fillers are set, or as
+  /// the deprecated ``fillers`` key when only one kind is present, matching
+  /// the reference add_language filler handling.
+  std::vector<std::string> speech_fillers;
+  /// Filler phrases spoken while a function call is in flight. Emitted as
+  /// ``function_fillers`` when paired with speech_fillers.
+  std::vector<std::string> function_fillers;
   /// Per-language params dict (engine-specific tuning, voice
   /// settings, etc.). Emitted as the language object's ``params``
   /// key in SWML only when non-empty — matches Python reference
@@ -70,11 +83,21 @@ struct LanguageConfig {
     if (!engine.empty()) {
       j["engine"] = engine;
     }
-    if (!fillers.empty()) {
-      j["fillers"] = fillers;
+    if (!model.empty()) {
+      j["model"] = model;
+    }
+    // Filler emission mirrors Python: both kinds -> the two explicit keys;
+    // only one kind -> the deprecated combined ``fillers`` key.
+    if (!speech_fillers.empty() && !function_fillers.empty()) {
+      j["speech_fillers"] = speech_fillers;
+      j["function_fillers"] = function_fillers;
+    } else if (!speech_fillers.empty()) {
+      j["fillers"] = speech_fillers;
+    } else if (!function_fillers.empty()) {
+      j["fillers"] = function_fillers;
     }
     // Only emit the params key when non-empty so we don't pollute
-    // SWML with empty objects (parity with Python's
+    // SWML with empty objects (matches Python's
     // ``if params:`` check).
     if (params.is_object() && !params.empty()) {
       j["params"] = params;
@@ -163,7 +186,7 @@ class AgentBase : public swml::Service {
 
   /// Read-only snapshot of the agent's POM as a ``PromptObjectModel``.
   ///
-  /// Python parity: ``agent.pom`` instance attribute (agent_base.py
+  /// Corresponds to ``agent.pom`` instance attribute (agent_base.py
   /// line 209). Returns ``std::nullopt`` when ``use_pom`` is false
   /// (mirroring Python's ``self.pom = None``); otherwise returns a
   /// freshly built ``signalwire::pom::PromptObjectModel`` whose
@@ -270,9 +293,30 @@ class AgentBase : public swml::Service {
                                                        const json& raw_data) override;
   [[nodiscard]] std::vector<std::string> list_tools() const;
 
+  /// Register several SWAIG tools at once (Python: ``ToolMixin.define_tools``).
+  /// Each entry is a full tool descriptor (name/description/parameters);
+  /// delegates to ``register_swaig_function`` per entry. Returns ``*this`` for
+  /// fluent chaining.
+  AgentBase& define_tools(const std::vector<swaig::ToolDefinition>& tools);
+
+  /// Register a routing callback for a request path (Python:
+  /// ``WebMixin.register_routing_callback``). The callback receives the parsed
+  /// request ``body`` and the request ``headers`` and returns the route to
+  /// dispatch to (empty string = no override), matching Python's
+  /// ``callback_fn(body, headers) -> route | None``. Used to steer inbound
+  /// requests to per-path handlers.
+  using RoutingCallback = std::function<std::string(
+      const json& body, const std::map<std::string, std::string>& headers)>;
+  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+
+  /// Install signal handlers so the agent's HTTP server drains + stops cleanly
+  /// on SIGINT/SIGTERM (Python: ``WebMixin.setup_graceful_shutdown``). Real
+  /// C++ implementation over the running httplib server.
+  void setup_graceful_shutdown();
+
   /// Mint a per-call SWAIG-function token via the agent's SessionManager.
   ///
-  /// Python parity: ``state_mixin.StateMixin._create_tool_token`` —
+  /// Corresponds to ``state_mixin.StateMixin._create_tool_token`` —
   /// delegates to ``SessionManager::create_token`` and returns an empty
   /// string on any thrown exception (Python catches all exceptions and
   /// returns "" on error).
@@ -283,7 +327,7 @@ class AgentBase : public swml::Service {
   /// the function is not registered, when the SessionManager rejects the
   /// token, or on any underlying exception.
   ///
-  /// Python parity: ``state_mixin.StateMixin.validate_tool_token`` —
+  /// Corresponds to ``state_mixin.StateMixin.validate_tool_token`` —
   /// rejects unknown function names up-front and swallows exceptions.
   [[nodiscard]] bool validate_tool_token(const std::string& function_name, const std::string& token,
                                          const std::string& call_id) const;
@@ -294,7 +338,13 @@ class AgentBase : public swml::Service {
 
   AgentBase& add_hint(const std::string& hint);
   AgentBase& add_hints(const std::vector<std::string>& hints);
-  AgentBase& add_pattern_hint(const std::string& pattern);
+  /// Add a STRUCTURED pattern hint. Mirrors Python's
+  /// ``add_pattern_hint(hint, pattern, replace, ignore_case=False)``: appends
+  /// a ``{hint, pattern, replace, ignore_case}`` object to the hints list
+  /// (not a bare string), which renders into the SWML ``ai.hints`` array.
+  /// No-op unless hint, pattern, and replace are all non-empty.
+  AgentBase& add_pattern_hint(const std::string& hint, const std::string& pattern,
+                              const std::string& replace, bool ignore_case = false);
   AgentBase& add_language(const LanguageConfig& lang);
   AgentBase& set_languages(const std::vector<LanguageConfig>& langs);
 
@@ -305,7 +355,7 @@ class AgentBase : public swml::Service {
   /// removes the params key (treated as unset). No-op if ``code``
   /// isn't found among previously-added languages.
   ///
-  /// Python parity: ``AIConfigMixin.set_language_params`` (029ca6f).
+  /// Corresponds to ``AIConfigMixin.set_language_params`` (029ca6f).
   AgentBase& set_language_params(const std::string& code, const json& params);
 
   /// Read the per-language ``params`` dict for a previously-added
@@ -313,8 +363,20 @@ class AgentBase : public swml::Service {
   /// when params were never set on that language — no exception
   /// path, mirroring Python's ``None`` return.
   ///
-  /// Python parity: ``AIConfigMixin.get_language_params`` (029ca6f).
+  /// Corresponds to ``AIConfigMixin.get_language_params`` (029ca6f).
   [[nodiscard]] std::optional<json> get_language_params(const std::string& code) const;
+
+  /// Configure ASR-driven multilingual mode (Mode B). Emits a top-level
+  /// ``multilingual`` object on the AI verb: the recognizer runs in
+  /// code-switching mode and the agent answers in whatever language the
+  /// caller actually spoke. Mutually exclusive with set_languages() — if
+  /// both are set the server uses ``multilingual`` and ignores ``languages``.
+  /// A non-object / empty config is ignored (leaves the mode unset),
+  /// mirroring Python's ``if config and isinstance(config, dict)``.
+  ///
+  /// Corresponds to ``AIConfigMixin.set_multilingual``.
+  AgentBase& set_multilingual(const json& config);
+
   AgentBase& add_pronunciation(const std::string& replace_val, const std::string& with_val,
                                bool ignore_case = false);
   AgentBase& set_pronunciations(const std::vector<Pronunciation>& pronuns);
@@ -322,6 +384,9 @@ class AgentBase : public swml::Service {
   AgentBase& set_params(const json& params);
   AgentBase& set_global_data(const json& data);
   AgentBase& update_global_data(const json& data);
+  /// The accumulated global-data object (Python: ``AgentBase._global_data``).
+  /// Returns a copy; an empty object when nothing has been set.
+  [[nodiscard]] json get_global_data() const;
   AgentBase& set_native_functions(const std::vector<std::string>& funcs);
   /// The complete set of internal SWAIG function names that accept
   /// fillers, matching the SWAIGInternalFiller schema definition.
@@ -370,8 +435,8 @@ class AgentBase : public swml::Service {
   AgentBase& enable_debug_events(bool enable = true);
   AgentBase& add_function_include(const json& include);
   AgentBase& set_function_includes(const std::vector<json>& includes);
-  AgentBase& set_prompt_llm_params(const json& params);
-  AgentBase& set_post_prompt_llm_params(const json& params);
+  AgentBase& set_prompt_llm_params(const json& params = json::object());
+  AgentBase& set_post_prompt_llm_params(const json& params = json::object());
 
   // ========================================================================
   // Verb Methods (5-phase pipeline)
@@ -393,6 +458,12 @@ class AgentBase : public swml::Service {
   contexts::Context& add_context(const std::string& name);
   [[nodiscard]] bool has_contexts() const;
 
+  /// Return the defined contexts as a serialised JSON object, or
+  /// ``std::nullopt`` when no contexts exist. Mirrors Python's
+  /// ``PromptMixin.contexts`` property (the read side of the contexts POM).
+  /// Alias of ``get_contexts`` under the Python-canonical name.
+  [[nodiscard]] std::optional<json> contexts() const { return get_contexts(); }
+
   /// Remove all contexts, returning the agent to a no-contexts state.
   /// Convenience wrapper around define_contexts().reset().
   AgentBase& reset_contexts();
@@ -410,7 +481,7 @@ class AgentBase : public swml::Service {
   // to the string overloads above via skills::skill_name_value(), so the
   // enum and the bare string load the IDENTICAL skill — the enum just adds
   // call-site typo checking + autocompletion. The string overloads stay the
-  // canonical surface (parity with Python's bare str + custom skills); these
+  // canonical surface (matches Python's bare str + custom skills); these
   // are an idiomatic C++ addition (see PORT_ADDITIONS.md).
   AgentBase& add_skill(skills::SkillName skill_name, const json& params = json::object());
   AgentBase& remove_skill(skills::SkillName skill_name);
@@ -442,6 +513,29 @@ class AgentBase : public swml::Service {
   AgentBase& clear_swaig_query_params();
   AgentBase& enable_debug_routes(bool enable = true);
 
+  // ---- Public surface ----------------------------------------------
+
+  /// Agent name (Python: ``get_name``). Alias of the inherited ``name()``.
+  [[nodiscard]] std::string get_name() const { return name(); }
+
+  /// Override the SWAIG-webhook URL (Python: ``set_web_hook_url``). Alias of
+  /// set_webhook_url (the Python spelling splits ``web_hook``).
+  AgentBase& set_web_hook_url(const std::string& url) { return set_webhook_url(url); }
+
+  /// Add multiple SWAIG query params at once (Python: ``add_swaig_query_params``).
+  AgentBase& add_swaig_query_params(const json& params) {
+    for (auto it = params.begin(); it != params.end(); ++it) {
+      if (it.value().is_string()) {
+        add_swaig_query_param(it.key(), it.value().get<std::string>());
+      }
+    }
+    return *this;
+  }
+
+  /// Full URL for this agent's endpoint — host, port, route (Python:
+  /// ``get_full_url``). ``include_auth`` embeds basic-auth credentials.
+  [[nodiscard]] std::string get_full_url(bool include_auth = false) const;
+
   // ========================================================================
   // SIP Methods
   // ========================================================================
@@ -449,6 +543,9 @@ class AgentBase : public swml::Service {
   AgentBase& enable_sip_routing(bool enable = true);
   AgentBase& register_sip_username(const std::string& username);
   AgentBase& auto_map_sip_usernames(bool enable = true);
+  /// The registered SIP usernames (lowercased set — Python:
+  /// ``AgentBase._sip_usernames``). Returned in registration order.
+  [[nodiscard]] std::vector<std::string> get_sip_usernames() const;
 
   // ========================================================================
   // Auth
@@ -459,7 +556,7 @@ class AgentBase : public swml::Service {
   const std::string& auth_password() const { return auth_pass_; }
 
   // ========================================================================
-  // Webhook Signature Validation (porting-sdk/webhooks.md)
+  // Webhook Signature Validation (the SignalWire webhook signature spec)
   //
   // When ``signing_key`` is set, the agent server auto-mounts the
   // webhook validator on POST `/`, `/swaig`, and `/post_prompt`. Unsigned
@@ -503,6 +600,33 @@ class AgentBase : public swml::Service {
       const std::map<std::string, std::string>& query_params, const json& body_params,
       const std::map<std::string, std::string>& headers) const;
 
+  /// Framework-free request-dispatch core (Python:
+  /// ``AgentBase.handle_request``). Overrides ``SWMLService::handle_request`` so
+  /// the primitive dispatch surface renders SWML via AgentBase's request-aware
+  /// render path (``render_swml_for_request``) instead of the base
+  /// ``render_document``. Over plain ``(method, url, headers, body)`` primitives
+  /// it performs proxy detection, basic-auth over the header map, and the
+  /// routing-callback check, returning a ``(status, response_headers,
+  /// body_string)`` triple with the 401-auth and 307-redirect behavior
+  /// preserved.
+  [[nodiscard]] std::tuple<int, std::map<std::string, std::string>, std::string> handle_request(
+      const std::string& method, const std::string& url,
+      const std::map<std::string, std::string>& headers,
+      const std::optional<json>& body = std::nullopt);
+
+  /// Auto-detect (or force via ``mode``) the serverless platform and dispatch
+  /// the request to the matching handler, returning the ``(status, headers,
+  /// body)`` response. Canonical entry point for Python
+  /// ``ServerlessMixin.handle_serverless_request(event, context, mode)``:
+  /// ``mode`` empty = auto-detect via get_execution_mode, selecting
+  /// lambda / google_cloud_function / azure_function / cgi. Delegates to the
+  /// per-platform dispatchers in ``signalwire::utils`` (handle_lambda / _gcf /
+  /// _azure / _cgi); an unknown/``"server"`` mode renders SWML via a plain GET
+  /// so a dispatch always produces a real response.
+  [[nodiscard]] utils::ServerlessResponse handle_serverless_request(
+      const json& event = json::object(), const json& context = json::object(),
+      const std::string& mode = "");
+
   // ========================================================================
   // Server
   // ========================================================================
@@ -537,8 +661,9 @@ class AgentBase : public swml::Service {
   // Initialize auth
   void init_auth();
 
-  // Setup HTTP routes
-  void setup_routes(httplib::Server& server);
+  // Setup HTTP routes (overrides Service::setup_routes to add the agent's
+  // /post_prompt, /mcp, /debug endpoints; dispatched by as_router()/serve()).
+  void setup_routes(httplib::Server& server) override;
 
   // Handle SWML request
   void handle_swml_request(const httplib::Request& req, httplib::Response& res);
@@ -557,6 +682,11 @@ class AgentBase : public swml::Service {
 
   // Internal SWML rendering (used by render_swml_for_request)
   [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers) const;
+
+  /// Post-render transform hook. Called on the fully-rendered SWML document
+  /// just before it is returned, so a subclass can rewrite it (e.g. BedrockAgent
+  /// transforms the ``ai`` verb into ``amazon_bedrock``). Default: no-op.
+  virtual void transform_swml(json& swml) const;
 
   // ========================================================================
   // State
@@ -579,8 +709,12 @@ class AgentBase : public swml::Service {
   std::vector<json> function_includes_;
 
   // AI Config
-  std::vector<std::string> hints_;
+  /// Hints list. Plain string hints are stored as JSON strings; structured
+  /// pattern hints (add_pattern_hint) are stored as JSON objects. Rendered
+  /// verbatim into the SWML ``ai.hints`` array.
+  std::vector<json> hints_;
   std::vector<LanguageConfig> languages_;
+  json multilingual_;  // ASR-driven multilingual (Mode B); null when unset
   std::vector<Pronunciation> pronunciations_;
   json ai_params_;
   json global_data_;
@@ -609,6 +743,7 @@ class AgentBase : public swml::Service {
   std::optional<std::string> webhook_url_;
   std::vector<SwaigQueryParam> swaig_query_params_;
   bool debug_routes_ = false;
+  std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
 
   // MCP
   std::vector<json> mcp_servers_;
@@ -626,7 +761,7 @@ class AgentBase : public swml::Service {
   // Security
   security::SessionManager session_manager_;
 
-  // Webhook signature validation (porting-sdk/webhooks.md)
+  // Webhook signature validation (the SignalWire webhook signature spec)
   // When set, the server auto-mounts the validator on POST `/`,
   // `/swaig`, and `/post_prompt`. Resolution order:
   //   explicit set_signing_key(...) > SIGNALWIRE_SIGNING_KEY env > none

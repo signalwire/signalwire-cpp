@@ -39,6 +39,20 @@ class SkillManager {
   /// List loaded skills
   [[nodiscard]] std::vector<std::string> list_loaded() const;
 
+  // ---- Public surface (signalwire.core.skill_manager.SkillManager) --
+
+  /// Whether a skill is loaded (Python: ``has_skill``). Alias of is_loaded.
+  [[nodiscard]] bool has_skill(const std::string& skill_name) const {
+    return is_loaded(skill_name);
+  }
+
+  /// List loaded skill names (Python: ``list_loaded_skills``). Alias of list_loaded.
+  [[nodiscard]] std::vector<std::string> list_loaded_skills() const { return list_loaded(); }
+
+  /// Get a loaded skill instance by name, or nullptr if not loaded
+  /// (Python: ``get_skill``).
+  [[nodiscard]] SkillBase* get_skill(const std::string& skill_name) const;
+
   /// Cleanup all skills
   void cleanup_all();
 

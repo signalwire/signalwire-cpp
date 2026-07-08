@@ -1,10 +1,23 @@
 # WebService Documentation
 
-The `WebService` class provides static file serving capabilities for the SignalWire AI Agents SDK. It follows the same architectural pattern as `SearchService`, allowing it to run as a standalone service or alongside your AI agents.
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/web/web_service.hpp>
+#include <nlohmann/json.hpp>
+#include <map>
+#include <string>
+#include <vector>
+#include <optional>
+#include <memory>
+
+using json = nlohmann::json;
+```
+
+The `WebService` class provides static file serving capabilities for the SignalWire AI Agents SDK. It maps URL route prefixes to local directories and serves their files over an in-process HTTP server (the vendored cpp-httplib), with file-allowed safety checks, path-traversal protection, and optional basic auth.
 
 ## Table of Contents
 - [Overview](#overview)
-- [Installation](#installation)
+- [Building](#building)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Security Features](#security-features)
@@ -25,109 +38,79 @@ WebService is designed to serve static files with configurable security features
 ### Key Features
 - **Multiple directory mounting** - Serve different directories at different URL paths
 - **Security-first design** - Authentication, CORS, security headers, file filtering
-- **HTTPS support** - Full SSL/TLS support with PEM files
 - **Directory browsing** - Optional HTML directory listings
 - **MIME type handling** - Automatic content-type detection
 - **Path traversal protection** - Prevents access outside designated directories
 - **File filtering** - Allow/block specific file extensions
 
-## Installation
+## Building
 
-WebService is included in the core SignalWire AI Agents SDK:
+WebService is part of the core SignalWire AI Agents SDK static library
+(`libsignalwire.a`). Include its header and link the library:
 
-```bash
-pip install signalwire-agents
+```cpp
+#include <signalwire/web/web_service.hpp>
+
+using namespace signalwire;
 ```
 
 ## Quick Start
 
-```python
-from signalwire import WebService
+```cpp
+#include <signalwire/web/web_service.hpp>
 
-# Create a service to serve files
-service = WebService(
-    port=8002,
-    directories={
-        "/docs": "./documentation",
-        "/assets": "./static/assets"
-    }
-)
+using namespace signalwire;
 
-# Start the service
-service.start()
-# Service available at http://localhost:8002
-# Basic Auth: dev:w00t (auto-generated)
+int main() {
+    // Create a service to serve files
+    signalwire::web::WebService service(
+        8002,
+        std::map<std::string, std::string>{
+            {"/docs", "./documentation"},
+            {"/assets", "./static/assets"},
+        });
+
+    // Start the service (non-blocking; returns the bound port)
+    int bound = service.start();
+    // Service available at http://localhost:8002
+}
 ```
 
 ## Configuration
 
-WebService can be configured through multiple methods (in order of priority):
+WebService is configured through its constructor.
 
-### 1. Constructor Parameters
+### Constructor Parameters
 
-```python
-service = WebService(
-    port=8002,                          # Port to bind to
-    directories={                       # URL path to directory mappings
-        "/docs": "./documentation",
-        "/assets": "./static"
+```cpp
+signalwire::web::WebService service(
+    8002,                                    // Port to bind to
+    std::map<std::string, std::string>{      // URL path to directory mappings
+        {"/docs", "./documentation"},
+        {"/assets", "./static"},
     },
-    basic_auth=("admin", "secret"),    # Custom authentication
-    enable_directory_browsing=True,     # Allow directory listings
-    allowed_extensions=['.html', '.css', '.js'],  # Whitelist extensions
-    blocked_extensions=['.env', '.key'],          # Blacklist extensions
-    max_file_size=100 * 1024 * 1024,   # Max file size (100MB)
-    enable_cors=True                    # Enable CORS headers
-)
+    std::make_pair("admin", "secret"),       // Custom basic auth (user, pass)
+    std::nullopt,                            // config_file (parity no-op)
+    true,                                    // enable_directory_browsing
+    std::vector<std::string>{".html", ".css", ".js"},  // allowed_extensions
+    std::vector<std::string>{".env", ".key"},          // blocked_extensions
+    100LL * 1024 * 1024,                     // max_file_size (100MB)
+    true);                                   // enable_cors
 ```
 
-### 2. Environment Variables
+### Environment Variables
+
+Basic-auth and TLS material can be provided via the standard SDK environment
+variables consumed by the security layer:
 
 ```bash
 # Basic authentication
 export SWML_BASIC_AUTH_USER="admin"
 export SWML_BASIC_AUTH_PASS="secretpassword"
 
-# SSL/HTTPS configuration
-export SWML_SSL_ENABLED=true
-export SWML_SSL_CERT="/path/to/cert.pem"
-export SWML_SSL_KEY="/path/to/key.pem"
-
-# Security settings
+# TLS is terminated externally (reverse proxy) — see HTTPS/SSL Support below.
 export SWML_ALLOWED_HOSTS="example.com,*.example.com"
 export SWML_CORS_ORIGINS="https://app.example.com"
-```
-
-### 3. Configuration File
-
-Create a `web.json` or `swml_web.json` file:
-
-```json
-{
-    "service": {
-        "port": 8002,
-        "directories": {
-            "/docs": "./documentation",
-            "/api": "./api-specs",
-            "/reports": "./generated/reports"
-        },
-        "enable_directory_browsing": true,
-        "max_file_size": 52428800,
-        "allowed_extensions": [".html", ".css", ".js", ".json", ".pdf"],
-        "blocked_extensions": [".env", ".key", ".pem"]
-    },
-    "security": {
-        "basic_auth": {
-            "username": "admin",
-            "password": "secure123"
-        },
-        "ssl_enabled": true,
-        "ssl_cert": "/etc/ssl/certs/server.crt",
-        "ssl_key": "/etc/ssl/private/server.key",
-        "allowed_hosts": ["*"],
-        "cors_origins": ["*"]
-    }
-}
 ```
 
 ## Security Features
@@ -136,31 +119,38 @@ Create a `web.json` or `swml_web.json` file:
 
 WebService implements HTTP Basic Authentication. Credentials can be set via:
 
-1. **Constructor**: `basic_auth=("username", "password")`
+1. **Constructor**: the `basic_auth` argument, `std::make_pair("username", "password")`
 2. **Environment**: `SWML_BASIC_AUTH_USER` and `SWML_BASIC_AUTH_PASS`
-3. **Config file**: `security.basic_auth` section
-4. **Auto-generated**: If not specified, generates random credentials
 
 ### File Security
 
 #### Default Blocked Extensions/Files
 - `.env`, `.git`, `.gitignore`
 - `.key`, `.pem`, `.crt`
-- `.pyc`, `__pycache__`
 - `.DS_Store`, `.swp`
 
-#### Path Traversal Protection
-WebService prevents access outside designated directories:
-```python
-# These attempts will be blocked:
-# GET /docs/../../../etc/passwd
-# GET /docs/./././../config.json
+The `file_allowed()` accessor reports whether a given path would be served under
+the current size and extension/name filters:
+
+```cpp
+signalwire::web::WebService service(8002, std::map<std::string, std::string>{{"/docs", "./documentation"}});
+bool ok = service.file_allowed("./documentation/index.html");
 ```
 
+#### Path Traversal Protection
+WebService prevents access outside designated directories. Requests such as
+`GET /docs/../../../etc/passwd` or `GET /docs/./././../config.json` are rejected
+before touching the filesystem.
+
 #### File Size Limits
-Default maximum file size is 100MB. Configure with:
-```python
-service = WebService(max_file_size=50 * 1024 * 1024)  # 50MB
+Default maximum file size is 100MB. Configure it via the `max_file_size`
+constructor argument:
+
+```cpp
+signalwire::web::WebService service(
+    8002, std::nullopt, std::nullopt, std::nullopt,
+    false, std::nullopt, std::nullopt,
+    50LL * 1024 * 1024);  // 50MB
 ```
 
 ### Security Headers
@@ -169,63 +159,23 @@ Automatically adds security headers to all responses:
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
-- `Strict-Transport-Security` (when HTTPS is enabled)
 
 ## HTTPS/SSL Support
 
-WebService provides multiple ways to enable HTTPS:
-
-### Method 1: Environment Variables
-
-```bash
-# Using file paths
-export SWML_SSL_CERT="/path/to/cert.pem"
-export SWML_SSL_KEY="/path/to/key.pem"
-
-# Or using inline PEM content
-export SWML_SSL_CERT_INLINE="-----BEGIN CERTIFICATE-----
-MIIDXTCCAkWgAwIBAgIJAKLdQVPy...
------END CERTIFICATE-----"
-export SWML_SSL_KEY_INLINE="-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQE...
------END PRIVATE KEY-----"
-```
-
-### Method 2: Direct Parameters
-
-```python
-service = WebService(directories={"/docs": "./docs"})
-service.start(
-    ssl_cert="/path/to/cert.pem",
-    ssl_key="/path/to/key.pem"
-)
-# Service available at https://localhost:8002
-```
-
-### Method 3: Configuration File
-
-```json
-{
-    "security": {
-        "ssl_enabled": true,
-        "ssl_cert": "/etc/ssl/certs/server.crt",
-        "ssl_key": "/etc/ssl/private/server.key"
-    }
-}
-```
+The C++ WebService serves plain HTTP from its in-process server; TLS is
+terminated **externally** by a reverse proxy (Nginx/Apache) or a load balancer.
+This mirrors the SDK's build configuration where cpp-httplib is compiled without
+OpenSSL TLS support. See [Nginx Reverse Proxy](#nginx-reverse-proxy) below for a
+production TLS front-end.
 
 ### Generating Self-Signed Certificates
 
-For development/testing:
+For development/testing behind a proxy:
 
 ```bash
-# Generate a self-signed certificate
+# Generate a self-signed certificate for the reverse proxy
 openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem \
     -days 365 -nodes -subj "/CN=localhost"
-
-# Use with WebService
-export SWML_SSL_CERT="cert.pem"
-export SWML_SSL_KEY="key.pem"
 ```
 
 ## API Endpoints
@@ -238,7 +188,6 @@ Health check endpoint (no authentication required)
 {
     "status": "healthy",
     "directories": ["/docs", "/assets"],
-    "ssl_enabled": false,
     "auth_required": true,
     "directory_browsing": true
 }
@@ -265,109 +214,79 @@ Serve files from mounted directories
 
 ### Basic File Serving
 
-```python
-from signalwire import WebService
+```cpp
+signalwire::web::WebService service(
+    8002,
+    std::map<std::string, std::string>{
+        {"/docs", "./documentation"},
+        {"/api", "./api-specs"},
+    });
+service.start();
 
-# Serve documentation
-service = WebService(
-    directories={
-        "/docs": "./documentation",
-        "/api": "./api-specs"
-    }
-)
-service.start()
-
-# Files accessible at:
-# http://localhost:8002/docs/index.html
-# http://localhost:8002/api/swagger.json
+// Files accessible at:
+// http://localhost:8002/docs/index.html
+// http://localhost:8002/api/swagger.json
 ```
 
 ### With Directory Browsing
 
-```python
-service = WebService(
-    directories={"/files": "./public"},
-    enable_directory_browsing=True  # Allow browsing directories
-)
-service.start()
+```cpp
+signalwire::web::WebService service(
+    8002,
+    std::map<std::string, std::string>{{"/files", "./public"}},
+    std::nullopt, std::nullopt,
+    /*enable_directory_browsing=*/true);
+service.start();
 
-# Browse files at: http://localhost:8002/files/
+// Browse files at: http://localhost:8002/files/
 ```
 
 ### Restricted File Types
 
-```python
-# Only serve web assets
-service = WebService(
-    directories={"/web": "./www"},
-    allowed_extensions=['.html', '.css', '.js', '.png', '.jpg', '.woff2'],
-    enable_directory_browsing=False
-)
+```cpp
+// Only serve web assets
+signalwire::web::WebService service(
+    8002,
+    std::map<std::string, std::string>{{"/web", "./www"}},
+    std::nullopt, std::nullopt,
+    /*enable_directory_browsing=*/false,
+    std::vector<std::string>{".html", ".css", ".js", ".png", ".jpg", ".woff2"});
 ```
 
 ### Dynamic Directory Management
 
-```python
-service = WebService()
+```cpp
+signalwire::web::WebService service;  // defaults (port 8002, no directories)
 
-# Add directories after initialization
-service.add_directory("/docs", "./documentation")
-service.add_directory("/reports", "./generated/reports")
+// Add directories after construction
+service.add_directory("/docs", "./documentation");
+service.add_directory("/reports", "./generated/reports");
 
-# Remove a directory
-service.remove_directory("/reports")
+// Remove a directory
+service.remove_directory("/reports");
 
-service.start()
+service.start();
 ```
 
 ### With Custom Authentication
 
-```python
-service = WebService(
-    directories={"/private": "./sensitive-docs"},
-    basic_auth=("admin", "super-secret-password")
-)
-service.start()
+```cpp
+signalwire::web::WebService service(
+    8002,
+    std::map<std::string, std::string>{{"/private", "./sensitive-docs"}},
+    std::make_pair("admin", "super-secret-password"));
+service.start();
 ```
 
-### HTTPS with Let's Encrypt
+### Ephemeral Port (tests)
 
-```python
-# Assuming you have Let's Encrypt certificates
-service = WebService(
-    directories={"/secure": "./secure-files"}
-)
-service.start(
-    ssl_cert="/etc/letsencrypt/live/example.com/fullchain.pem",
-    ssl_key="/etc/letsencrypt/live/example.com/privkey.pem"
-)
-# Service available at https://example.com:8002
-```
-
-### Multi-Environment Configuration
-
-```python
-import os
-
-# Development vs Production
-if os.getenv("ENVIRONMENT") == "production":
-    service = WebService(
-        port=443,
-        directories={"/": "./dist"},
-        enable_directory_browsing=False
-    )
-    service.start(
-        host="0.0.0.0",
-        ssl_cert="/etc/ssl/certs/production.crt",
-        ssl_key="/etc/ssl/private/production.key"
-    )
-else:
-    service = WebService(
-        port=8002,
-        directories={"/": "./src"},
-        enable_directory_browsing=True
-    )
-    service.start()
+```cpp
+// Pass port 0 to bind an OS-assigned ephemeral port; start() returns it.
+signalwire::web::WebService service(
+    0, std::map<std::string, std::string>{{"/docs", "./documentation"}});
+int bound = service.start("127.0.0.1");
+// ... exercise the service on `bound` ...
+service.stop();
 ```
 
 ## Deployment Patterns
@@ -376,104 +295,69 @@ else:
 
 Run WebService as a dedicated static file server:
 
-```python
-# web_server.py
-from signalwire import WebService
+```cpp
+// web_server.cpp
+#include <signalwire/web/web_service.hpp>
 
-if __name__ == "__main__":
-    service = WebService(
-        port=8002,
-        directories={
-            "/docs": "/var/www/docs",
-            "/assets": "/var/www/assets",
-            "/downloads": "/var/www/downloads"
-        }
-    )
-    service.start()
+#include <chrono>
+#include <thread>
+
+using namespace signalwire;
+
+int main() {
+    signalwire::web::WebService service(
+        8002,
+        std::map<std::string, std::string>{
+            {"/docs", "/var/www/docs"},
+            {"/assets", "/var/www/assets"},
+            {"/downloads", "/var/www/downloads"},
+        });
+    service.start();  // non-blocking
+
+    // Keep the process alive while the background server runs.
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::hours(1));
+    }
+}
 ```
 
 ### Alongside AI Agents
 
-Run WebService alongside your AI agents on different ports:
+`WebService::start()` is non-blocking (it runs the HTTP server on a background
+thread), so you can start it and then run your agent on a different port:
 
-```python
-# main.py
-from signalwire import AgentBase, WebService
-import threading
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/web/web_service.hpp>
 
-# Start WebService in background
-def run_web_service():
-    web = WebService(
-        port=8002,
-        directories={"/docs": "./agent-docs"}
-    )
-    web.start()
+using namespace signalwire;
 
-# Start web service thread
-web_thread = threading.Thread(target=run_web_service, daemon=True)
-web_thread.start()
+class MyAgent : public signalwire::agent::AgentBase {
+public:
+    MyAgent() : AgentBase("My Agent") {}
+};
 
-# Run your agent
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="My Agent")
+int main() {
+    // Start WebService in the background (returns immediately)
+    signalwire::web::WebService web(
+        8002, std::map<std::string, std::string>{{"/docs", "./agent-docs"}});
+    web.start();
 
-agent = MyAgent()
-agent.serve(port=3000)  # Agent on port 3000, WebService on 8002
-```
-
-### Docker Deployment
-
-```dockerfile
-FROM python:3.9-slim
-
-WORKDIR /app
-
-# Install SDK
-RUN pip install signalwire-agents
-
-# Copy static files
-COPY ./static /app/static
-COPY ./web_config.json /app/web_config.json
-
-# Expose port
-EXPOSE 8002
-
-# Run WebService
-CMD ["python", "-c", "from signalwire import WebService; WebService(config_file='web_config.json').start()"]
-```
-
-### Systemd Service
-
-Create `/etc/systemd/system/signalwire-web.service`:
-
-```ini
-[Unit]
-Description=SignalWire Web Service
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/signalwire
-Environment="SWML_SSL_CERT=/etc/ssl/certs/server.crt"
-Environment="SWML_SSL_KEY=/etc/ssl/private/server.key"
-ExecStart=/usr/bin/python3 -c "from signalwire import WebService; WebService(directories={'/': '/var/www/html'}).start()"
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
+    // Run the agent on its own port (set via the constructor's port argument)
+    MyAgent agent;
+    agent.serve();  // Agent on its constructor port (3000), WebService on 8002
+}
 ```
 
 ### Nginx Reverse Proxy
 
-For production, use Nginx as a reverse proxy:
+For production TLS termination, put Nginx in front of the plain-HTTP WebService:
 
 ```nginx
 server {
     listen 80;
     server_name static.example.com;
-    
+
     # Redirect to HTTPS
     return 301 https://$server_name$request_uri;
 }
@@ -481,17 +365,17 @@ server {
 server {
     listen 443 ssl http2;
     server_name static.example.com;
-    
+
     ssl_certificate /etc/ssl/certs/example.com.crt;
     ssl_certificate_key /etc/ssl/private/example.com.key;
-    
+
     location / {
         proxy_pass http://localhost:8002;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        
+
         # Cache static assets
         location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
             proxy_pass http://localhost:8002;
@@ -505,173 +389,144 @@ server {
 ## Best Practices
 
 ### Security
-1. **Always use HTTPS in production** - Protect data in transit
-2. **Change default credentials** - Never use auto-generated auth in production
+1. **Always terminate TLS at the proxy in production** - Protect data in transit
+2. **Change default credentials** - Set explicit `basic_auth` in production
 3. **Restrict file types** - Use `allowed_extensions` to whitelist safe files
 4. **Disable directory browsing** - Turn off in production environments
-5. **Use reverse proxy** - Put Nginx/Apache in front for additional security
+5. **Use a reverse proxy** - Put Nginx/Apache in front for TLS and extra security
 
 ### Performance
-1. **Set appropriate cache headers** - WebService adds 1-hour cache by default
+1. **Set appropriate cache headers** at the reverse proxy
 2. **Limit file sizes** - Adjust `max_file_size` based on your needs
-3. **Use CDN for static assets** - Offload traffic for better performance
-4. **Compress large files** - Use gzip/brotli at reverse proxy level
+3. **Use a CDN for static assets** - Offload traffic for better performance
+4. **Compress large files** - Use gzip/brotli at the reverse proxy level
 
 ### Organization
 1. **Separate content types** - Use different routes for different file types
-2. **Version your assets** - Include version in path (e.g., `/assets/v1/`)
+2. **Version your assets** - Include a version in the path (e.g., `/assets/v1/`)
 3. **Use index.html** - Provide default files for directories
 4. **Document your structure** - Maintain clear directory organization
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue: "FastAPI not available"**
-```bash
-# Install FastAPI and uvicorn
-pip install fastapi uvicorn
-```
-
-**Issue: SSL certificate errors**
-```python
-# Check certificate paths
-import os
-print(os.path.exists("/path/to/cert.pem"))  # Should be True
-print(os.path.exists("/path/to/key.pem"))   # Should be True
-```
-
-**Issue: Permission denied**
-```bash
-# Ensure read permissions on directories
-chmod -R 755 /path/to/static/files
-```
-
-**Issue: Directory not found**
-```python
-# Use absolute paths
-import os
-service = WebService(
-    directories={
-        "/docs": os.path.abspath("./documentation")
-    }
-)
-```
-
-### Debug Logging
-
-Enable debug logging to troubleshoot issues:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-service = WebService(directories={"/test": "./test"})
-service.start()
-```
 
 ## API Reference
 
 ### WebService Class
 
-```python
-class WebService:
-    def __init__(self,
-                 port: int = 8002,
-                 directories: Dict[str, str] = None,
-                 basic_auth: Optional[Tuple[str, str]] = None,
-                 config_file: Optional[str] = None,
-                 enable_directory_browsing: bool = False,
-                 allowed_extensions: Optional[list] = None,
-                 blocked_extensions: Optional[list] = None,
-                 max_file_size: int = 100 * 1024 * 1024,
-                 enable_cors: bool = True)
+```cpp
+class WebService {
+ public:
+    static constexpr std::int64_t kDefaultMaxFileSize = 100LL * 1024 * 1024;
+
+    explicit WebService(
+        int port = 8002,
+        std::optional<std::map<std::string, std::string>> directories = std::nullopt,
+        std::optional<std::pair<std::string, std::string>> basic_auth = std::nullopt,
+        const std::optional<std::string>& config_file = std::nullopt,
+        bool enable_directory_browsing = false,
+        std::optional<std::vector<std::string>> allowed_extensions = std::nullopt,
+        std::optional<std::vector<std::string>> blocked_extensions = std::nullopt,
+        std::int64_t max_file_size = kDefaultMaxFileSize,
+        bool enable_cors = true);
+};
 ```
 
 #### Parameters
-- `port`: Port to bind to (default: 8002)
-- `directories`: Dictionary mapping URL paths to local directories
-- `basic_auth`: Tuple of (username, password) for authentication
-- `config_file`: Path to JSON configuration file
-- `enable_directory_browsing`: Allow directory listing (default: False)
+- `port`: Port to bind to (default: 8002; 0 = OS-assigned ephemeral)
+- `directories`: Map of URL route prefixes to local directories
+- `basic_auth`: `std::pair<username, password>` for authentication
+- `config_file`: accepted for signature parity (loading is a no-op)
+- `enable_directory_browsing`: Allow directory listing (default: false)
 - `allowed_extensions`: List of allowed file extensions
 - `blocked_extensions`: List of blocked file extensions
 - `max_file_size`: Maximum file size in bytes (default: 100MB)
-- `enable_cors`: Enable CORS headers (default: True)
+- `enable_cors`: Enable CORS headers (default: true)
 
 #### Methods
 
 ##### start()
-```python
-def start(self,
-          host: str = "0.0.0.0",
-          port: Optional[int] = None,
-          ssl_cert: Optional[str] = None,
-          ssl_key: Optional[str] = None)
+```cpp
+int start(const std::string& host = "0.0.0.0",
+          std::optional<int> bind_port = std::nullopt);
 ```
-Start the web service.
+Start the web service (non-blocking) and return the bound port.
+
+##### stop()
+```cpp
+void stop();
+```
+Stop the service and release the socket. Safe to call when not running.
 
 ##### add_directory()
-```python
-def add_directory(self, route: str, directory: str) -> None
+```cpp
+void add_directory(const std::string& route, const std::string& directory);
 ```
-Add a new directory to serve.
+Add a new directory to serve. Throws `std::invalid_argument` when the path does
+not exist or is not a directory.
 
 ##### remove_directory()
-```python
-def remove_directory(self, route: str) -> None
+```cpp
+void remove_directory(const std::string& route);
 ```
-Remove a directory from being served.
+Remove a directory from being served (no-op when absent).
+
+##### file_allowed()
+<!-- snippet: no-compile member-function signature listing (const qualifier shown out of class context) -->
+```cpp
+bool file_allowed(const std::string& file_path) const;
+```
+Whether a file may be served under the current size and extension/name filters.
 
 ## Integration with SignalWire Agents
 
 WebService complements AI agents by providing static file serving:
 
-```python
-from signalwire import AgentBase, WebService
+```cpp
+#include <signalwire/agent/agent_base.hpp>
+#include <signalwire/web/web_service.hpp>
 
-class DocumentationAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="Documentation Assistant")
-        
-        # Reference documentation served by WebService
-        self.prompt_add_section(
+using namespace signalwire;
+using json = nlohmann::json;
+
+class DocumentationAgent : public signalwire::agent::AgentBase {
+public:
+    DocumentationAgent() : AgentBase("Documentation Assistant") {
+        // Reference documentation served by WebService
+        prompt_add_section(
             "Documentation",
-            "User documentation is available at https://example.com:8002/docs/"
-        )
-    
-        @self.tool(
-            "get_doc_link",
-            description="Get link to a documentation page",
-            parameters={
-                "doc_name": {"type": "string", "description": "Name of the documentation page"}
-            }
-        )
-        def get_doc_link(self, args, raw_data):
-            doc_name = args.get('doc_name')
-            return SwaigFunctionResult(
-                f"Documentation available at: https://example.com:8002/docs/{doc_name}.html"
-            )
+            "User documentation is available at https://example.com:8002/docs/");
 
-# Run both services
-if __name__ == "__main__":
-    # Start WebService for documentation
-    web = WebService(
-        port=8002,
-        directories={"/docs": "./documentation"}
-    )
-    
-    # Start agent
-    agent = DocumentationAgent()
-    
-    # Run in threads or separate processes
-    import threading
-    web_thread = threading.Thread(target=web.start, daemon=True)
-    web_thread.start()
-    
-    agent.serve(port=3000)
+        json params = {
+            {"type", "object"},
+            {"properties",
+             {{"doc_name",
+               {{"type", "string"},
+                {"description", "Name of the documentation page"}}}}}};
+
+        define_tool(
+            "get_doc_link", "Get link to a documentation page", params,
+            [](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
+                std::string doc_name = args.at("doc_name");
+                return swaig::FunctionResult(
+                    "Documentation available at: https://example.com:8002/docs/"
+                    + doc_name + ".html");
+            });
+    }
+};
+
+int main() {
+    // Start WebService for documentation (non-blocking)
+    signalwire::web::WebService web(
+        8002, std::map<std::string, std::string>{{"/docs", "./documentation"}});
+    web.start();
+
+    // Start the agent (port comes from its constructor, default 3000)
+    DocumentationAgent agent;
+    agent.serve();
+}
 ```
 
 ## Summary
 
-WebService provides a secure, configurable static file server that integrates with the SignalWire AI Agents SDK. It follows the same architectural patterns as other SDK services, making it familiar and easy to use while providing configurable security features and flexible deployment options.
+WebService provides a secure, configurable static file server that integrates
+with the SignalWire AI Agents SDK. It follows the same architectural patterns as
+other SDK services, providing configurable security features and flexible
+deployment options.

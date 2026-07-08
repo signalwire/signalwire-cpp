@@ -70,38 +70,27 @@ export SWML_BASIC_AUTH_PASSWORD=mysecurepassword
 
 SWML-based services automatically use the unified security configuration:
 
-```python
-from signalwire import AgentBase
+```cpp
+#include <signalwire/agent/agent_base.hpp>
 
-class MyAgent(AgentBase):
-    def __init__(self):
-        super().__init__(name="secure-agent", route="/agent")
-        # Security is automatically configured from environment
+using namespace signalwire;
 
-# The agent will use HTTPS if SWML_SSL_ENABLED=true
-agent = MyAgent()
-agent.run()
+class MyAgent : public agent::AgentBase {
+public:
+    MyAgent() : AgentBase("secure-agent", "/agent") {
+        // Security is configured from the environment (SWML_* variables)
+    }
+};
+
+int main() {
+    MyAgent agent;
+    agent.serve();  // honours SWML_BASIC_AUTH_* and host/CORS settings; port from the constructor
+}
 ```
 
-### Search Service
-
-The standalone search service also supports the same security configuration:
-
-```python
-from signalwire.search import SearchService
-
-# Basic usage - security configured from environment
-service = SearchService(port=8001, indexes={"docs": "index.swsearch"})
-service.start()
-
-# Override SSL settings programmatically
-service.start(
-    host="0.0.0.0",
-    port=8001,
-    ssl_cert="/path/to/cert.pem",
-    ssl_key="/path/to/key.pem"
-)
-```
+> **Note:** The standalone search service (semantic / vector search) is not part
+> of the C++ port; it remains a Python-only capability. TLS for the C++ HTTP
+> server is terminated by an external reverse proxy (see the HTTPS notes below).
 
 ## Security Headers
 
@@ -186,12 +175,12 @@ export SWML_RATE_LIMIT=20
 
 Monitor security-related logs:
 
-```python
-# Security events are logged with structured data
-# Look for log entries with:
-# - "security_config_loaded" - Configuration details
-# - "ssl_config_invalid" - SSL configuration errors
-# - "starting_search_service" / "starting_server" - Service startup with security info
+```text
+Security events are logged with structured data.
+Look for log entries with:
+- "security_config_loaded"  - Configuration details
+- "ssl_config_invalid"      - SSL configuration errors
+- "starting_server"         - Service startup with security info
 ```
 
 ## Migration Guide

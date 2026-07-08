@@ -15,6 +15,7 @@ target_link_libraries(my_app PRIVATE signalwire::signalwire)
 
 ## Include Changes
 
+<!-- snippet: no-compile before/after migration listing that references the pre-2.0 signalwire_agents.hpp header (intentionally removed) -->
 ```cpp
 // Before
 #include <signalwire_agents.hpp>

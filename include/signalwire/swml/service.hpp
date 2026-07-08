@@ -2,10 +2,12 @@
 
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "signalwire/logging.hpp"
@@ -24,6 +26,9 @@ class Response;
 }  // namespace httplib
 
 namespace signalwire {
+namespace core {
+class SWMLVerbHandler;  // fwd (core/swml_handler.hpp)
+}  // namespace core
 namespace swml {
 
 using json = nlohmann::json;
@@ -64,21 +69,21 @@ class Service {
   const std::string& auth_password() const { return auth_pass_; }
 
   // ========================================================================
-  // AuthMixin parity (Python: signalwire.core.mixins.auth_mixin)
+  // AuthMixin (mirrors Python: signalwire.core.mixins.auth_mixin)
   // ========================================================================
 
   /// Validate provided basic-auth credentials against the configured ones
   /// using a constant-time comparison.
-  /// Python parity: ``AuthMixin.validate_basic_auth(username, password)``.
+  /// Corresponds to ``AuthMixin.validate_basic_auth(username, password)``.
   [[nodiscard]] bool validate_basic_auth(const std::string& username,
                                          const std::string& password) const;
 
   /// Get (user, password) — Python-canonical name.
-  /// Python parity: ``AuthMixin.get_basic_auth_credentials``.
+  /// Corresponds to ``AuthMixin.get_basic_auth_credentials``.
   [[nodiscard]] std::pair<std::string, std::string> get_basic_auth_credentials() const;
 
   /// Get (user, password, source) where source is one of "provided",
-  /// "environment", or "generated". Python parity:
+  /// "environment", or "generated". Corresponds to
   /// ``AuthMixin.get_basic_auth_credentials(include_source=True)``.
   [[nodiscard]] std::tuple<std::string, std::string, std::string>
   get_basic_auth_credentials_with_source() const;
@@ -151,6 +156,79 @@ class Service {
   [[nodiscard]] json render_swml() const;
 
   // ========================================================================
+  // Document-lifecycle helpers (Corresponds to SWMLService.*)
+  // ========================================================================
+
+  /// Add a named section to the document (Python:
+  /// ``SWMLService.add_section``). Returns ``false`` if the section already
+  /// exists, ``true`` when a new one is created.
+  bool add_section(const std::string& section_name);
+
+  /// Add a verb to a named section (Python:
+  /// ``SWMLService.add_verb_to_section``). ``config`` is the verb's params
+  /// object. Returns ``*this`` for fluent chaining.
+  Service& add_verb_to_section(const std::string& section_name, const std::string& verb_name,
+                               const json& config);
+
+  /// Return the SWML document as a JSON object (Python:
+  /// ``SWMLService.get_document`` — a dict). Alias of ``render_swml`` under
+  /// the Python-canonical name.
+  [[nodiscard]] json get_document() const { return render_swml(); }
+
+  /// Render the SWML document to a JSON string (Python:
+  /// ``SWMLService.render_document``).
+  [[nodiscard]] std::string render_document() const;
+
+  /// Framework-free request-dispatch core (Python:
+  /// ``SWMLService.handle_request``). The primitive dispatch surface the SDK
+  /// ports share: over plain ``(method, url, headers, body)`` primitives it
+  /// performs proxy detection, basic-auth over the header map, the
+  /// routing-callback check, then renders the SWML document — returning a
+  /// ``(status, response_headers, body_string)`` triple. On auth failure it
+  /// returns ``(401, {"WWW-Authenticate":"Basic"}, {"error":"Unauthorized"})``;
+  /// on a routing-callback redirect ``(307, {"Location": route}, "")``;
+  /// otherwise ``(200, {}, render_document())``.
+  [[nodiscard]] std::tuple<int, std::map<std::string, std::string>, std::string> handle_request(
+      const std::string& method, const std::string& url,
+      const std::map<std::string, std::string>& headers,
+      const std::optional<json>& body = std::nullopt);
+
+  /// Reset the document to an empty state (Python:
+  /// ``SWMLService.reset_document``).
+  void reset_document();
+
+  /// Manually override the proxy URL used to build absolute webhook URLs
+  /// (Python: ``SWMLService.manual_set_proxy_url``).
+  void manual_set_proxy_url(const std::string& proxy_url);
+
+  /// Register a routing callback for a request path (Python:
+  /// ``SWMLService.register_routing_callback``). The callback receives the
+  /// parsed request ``body`` and the request ``headers`` and returns the route
+  /// to dispatch to (empty string = no override), matching Python's
+  /// ``callback_fn(body, headers) -> route | None``.
+  using RoutingCallback = std::function<std::string(
+      const json& body, const std::map<std::string, std::string>& headers)>;
+  void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+
+  /// The registered (normalized) routing-callback paths, sorted (Python:
+  /// ``sorted(SWMLService._routing_callbacks.keys())``).
+  [[nodiscard]] std::vector<std::string> get_routing_callback_paths() const;
+
+  /// Register a SWML verb handler (Python:
+  /// ``SWMLService.register_verb_handler``). Delegates to the service's verb
+  /// handler registry so custom verbs validate + build through the handler.
+  void register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler);
+
+  /// Whether full schema validation of the rendered document is enabled
+  /// (Python: ``SWMLService.full_validation_enabled``).
+  [[nodiscard]] bool full_validation_enabled() const { return full_validation_; }
+
+  /// Extract the SIP username from a request body's ``call.to`` SIP URI
+  /// (Python: static ``SWMLService.extract_sip_username``). Returns an empty
+  /// string when no SIP username can be extracted.
+  [[nodiscard]] static std::string extract_sip_username(const json& request_body);
+
+  // ========================================================================
   // SWAIG tool registry (lifted from AgentBase)
   // ========================================================================
 
@@ -173,26 +251,26 @@ class Service {
   [[nodiscard]] std::vector<std::string> list_tool_names() const;
 
   // ========================================================================
-  // ToolRegistry parity (Python: signalwire.core.agent.tools.registry)
+  // ToolRegistry (mirrors Python: signalwire.core.agent.tools.registry)
   // ========================================================================
 
   /// Whether a SWAIG function with the given name is registered.
-  /// Python parity: ``ToolRegistry.has_function``.
+  /// Corresponds to ``ToolRegistry.has_function``.
   [[nodiscard]] bool has_function(const std::string& name) const;
 
   /// Get a registered SWAIG function definition by name.
   /// Returns nullptr when no such function is registered.
-  /// Python parity: ``ToolRegistry.get_function``.
+  /// Corresponds to ``ToolRegistry.get_function``.
   [[nodiscard]] const swaig::ToolDefinition* get_function(const std::string& name) const;
 
   /// Snapshot of all registered SWAIG functions keyed by name.
   /// Returned by value so subsequent registrations don't mutate the
-  /// snapshot. Python parity: ``ToolRegistry.get_all_functions``.
+  /// snapshot. Corresponds to ``ToolRegistry.get_all_functions``.
   [[nodiscard]] std::map<std::string, swaig::ToolDefinition> get_all_functions() const;
 
   /// Remove a registered SWAIG function. Returns true when the
   /// function was found and removed; false when it wasn't registered.
-  /// Python parity: ``ToolRegistry.remove_function``.
+  /// Corresponds to ``ToolRegistry.remove_function``.
   [[nodiscard]] bool remove_function(const std::string& name);
 
   /// Build the introspect payload for the registered tools as a JSON string
@@ -216,6 +294,25 @@ class Service {
   /// Start the HTTP server (blocking)
   void serve();
 
+  /// Build a mountable HTTP router for embedding this service's routes in a
+  /// host application, WITHOUT starting a listener.
+  ///
+  /// Returns an `httplib::Server` pre-populated with every route this service
+  /// exposes (the SWML endpoint, `/swaig`, and any subclass routes such as
+  /// AgentBase's `/post_prompt` and `/mcp`) via the same `setup_routes` logic
+  /// `serve()` uses. In cpp-httplib an `httplib::Server` IS the route-handler
+  /// unit — its registered `Handler`s (`std::function<void(const Request&,
+  /// Response&)>`) are the mountable dispatch surface — so handing one out is
+  /// the idiomatic "give me this agent's routes to embed" capability. The
+  /// caller owns the returned Server and can `listen()` on it directly, front
+  /// it behind its own TLS/proxy, or copy its handlers into a parent server.
+  ///
+  /// Corresponds to WebMixin.as_router / SWMLService.as_router — the
+  /// cross-port "embed my routes in a host app" unit (Python returns a FastAPI
+  /// APIRouter, Go returns an http.Handler; C++ returns a populated
+  /// httplib::Server).
+  [[nodiscard]] std::shared_ptr<httplib::Server> as_router();
+
   /// Stop the HTTP server
   void stop();
 
@@ -236,7 +333,7 @@ class Service {
   /// non-null JSON with modifications to merge into the rendered
   /// document.
   ///
-  /// Python parity: WebMixin.on_request(request_data, callback_path).
+  /// Corresponds to WebMixin.on_request(request_data, callback_path).
   /// The Python third `request` argument is FastAPI-specific and
   /// intentionally not mirrored on the cross-language API.
   virtual std::optional<json> on_request(
@@ -246,7 +343,7 @@ class Service {
   /// Customization point for subclasses to modify SWML based on
   /// request data. Default returns std::nullopt (no modification).
   ///
-  /// Python parity: WebMixin.on_swml_request(request_data, callback_path).
+  /// Corresponds to WebMixin.on_swml_request(request_data, callback_path).
   virtual std::optional<json> on_swml_request(
       const std::optional<json>& request_data = std::nullopt,
       const std::optional<std::string>& callback_path = std::nullopt);
@@ -287,14 +384,23 @@ class Service {
   std::string host_ = "0.0.0.0";
   int port_ = 3000;
 
-  std::string auth_user_;
-  std::string auth_pass_;
-  bool auth_initialized_ = false;
+  // Mutable so credentials can be lazily resolved from the environment on the
+  // first auth check regardless of entry point (init_auth() is const and called
+  // by the const validate_basic_auth). Mirrors the reference's lazy auth
+  // resolution: a serverless dispatch validates auth without a prior serve().
+  mutable std::string auth_user_;
+  mutable std::string auth_pass_;
+  mutable bool auth_initialized_ = false;
 
   Schema schema_;
   /// SchemaUtils helper exposed via schema_utils(). Mutable so the
   /// const accessor can lazy-build it.
   mutable std::unique_ptr<signalwire::utils::SchemaUtils> schema_utils_;
+
+  std::optional<std::string> manual_proxy_url_;
+  bool full_validation_ = false;
+  std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
+  std::vector<std::shared_ptr<signalwire::core::SWMLVerbHandler>> verb_handlers_;
 
   // SWAIG tool registry — protected so subclasses can read/write directly
   // when needed (e.g. AgentBase's per-tool secure flag, BuildSwaigBlock).
@@ -302,10 +408,14 @@ class Service {
   std::vector<std::string> tool_order_;
   std::vector<json> registered_swaig_functions_;
 
-  void setup_routes(httplib::Server& server);
+  /// Register this service's HTTP routes onto `server`. Virtual so that
+  /// as_router() (and serve()) dispatch to a subclass's fuller route set —
+  /// AgentBase overrides this to add /post_prompt, /mcp, and /debug on top of
+  /// the SWML + /swaig base routes.
+  virtual void setup_routes(httplib::Server& server);
 
  private:
-  void init_auth();
+  void init_auth() const;
 
   std::unique_ptr<httplib::Server> server_;
 };

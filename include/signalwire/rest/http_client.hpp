@@ -83,24 +83,6 @@ class HttpClient {
   std::string ca_cert_path_;
 };
 
-/// Generic CRUD resource for REST API namespaces
-class CrudResource {
- public:
-  CrudResource(const HttpClient& client, const std::string& base_path);
-
-  // [[nodiscard]]: each CRUD verb returns the REST response body; ignoring
-  // it drops the result of the call.
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const;
-  [[nodiscard]] json create(const json& data) const;
-  [[nodiscard]] json get(const std::string& id) const;
-  [[nodiscard]] json update(const std::string& id, const json& data) const;
-  [[nodiscard]] json del(const std::string& id) const;
-
- protected:
-  const HttpClient& client_;
-  std::string base_path_;
-};
-
 /// Iterates items across paginated API responses.
 ///
 /// Mirrors signalwire-python's ``signalwire.rest._pagination.PaginatedIterator``:

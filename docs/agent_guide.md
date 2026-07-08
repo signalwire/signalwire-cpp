@@ -33,12 +33,26 @@ This guide explains how to create and customize your own AI agents, with example
 
 The header to include is:
 
+<!-- snippet-setup -->
 ```cpp
 #include <signalwire/agent/agent_base.hpp>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swaig/parameter_schema.hpp>
+#include <signalwire/datamap/datamap.hpp>
+#include <signalwire/contexts/contexts.hpp>
+#include <signalwire/prefabs/prefabs.hpp>
+#include <signalwire/skills/skill_name.hpp>
+#include <signalwire/server/agent_server.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
 
-using namespace signalwire;
 using json = nlohmann::json;
+signalwire::agent::AgentBase agent("my-agent");
 ```
+
+In your own code you would write `using namespace signalwire;` so the `agent::`,
+`swaig::`, and `datamap::` namespaces are in scope; the examples below spell the
+namespaces out in full.
 
 ## Architecture Overview
 
@@ -102,6 +116,7 @@ POM (the Prompt Object Model) is enabled by default. You can toggle it with `set
 - `serve()` — start the HTTP server directly
 - `stop()` — stop the running server
 
+<!-- snippet: no-compile depends on the MyAgent subclass defined in the preceding block -->
 ```cpp
 int main() {
     MyAgent agent;
@@ -122,17 +137,17 @@ The Prompt Object Model (POM) provides a structured way to build prompts. `promp
 
 ```cpp
 // Add a section with just body text
-prompt_add_section("Personality", "You are a friendly assistant.");
+agent.prompt_add_section("Personality", "You are a friendly assistant.");
 
 // Add a section with bullet points (empty body, then the bullets vector)
-prompt_add_section("Instructions", "", {
+agent.prompt_add_section("Instructions", "", {
     "Answer questions clearly",
     "Be helpful and polite",
     "Use functions when appropriate"
 });
 
 // Add a section with both body and bullets
-prompt_add_section("Context",
+agent.prompt_add_section("Context",
     "The user is calling about technical support.",
     {"They may need help with their account", "Check for existing tickets"});
 ```
@@ -140,11 +155,11 @@ prompt_add_section("Context",
 You can also nest a subsection under an existing section, or append to a section you have already created:
 
 ```cpp
-prompt_add_subsection("Instructions", "Escalation",
+agent.prompt_add_subsection("Instructions", "Escalation",
     "When to escalate to a human agent.",
     {"After two failed attempts", "On explicit request"});
 
-prompt_add_to_section("Instructions", "Always confirm the caller's identity first.");
+agent.prompt_add_to_section("Instructions", "Always confirm the caller's identity first.");
 ```
 
 ### 2. Using Raw Text Prompts
@@ -152,8 +167,8 @@ prompt_add_to_section("Instructions", "Always confirm the caller's identity firs
 For simpler agents, you can set the prompt directly as text. This switches the agent out of POM mode:
 
 ```cpp
-set_use_pom(false);
-set_prompt_text(
+agent.set_use_pom(false);
+agent.set_prompt_text(
     "You are a helpful assistant. Your goal is to provide clear and concise "
     "information to the user. Answer their questions to the best of your ability.");
 ```
@@ -163,7 +178,7 @@ set_prompt_text(
 The post-prompt is sent to the AI after the conversation for summary or analysis:
 
 ```cpp
-set_post_prompt(
+agent.set_post_prompt(
     "Analyze the conversation and extract:\n"
     "1. Main topics discussed\n"
     "2. Action items or follow-ups needed\n"
@@ -212,15 +227,15 @@ A vague description is the #1 cause of "the model has the right tool but doesn't
 Register a tool with `define_tool(name, description, parameters, handler, secure = false)`. The `parameters` argument is a JSON-Schema object. The handler is a `swaig::ToolHandler`, which is `std::function<swaig::FunctionResult(const json& args, const json& raw_data)>`:
 
 ```cpp
-define_tool("get_weather", "Get the current weather for a location",
+agent.define_tool("get_weather", "Get the current weather for a location",
     {{"type", "object"}, {"properties", {
         {"location", {{"type", "string"}, {"description", "The city or location to get weather for"}}}
     }}},
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)raw;
         std::string location = args.value("location", "Unknown location");
         // Here you would typically call a weather API; we return mock data.
-        return swaig::FunctionResult("It's sunny and 72F in " + location + ".");
+        return signalwire::swaig::FunctionResult("It's sunny and 72F in " + location + ".");
     });
 ```
 
@@ -231,15 +246,15 @@ The handler receives the parsed function arguments (`args`) and the full raw req
 Writing JSON Schema by hand is error-prone. The `swaig::ParameterSchema` builder produces byte-identical wire JSON via a typed fluent API and converts implicitly to `json`:
 
 ```cpp
-auto params = swaig::ParameterSchema{}
+auto params = signalwire::swaig::ParameterSchema{}
     .string("location", "The city or location to get weather for")
     .enum_of("units", {"celsius", "fahrenheit"}, "Temperature units")
     .required({"location"});
 
-define_tool("get_weather", "Get the current weather for a location", params,
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+agent.define_tool("get_weather", "Get the current weather for a location", params,
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)raw;
-        return swaig::FunctionResult("It's sunny in " + args.value("location", ""));
+        return signalwire::swaig::FunctionResult("It's sunny in " + args.value("location", ""));
     });
 ```
 
@@ -269,14 +284,16 @@ To return results from a SWAIG function, build a `swaig::FunctionResult`. Every 
 
 ```cpp
 // Basic result with just text
-return swaig::FunctionResult("Here's the result");
+signalwire::swaig::FunctionResult r1("Here's the result");
 
 // Result with a single manual action
-return swaig::FunctionResult("Here's the result with an action")
+signalwire::swaig::FunctionResult r2 =
+    signalwire::swaig::FunctionResult("Here's the result with an action")
     .add_action("say", "I found the information you requested.");
 
 // Result with multiple manual actions
-return swaig::FunctionResult("Multiple actions example")
+signalwire::swaig::FunctionResult r3 =
+    signalwire::swaig::FunctionResult("Multiple actions example")
     .add_actions({
         {{"playback_bg", {{"file", "https://example.com/music.mp3"}}}},
         {{"set_global_data", {{"key", "value"}}}}
@@ -290,7 +307,7 @@ return swaig::FunctionResult("Multiple actions example")
 The agent can enable SignalWire's built-in (native) functions:
 
 ```cpp
-set_native_functions({"check_time", "wait_seconds"});
+agent.set_native_functions({"check_time", "wait_seconds"});
 ```
 
 ### Function Includes
@@ -298,7 +315,7 @@ set_native_functions({"check_time", "wait_seconds"});
 You can include functions from remote sources with `add_function_include(json)`:
 
 ```cpp
-add_function_include({
+agent.add_function_include({
     {"url", "https://api.example.com/functions"},
     {"functions", {"get_weather", "get_news"}},
     {"meta_data", {{"session_id", "unique-session-123"}}}  // session tracking, NOT credentials
@@ -310,11 +327,11 @@ add_function_include({
 SWAIG functions can be secured with a per-call token mechanism. Pass `secure = true` as the final argument to `define_tool(...)` for functions that should require a valid token:
 
 ```cpp
-define_tool("get_account_details", "Get customer account details",
-    swaig::ParameterSchema{}.string("account_id", "The customer's account ID").required({"account_id"}),
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+agent.define_tool("get_account_details", "Get customer account details",
+    signalwire::swaig::ParameterSchema{}.string("account_id", "The customer's account ID").required({"account_id"}),
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)raw;
-        return swaig::FunctionResult("Account " + args.value("account_id", "") + " is in good standing.");
+        return signalwire::swaig::FunctionResult("Account " + args.value("account_id", "") + " is in good standing.");
     },
     /*secure=*/true);
 ```
@@ -329,8 +346,9 @@ When a function is marked secure, a token is generated and embedded in the funct
 The token system is backed by an HMAC-SHA256 `security::SessionManager`. You can mint and validate tokens directly:
 
 ```cpp
-std::string token = create_tool_token("get_account_details", call_id);
-bool ok = validate_tool_token("get_account_details", token, call_id);
+std::string call_id = "call-uuid";
+std::string token = agent.create_tool_token("get_account_details", call_id);
+bool ok = agent.validate_tool_token("get_account_details", token, call_id);
 ```
 
 This stateless design lets tokens remain valid across server restarts and allows requests to be load-balanced across multiple servers without shared state.
@@ -340,7 +358,7 @@ This stateless design lets tokens remain valid across server restarts and allows
 The Skills System lets you extend agents with reusable capabilities via one-liner calls. Add a skill with `add_skill(name, params)`, where `params` is an optional JSON object:
 
 ```cpp
-class SkillfulAgent : public agent::AgentBase {
+class SkillfulAgent : public signalwire::agent::AgentBase {
 public:
     SkillfulAgent() : AgentBase("skillful-agent", "/skillful") {
         // Add skills with one-liners
@@ -362,24 +380,24 @@ public:
 For built-in skills you can use the `skills::SkillName` enum instead of a bare string. The enum gives editor autocompletion and catches typos at the call site; it loads the identical skill as the string form:
 
 ```cpp
-add_skill(skills::SkillName::Datetime);   // typed, autocompleted
-add_skill("datetime");                    // string still works
-add_skill("my_custom_skill");             // open set: custom skills are fine
+agent.add_skill(signalwire::skills::SkillName::Datetime);   // typed, autocompleted
+agent.add_skill("datetime");                                // string still works
+agent.add_skill("my_custom_skill");                         // open set: custom skills are fine
 ```
 
 ### Skill Management
 
 ```cpp
 // Check what skills are loaded
-std::vector<std::string> loaded = list_skills();
+std::vector<std::string> loaded = agent.list_skills();
 
 // Check if a specific skill is loaded
-if (has_skill("web_search")) {
+if (agent.has_skill("web_search")) {
     // Web search is available
 }
 
 // Remove a skill
-remove_skill("math");
+agent.remove_skill("math");
 ```
 
 ### Configuring Skills with Parameters
@@ -387,7 +405,7 @@ remove_skill("math");
 Skill parameters are passed as a JSON object. For example, the web-search skill accepts an API key, a search-engine ID, a result count, a delay, and a custom tool name:
 
 ```cpp
-add_skill("web_search", {
+agent.add_skill("web_search", {
     {"api_key", "your-google-api-key"},
     {"search_engine_id", "your-search-engine-id"},
     {"num_results", 3},
@@ -399,8 +417,8 @@ add_skill("web_search", {
 Choose parameters for your use case — a single fast result for customer service, or several results with a delay for research:
 
 ```cpp
-add_skill("web_search", {{"num_results", 1}, {"delay", 0}});    // for speed
-add_skill("web_search", {{"num_results", 5}, {"delay", 1.0}});  // for research
+agent.add_skill("web_search", {{"num_results", 1}, {"delay", 0}});    // for speed
+agent.add_skill("web_search", {{"num_results", 5}, {"delay", 1.0}});  // for research
 ```
 
 ## Multilingual Support
@@ -409,22 +427,22 @@ Agents can support multiple languages. `add_language(LanguageConfig)` takes a br
 
 ```cpp
 // Simple form: name, code, voice
-add_language({"English", "en-US", "inworld.Mark"});
-add_language({"Spanish", "es", "rime.spore:multilingual"});
+agent.add_language({"English", "en-US", "inworld.Mark"});
+agent.add_language({"Spanish", "es", "rime.spore:multilingual"});
 
 // With an explicit engine and per-language params
-add_language({"British English", "en-GB", "spore", "rime"});
+agent.add_language({"British English", "en-GB", "spore", "rime"});
 ```
 
 You can replace the whole list with `set_languages(...)`, and set engine-specific tuning on an already-added language with `set_language_params(code, params)`:
 
 ```cpp
-set_languages({
+agent.set_languages({
     {"English", "en-US", "inworld.Mark"},
     {"Spanish", "es", "inworld.Sarah"}
 });
 
-set_language_params("en-US", {{"speed", 1.1}});
+agent.set_language_params("en-US", {{"speed", 1.1}});
 ```
 
 ## Agent Configuration
@@ -435,13 +453,13 @@ Hints help the AI recognize specific terms:
 
 ```cpp
 // Simple hints
-add_hints({"SignalWire", "SWML", "SWAIG"});
+agent.add_hints({"SignalWire", "SWML", "SWAIG"});
 
 // A single hint
-add_hint("DataSphere");
+agent.add_hint("DataSphere");
 
-// A pattern hint (regular expression)
-add_pattern_hint("AI\\s+Agent");
+// A pattern hint: (hint, pattern, replace, ignore_case=false)
+agent.add_pattern_hint("AI Agent", "AI\\s+Agent", "AI Agent", true);
 ```
 
 ### Adding Pronunciation Rules
@@ -449,8 +467,8 @@ add_pattern_hint("AI\\s+Agent");
 Pronunciation rules help the AI speak certain terms correctly. `add_pronunciation(replace, with, ignore_case)`:
 
 ```cpp
-add_pronunciation("API", "A P I", false);
-add_pronunciation("SIP", "sip", true);
+agent.add_pronunciation("API", "A P I", false);
+agent.add_pronunciation("SIP", "sip", true);
 ```
 
 ### Setting AI Parameters
@@ -458,7 +476,7 @@ add_pronunciation("SIP", "sip", true);
 Configure AI behavior parameters with `set_params(json)` (or `set_param(key, value)` for one at a time):
 
 ```cpp
-set_params({
+agent.set_params({
     {"wait_for_user", false},
     {"end_of_speech_timeout", 1000},
     {"ai_volume", 5},
@@ -472,13 +490,13 @@ set_params({
 Provide global data for the AI to reference. `set_global_data(json)` replaces the data; `update_global_data(json)` merges into it:
 
 ```cpp
-set_global_data({
+agent.set_global_data({
     {"company_name", "SignalWire"},
     {"product", "AI Agent SDK"},
     {"supported_features", {"Voice AI", "Telephone integration", "SWAIG functions"}}
 });
 
-update_global_data({{"service_level", "premium"}});
+agent.update_global_data({{"service_level", "premium"}});
 ```
 
 ### Customizing LLM Parameters
@@ -487,7 +505,7 @@ update_global_data({{"service_level", "premium"}});
 
 ```cpp
 // Main prompt
-set_prompt_llm_params({
+agent.set_prompt_llm_params({
     {"temperature", 0.7},        // Controls randomness
     {"top_p", 0.9},              // Nucleus sampling threshold
     {"barge_confidence", 0.6},   // ASR confidence to interrupt
@@ -496,7 +514,7 @@ set_prompt_llm_params({
 });
 
 // Post-prompt (lower temperature for consistent summaries)
-set_post_prompt_llm_params({
+agent.set_post_prompt_llm_params({
     {"temperature", 0.3},
     {"top_p", 0.95}
 });
@@ -514,9 +532,9 @@ set_post_prompt_llm_params({
 Internal fillers are short phrases the AI speaks while a native function is running, so the caller does not hear dead air. Set them per native function and language with `add_internal_filler(function_name, language_code, phrases)` or in bulk with `set_internal_fillers(json)`:
 
 ```cpp
-add_internal_filler("check_time", "en-US", {"Let me check the time...", "One moment..."});
+agent.add_internal_filler("check_time", "en-US", {"Let me check the time...", "One moment..."});
 
-set_internal_fillers({
+agent.set_internal_fillers({
     {"wait_seconds", {{"en-US", {"Hold on a second..."}}}}
 });
 ```
@@ -533,6 +551,7 @@ With **static** configuration, everything is set once in the constructor and is 
 
 With **dynamic** configuration, you register a callback that runs fresh for each request and configures a per-request copy of the agent. Register it with `set_dynamic_config_callback(cb)`, where `cb` is an `agent::DynamicConfigCallback`:
 
+<!-- snippet: no-compile type-alias reference illustration for signalwire::agent::DynamicConfigCallback -->
 ```cpp
 using agent::DynamicConfigCallback = std::function<void(
     const std::map<std::string, std::string>& query_params,
@@ -544,14 +563,14 @@ using agent::DynamicConfigCallback = std::function<void(
 ### Setting Up Dynamic Configuration
 
 ```cpp
-class DynamicAgent : public agent::AgentBase {
+class DynamicAgent : public signalwire::agent::AgentBase {
 public:
     DynamicAgent() : AgentBase("dynamic-agent", "/agent") {
         set_dynamic_config_callback(
             [](const std::map<std::string, std::string>& query_params,
                const json& body_params,
                const std::map<std::string, std::string>& headers,
-               agent::AgentBase& agent) {
+               signalwire::agent::AgentBase& agent) {
                 (void)body_params; (void)headers;
 
                 // Look up a query parameter with a safe default
@@ -589,6 +608,9 @@ Inside the callback you can call any of the same configuration methods you would
 Because `query_params` and `headers` are `std::map`, read them with `find` and provide defaults:
 
 ```cpp
+std::map<std::string, std::string> query_params;
+json body_params;
+
 std::string tier = "standard";
 if (auto it = query_params.find("tier"); it != query_params.end()) {
     tier = it->second;
@@ -612,9 +634,13 @@ std::string voice_speed = body_params.value("/preferences/voice_speed"_json_poin
 The debug events system POSTs structured JSON events to your agent throughout the call lifecycle — session start/end, barge interruptions, LLM errors, step changes, and more. Enable it with `enable_debug_events()`:
 
 ```cpp
-agent::AgentBase agent("my_agent");
-agent.enable_debug_events();  // events are auto-logged
-agent.serve();
+#include <signalwire/agent/agent_base.hpp>
+
+int main() {
+    signalwire::agent::AgentBase agent("my_agent");
+    agent.enable_debug_events();  // events are auto-logged
+    agent.serve();
+}
 ```
 
 To act on specific events, register a handler with `on_debug_event(cb)`, where `cb` is a `agent::DebugEventCallback` (`std::function<void(const json& event)>`):
@@ -648,22 +674,22 @@ SignalWire calls two specially-named SWAIG functions automatically at the start 
 Implement them as ordinary tools whose names are exactly `startup_hook` and `hangup_hook`:
 
 ```cpp
-define_tool("startup_hook", "Called when the voice session starts",
+agent.define_tool("startup_hook", "Called when the voice session starts",
     {{"type", "object"}, {"properties", json::object()}},
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)args;
         std::string call_id = raw.value("call_id", "");
         std::cout << "Session started: " << call_id << "\n";
-        return swaig::FunctionResult("Session initialized successfully");
+        return signalwire::swaig::FunctionResult("Session initialized successfully");
     });
 
-define_tool("hangup_hook", "Called when the voice session ends",
+agent.define_tool("hangup_hook", "Called when the voice session ends",
     {{"type", "object"}, {"properties", json::object()}},
-    [](const json& args, const json& raw) -> swaig::FunctionResult {
+    [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
         (void)args;
         std::string call_id = raw.value("call_id", "");
         std::cout << "Session ended: " << call_id << "\n";
-        return swaig::FunctionResult("Session cleanup completed");
+        return signalwire::swaig::FunctionResult("Session cleanup completed");
     });
 ```
 
@@ -674,7 +700,7 @@ Both hooks must return a `swaig::FunctionResult`. `startup_hook` is called befor
 For workflows that move through distinct phases, use the contexts API. `define_contexts()` returns a `contexts::ContextBuilder`; add a context, then add ordered steps to it. Each step carries its own task prompt, completion criteria, and (optionally) a whitelist of which functions are callable while it is active:
 
 ```cpp
-auto& ctx = define_contexts().add_context("default");
+auto& ctx = agent.define_contexts().add_context("default");
 
 ctx.add_step("greeting")
    .add_section("Task", "Greet the caller and ask how you can help.")
@@ -697,12 +723,12 @@ Enable SIP routing so the agent can receive voice calls via SIP addresses:
 
 ```cpp
 // Enable SIP routing and auto-map usernames from the agent name/route
-enable_sip_routing(true);
-auto_map_sip_usernames(true);
+agent.enable_sip_routing(true);
+agent.auto_map_sip_usernames(true);
 
 // Register additional SIP usernames for this agent
-register_sip_username("support_agent");
-register_sip_username("help_desk");
+agent.register_sip_username("support_agent");
+agent.register_sip_username("help_desk");
 ```
 
 ### Authentication and Webhook Signing
@@ -710,12 +736,12 @@ register_sip_username("help_desk");
 Protect the agent's endpoints with HTTP basic auth, and validate inbound webhook signatures with a signing key:
 
 ```cpp
-set_auth("admin", "secret");
+agent.set_auth("admin", "secret");
 
 // Set the SignalWire Signing Key (Dashboard → API Credentials).
 // When set, the server validates the signature on POST `/`, `/swaig`,
 // and `/post_prompt`; unsigned or wrongly-signed requests get a 403.
-set_signing_key("your-signing-key");
+agent.set_signing_key("your-signing-key");
 ```
 
 If no signing key is set explicitly, the agent falls back to the `SIGNALWIRE_SIGNING_KEY` environment variable.
@@ -726,10 +752,10 @@ Override the default URLs for SWAIG function delivery and post-prompt delivery:
 
 ```cpp
 // Send function calls to an external service instead of handling them locally
-set_webhook_url("https://external-service.example.com/handle-swaig");
+agent.set_webhook_url("https://external-service.example.com/handle-swaig");
 
 // Send conversation summaries to an analytics service
-set_post_prompt_url("https://analytics.example.com/conversation-summaries");
+agent.set_post_prompt_url("https://analytics.example.com/conversation-summaries");
 ```
 
 You can also append extra query parameters to every SWAIG URL with `add_swaig_query_param(key, value)` (and clear them with `clear_swaig_query_params()`).
@@ -753,8 +779,8 @@ agent.on_summary([](const json& summary, const json& raw_data) {
 The agent can connect to Model Context Protocol (MCP) servers. Register a server with `add_mcp_server(url, ...)` and enable the integration with `enable_mcp_server()`:
 
 ```cpp
-add_mcp_server("https://mcp.example.com");
-enable_mcp_server(true);
+agent.add_mcp_server("https://mcp.example.com");
+agent.enable_mcp_server(true);
 ```
 
 ## Prefab Agents
@@ -772,14 +798,14 @@ using namespace signalwire;
 Collects structured information from users:
 
 ```cpp
-prefabs::InfoGathererAgent agent("info-gatherer", "/info-gatherer");
-agent.set_questions({
+signalwire::prefabs::InfoGathererAgent gatherer("info-gatherer", "/info-gatherer");
+gatherer.set_questions({
     {{"name", "full_name"}, {"prompt", "What is your full name?"}},
     {{"name", "email"}, {"prompt", "What is your email address?"}},
     {{"name", "reason"}, {"prompt", "How can I help you today?"}}
 });
-agent.set_completion_message("Thanks! I'll help you with your request.");
-agent.run();
+gatherer.set_completion_message("Thanks! I'll help you with your request.");
+gatherer.run();
 ```
 
 #### SurveyAgent
@@ -787,13 +813,13 @@ agent.run();
 Conducts structured surveys with different question types:
 
 ```cpp
-prefabs::SurveyAgent agent("satisfaction-survey", "/survey");
-agent.set_intro_message("We'd like to know about your recent experience.");
-agent.set_questions({
+signalwire::prefabs::SurveyAgent survey("satisfaction-survey", "/survey");
+survey.set_intro_message("We'd like to know about your recent experience.");
+survey.set_questions({
     {{"id", "satisfaction"}, {"text", "How satisfied are you?"}, {"type", "rating"}, {"scale", 5}},
     {{"id", "feedback"}, {"text", "Any specific feedback?"}, {"type", "text"}}
 });
-agent.run();
+survey.run();
 ```
 
 #### ReceptionistAgent
@@ -801,13 +827,13 @@ agent.run();
 Handles call routing and department transfers:
 
 ```cpp
-prefabs::ReceptionistAgent agent("acme-receptionist", "/reception");
-agent.set_greeting("Thank you for calling ACME Corp. How may I direct your call?");
-agent.set_departments({
+signalwire::prefabs::ReceptionistAgent reception("acme-receptionist", "/reception");
+reception.set_greeting("Thank you for calling ACME Corp. How may I direct your call?");
+reception.set_departments({
     {{"name", "sales"}, {"description", "Product inquiries and pricing"}, {"number", "+15551235555"}},
     {{"name", "support"}, {"description", "Technical assistance"}, {"number", "+15551236666"}}
 });
-agent.run();
+reception.run();
 ```
 
 #### FAQBotAgent
@@ -815,12 +841,12 @@ agent.run();
 Answers questions using keyword-matched FAQ entries:
 
 ```cpp
-prefabs::FAQBotAgent agent("knowledge-base", "/knowledge-base");
-agent.set_faqs({
+signalwire::prefabs::FAQBotAgent faqbot("knowledge-base", "/knowledge-base");
+faqbot.set_faqs({
     {{"question", "What are your hours?"}, {"answer", "We are open 9am-5pm ET."}}
 });
-agent.set_no_match_message("I'm not sure about that one — let me connect you to a person.");
-agent.run();
+faqbot.set_no_match_message("I'm not sure about that one — let me connect you to a person.");
+faqbot.run();
 ```
 
 #### ConciergeAgent
@@ -828,12 +854,12 @@ agent.run();
 Provides venue and amenity information:
 
 ```cpp
-prefabs::ConciergeAgent agent("concierge", "/concierge");
-agent.set_venue_name("Grand Hotel");
-agent.set_amenities({
+signalwire::prefabs::ConciergeAgent concierge("concierge", "/concierge");
+concierge.set_venue_name("Grand Hotel");
+concierge.set_amenities({
     {{"name", "Pool"}, {"description", "Open 6am-10pm on the roof deck."}}
 });
-agent.run();
+concierge.run();
 ```
 
 ### Creating Your Own Prefabs
@@ -841,7 +867,7 @@ agent.run();
 You can create your own prefab by subclassing `AgentBase` (or any existing prefab) and applying configuration in the constructor:
 
 ```cpp
-class CustomerSupportAgent : public agent::AgentBase {
+class CustomerSupportAgent : public signalwire::agent::AgentBase {
 public:
     explicit CustomerSupportAgent(const std::string& product_name)
         : AgentBase("voice-support", "/voice-support") {
@@ -853,13 +879,13 @@ public:
         });
 
         define_tool("escalate_issue", "Escalate a customer issue to a human agent",
-            swaig::ParameterSchema{}
+            signalwire::swaig::ParameterSchema{}
                 .string("issue_summary", "Brief summary of the issue")
                 .string("customer_email", "Customer's email address")
                 .required({"issue_summary"}),
-            [](const json& args, const json& raw) -> swaig::FunctionResult {
+            [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
                 (void)args; (void)raw;
-                return swaig::FunctionResult("Issue escalated successfully.");
+                return signalwire::swaig::FunctionResult("Issue escalated successfully.");
             });
     }
 };
@@ -871,20 +897,27 @@ To host several agents in one process, use `server::AgentServer`. Register each 
 
 ```cpp
 #include <signalwire/server/agent_server.hpp>
+#include <signalwire/agent/agent_base.hpp>
+#include <memory>
 
 using namespace signalwire;
 
-server::AgentServer srv("0.0.0.0", 3000);
+int main() {
+    auto registration_agent = std::make_shared<agent::AgentBase>("registration", "/register");
+    auto support_agent = std::make_shared<agent::AgentBase>("support", "/support");
 
-srv.register_agent(registration_agent, "/register");
-srv.register_agent(support_agent, "/support");
+    server::AgentServer srv("0.0.0.0", 3000);
 
-// Central SIP routing across all hosted agents
-srv.enable_sip_routing();
-srv.map_sip_username("signup", "/register");  // signup@domain → registration agent
-srv.map_sip_username("help", "/support");     // help@domain → support agent
+    srv.register_agent(registration_agent, "/register");
+    srv.register_agent(support_agent, "/support");
 
-srv.run();
+    // Central SIP routing across all hosted agents
+    srv.enable_sip_routing();
+    srv.map_sip_username("signup", "/register");  // signup@domain → registration agent
+    srv.map_sip_username("help", "/support");     // help@domain → support agent
+
+    srv.run();
+}
 ```
 
 `AgentServer` also exposes `list_routes()`, `unregister_agent(...)`, `set_static_dir(...)`, and `stop()`.
@@ -893,6 +926,7 @@ srv.run();
 
 ### Constructor
 
+<!-- snippet: no-compile constructor-signature reference (declaration illustration) -->
 ```cpp
 AgentBase(const std::string& name = "agent",
           const std::string& route = "/",
@@ -1003,7 +1037,7 @@ int main() {
 ### Multi-Language Customer Service Agent
 
 ```cpp
-class CustomerServiceAgent : public agent::AgentBase {
+class CustomerServiceAgent : public signalwire::agent::AgentBase {
 public:
     CustomerServiceAgent() : AgentBase("customer-service", "/support") {
         prompt_add_section("Personality",
@@ -1029,24 +1063,24 @@ public:
         });
 
         define_tool("check_account_status", "Check the status of a customer's account",
-            swaig::ParameterSchema{}
+            signalwire::swaig::ParameterSchema{}
                 .string("account_id", "The customer's account ID")
                 .required({"account_id"}),
-            [](const json& args, const json& raw) -> swaig::FunctionResult {
+            [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
                 (void)raw;
                 std::string id = args.value("account_id", "");
-                return swaig::FunctionResult("Account " + id + " is in good standing.");
+                return signalwire::swaig::FunctionResult("Account " + id + " is in good standing.");
             });
 
         define_tool("create_support_ticket", "Create a support ticket for an unresolved issue",
-            swaig::ParameterSchema{}
+            signalwire::swaig::ParameterSchema{}
                 .string("issue", "Brief description of the issue")
                 .enum_of("priority", {"low", "medium", "high", "critical"}, "Ticket priority")
                 .required({"issue"}),
-            [](const json& args, const json& raw) -> swaig::FunctionResult {
+            [](const json& args, const json& raw) -> signalwire::swaig::FunctionResult {
                 (void)raw;
                 std::string priority = args.value("priority", "medium");
-                return swaig::FunctionResult(
+                return signalwire::swaig::FunctionResult(
                     "Support ticket created with " + priority + " priority. "
                     "A representative will contact you shortly.");
             });

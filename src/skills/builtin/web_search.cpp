@@ -49,7 +49,7 @@ class WebSearchSkill : public SkillBase {
     // rules. Mirrors response_format_callback in native_vector_search.
     response_prefix_ = get_param<std::string>(params, "response_prefix", "");
     response_postfix_ = get_param<std::string>(params, "response_postfix", "");
-    // Latency-control params (Python parity: 51101da + 295745b). Shared
+    // Latency-control params (Corresponds to 51101da + 295745b). Shared
     // implementation in web_search_core.hpp; identical to WebSearchSkillR
     // in skill_registry.cpp (the registered class). overall_deadline +
     // per_page_timeout are the contract; parallel_scrape is best-effort.
@@ -147,7 +147,7 @@ class WebSearchSkill : public SkillBase {
   }
 
   json get_parameter_schema() const override {
-    // Advertise the 6 latency / response params (Python parity: 295745b).
+    // Advertise the 6 latency / response params (Corresponds to 295745b).
     return web_search_core::schema_fragment();
   }
 

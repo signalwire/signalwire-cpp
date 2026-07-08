@@ -59,6 +59,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake g++ libssl-dev
 
+      # clang-tidy result cache (vendored ctcache, scripts/clang_tidy_cache.py).
+      # The LINT gate — clang-tidy over 65 TUs — is cpp's CI wall-clock driver
+      # (~824s serial, ~252s after the xargs fan-out). ccache does NOT help it
+      # (that's compilation; this is static analysis), which is why the old ccache
+      # cache-persistence here was dead weight — removed. Instead persist ctcache's
+      # per-TU result cache: an UNCHANGED TU (source, its headers, checks, config
+      # all identical) returns the cached result without running clang-tidy.
+      # Stable key + run_id suffix so each run restores the most recent cache and
+      # saves an updated one; source-hashing the key would defeat the point (we
+      # WANT it to persist across source changes and only miss on the changed TUs).
+      # Split restore/save (not actions/cache) so the cache SAVES even when the
+      # gate job fails: the combined action's post-save is SKIPPED on a failed
+      # prior step, and every cpp run is currently red on the pre-existing
+      # spec-coupling — so a combined cache would never populate. The separate
+      # save step below runs with if: always().
+      - name: Restore clang-tidy cache (ctcache)
+        id: ctcache_restore
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ctcache
+          key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ctcache-cpp-${{ runner.os }}-
+
       # The FMT (clang-format) + LINT (clang-tidy) gates need the gate tools
       # PINNED to the EXACT patch the rollout was burned to zero against (18.1.8).
       # clang-format formatting differs at PATCH level (ubuntu's 18.1.3 rejects
@@ -124,4 +148,22 @@ jobs:
         working-directory: signalwire-cpp
         env:
           PORTING_SDK: ${{ github.workspace }}/porting-sdk
-        run: bash scripts/run-ci.sh
+        run: |
+          # Enables the vendored clang-tidy result cache in the LINT gate
+          # (run-lint.sh routes clang-tidy through scripts/clang_tidy_cache.py when
+          # CTCACHE_DIR is set + the wrapper exists). Persisted across runs by the
+          # cache step above; unset => plain clang-tidy (no behavior change). Set
+          # here (not in env:) so $HOME expands to an ABSOLUTE path — ctcache does
+          # NOT expanduser CTCACHE_DIR, so a literal "~" would create a bogus dir.
+          export CTCACHE_DIR="$HOME/.cache/ctcache"
+          bash scripts/run-ci.sh
+
+      # Save the ctcache store even if the gate failed (the LINT gate still ran +
+      # populated it). Unique run_id key so every run persists an updated cache;
+      # the next run's restore-keys prefix picks up the most recent.
+      - name: Save clang-tidy cache (ctcache)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ctcache
+          key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}

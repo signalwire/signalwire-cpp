@@ -10,10 +10,11 @@ Format: `<endpoint_id>: sdk-gap — <rationale>`. If a method is later added, th
 route becomes coverable and the checker fails on the now-stale entry until it's
 removed.
 
-These 18 gaps match the python/go/java/typescript/ruby accepted gaps exactly.
-C++ reaches 286/307 with these allowlisted (it carries the chat/pubsub
-create_token + verified_callers verification SDK methods, so those routes ARE
-covered).
+These gaps match the python/go/java/typescript/ruby accepted gaps exactly (the
+compatibility/LAML surface was removed from the reference — commit a9ed611 — so
+its former `compatibility.*` gap no longer exists as a canonical route). C++
+carries the chat/pubsub create_token + verified_callers verification SDK
+methods, so those routes ARE covered.
 
 ## fabric — dialogflow_agents resource not wired
 
@@ -40,7 +41,3 @@ relay-rest.delete_domain_application: sdk-gap — see above.
 
 video.list_logs: sdk-gap — VideoNamespace exposes no logs accessor for GET /api/video/logs (same as python).
 video.get_log: sdk-gap — no video logs accessor (see above).
-
-## compatibility — bare per-country available-numbers node
-
-compatibility.list_available_phone_number_resources_by_country: sdk-gap — CompatPhoneNumbers exposes list_available_countries + search_local (/{IsoCountry}/Local) + search_toll_free (/{IsoCountry}/TollFree), but no method hits the bare /AvailablePhoneNumbers/{IsoCountry} node (same as python).

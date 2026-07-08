@@ -195,32 +195,6 @@ json HttpClient::del(const std::string& path) const {
 }
 
 // ============================================================================
-// CrudResource
-// ============================================================================
-
-CrudResource::CrudResource(const HttpClient& client, const std::string& base_path)
-    : client_(client), base_path_(base_path) {}
-
-json CrudResource::list(const std::map<std::string, std::string>& params) const {
-  return client_.get(base_path_, params);
-}
-
-json CrudResource::create(const json& data) const { return client_.post(base_path_, data); }
-
-json CrudResource::get(const std::string& id) const { return client_.get(base_path_ + "/" + id); }
-
-json CrudResource::update(const std::string& id, const json& data) const {
-  // Python parity: CrudResource._update_method defaults to "PATCH". Resources
-  // whose canonical update verb is PUT/POST (phone_numbers, verified_callers,
-  // video rooms/conferences/streams, queues, number_groups, short_codes,
-  // registry campaigns, sip_profile, the FabricResourcePUT family, the compat
-  // POST-update resources) override this; the inherited default is PATCH.
-  return client_.patch(base_path_ + "/" + id, data);
-}
-
-json CrudResource::del(const std::string& id) const { return client_.del(base_path_ + "/" + id); }
-
-// ============================================================================
 // PaginatedIterator
 //
 // Mirrors signalwire-python's signalwire.rest._pagination.PaginatedIterator.

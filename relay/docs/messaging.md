@@ -2,10 +2,21 @@
 
 Send and receive SMS/MMS messages through the RELAY client.
 
+<!-- snippet-setup -->
+```cpp
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/message.hpp>
+#include <nlohmann/json.hpp>
+#include <iostream>
+using json = nlohmann::json;
+signalwire::relay::RelayClient client("project-id", "api-token", "example.signalwire.com", {"default"});
+```
+
 ## Sending Messages
 
 Use `client.send_message()` to send an outbound SMS or MMS. The signature is:
 
+<!-- snippet: no-compile method-signature reference (declaration illustration) -->
 ```cpp
 Message send_message(const std::string& from, const std::string& to, const std::string& body,
                      const std::vector<std::string>& media = {},
@@ -47,7 +58,7 @@ terminal state (`CompletedCallback = std::function<void(const Message&)>`):
 
 ```cpp
 auto message = client.send_message("+15551111111", "+15552222222", "Hello!");
-message.on_completed([](const Message& m) {
+message.on_completed([](const signalwire::relay::Message& m) {
     std::cout << "Delivery: " << m.state() << "\n";
 });
 ```
@@ -80,6 +91,7 @@ Register a handler with `client.on_message()` to receive inbound SMS/MMS.
 
 ```cpp
 #include <signalwire/relay/client.hpp>
+#include <iostream>
 
 using namespace signalwire::relay;
 
@@ -143,18 +155,27 @@ Inbound messages arrive with state `received`.
 The same `RelayClient` handles both calls and messages:
 
 ```cpp
-auto client = RelayClient::from_env();
+#include <signalwire/relay/client.hpp>
+#include <signalwire/relay/call.hpp>
+#include <signalwire/relay/message.hpp>
+#include <iostream>
 
-client.on_call([](Call& call) {
-    call.answer();
-    auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello!"}}}}});
-    action.wait();
-    call.hangup();
-});
+using namespace signalwire::relay;
 
-client.on_message([](const Message& message) {
-    std::cout << "SMS from " << message.from << ": " << message.body << "\n";
-});
+int main() {
+    auto client = RelayClient::from_env();
 
-client.run();
+    client.on_call([](Call& call) {
+        call.answer();
+        auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello!"}}}}});
+        action.wait();
+        call.hangup();
+    });
+
+    client.on_message([](const Message& message) {
+        std::cout << "SMS from " << message.from << ": " << message.body << "\n";
+    });
+
+    client.run();
+}
 ```

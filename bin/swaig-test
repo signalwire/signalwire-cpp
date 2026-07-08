@@ -47,6 +47,13 @@ OPTIONS:
     --build-dir <path>        Where to look for example binaries (default: build)
     --raw                     Print raw JSON (no formatting) for --example
     --verbose                 Show HTTP response headers / extra diagnostics
+    --parse-only              Validate the CLI arguments and exit WITHOUT
+                              loading/introspecting any agent or binary and
+                              WITHOUT making a network call. Prints exactly
+                              'parse OK' and exits 0 on valid args; exits 2 on
+                              invalid args. Position-independent (honored even
+                              when it trails --exec). Alias: --dry-run.
+    --dry-run                 Alias for --parse-only.
     --help                    Show this help
 
 EXAMPLES:
@@ -63,7 +70,10 @@ EOF
     exit 0
 }
 
-die() { echo "ERROR: $1" >&2; exit 1; }
+# In --parse-only mode a bad-argument error must exit 2 (matching the python
+# reference / argparse usage-error code) and must NOT print "parse OK"; in
+# normal mode the historical exit code (1) is preserved.
+die() { echo "ERROR: $1" >&2; [ "${PARSE_ONLY:-0}" -eq 1 ] && exit 2; exit 1; }
 
 # Check for curl (only required for URL mode)
 command -v python3 >/dev/null 2>&1 && HAS_PYTHON=1 || HAS_PYTHON=0
@@ -84,7 +94,23 @@ EXAMPLE_NAME=""
 BUILD_DIR="build"
 VERBOSE=0
 RAW=0
+PARSE_ONLY=0
 declare -a PARAMS=()
+
+# --parse-only / --dry-run is position-independent: it may appear ANYWHERE in
+# the arg list, including trailing an `--exec <tool>` (which would otherwise
+# consume the next token as the tool name). Detect + strip it up front — like
+# the python reference removes it from argv before the exec parser runs — so
+# the remaining args are validated normally and then we short-circuit with
+# "parse OK" WITHOUT loading/introspecting any agent or touching the network.
+declare -a REST_ARGS=()
+for arg in "$@"; do
+    case "$arg" in
+        --parse-only|--dry-run) PARSE_ONLY=1 ;;
+        *) REST_ARGS+=("$arg") ;;
+    esac
+done
+set -- "${REST_ARGS[@]+"${REST_ARGS[@]}"}"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -108,6 +134,23 @@ while [ $# -gt 0 ]; do
             ;;
     esac
 done
+
+# --parse-only / --dry-run short-circuit: the arg loop above already validated
+# that every flag is known and every option that requires a value got one (bad
+# args exited 2 via die()). The remaining well-formedness rule mirrors the
+# other modes: an invocation must name EITHER an action (--exec/--list-tools/
+# --dump-swml on a URL) or --example <name>. We do NOT load the agent, spawn the
+# example binary, or make any HTTP call — just report the args parse and exit.
+if [ "$PARSE_ONLY" -eq 1 ]; then
+    if [ "$MODE" = "introspect" ]; then
+        [ -n "$EXAMPLE_NAME" ] || die "--example requires a name"
+    else
+        [ -n "$AGENT_URL" ] || die "Agent URL is required (or use --example <name>)."
+        [ -n "$MODE" ] || die "Specify an action: --list-tools, --exec <tool>, --dump-swml, or --example <name>"
+    fi
+    echo "parse OK"
+    exit 0
+fi
 
 # --example mode: introspect a built example binary
 if [ "$MODE" = "introspect" ]; then

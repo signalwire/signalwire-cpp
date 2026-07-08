@@ -7,12 +7,14 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <ctime>
 #include <regex>
 #include <sstream>
 
 #include "signalwire/common.hpp"
 #include "signalwire/datamap/datamap.hpp"
+#include "signalwire/skills/claude_skills_core.hpp"
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skills_http.hpp"
 #include "signalwire/skills/web_search_core.hpp"
@@ -268,7 +270,7 @@ class WebSearchSkillR : public SkillBase {
   // Per Python 8aad242 — optional prefix/postfix wrapped around the
   // success response only (transport/HTTP/parse errors stay raw).
   std::string rp_, rpf_;
-  // Latency-control params (Python parity: 51101da + 295745b). Shared
+  // Latency-control params (Corresponds to 51101da + 295745b). Shared
   // implementation lives in web_search_core.hpp so this skill and the
   // builtin WebSearchSkill can never drift. overall_deadline +
   // per_page_timeout are the contract; parallel_scrape is best-effort.
@@ -351,8 +353,8 @@ class WebSearchSkillR : public SkillBase {
           // run() handles snippets_only / deadline-bounded scraping /
           // snippet fallback. Returns UNWRAPPED body.
           std::string response = web_search_core::run(q, cands, lp, nr, mcl, no_items);
-          // Wrap the success / snippet / scraped response (parity with
-          // Python 8aad242). The no-items message stays unwrapped.
+          // Wrap the success / snippet / scraped response; the no-items
+          // message stays unwrapped.
           if (response != no_items) {
             if (!rp.empty()) {
               response = rp + "\n\n" + response;
@@ -369,7 +371,7 @@ class WebSearchSkillR : public SkillBase {
   }
   json get_global_data() const override { return json::object({{"web_search_enabled", true}}); }
   json get_parameter_schema() const override {
-    // Advertise the 6 latency / response params (Python parity: 295745b).
+    // Advertise the 6 latency / response params (Corresponds to 295745b).
     return web_search_core::schema_fragment();
   }
 };
@@ -847,7 +849,7 @@ class ApiNinjasTriviaSkillR : public SkillBase {
 };
 
 class NativeVectorSearchSkillR : public SkillBase {
-  std::string tn_ = "search_knowledge", ru_;
+  std::string tn_ = "search_knowledge", ru_, index_name_;
 
  public:
   std::string skill_name() const override { return "native_vector_search"; }
@@ -857,6 +859,11 @@ class NativeVectorSearchSkillR : public SkillBase {
     params_ = p;
     tn_ = get_param<std::string>(p, "tool_name", "search_knowledge");
     ru_ = get_param<std::string>(p, "remote_url", "");
+    index_name_ = get_param<std::string>(p, "index_name", "");
+    // Strip a single trailing slash so ru_ + "/search" is well-formed.
+    if (!ru_.empty() && ru_.back() == '/') {
+      ru_.pop_back();
+    }
     return !ru_.empty() || p.contains("index_file");
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
@@ -865,11 +872,80 @@ class NativeVectorSearchSkillR : public SkillBase {
         json::object(
             {{"type", "object"},
              {"properties", json::object({{"query", json::object({{"type", "string"}})}})}}),
-        [](const json& a, const json&) -> swaig::FunctionResult {
-          return swaig::FunctionResult("Search: " + a.value("query", ""));
+        [this](const json& a, const json&) -> swaig::FunctionResult {
+          std::string query = a.value("query", "");
+          if (query.empty()) {
+            return swaig::FunctionResult("Please provide a search query.");
+          }
+          if (!ru_.empty()) {
+            return search_remote(query, a.value("count", 3));
+          }
+          return swaig::FunctionResult(
+              "Vector search for '" + query +
+              "': local index mode is not supported in this build; configure a "
+              "remote_url for network search.");
         })};
   }
   std::vector<std::string> get_hints() const override { return {"search", "find"}; }
+
+ private:
+  // Network mode (Python _search_remote): POST {query,index_name,count,...} to
+  // <remote_url>/search and format the returned results into the tool result.
+  swaig::FunctionResult search_remote(const std::string& query, int count) const {
+    json request = json::object({
+        {"query", query},
+        {"index_name", index_name_},
+        {"count", count},
+        {"similarity_threshold", get_param<double>(params_, "similarity_threshold", 0.0)},
+        {"tags", params_.contains("tags") ? params_["tags"] : json::array()},
+    });
+
+    SkillHttpResponse resp = http_post(ru_ + "/search", request.dump(), "application/json", {}, 30);
+
+    if (resp.status == 0) {
+      return swaig::FunctionResult("Remote search error: " + resp.error);
+    }
+    if (resp.status != 200) {
+      return swaig::FunctionResult("Remote search failed with status " +
+                                   std::to_string(resp.status));
+    }
+
+    json data;
+    try {
+      data = json::parse(resp.body);
+    } catch (const std::exception& e) {
+      return swaig::FunctionResult(std::string("Remote search response parse error: ") + e.what());
+    }
+
+    const json results =
+        data.contains("results") && data["results"].is_array() ? data["results"] : json::array();
+    if (results.empty()) {
+      return swaig::FunctionResult("No search results found for '" + query + "'.");
+    }
+
+    std::string response =
+        "Found " + std::to_string(results.size()) + " relevant results for '" + query + "':\n";
+    int i = 1;
+    for (const auto& result : results) {
+      std::string content = result.value("content", "");
+      double score = result.value("score", 0.0);
+      std::string filename;
+      if (result.contains("metadata") && result["metadata"].is_object()) {
+        filename = result["metadata"].value("filename", "");
+      }
+      char score_buf[16];
+      std::snprintf(score_buf, sizeof(score_buf), "%.2f", score);
+      response += "\n**Result " + std::to_string(i) + "**";
+      if (!filename.empty()) {
+        response += " (from " + filename + ", relevance: " + score_buf + ")";
+      } else {
+        response += " (relevance: " + std::string(score_buf) + ")";
+      }
+      response += "\n" + content + "\n";
+      ++i;
+    }
+    return swaig::FunctionResult(response);
+  }
 };
 
 class InfoGathererSkillR : public SkillBase {
@@ -908,8 +984,15 @@ class InfoGathererSkillR : public SkillBase {
   }
 };
 
+// Real SKILL.md discovery — the registered claude_skills implementation.
+// Discovers subdirectories of skills_path containing a SKILL.md, parses the
+// frontmatter, and declares one SWAIG tool per skill. Logic lives in
+// claude_skills_core.hpp, shared with builtin/claude_skills.cpp so the two can
+// never drift. Native execution of skill code is impossible (AOT) — discover +
+// declare only.
 class ClaudeSkillsSkillR : public SkillBase {
   std::string sp_, tp_ = "claude_";
+  std::vector<claude_core::DiscoveredSkill> discovered_;
 
  public:
   std::string skill_name() const override { return "claude_skills"; }
@@ -918,17 +1001,23 @@ class ClaudeSkillsSkillR : public SkillBase {
   bool setup(const json& p) override {
     params_ = p;
     sp_ = get_param<std::string>(p, "skills_path", "");
-    return !sp_.empty();
+    tp_ = get_param<std::string>(p, "tool_prefix", "claude_");
+    if (sp_.empty()) {
+      return false;
+    }
+    discovered_ = claude_core::discover_skills(sp_);
+    return true;
   }
   std::vector<swaig::ToolDefinition> register_tools() override {
-    return {define_tool(
-        tp_ + "skill", "Claude skill",
-        json::object(
-            {{"type", "object"},
-             {"properties", json::object({{"arguments", json::object({{"type", "string"}})}})}}),
-        [](const json& a, const json&) -> swaig::FunctionResult {
-          return swaig::FunctionResult("Claude: " + a.value("arguments", ""));
-        })};
+    std::vector<swaig::ToolDefinition> tools;
+    tools.reserve(discovered_.size());
+    for (const auto& skill : discovered_) {
+      tools.push_back(claude_core::build_tool(skill, tp_));
+    }
+    return tools;
+  }
+  std::vector<std::string> get_hints() const override {
+    return claude_core::hints_from(discovered_);
   }
 };
 

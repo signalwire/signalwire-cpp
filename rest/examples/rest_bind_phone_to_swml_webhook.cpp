@@ -41,7 +41,7 @@ int main() {
 
         // The typed helper — one line:
         std::cout << "Binding " << pn_sid << " to " << webhook_url << " ...\n";
-        client.phone_numbers().set_swml_webhook(pn_sid, webhook_url);
+        client.phone_numbers().setSwmlWebhook(pn_sid, {.url = webhook_url});
 
         // The equivalent wire-level form (use this if you need unusual fields):
         //
@@ -58,11 +58,11 @@ int main() {
                   << pn.value("calling_handler_resource_id", "") << "\n";
 
         // To route to something other than an SWML webhook, use:
-        //   client.phone_numbers().set_cxml_webhook(sid, url)         // LAML / Twilio-compat
-        //   client.phone_numbers().set_ai_agent(sid, agent_id)        // AI Agent
-        //   client.phone_numbers().set_call_flow(sid, flow_id)        // Call Flow
-        //   client.phone_numbers().set_relay_application(sid, name)   // Named RELAY app
-        //   client.phone_numbers().set_relay_topic(sid, topic)        // RELAY topic
+        //   client.phone_numbers().setCxmlWebhook(sid, {.url = url})            // LAML / Twilio-compat
+        //   client.phone_numbers().setAiAgent(sid, {.agent_id = agent_id})     // AI Agent
+        //   client.phone_numbers().setCallFlow(sid, {.flow_id = flow_id})      // Call Flow
+        //   client.phone_numbers().setRelayApplication(sid, {.name = name})    // Named RELAY app
+        //   client.phone_numbers().setRelayTopic(sid, {.topic = topic})        // RELAY topic
 
     } catch (const SignalWireRestError& e) {
         std::cerr << "Error " << e.status() << ": " << e.what() << "\n";

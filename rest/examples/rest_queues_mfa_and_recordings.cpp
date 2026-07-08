@@ -23,8 +23,9 @@ int main() {
 
         // MFA: send a verification code via SMS
         auto mfa = client.mfa().sms({
-            {"to", "+15551234567"}, {"from", "+15559876543"},
-            {"message", "Your code is {code}"}
+            .to = "+15551234567",
+            .from = "+15559876543",
+            .message = "Your code is {code}",
         });
         std::cout << "MFA request: " << mfa.dump(2) << "\n";
 

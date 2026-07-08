@@ -156,7 +156,7 @@ TEST(schema_verb_names_contain_all_38) {
 
 TEST(schema_load_from_file) {
     Schema schema;
-    bool loaded = schema.load_from_file("/home/devuser/src/signalwire-agents-cpp/src/swml/schema.json");
+    bool loaded = schema.load_from_file("src/swml/schema.json");
     if (loaded) {
         auto names = schema.verb_names();
         ASSERT_EQ(names.size(), 38u);

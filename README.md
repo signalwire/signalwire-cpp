@@ -206,11 +206,11 @@ cmake ..
 make -j$(nproc)
 ```
 
-This produces the static library `libsignalwire.a` and the `run_tests` binary.
+This produces the shared library `libsignalwire` (built SHARED — see CMakeLists.txt) and the `run_tests` binary.
 
 ### Link to Your Project
 
-Use CMake -- `add_subdirectory` (or `FetchContent`) wires up the static library
+Use CMake -- `add_subdirectory` (or `FetchContent`) wires up the shared library
 plus all of its transitive dependencies (OpenSSL, pthreads, IXWebSocket, and the
 Apple `CoreFoundation`/`Security` frameworks on macOS) automatically. Add to your
 `CMakeLists.txt`:
@@ -239,7 +239,7 @@ target_link_libraries(my_agent signalwire)
 The public headers live under [`include/`](include/) and the vendored
 header-only dependencies (nlohmann/json, cpp-httplib) under [`deps/`](deps/);
 both are added to the `signalwire` target's public include path, so consumers do
-not need to set them manually. Compiling against the static archive by hand
+not need to set them manually. Compiling against the shared library by hand
 (raw `g++`) also requires linking IXWebSocket and, on macOS, the
 `CoreFoundation`/`Security` frameworks -- CMake is the supported path.
 

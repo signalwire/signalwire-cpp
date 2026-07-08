@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with this C++ codebase.
 
 C++17 port of the SignalWire AI Agents SDK. Provides AgentBase, SWML document
 building, SWAIG function results, DataMap tools, Contexts/Steps, Skills, Prefabs,
-REST client, and RELAY client stubs as a single static library.
+REST client, and RELAY client as a single shared library.
 
 ## Build Commands
 
@@ -55,7 +55,7 @@ include/signalwire/           Public headers
     prefabs/prefabs.hpp       Pre-built agent types
     rest/                     RestClient, HttpClient, CrudResource
     security/                 SessionManager (HMAC-SHA256)
-    relay/                    RELAY client stubs (constants, event, call, client)
+    relay/                    RELAY client (constants, event, call, client, websocket)
     common.hpp                Utilities (UUID, base64, url_encode, env)
     logging.hpp               Thread-safe logger
     signalwire.hpp     Umbrella include
@@ -154,11 +154,11 @@ ctx.add_step("step1")
 
 ## Important Notes
 
-- Library is built as a static archive: `libsignalwire.a`
+- Library is built as a shared library `libsignalwire` (CMake `add_library(signalwire SHARED)`)
 - No package manager required; all deps vendored
 - CPPHTTPLIB_OPENSSL_SUPPORT is disabled (requires OpenSSL 3.0+)
 - SSL for httplib handled externally; crypto primitives use OpenSSL directly
-- RELAY client headers are stubs; WebSocket transport not yet implemented
+- RELAY client: IXWebSocket-backed transport implemented (src/relay/websocket.cpp, client.cpp) — Blade/JSON-RPC session + real frame I/O
 - C wrapper (`signalwire_c.h`) provides FFI for other languages
 - Examples are standalone `.cpp` files meant to illustrate usage, not built by CMake
 - Logging controlled by `SIGNALWIRE_LOG_LEVEL` env var and `Logger::instance()`

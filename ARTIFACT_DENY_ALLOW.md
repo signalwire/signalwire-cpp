@@ -1,7 +1,7 @@
 # ARTIFACT_DENY_ALLOW — files excused from the artifact-deny gate
 
-The C++ port's **published artifact** is the static library `libsignalwire.a`
-built from `src/*.cpp` (`add_library(signalwire STATIC …)` in `CMakeLists.txt`
+The C++ port's **published artifact** is the shared library `libsignalwire`
+built from `src/*.cpp` (`add_library(signalwire SHARED …)` in `CMakeLists.txt`
 globs `src/*.cpp` only) plus the public headers under `include/`. There is no
 `cmake --install` / CPack / `make dist` rule that packages the repository root or
 the auxiliary build targets, so there is no package-list command to feed the
@@ -9,7 +9,7 @@ gate's authoritative `--listing` mode.
 
 The `git ls-files` proxy therefore over-reports: every file below is a
 porting-audit contract file, an audit JSON, or a **separate** `add_executable` /
-example build-target — none is compiled into `libsignalwire.a` and none lives
+example build-target — none is compiled into `libsignalwire` and none lives
 under `src/` or `include/`, so none can ever enter the published artifact.
 
 - `src/*.cpp` → library; `include/` → public headers. Contract/audit files live at

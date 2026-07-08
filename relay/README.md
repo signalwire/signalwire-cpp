@@ -4,9 +4,10 @@ Real-time call control and messaging over WebSocket. The RELAY client connects
 to SignalWire via the Blade protocol (JSON-RPC 2.0 over WebSocket) and gives
 you imperative control over live phone calls and SMS/MMS messaging.
 
-> **Status:** Header stubs are provided so downstream code can compile and link.
-> The WebSocket transport layer is not yet implemented -- all I/O methods are
-> no-ops that return immediately.
+> **Status:** The WebSocket transport is implemented (IXWebSocket-backed):
+> `RelayClient::connect` establishes the Blade/JSON-RPC session and the call
+> control methods transmit real frames. See `src/relay/client.cpp` and
+> `src/relay/websocket.cpp`.
 
 ## Quick Start
 

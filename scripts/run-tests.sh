@@ -37,8 +37,11 @@ if [ ! -d "$BUILD_DIR" ]; then
     cmake -S . -B "$BUILD_DIR" || exit 1
 fi
 
-# Build the test binary (the ONE heavy step). -j uses all cores.
-cmake --build "$BUILD_DIR" --target run_tests -j || exit 1
+# Build the test binary (the ONE heavy step). Parallelism is memory-aware —
+# the unity test TU peaks at ~2.1 GB compiler RSS, so a bare -j (unlimited
+# with the Makefile generator) OOM-kills 16 GB CI runners. See sw_build_jobs
+# in _env.sh.
+cmake --build "$BUILD_DIR" --target run_tests -j"$(sw_build_jobs)" || exit 1
 
 # run_tests takes an optional positional substring filter.
 exec "$BUILD_DIR/run_tests" "$@"

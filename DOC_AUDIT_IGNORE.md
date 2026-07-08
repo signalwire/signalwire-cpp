@@ -149,3 +149,37 @@ is_object: nlohmann::json::is_object() — vendored
 is_string: nlohmann::json::is_string() — vendored
 length: std::sub_match::length() / std::string::length() — stdlib
 front: std::string::front() — stdlib container access
+
+## 11. C++ stdlib / std::chrono / json / internal helpers + migration-doc names (2026-07-08)
+
+Pre-existing DOC-AUDIT flags surfaced when CI re-ran; none is a public SDK-surface
+method (stdlib, std::chrono literals, nlohmann::json calls, internal free-function
+helpers, or an intentionally-shown old name in the migration guide).
+
+array: std::array / nlohmann::json::array() — stdlib/vendored
+atof: std::atof — C stdlib string-to-double
+atoi: std::atoi — C stdlib string-to-int
+exit: std::exit — C stdlib process exit
+getline: std::getline — stdlib stream read
+hours: std::chrono::hours — stdlib duration literal
+invalid_argument: std::invalid_argument — stdlib exception type
+localtime: std::localtime — C stdlib time conversion
+make_pair: std::make_pair — stdlib utility
+milliseconds: std::chrono::milliseconds — stdlib duration literal
+object: nlohmann::json::object() — vendored json factory
+seconds: std::chrono::seconds — stdlib duration literal
+setenv: POSIX setenv() — libc environment setter
+signal: POSIX signal() — libc signal handler registration (kubernetes_ready_agent example)
+sleep_for: std::this_thread::sleep_for — stdlib thread sleep
+sregex_iterator: std::sregex_iterator — stdlib regex iteration (skills_audit_harness)
+super: Python-style `super` shown in an architecture.md contrast block; C++ uses explicit base-class calls
+time: std::time — C stdlib wall-clock read
+tolower: std::tolower — stdlib char case fold
+toupper: std::toupper — stdlib char case fold
+transform: std::transform — stdlib algorithm
+get_env: `signalwire::common::get_env` internal env-read helper, not a public SDK-surface method
+http_get: `signalwire::skills::http_get` internal skill HTTP helper (skills_http.hpp), not on the public surface
+http_post: `signalwire::skills::http_post` internal skill HTTP helper (skills_http.hpp), not on the public surface
+ensure_builtin_skills_registered: internal skill-registry bootstrap free function (skill_registry.hpp), not a public method
+to_wire_string: internal `signalwire::rest::to_wire_string` inline helper (phone_call_handler.hpp), not on the public surface
+SignalWireClient: the OLD 2.x class name shown verbatim in docs/MIGRATION-2.0.md's rename table (renamed to RestClient); intentionally documented, not a live symbol

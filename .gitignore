@@ -15,3 +15,8 @@ __pycache__/
 
 # Test scratch fixtures (config-loader probe outputs) — not source
 .sw-test-tmp/
+
+# Track the shared Claude Code permission set (rest of .claude/ stays local)
+!.claude/
+.claude/*
+!.claude/settings.json

@@ -62,6 +62,44 @@ if [ "${_CF_MAJOR:-0}" != "18" ]; then
     exit 1
 fi
 
+# --- memory-aware build parallelism -------------------------------------------
+# sw_build_jobs prints the -j value for cmake --build. NEVER use a bare -j:
+# with the Makefile generator that means UNLIMITED parallel jobs, and this
+# repo's test unity TU (tests/test_main.cpp, ~115 included test .cpp files)
+# peaks at ~2.1 GB compiler RSS (measured clang arm64, default flags; each
+# mocktest TU is ~0.75 GB). Unlimited jobs on a 4-core/16 GB CI runner stacks
+# the unity TU with ~40 library/tool TUs at once and the OOM killer takes out
+# the runner agent — 4/4 cross-port-matrix cpp jobs died with exit 143 /
+# "runner received a shutdown signal" after feat/rest-generated grew the unity
+# TU (2026-07-08).
+#
+#   jobs = min(ncpu, available_RAM / SW_BUILD_MEM_PER_JOB_MB), floor 1
+#
+# SW_BUILD_MEM_PER_JOB_MB defaults to 2560 (worst measured TU + headroom).
+# SW_BUILD_JOBS overrides the whole computation (CI tuning / testing the cap).
+# Linux uses MemAvailable (the guard that matters on CI runners); macOS uses
+# total hw.memsize — dev boxes are RAM-rich, so the cap is a no-op there.
+sw_build_jobs() {
+    if [ -n "${SW_BUILD_JOBS:-}" ]; then
+        echo "$SW_BUILD_JOBS"
+        return 0
+    fi
+    local ncpu mem_kb per_job_kb jobs
+    per_job_kb=$(( ${SW_BUILD_MEM_PER_JOB_MB:-2560} * 1024 ))
+    if [ "$(uname -s)" = "Darwin" ]; then
+        ncpu="$(sysctl -n hw.ncpu)"
+        mem_kb=$(( $(sysctl -n hw.memsize) / 1024 ))
+    else
+        ncpu="$(nproc)"
+        mem_kb="$(awk '/MemAvailable/{print $2; exit}' /proc/meminfo 2>/dev/null || true)"
+        [ -n "$mem_kb" ] || mem_kb="$(awk '/MemTotal/{print $2; exit}' /proc/meminfo)"
+    fi
+    jobs=$(( mem_kb / per_job_kb ))
+    [ "$jobs" -ge 1 ] || jobs=1
+    [ "$jobs" -le "$ncpu" ] || jobs="$ncpu"
+    echo "$jobs"
+}
+
 # --- ccache (optional compiler cache) ----------------------------------------
 # ccache is an OPTIONAL speedup: CMakeLists.txt availability-gates it as the C/C++
 # compiler launcher (find_program(CCACHE_PROGRAM ccache) — a strict no-op when

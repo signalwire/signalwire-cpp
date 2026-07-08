@@ -233,7 +233,7 @@ test_gate() {
             # rebuilds run_tests (a near-no-op since it was just built) and runs
             # the full suite.
             cmake --build build --target emit_corpus emit_skills \
-                wire_dump swml_dump state_dump http_dump wire_relay_dump -j || return 1
+                wire_dump swml_dump state_dump http_dump wire_relay_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
@@ -543,7 +543,7 @@ spec_parity_gate() {
         host)
             # The TEST gate builds run_tests/emit_corpus/emit_skills but not
             # route_registry, so build it here before invoking it.
-            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            cmake --build "$PORT_ROOT/build" --target route_registry -j"$(sw_build_jobs)" 1>&2 || return 1
             "$PORT_ROOT/build/route_registry" >"$reg" || return 1
             ;;
         exec:*)
@@ -581,7 +581,7 @@ route_collision_gate() {
     trap "rm -f '$reg'" RETURN
     case "$BUILD_MODE" in
         host)
-            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            cmake --build "$PORT_ROOT/build" --target route_registry -j"$(sw_build_jobs)" 1>&2 || return 1
             "$PORT_ROOT/build/route_registry" >"$reg" || return 1
             ;;
         exec:*)
@@ -711,7 +711,7 @@ run_gate "GEN-FRESH-SWAIG" "generated SWAIG read-side payload surface byte-ident
 gen_fresh_tests_gate() {
     case "$BUILD_MODE" in
         host)
-            cmake --build "$PORT_ROOT/build" --target route_registry -j 1>&2 || return 1
+            cmake --build "$PORT_ROOT/build" --target route_registry -j"$(sw_build_jobs)" 1>&2 || return 1
             local reg
             reg="$(mktemp -t cpp_rest_test_plan.XXXXXX.json)"
             # shellcheck disable=SC2064

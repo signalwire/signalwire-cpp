@@ -882,6 +882,38 @@ run_gate "GEN-IDIOM" "generated code is not lint-excluded from the idiom linter"
 run_gate "RELEASE-FRESH" "publish workflow runs gates before publishing" \
     python3 "$PORTING_SDK_DIR/scripts/release_fresh.py" --port cpp --repo .
 
+# --- §C1 doc/example execution gates ------------------------------------------
+# SNIPPET-COMPILE syntax-checks every cpp fenced block WITH the SDK headers on the
+# include path (g++ -fsyntax-only). DOC-CLI line-detects documented swaig-test
+# invocations. Both are cheap → blocking. EXAMPLES-RUN skips-with-note on cpp (no
+# CMake example-run target) and SNIPPET-RUN self-skips (compiled port; SNIPPET-
+# COMPILE covers it) — both exit 0. cpp runs gates serially (no defer tier), so
+# all four are wired blocking.
+run_gate "SNIPPET-COMPILE" "documented code snippets compile" \
+    python3 "$PORTING_SDK_DIR/scripts/snippet_compile.py" --port cpp --repo .
+
+run_gate "DOC-CLI" "documented swaig-test invocations parse against the real CLI" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_cli.py" --port cpp --repo .
+
+run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" \
+    python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
+
+run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips)" \
+    python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
+
+# --- §G anti-laundering ledger gate -------------------------------------------
+# SUPPRESSION-LEDGER: no un-ledgered analyzer suppressions (complements the
+# already-wired IGNORE-LEDGER-VERIFY DOC_AUDIT_IGNORE hygiene gate above).
+run_gate "SUPPRESSION-LEDGER" "no un-ledgered analyzer suppressions" \
+    python3 "$PORTING_SDK_DIR/scripts/suppression_ledger.py" --port cpp --repo .
+
+# --- §D1 packaging gate -------------------------------------------------------
+# PACKAGE-SMOKE: build the real cmake --install artifact into a clean prefix, then
+# compile+link+construct RestClient from the INSTALLED headers/lib. Catches
+# missing install() rules the in-tree tests never see. Heaviest gate → runs last.
+run_gate "PACKAGE-SMOKE" "real artifact builds, installs, and imports from a clean prefix" \
+    python3 "$PORTING_SDK_DIR/scripts/package_smoke.py" --port cpp --repo .
+
 if [ -z "$FAILED_GATES" ]; then
     echo "==> CI PASS"
     exit 0

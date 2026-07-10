@@ -3,9 +3,25 @@
 #include "signalwire/contexts/contexts.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 
 namespace signalwire {
 namespace contexts {
+
+namespace {
+
+// Valid values for a step's or context's `history` visibility mode.
+//   keep     nothing is cleared — prior instructions and dialogue stay.
+//   default  prior step instructions are hidden; the dialogue is kept.
+//   hide     prior instructions hidden AND the prior dialogue pulled out.
+std::string validate_history(const std::string& mode) {
+  if (mode != "keep" && mode != "default" && mode != "hide") {
+    throw std::invalid_argument("history must be one of (keep, default, hide), got '" + mode + "'");
+  }
+  return mode;
+}
+
+}  // namespace
 
 const std::set<std::string>& reserved_native_tool_names() {
   static const std::set<std::string> kReserved{
@@ -22,13 +38,15 @@ const std::set<std::string>& reserved_native_tool_names() {
 
 GatherQuestion::GatherQuestion(const std::string& key, const std::string& question,
                                const std::string& type, bool confirm, const std::string& prompt,
-                               const std::vector<std::string>& functions)
+                               const std::vector<std::string>& functions,
+                               const std::optional<bool>& isolated)
     : key_(key),
       question_(question),
       type_(type),
       confirm_(confirm),
       prompt_(prompt),
-      functions_(functions) {}
+      functions_(functions),
+      isolated_(isolated) {}
 
 json GatherQuestion::to_json() const {
   json j;
@@ -44,6 +62,10 @@ json GatherQuestion::to_json() const {
   if (!functions_.empty()) {
     j["functions"] = functions_;
   }
+  // Emitted even when false, so it can override an isolated gather.
+  if (isolated_.has_value()) {
+    j["isolated"] = *isolated_;
+  }
   return j;
 }
 
@@ -52,14 +74,18 @@ json GatherQuestion::to_json() const {
 // ============================================================================
 
 GatherInfo::GatherInfo(const std::string& output_key, const std::string& completion_action,
-                       const std::string& prompt)
-    : output_key_(output_key), completion_action_(completion_action), prompt_(prompt) {}
+                       const std::string& prompt, bool isolated)
+    : output_key_(output_key),
+      completion_action_(completion_action),
+      prompt_(prompt),
+      isolated_(isolated) {}
 
 GatherInfo& GatherInfo::add_question(const std::string& key, const std::string& question,
                                      const std::string& type, bool confirm,
                                      const std::string& prompt,
-                                     const std::vector<std::string>& functions) {
-  questions_.emplace_back(key, question, type, confirm, prompt, functions);
+                                     const std::vector<std::string>& functions,
+                                     const std::optional<bool>& isolated) {
+  questions_.emplace_back(key, question, type, confirm, prompt, functions, isolated);
   return *this;
 }
 
@@ -79,6 +105,10 @@ json GatherInfo::to_json() const {
     for (const auto& q : questions_) {
       j["questions"].push_back(q.to_json());
     }
+  }
+  // Gather-level default: emitted only when truthy (a false default is omitted).
+  if (isolated_) {
+    j["isolated"] = true;
   }
   return j;
 }
@@ -143,17 +173,23 @@ Step& Step::set_skip_to_next_step(bool skip) {
   return *this;
 }
 
+Step& Step::set_history(const std::string& history) {
+  history_ = validate_history(history);
+  return *this;
+}
+
 Step& Step::set_gather_info(const std::string& output_key, const std::string& completion_action,
-                            const std::string& prompt) {
-  gather_info_ = GatherInfo(output_key, completion_action, prompt);
+                            const std::string& prompt, bool isolated) {
+  gather_info_ = GatherInfo(output_key, completion_action, prompt, isolated);
   return *this;
 }
 
 Step& Step::add_gather_question(const std::string& key, const std::string& question,
                                 const std::string& type, bool confirm, const std::string& prompt,
-                                const std::vector<std::string>& functions) {
+                                const std::vector<std::string>& functions,
+                                const std::optional<bool>& isolated) {
   if (gather_info_) {
-    gather_info_->add_question(key, question, type, confirm, prompt, functions);
+    gather_info_->add_question(key, question, type, confirm, prompt, functions, isolated);
   }
   return *this;
 }
@@ -231,6 +267,10 @@ json Step::to_json() const {
   }
   if (skip_to_next_step_) {
     j["skip_to_next_step"] = true;
+  }
+
+  if (history_) {
+    j["history"] = *history_;
   }
 
   if (functions_) {
@@ -370,6 +410,11 @@ Context& Context::set_user_prompt(const std::string& up) {
 }
 Context& Context::set_isolated(bool isolated) {
   isolated_ = isolated;
+  return *this;
+}
+
+Context& Context::set_history(const std::string& history) {
+  history_ = validate_history(history);
   return *this;
 }
 
@@ -530,6 +575,10 @@ json Context::to_json() const {
         j["steps"].push_back(it->second.to_json());
       }
     }
+  }
+
+  if (history_) {
+    j["history"] = *history_;
   }
 
   return j;

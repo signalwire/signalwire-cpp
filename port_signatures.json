@@ -2085,6 +2085,20 @@
               ],
               "returns": "class:signalwire.core.contexts.Context"
             },
+            "set_history": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "history",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.core.contexts.Context"
+            },
             "set_initial_step": {
               "params": [
                 {
@@ -2337,6 +2351,12 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "isolated",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -2378,6 +2398,12 @@
                 {
                   "name": "functions",
                   "type": "list<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "isolated",
+                  "type": "optional<bool>",
                   "required": false,
                   "default": null
                 }
@@ -2461,6 +2487,12 @@
                 {
                   "name": "functions",
                   "type": "list<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "isolated",
+                  "type": "optional<bool>",
                   "required": false,
                   "default": null
                 }
@@ -2554,6 +2586,12 @@
                 {
                   "name": "functions",
                   "type": "list<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "isolated",
+                  "type": "optional<bool>",
                   "required": false,
                   "default": null
                 }
@@ -2657,6 +2695,26 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "isolated",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.core.contexts.Step"
+            },
+            "set_history": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "history",
+                  "type": "string",
+                  "required": true
                 }
               ],
               "returns": "class:signalwire.core.contexts.Step"

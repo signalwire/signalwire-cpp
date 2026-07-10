@@ -410,3 +410,150 @@ TEST(context_step_order_preserved) {
     ASSERT_EQ(j["steps"][2]["name"].get<std::string>(), "gamma");
     return true;
 }
+
+// ========================================================================
+// set_history (Step + Context)
+// ========================================================================
+
+TEST(step_set_history_unset_omits_key) {
+    Step s("greet");
+    s.set_text("Hi");
+    auto j = s.to_json();
+    ASSERT_FALSE(j.contains("history"));
+    return true;
+}
+
+TEST(step_set_history_each_mode_emits) {
+    for (const std::string& mode : {"keep", "default", "hide"}) {
+        Step s("greet");
+        s.set_text("Hi").set_history(mode);
+        auto j = s.to_json();
+        ASSERT_TRUE(j.contains("history"));
+        ASSERT_EQ(j["history"].get<std::string>(), mode);
+    }
+    return true;
+}
+
+TEST(step_set_history_is_fluent) {
+    Step s("greet");
+    Step& ref = s.set_history("keep");
+    ASSERT_EQ(&ref, &s);
+    return true;
+}
+
+TEST(step_set_history_invalid_throws) {
+    Step s("greet");
+    ASSERT_THROWS(s.set_history("erase"));
+    return true;
+}
+
+TEST(context_set_history_unset_omits_key) {
+    Context ctx("default");
+    ctx.add_step("s").set_text("Hi");
+    auto j = ctx.to_json();
+    ASSERT_FALSE(j.contains("history"));
+    return true;
+}
+
+TEST(context_set_history_each_mode_emits) {
+    for (const std::string& mode : {"keep", "default", "hide"}) {
+        Context ctx("default");
+        ctx.add_step("s").set_text("Hi");
+        ctx.set_history(mode);
+        auto j = ctx.to_json();
+        ASSERT_TRUE(j.contains("history"));
+        ASSERT_EQ(j["history"].get<std::string>(), mode);
+    }
+    return true;
+}
+
+TEST(context_set_history_is_fluent) {
+    Context ctx("default");
+    Context& ref = ctx.set_history("hide");
+    ASSERT_EQ(&ref, &ctx);
+    return true;
+}
+
+TEST(context_set_history_invalid_throws) {
+    Context ctx("default");
+    ASSERT_THROWS(ctx.set_history("bogus"));
+    return true;
+}
+
+// ========================================================================
+// gather isolated flag (question tri-state + gather-level default)
+// ========================================================================
+
+TEST(gather_question_isolated_none_omits) {
+    GatherQuestion q("k", "Q?");
+    auto j = q.to_json();
+    ASSERT_FALSE(j.contains("isolated"));
+    return true;
+}
+
+TEST(gather_question_isolated_true_emits) {
+    GatherQuestion q("k", "Q?", "string", false, "", {}, true);
+    auto j = q.to_json();
+    ASSERT_TRUE(j.contains("isolated"));
+    ASSERT_EQ(j["isolated"].get<bool>(), true);
+    return true;
+}
+
+TEST(gather_question_isolated_false_emits) {
+    // Explicit false IS on the wire so it can override an isolated gather.
+    GatherQuestion q("k", "Q?", "string", false, "", {}, false);
+    auto j = q.to_json();
+    ASSERT_TRUE(j.contains("isolated"));
+    ASSERT_EQ(j["isolated"].get<bool>(), false);
+    return true;
+}
+
+TEST(gather_info_isolated_false_default_omits) {
+    GatherInfo gi;
+    gi.add_question("k", "Q?");
+    auto j = gi.to_json();
+    ASSERT_FALSE(j.contains("isolated"));
+    return true;
+}
+
+TEST(gather_info_isolated_true_emits) {
+    GatherInfo gi("", "", "", true);
+    gi.add_question("k", "Q?");
+    auto j = gi.to_json();
+    ASSERT_TRUE(j.contains("isolated"));
+    ASSERT_EQ(j["isolated"].get<bool>(), true);
+    return true;
+}
+
+TEST(step_set_gather_info_isolated_default) {
+    Step s("gather");
+    s.set_text("x");
+    s.set_gather_info("", "", "", true);
+    s.add_gather_question("k", "Q?");
+    auto j = s.to_json();
+    ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
+    return true;
+}
+
+TEST(step_add_gather_question_isolated_override) {
+    Step s("gather");
+    s.set_text("x");
+    // Gather-level default true; per-question overrides.
+    s.set_gather_info("", "", "", true);
+    s.add_gather_question("inherit", "Q1?");
+    s.add_gather_question("override_false", "Q2?", "string", false, "", {}, false);
+    s.add_gather_question("override_true", "Q3?", "string", false, "", {}, true);
+    auto j = s.to_json();
+    const auto& qs = j["gather_info"]["questions"];
+    // Gather-level default emitted.
+    ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
+    // Inheriting question omits isolated (None).
+    ASSERT_FALSE(qs[0].contains("isolated"));
+    // Explicit false override is on the wire.
+    ASSERT_TRUE(qs[1].contains("isolated"));
+    ASSERT_EQ(qs[1]["isolated"].get<bool>(), false);
+    // Explicit true override is on the wire.
+    ASSERT_TRUE(qs[2].contains("isolated"));
+    ASSERT_EQ(qs[2]["isolated"].get<bool>(), true);
+    return true;
+}

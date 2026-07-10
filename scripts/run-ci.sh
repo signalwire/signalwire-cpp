@@ -178,6 +178,18 @@ FAILED_GATES=""
 run_gate() {
     local name="$1"; shift
     local description="$1"; shift
+    # Optional leading --tier=<pr|nightly> (default pr). A nightly-tier gate is
+    # SKIPPED unless SW_CI_TIER=nightly|all — mirrors gate_scheduler.sh's tier= so
+    # cpp (which runs gates serially via run_gate, not the DAG scheduler) gets the
+    # same per-PR/nightly split. nightly is a superset (runs pr gates too).
+    local tier=pr
+    case "$1" in --tier=*) tier="${1#--tier=}"; shift ;; esac
+    if [ "$tier" = "nightly" ]; then
+        case "${SW_CI_TIER:-pr}" in
+            nightly|all) : ;;   # active — run it
+            *) echo "[$name] $description ... SKIP (tier=nightly; runs in nightly CI)"; return 0 ;;
+        esac
+    fi
     local logfile
     logfile="$(mktemp)"
     "$@" >"$logfile" 2>&1
@@ -884,21 +896,22 @@ run_gate "RELEASE-FRESH" "publish workflow runs gates before publishing" \
 
 # --- §C1 doc/example execution gates ------------------------------------------
 # SNIPPET-COMPILE syntax-checks every cpp fenced block WITH the SDK headers on the
-# include path (g++ -fsyntax-only). DOC-CLI line-detects documented swaig-test
-# invocations. Both are cheap → blocking. EXAMPLES-RUN skips-with-note on cpp (no
-# CMake example-run target) and SNIPPET-RUN self-skips (compiled port; SNIPPET-
-# COMPILE covers it) — both exit 0. cpp runs gates serially (no defer tier), so
-# all four are wired blocking.
-run_gate "SNIPPET-COMPILE" "documented code snippets compile" \
+# include path (g++ -fsyntax-only) — the heavy cpp doc gate (~11min). DOC-CLI
+# line-detects documented swaig-test invocations (cheap → per-PR). The 3 heavy
+# doc-execution gates are --tier=nightly: skipped on per-PR run-ci, run by the
+# nightly workflow (and per-PR when the diff touches docs/examples via
+# SW_CI_TIER=nightly). EXAMPLES-RUN/SNIPPET-RUN self-skip on cpp but stay in the
+# nightly tier for a uniform full-doc sweep.
+run_gate "SNIPPET-COMPILE" "documented code snippets compile" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/snippet_compile.py" --port cpp --repo .
 
 run_gate "DOC-CLI" "documented swaig-test invocations parse against the real CLI" \
     python3 "$PORTING_SDK_DIR/scripts/doc_cli.py" --port cpp --repo .
 
-run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" \
+run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
 
-run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips)" \
+run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
 
 # --- §G anti-laundering ledger gate -------------------------------------------

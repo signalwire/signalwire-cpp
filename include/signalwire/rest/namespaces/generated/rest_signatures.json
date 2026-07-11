@@ -1659,6 +1659,15 @@
         "default": {}
       }
     ],
+    "FabricAddresses::paginate": [
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "FabricTokens::createEmbedToken": [
       {
         "name": "token",
@@ -1871,6 +1880,15 @@
         "default": {}
       }
     ],
+    "FaxLogs::paginate": [
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "FreeswitchConnectors::create": [
       {
         "name": "body",
@@ -2067,6 +2085,15 @@
       }
     ],
     "MessageLogs::list": [
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "MessageLogs::paginate": [
       {
         "name": "params",
         "kind": "var_keyword",
@@ -3703,6 +3730,15 @@
         "default": {}
       }
     ],
+    "VideoRoomSessions::paginate": [
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "VideoRoomTokens::create": [
       {
         "name": "room_name",
@@ -3982,6 +4018,15 @@
         "type": "string",
         "required": true
       },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "VoiceLogs::paginate": [
       {
         "name": "params",
         "kind": "var_keyword",

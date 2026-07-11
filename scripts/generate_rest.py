@@ -1033,13 +1033,19 @@ def emit_resource(spec: Spec, anchor: str, markup: dict) -> str:
     #   FabricResource -> create + update      (list/get/delete/list_addresses inherited)
     # (ReadResource DOES record list/get; the write bases do NOT record list/get.)
     _INHERITED_VERBS_BY_BASE = {
-        "ReadResource": ("list", "get"),
+        "ReadResource": ("list", "paginate", "get"),
         "FabricResource": ("create", "update"),
         "CrudResource": ("create", "update", "delete"),
     }
 
     def _verb_records(verb: str) -> list[dict]:
         if verb == "list":
+            return [{"name": "params", "kind": "var_keyword", "type": "any",
+                     "required": False, "default": {}}]
+        if verb == "paginate":
+            # ``paginate(**params) -> PaginatedIterator`` (inherited from
+            # ReadResource): same var-keyword params shape as ``list``; the
+            # ``any`` return reconciles with the oracle's PaginatedIterator class.
             return [{"name": "params", "kind": "var_keyword", "type": "any",
                      "required": False, "default": {}}]
         if verb == "get":

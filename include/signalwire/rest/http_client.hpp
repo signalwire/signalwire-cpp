@@ -17,17 +17,28 @@ namespace rest {
 
 using json = nlohmann::json;
 
-/// Error thrown on non-2xx REST API responses
+/// Error thrown on non-2xx REST API responses.
+///
+/// Carries the full request/response envelope — HTTP ``status`` code, response
+/// ``body``, the request ``url`` and ``method`` — mirroring Python's
+/// ``SignalWireRestError(status_code, body, url, method)``. Every field is
+/// exposed so a caller catching the error can inspect exactly which request
+/// failed and how.
 class SignalWireRestError : public std::runtime_error {
  public:
-  SignalWireRestError(int status, const std::string& message, const std::string& body = "")
-      : std::runtime_error(message), status_(status), body_(body) {}
+  SignalWireRestError(int status, const std::string& message, const std::string& body = "",
+                      const std::string& url = "", const std::string& method = "GET")
+      : std::runtime_error(message), status_(status), body_(body), url_(url), method_(method) {}
   int status() const { return status_; }
   const std::string& body() const { return body_; }
+  const std::string& url() const { return url_; }
+  const std::string& method() const { return method_; }
 
  private:
   int status_;
   std::string body_;
+  std::string url_;
+  std::string method_;
 };
 
 /// HTTP client with Basic Auth support using cpp-httplib
@@ -72,7 +83,8 @@ class HttpClient {
   const std::string& base_url() const { return base_url_; }
 
  private:
-  json handle_response(int status, const std::string& body) const;
+  json handle_response(int status, const std::string& body, const std::string& url,
+                       const std::string& method) const;
   std::string build_query_string(const std::map<std::string, std::string>& params) const;
   void configure_client(httplib::Client& cli) const;
 

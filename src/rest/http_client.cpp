@@ -64,7 +64,8 @@ std::string HttpClient::build_query_string(const std::map<std::string, std::stri
   return qs;
 }
 
-json HttpClient::handle_response(int status, const std::string& body) const {
+json HttpClient::handle_response(int status, const std::string& body, const std::string& url,
+                                 const std::string& method) const {
   if (status == 204 || body.empty()) {
     return json::object();
   }
@@ -77,13 +78,17 @@ json HttpClient::handle_response(int status, const std::string& body) const {
     }
   }
 
-  std::string msg = "HTTP " + std::to_string(status);
+  // Mirror Python's ``f"{method} {url} returned {status}: {body}"`` message so
+  // the thrown error carries the full (status, body, url, method) envelope.
+  std::string msg = method + " " + url + " returned " + std::to_string(status);
   try {
     json err = json::parse(body);
     if (err.contains("message")) {
       msg += ": " + err["message"].get<std::string>();
     } else if (err.contains("error")) {
       msg += ": " + err["error"].get<std::string>();
+    } else {
+      msg += ": " + body;
     }
   } catch (...) {
     if (!body.empty()) {
@@ -91,7 +96,7 @@ json HttpClient::handle_response(int status, const std::string& body) const {
     }
   }
 
-  throw SignalWireRestError(status, msg, body);
+  throw SignalWireRestError(status, msg, body, url, method);
 }
 
 // Helper to extract scheme and host from base_url
@@ -130,9 +135,9 @@ json HttpClient::get(const std::string& path,
 
   auto res = cli.Get(full_path, hdrs);
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed to " + host);
+    throw SignalWireRestError(0, "Connection failed to " + host, "", full_path, "GET");
   }
-  return handle_response(res->status, res->body);
+  return handle_response(res->status, res->body, full_path, "GET");
 }
 
 json HttpClient::post(const std::string& path, const json& body) const {
@@ -145,9 +150,9 @@ json HttpClient::post(const std::string& path, const json& body) const {
 
   auto res = cli.Post(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed");
+    throw SignalWireRestError(0, "Connection failed", "", path, "POST");
   }
-  return handle_response(res->status, res->body);
+  return handle_response(res->status, res->body, path, "POST");
 }
 
 json HttpClient::put(const std::string& path, const json& body) const {
@@ -160,9 +165,9 @@ json HttpClient::put(const std::string& path, const json& body) const {
 
   auto res = cli.Put(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed");
+    throw SignalWireRestError(0, "Connection failed", "", path, "PUT");
   }
-  return handle_response(res->status, res->body);
+  return handle_response(res->status, res->body, path, "PUT");
 }
 
 json HttpClient::patch(const std::string& path, const json& body) const {
@@ -175,9 +180,9 @@ json HttpClient::patch(const std::string& path, const json& body) const {
 
   auto res = cli.Patch(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed");
+    throw SignalWireRestError(0, "Connection failed", "", path, "PATCH");
   }
-  return handle_response(res->status, res->body);
+  return handle_response(res->status, res->body, path, "PATCH");
 }
 
 json HttpClient::del(const std::string& path) const {
@@ -189,9 +194,9 @@ json HttpClient::del(const std::string& path) const {
 
   auto res = cli.Delete(path, hdrs);
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed");
+    throw SignalWireRestError(0, "Connection failed", "", path, "DELETE");
   }
-  return handle_response(res->status, res->body);
+  return handle_response(res->status, res->body, path, "DELETE");
 }
 
 // ============================================================================

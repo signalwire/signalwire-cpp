@@ -49,6 +49,16 @@ class ReadResource : public BaseResource {
   [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_, params);
   }
+  /// Iterate every item across all pages of this resource's list endpoint.
+  ///
+  /// Mirrors Python's ``ReadResource.paginate``: ``list()`` returns a single
+  /// raw page; ``paginate()`` returns a ``PaginatedIterator`` that walks
+  /// ``resp["data"]`` and follows ``resp["links"]["next"]`` so callers page
+  /// through a list endpoint without hand-building the token loop.
+  [[nodiscard]] PaginatedIterator paginate(
+      const std::map<std::string, std::string>& params = {}) const {
+    return PaginatedIterator(client_, base_path_, params, "data");
+  }
   [[nodiscard]] json get(const std::string& id,
                          const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id, params);

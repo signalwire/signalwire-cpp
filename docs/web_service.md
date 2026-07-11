@@ -106,7 +106,7 @@ variables consumed by the security layer:
 ```bash
 # Basic authentication
 export SWML_BASIC_AUTH_USER="admin"
-export SWML_BASIC_AUTH_PASS="secretpassword"
+export SWML_BASIC_AUTH_PASSWORD="secretpassword"
 
 # TLS is terminated externally (reverse proxy) — see HTTPS/SSL Support below.
 export SWML_ALLOWED_HOSTS="example.com,*.example.com"
@@ -120,7 +120,7 @@ export SWML_CORS_ORIGINS="https://app.example.com"
 WebService implements HTTP Basic Authentication. Credentials can be set via:
 
 1. **Constructor**: the `basic_auth` argument, `std::make_pair("username", "password")`
-2. **Environment**: `SWML_BASIC_AUTH_USER` and `SWML_BASIC_AUTH_PASS`
+2. **Environment**: `SWML_BASIC_AUTH_USER` and `SWML_BASIC_AUTH_PASSWORD`
 
 ### File Security
 

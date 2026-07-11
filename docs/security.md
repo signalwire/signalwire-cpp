@@ -64,6 +64,17 @@ export SWML_BASIC_AUTH_PASSWORD=mysecurepassword
 | `SWML_RATE_LIMIT` | `60` | Requests per minute limit |
 | `SWML_REQUEST_TIMEOUT` | `30` | Request timeout in seconds |
 
+### Validation & URL Safety
+
+These toggles relax built-in safety checks. Leave them at their secure defaults
+in production — each one only exists as an escape hatch for controlled local /
+testing setups.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SWML_ALLOW_PRIVATE_URLS` | `false` | When `true`/`1`/`yes`, permit webhook / fetch URLs that resolve to private, loopback, or link-local addresses. **Security-critical:** the default (`false`) blocks these to prevent SSRF; only enable it for a trusted local environment. |
+| `SWML_SKIP_SCHEMA_VALIDATION` | `false` | When `true`/`1`/`yes`, skip SWML schema validation of generated documents. **Security-critical:** disabling validation lets malformed / unexpected SWML through; leave it off outside debugging. |
+
 ## Service-Specific Usage
 
 ### SWML Services (AgentBase)
@@ -84,7 +95,7 @@ public:
 
 int main() {
     MyAgent agent;
-    agent.serve();  // honours SWML_BASIC_AUTH_* and host/CORS settings; port from the constructor
+    agent.serve();  // honours SWML_BASIC_AUTH_USER / SWML_BASIC_AUTH_PASSWORD and host/CORS settings; port from the constructor
 }
 ```
 

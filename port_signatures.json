@@ -18152,6 +18152,21 @@
                 }
               ],
               "returns": "any"
+            },
+            "paginate": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "type": "dict<string,string>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "class:signalwire.rest._pagination.PaginatedIterator"
             }
           }
         },
@@ -18178,11 +18193,32 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "method",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
             },
             "body": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "method": {
               "params": [
                 {
                   "name": "self",
@@ -18199,6 +18235,15 @@
                 }
               ],
               "returns": "int"
+            },
+            "url": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             }
           }
         }
@@ -21188,6 +21233,22 @@
                 }
               ],
               "returns": "any"
+            },
+            "paginate": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "kind": "var_keyword",
+                  "type": "any",
+                  "required": false,
+                  "default": {}
+                }
+              ],
+              "returns": "any"
             }
           }
         },
@@ -22255,6 +22316,22 @@
                 }
               ],
               "returns": "any"
+            },
+            "paginate": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "kind": "var_keyword",
+                  "type": "any",
+                  "required": false,
+                  "default": {}
+                }
+              ],
+              "returns": "any"
             }
           }
         }
@@ -22339,6 +22416,22 @@
               "returns": "any"
             },
             "list": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "kind": "var_keyword",
+                  "type": "any",
+                  "required": false,
+                  "default": {}
+                }
+              ],
+              "returns": "any"
+            },
+            "paginate": {
               "params": [
                 {
                   "name": "self",
@@ -24775,6 +24868,22 @@
                 }
               ],
               "returns": "any"
+            },
+            "paginate": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "params",
+                  "kind": "var_keyword",
+                  "type": "any",
+                  "required": false,
+                  "default": {}
+                }
+              ],
+              "returns": "any"
             }
           }
         },
@@ -25212,6 +25321,22 @@
                   "kind": "positional",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "params",
+                  "kind": "var_keyword",
+                  "type": "any",
+                  "required": false,
+                  "default": {}
+                }
+              ],
+              "returns": "any"
+            },
+            "paginate": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
                 },
                 {
                   "name": "params",

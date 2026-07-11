@@ -12,6 +12,7 @@
 
 #include "mocktest.hpp"
 #include "signalwire/rest/http_client.hpp"
+#include "signalwire/rest/namespaces/generated/FabricAddresses.hpp"
 
 namespace {
 using namespace signalwire::rest;
@@ -121,6 +122,115 @@ TEST(rest_mock_pagination_next_pages_through_all_items) {
     }
     ASSERT_EQ(gets, 2);
     ASSERT_EQ(got_cursor_page2, 1);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// ReadResource::paginate() — the resource-level wiring (mirrors Python's
+// ReadResource.paginate(**params) -> PaginatedIterator). Constructs a real
+// generated read resource (FabricAddresses, base path /api/fabric/addresses),
+// calls paginate(), and walks two pages: the returned iterator must be wired to
+// the resource's own path and follow links.next across pages.
+// ---------------------------------------------------------------------------
+
+TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
+    auto client = mocktest::make_client();
+
+    // Page 1 -- has a next cursor.
+    mocktest::scenario_set(
+        kFabricAddressesEndpointId, 200,
+        {
+            {"data", json::array({
+                {{"id", "addr-1"}, {"name", "first"}},
+                {{"id", "addr-2"}, {"name", "second"}},
+            })},
+            {"links", {{"next", "http://example.com/api/fabric/addresses?cursor=page2"}}},
+        });
+    // Page 2 -- terminal (no next).
+    mocktest::scenario_set(
+        kFabricAddressesEndpointId, 200,
+        {
+            {"data", json::array({
+                {{"id", "addr-3"}, {"name", "third"}},
+            })},
+            {"links", json::object()},
+        });
+
+    signalwire::rest::generated::FabricAddresses addresses(client.http_client());
+    // paginate() returns a PaginatedIterator wired to this resource's base path.
+    auto it = addresses.paginate();
+    ASSERT_EQ(it.path(), kFabricAddressesPath);
+
+    std::vector<std::string> ids;
+    while (it.has_next()) {
+        json item = it.next();
+        ids.push_back(item.value("id", std::string()));
+    }
+    ASSERT_EQ(ids.size(), (size_t)3);
+    ASSERT_EQ(ids[0], std::string("addr-1"));
+    ASSERT_EQ(ids[1], std::string("addr-2"));
+    ASSERT_EQ(ids[2], std::string("addr-3"));
+
+    // Two GETs at the resource path; the second carries the parsed cursor=page2.
+    auto entries = mocktest::journal();
+    int gets = 0;
+    int got_cursor_page2 = 0;
+    for (const auto& e : entries) {
+        if (e.method == "GET" && e.path == kFabricAddressesPath) {
+            ++gets;
+            auto cit = e.query_params.find("cursor");
+            if (cit != e.query_params.end()
+                && !cit->second.empty()
+                && cit->second.front() == "page2") {
+                ++got_cursor_page2;
+            }
+        }
+    }
+    ASSERT_EQ(gets, 2);
+    ASSERT_EQ(got_cursor_page2, 1);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// paginate(params) forwards its query params onto the first fetch.
+// ---------------------------------------------------------------------------
+
+TEST(rest_mock_pagination_readresource_paginate_forwards_params) {
+    auto client = mocktest::make_client();
+    mocktest::scenario_set(
+        kFabricAddressesEndpointId, 200,
+        {
+            {"data", json::array({{{"id", "addr-1"}}})},
+            {"links", json::object()},
+        });
+
+    signalwire::rest::generated::FabricAddresses addresses(client.http_client());
+    auto it = addresses.paginate({{"page_size", "2"}});
+    auto p = it.params();
+    auto pit = p.find("page_size");
+    ASSERT_TRUE(pit != p.end());
+    ASSERT_EQ(pit->second, std::string("2"));
+
+    std::vector<std::string> ids;
+    while (it.has_next()) {
+        ids.push_back(it.next().value("id", std::string()));
+    }
+    ASSERT_EQ(ids.size(), (size_t)1);
+
+    // The first (only) GET carried page_size=2.
+    auto entries = mocktest::journal();
+    int with_page_size = 0;
+    for (const auto& e : entries) {
+        if (e.method == "GET" && e.path == kFabricAddressesPath) {
+            auto cit = e.query_params.find("page_size");
+            if (cit != e.query_params.end()
+                && !cit->second.empty()
+                && cit->second.front() == "2") {
+                ++with_page_size;
+            }
+        }
+    }
+    ASSERT_EQ(with_page_size, 1);
     return true;
 }
 

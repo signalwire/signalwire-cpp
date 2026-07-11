@@ -196,7 +196,7 @@ Agents completing this checklist have historically left gaps by treating ambiguo
 - [ ] CrudResource (List, Create, Get, Update, Delete)
 - [ ] Pagination support
 - [ ] SignalWireRestError
-- [ ] **All 21 REST namespaces** — exact stems below. Every one must be accessible as `client.<stem>` (Python) / `client.<CamelStem>` (Go/Java/etc.) in the port. Enforced by `scripts/audit_checklist.py`.
+- [ ] **All 20 REST namespaces** — exact stems below. Every one must be accessible as `client.<stem>` (Python) / `client.<CamelStem>` (Go/Java/etc.) in the port. Enforced by `scripts/audit_checklist.py`.
   - [ ] Fabric — **exactly 16 sub-resources**: `swml_scripts`, `swml_webhooks`, `ai_agents`, `relay_applications`, `call_flows`, `conference_rooms`, `freeswitch_connectors`, `subscribers`, `sip_endpoints`, `sip_gateways`, `cxml_scripts`, `cxml_webhooks`, `cxml_applications`, `resources`, `addresses`, `tokens`
   - [ ] Calling (**exactly 37 commands** — see the OpenAPI spec at `rest-apis/calling/openapi.yaml`)
   - [ ] PhoneNumbers — see § Phone-number binding below for the 7 typed helpers
@@ -485,7 +485,7 @@ Tests are proof of implementation. The port must test **everything the Python SD
 - [ ] All 41 SwaigFunctionResult action methods present (plus the non-action basics: set_response, set_post_process, add_action, add_actions, to_dict, and the 3 payment helpers). **Proof:** grep the port's equivalent file for the 41 action names in SWAIG_FUNCTION_RESULT_REFERENCE.md; every one resolves, or the omission is justified in PORT_OMISSIONS.md.
 - [ ] All 38 SWML verb methods present and schema-validated
 - [ ] RELAY client: all 4 correlation mechanisms implemented (JSON-RPC id, call_id, control_id, tag)
-- [ ] REST client: all 21 namespaces initialized with correct paths (see Phase 8 for the enumerated list)
+- [ ] REST client: all 20 namespaces initialized with correct paths (see Phase 8 for the enumerated list)
 - [ ] Skills registry: all 17 built-in skills registered (per Phase 4 enumerated list)
 - [ ] agent.AddSkill() one-liner integration works (not just manual SkillManager)
 - [ ] SIP username extraction utility exists

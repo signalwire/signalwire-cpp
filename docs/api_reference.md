@@ -3017,9 +3017,13 @@ The SDK supports various environment variables for configuration:
 ### Skills Configuration
 - `GOOGLE_SEARCH_API_KEY`: Google Custom Search API key
 - `GOOGLE_SEARCH_ENGINE_ID`: Google Custom Search Engine ID
-- `DATASPHERE_SPACE_NAME`: DataSphere space name
-- `DATASPHERE_PROJECT_ID`: DataSphere project ID
-- `DATASPHERE_TOKEN`: DataSphere access token
+- `SIGNALWIRE_SPACE_NAME`: DataSphere space name (fallback for the `space_name` skill param)
+- `SIGNALWIRE_PROJECT_ID`: DataSphere project ID (fallback for the `project_id` skill param)
+- `SIGNALWIRE_TOKEN` / `DATASPHERE_TOKEN`: DataSphere access token (fallback for the `token` skill param)
+- `SIGNALWIRE_SKILL_PATHS`: Colon-separated list of directories to add to the skill registry's external search path (see [Third-Party Skills](third_party_skills.md)).
+
+### RELAY Transport (advanced / testing)
+- `SIGNALWIRE_RELAY_SCHEME`: Override the RELAY WebSocket transport scheme. Production always uses TLS (`wss://`) and needs no setting; set this to a plain form only to point the RELAY client at a non-TLS local/dev or audit-fixture server. Leave unset in production.
 
 ### Usage
 

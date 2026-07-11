@@ -4,11 +4,13 @@
 
 #include <sys/stat.h>
 
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -129,20 +131,69 @@ class SkillRegistry {
       builtin.push_back(name);
     }
     out["builtin"] = builtin;
-    out["external"] = external_paths_;
+    // Effective external directories = registered ∪ SIGNALWIRE_SKILL_PATHS.
+    std::vector<std::string> ext = external_paths_;
+    for (const auto& env_path : env_skill_paths_locked()) {
+      bool dup = false;
+      for (const auto& existing : ext) {
+        if (existing == env_path) {
+          dup = true;
+          break;
+        }
+      }
+      if (!dup) {
+        ext.push_back(env_path);
+      }
+    }
+    out["external"] = ext;
     return out;
   }
 
-  /// Returns the registered external skill directories.
-  /// Mirrors Python's ``SkillRegistry._external_paths`` (private list,
-  /// exposed here as a public accessor for test inspection — C++
-  /// has no convention for protected attributes that tests can poke).
+  /// Returns the effective external skill directories: the ones registered via
+  /// ``add_skill_directory`` PLUS any supplied through the
+  /// ``SIGNALWIRE_SKILL_PATHS`` environment variable (colon-separated, deduped,
+  /// registered paths first). Mirrors Python's ``SkillRegistry`` search order,
+  /// which appends ``os.environ["SIGNALWIRE_SKILL_PATHS"]`` (split on
+  /// ``os.pathsep``) to the registered ``_external_paths`` when resolving a
+  /// skill by name.
   [[nodiscard]] std::vector<std::string> external_paths() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return external_paths_;
+    std::vector<std::string> paths = external_paths_;
+    for (const auto& env_path : env_skill_paths_locked()) {
+      bool dup = false;
+      for (const auto& existing : paths) {
+        if (existing == env_path) {
+          dup = true;
+          break;
+        }
+      }
+      if (!dup) {
+        paths.push_back(env_path);
+      }
+    }
+    return paths;
   }
 
  private:
+  /// Parse the ``SIGNALWIRE_SKILL_PATHS`` env var into a list of directories
+  /// (colon-separated, empty entries dropped). Read on every call so a var set
+  /// after construction still takes effect, matching Python's search-time read.
+  [[nodiscard]] static std::vector<std::string> env_skill_paths_locked() {
+    std::vector<std::string> out;
+    const char* raw = std::getenv("SIGNALWIRE_SKILL_PATHS");
+    if (raw == nullptr || *raw == '\0') {
+      return out;
+    }
+    std::stringstream ss(raw);
+    std::string item;
+    while (std::getline(ss, item, ':')) {
+      if (!item.empty()) {
+        out.push_back(item);
+      }
+    }
+    return out;
+  }
+
   SkillRegistry() = default;
   SkillRegistry(const SkillRegistry&) = delete;
   SkillRegistry& operator=(const SkillRegistry&) = delete;

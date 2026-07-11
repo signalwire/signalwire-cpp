@@ -1457,7 +1457,7 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     _base = modules.setdefault("signalwire.rest._base", {"classes": {}, "functions": []})
     for _bcls, _bmeths in (
         ("BaseResource", ["__init__"]),
-        ("ReadResource", ["get", "list"]),
+        ("ReadResource", ["get", "list", "paginate"]),
         ("CrudResource", ["create", "delete", "update"]),
         ("CrudWithAddresses", ["list_addresses"]),
         ("FabricResource", []),

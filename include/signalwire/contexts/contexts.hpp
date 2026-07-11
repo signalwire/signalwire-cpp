@@ -36,7 +36,8 @@ class GatherQuestion {
  public:
   GatherQuestion(const std::string& key, const std::string& question,
                  const std::string& type = "string", bool confirm = false,
-                 const std::string& prompt = "", const std::vector<std::string>& functions = {});
+                 const std::string& prompt = "", const std::vector<std::string>& functions = {},
+                 const std::optional<bool>& isolated = std::nullopt);
 
   [[nodiscard]] json to_json() const;
 
@@ -49,6 +50,8 @@ class GatherQuestion {
   bool confirm_;
   std::string prompt_;
   std::vector<std::string> functions_;
+  // Tri-state: nullopt means "inherit the gather_info default".
+  std::optional<bool> isolated_;
 };
 
 // ============================================================================
@@ -58,12 +61,13 @@ class GatherQuestion {
 class GatherInfo {
  public:
   GatherInfo(const std::string& output_key = "", const std::string& completion_action = "",
-             const std::string& prompt = "");
+             const std::string& prompt = "", bool isolated = false);
 
   GatherInfo& add_question(const std::string& key, const std::string& question,
                            const std::string& type = "string", bool confirm = false,
                            const std::string& prompt = "",
-                           const std::vector<std::string>& functions = {});
+                           const std::vector<std::string>& functions = {},
+                           const std::optional<bool>& isolated = std::nullopt);
 
   [[nodiscard]] json to_json() const;
 
@@ -76,6 +80,7 @@ class GatherInfo {
   std::string output_key_;
   std::string completion_action_;
   std::string prompt_;
+  bool isolated_ = false;
 };
 
 // ============================================================================
@@ -156,9 +161,35 @@ class Step {
   /// Set whether to auto-advance to the next step
   Step& set_skip_to_next_step(bool skip);
 
-  /// Enable info gathering on this step
+  /// Control what the model still sees when this step is entered.
+  ///
+  /// The mode applies at the moment this step is entered and governs
+  /// everything that came before it. It does not affect this step's own
+  /// turns, which accumulate fresh. Nothing is deleted: the call log keeps
+  /// every message.
+  ///
+  /// @param history One of:
+  ///   - "keep": clear nothing. Every prior step's instructions and
+  ///     dialogue stay visible to the model.
+  ///   - "default": hide the prior step instructions, keep the
+  ///     user/assistant dialogue. This is the behavior when unset.
+  ///   - "hide": hide the prior instructions AND pull the prior dialogue
+  ///     out of the model's context. Pair with a ${step_history.*}
+  ///     reference in this step's text to choose what comes back.
+  ///
+  /// Throws std::invalid_argument if history is not one of the three modes.
+  Step& set_history(const std::string& history);
+
+  /// Enable info gathering on this step.
+  ///
+  /// @param isolated Default for every question in this gather. When true,
+  ///   a question is asked with the sibling Q&A hidden from the model, so it
+  ///   must ask rather than derive the answer from an earlier one. A
+  ///   question's own isolated overrides this. The hidden turns remain in
+  ///   the call log.
   Step& set_gather_info(const std::string& output_key = "",
-                        const std::string& completion_action = "", const std::string& prompt = "");
+                        const std::string& completion_action = "", const std::string& prompt = "",
+                        bool isolated = false);
 
   /// Add a gather question (set_gather_info must be called first).
   ///
@@ -180,10 +211,15 @@ class Step {
   ///   email, geocode a ZIP), list that tool name in this question's
   ///   `functions` argument. Functions listed here are active ONLY
   ///   for this question.
+  ///   Pass this question's isolated to override the gather's isolated
+  ///   default: true hides the sibling Q&A while this question is asked;
+  ///   false keeps it visible even in an isolated gather; nullopt (default)
+  ///   inherits the gather's setting.
   Step& add_gather_question(const std::string& key, const std::string& question,
                             const std::string& type = "string", bool confirm = false,
                             const std::string& prompt = "",
-                            const std::vector<std::string>& functions = {});
+                            const std::vector<std::string>& functions = {},
+                            const std::optional<bool>& isolated = std::nullopt);
 
   /// Clear all sections and text
   Step& clear_sections();
@@ -217,6 +253,9 @@ class Step {
   std::optional<std::vector<std::string>> valid_contexts_;
   std::vector<json> sections_;
   std::optional<GatherInfo> gather_info_;
+
+  // Visibility of everything that came before this step (nullopt = unset).
+  std::optional<std::string> history_;
 
   bool end_ = false;
   bool skip_user_turn_ = false;
@@ -300,6 +339,16 @@ class Context {
   /// persona; resetting after a long off-topic detour.
   Context& set_isolated(bool isolated);
 
+  /// Set the default visibility mode for every step in this context.
+  ///
+  /// A step's own set_history overrides this. See Step::set_history for what
+  /// each mode does.
+  ///
+  /// @param history One of "keep", "default", or "hide".
+  ///
+  /// Throws std::invalid_argument if history is not one of the three modes.
+  Context& set_history(const std::string& history);
+
   /// Set prompt text directly
   Context& set_prompt(const std::string& prompt);
 
@@ -363,6 +412,9 @@ class Context {
 
   json enter_fillers_;
   json exit_fillers_;
+
+  // Default visibility mode for the steps in this context (nullopt = unset).
+  std::optional<std::string> history_;
 };
 
 // ============================================================================

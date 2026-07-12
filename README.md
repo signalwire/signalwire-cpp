@@ -326,7 +326,7 @@ ctest -R relay
 ctest -R rest
 ```
 
-The test suite contains 258 tests covering all components. The full local-and-CI
+The test suite contains 1900+ tests covering all components. The full local-and-CI
 gate runner is `bash scripts/run-ci.sh`.
 
 ## License

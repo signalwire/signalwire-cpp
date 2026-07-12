@@ -5,7 +5,6 @@ Each entry below is a name extracted from `docs/`, `rest/docs/`,
 part of the C++ port surface in `port_surface.json`, but is still a legitimate
 reference. Every entry has a one-line rationale.
 
-Categories:
 1. C++ standard library / language
 2. nlohmann::json (vendored in deps/json.hpp)
 3. Python-syntax doc blocks (ported from upstream Python docs, not yet re-written for C++)
@@ -23,11 +22,8 @@ Categories:
 
 at: nlohmann::json::at() / std::map::at() / std::vector::at() — vendored/stdlib element access
 begin: std::string::begin / std::vector::begin
-del: CrudResource/HttpClient DELETE verb — `delete` is a C++ keyword, so the real emitted method is `del`; the parity surface records the Python name `delete` (enumerate_surface RESERVED_WORD map del→delete), so docs correctly showing `.del(...)` won't resolve against port_surface.json
 delete_: generated BaseResource/FabricResource DELETE verb — `delete` is a C++ keyword, so the real emitted method is `delete_`; the parity surface records the Python name `delete` (enumerate_surface RESERVED_WORD map delete_→delete), so docs correctly showing `.delete_(...)` won't resolve against port_surface.json
 dump: nlohmann::json::dump() — vendored, not in port surface JSON
-empty: std::string::empty / std::vector::empty / std::optional::empty
-end: std::string::end / std::vector::end
 erase: std::string::erase / std::vector::erase
 push_back: std::vector::push_back
 substr: std::string::substr
@@ -40,22 +36,7 @@ value: nlohmann::json::value() + std::optional::value + std::variant::value
 ## 3. Python-syntax doc blocks (upstream Python docs not yet C++ rewritten)
 
 tool: `@AgentBase.tool(...)` Python decorator; C++ uses `define_tool(...)` (which IS in the surface)
-register: `server.register(agent)` Python API; C++ uses `register_agent(agent, route)` (which IS in the surface)
-build_voicemail_document: Python example helper method
-get_document: Python SWMLService accessor; C++ uses `document()` (present but naming differs)
-get_full_url: Python request-info helper
-get_section: Python ConfigManager
-has_config: Python ConfigManager
-register_customer_route: user-defined helper in Python routing example
-register_product_route: user-defined helper in Python routing example
 register_default_tools: Python-only skill helper
-reset_document: Python SWMLService helper; C++ rebuilds the document per render
-list_all_skill_sources: Python skill-registry diagnostic
-validate_env_vars: Python skill base-class helper
-validate_packages: Python skill base-class helper
-add_swaig_query_params: Python plural alias; C++ uses `add_swaig_query_param()` (singular, IS in the surface)
-add_directory: Python web-service static-file helper
-remove_directory: Python web-service static-file helper
 
 ## 4. Python private helpers / decorators in upstream docs
 
@@ -67,7 +48,6 @@ include_router: FastAPI `APIRouter.include_router` — Python only
 ## 6. Python datetime / logging stdlib
 
 basicConfig: logging.basicConfig()
-warning: logging.Logger.warning()
 
 ## 7. Filename fragments (comment text matched by `.name(` regex)
 
@@ -79,16 +59,6 @@ The C++ RELAY client is documented but implemented as a stub — transport layer
 (WebSocket) not yet present. The Python relay client method names appear in
 relay/docs/*.md and are kept pending transport implementation.
 
-denoise_stop: relay Call.denoise_stop()
-detect_stop: relay Call.detect_stop()
-echo: relay Call.echo()
-on: relay Call.on(event, callback)
-play_and_collect: relay Call.play_and_collect()
-receive: relay Client.receive()
-refer: relay Call.refer()
-stream: relay Call.stream()
-transcribe: relay Call.transcribe()
-volume: relay Call.volume()
 
 ## 9. REST namespace methods referenced in Python examples
 
@@ -105,7 +75,6 @@ subset (see `signalwire.rest.*` entries in port_surface.json, especially
 ### rest/docs/getting-started.md
 
 ### docs/api_reference.md / docs/swaig_reference.md — Python helpers
-start: service.start() — Python; C++ uses serve() (which IS in the surface)
 
 ### relay/docs/events.md / relay/docs/getting-started.md
 (covered in section 8)
@@ -120,16 +89,13 @@ load: std::atomic<T>::load() — used by relay_audit_harness to read a flag
 store: std::atomic<T>::store() — used by relay_audit_harness to set a flag
 position: std::sub_match::position() — used by skills_audit_harness regex iteration
 pop_back: std::string::pop_back() — used by skills_audit_harness URL trimming
-send_raw_request: relay::RelayClient::send_raw_request() — present in the
   C++ surface but the enumerator currently misses public methods declared on
   the same line block as overloaded factories; recorded here pending a
   fix to scripts/enumerate_surface.py
-list_tool_names: swml::Service::list_tool_names() — same enumerator-blind
   spot as send_raw_request; the symbol exists on the C++ surface
 set_content: httplib::Response::set_content() — third-party (cpp-httplib),
   shows up in swmlservice_ai_sidecar.cpp because the example registers a
   custom routing callback that writes a response directly
-Post: httplib::Server::Post() — third-party (cpp-httplib), used by
   swmlservice_ai_sidecar.cpp's custom route registration
 listen: httplib::Server::listen() — third-party (cpp-httplib), called on the
   Server returned by swml::Service::as_router() in swml_service_guide.md
@@ -140,7 +106,6 @@ compare: std::string::compare() — stdlib string comparison
 contains: nlohmann::json::contains() / std::map::contains() (C++20)
 find_first_not_of: std::string::find_first_not_of() — stdlib string scan
 find_last_not_of: std::string::find_last_not_of() — stdlib string scan
-handler: ToolDefinition::handler field reference (data member, not a method)
 is_array: nlohmann::json::is_array() — vendored
 is_boolean: nlohmann::json::is_boolean() — vendored
 is_null: nlohmann::json::is_null() — vendored
@@ -148,7 +113,6 @@ is_number: nlohmann::json::is_number() — vendored
 is_object: nlohmann::json::is_object() — vendored
 is_string: nlohmann::json::is_string() — vendored
 length: std::sub_match::length() / std::string::length() — stdlib
-front: std::string::front() — stdlib container access
 
 ## 11. C++ stdlib / std::chrono / json / internal helpers + migration-doc names (2026-07-08)
 

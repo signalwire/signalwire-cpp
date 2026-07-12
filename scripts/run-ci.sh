@@ -908,6 +908,22 @@ run_gate "SNIPPET-COMPILE" "documented code snippets compile" --tier=nightly \
 run_gate "DOC-CLI" "documented swaig-test invocations parse against the real CLI" \
     python3 "$PORTING_SDK_DIR/scripts/doc_cli.py" --port cpp --repo .
 
+# Wave-3 doc/API-truth gates — deterministic source/doc analysis (no build, no
+# mock, ~1.3s for all six). Per-PR tier (default): cheap enough to catch doc/API
+# drift at PR time rather than a day later in nightly.
+run_gate "ERROR-ENVELOPE" "REST error carries the full (status,body,url,method) envelope + raised on >=400" \
+    python3 "$PORTING_SDK_DIR/scripts/error_envelope.py" --port cpp --repo .
+run_gate "DEAD-PUBLIC-ERROR" "exported error types are raised/caught/user-signalled (no dead error surface)" \
+    python3 "$PORTING_SDK_DIR/scripts/dead_public_error.py" --port cpp --repo .
+run_gate "PAGINATION-WIRED" "shipped iterator-protocol paginator is wired into list()" \
+    python3 "$PORTING_SDK_DIR/scripts/pagination_wired.py" --port cpp --repo .
+run_gate "DOC-ENV" "documented SIGNALWIRE_*/SWML_* env vars <=> code-read vars agree" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_env.py" --port cpp --repo .
+run_gate "COUNT-CLAIM" "numeric doc claims (skills/namespaces) match reality" \
+    python3 "$PORTING_SDK_DIR/scripts/count_claim.py" --port cpp --repo .
+run_gate "ACCESSOR-TRUTH" "documented backtick method() refs exist in source" \
+    python3 "$PORTING_SDK_DIR/scripts/accessor_truth.py" --port cpp --repo .
+
 run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
 

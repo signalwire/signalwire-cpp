@@ -853,8 +853,8 @@ run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlis
 
 # Gate 17: IGNORE-LEDGER-VERIFY — no laundered false-absence entries in
 #          DOC_AUDIT_IGNORE.md
-run_gate "IGNORE-LEDGER-VERIFY" "no laundered false-absence entries in DOC_AUDIT_IGNORE.md" \
-    python3 "$PORTING_SDK_DIR/scripts/ignore_ledger_verify.py" --port cpp --repo .
+run_gate "IGNORE-LEDGER-VERIFY" "no laundered false-absence entries in DOC_AUDIT_IGNORE.md (--require-fields)" \
+    python3 "$PORTING_SDK_DIR/scripts/ignore_ledger_verify.py" --port cpp --repo . --require-fields
 
 # Gate 18: META-CONSISTENT — package metadata consistency
 run_gate "META-CONSISTENT" "package metadata consistency" \
@@ -870,8 +870,9 @@ run_gate "ARTIFACT-DENY" "no porting artifacts in the PUBLISHED package (git ls-
 # the GEN_TYPE_DEGENERACY_ALLOW.md / ROUTE_COLLISION_ALLOW.md allowlists are
 # user-approved, so all five pass enforcing. Four are pure host-side Python
 # (BUILD_MODE-blind); ROUTE-COLLISION needs the route_registry binary and so is
-# built + run per BUILD_MODE via route_collision_gate above. SEMVER-DIFF is NOT
-# wired (HELD pending the user's version-bump decision).
+# built + run per BUILD_MODE via route_collision_gate above. SEMVER-DIFF is wired
+# below (Gate 25) — the version bump must match the API surface change vs the
+# committed port_signatures.baseline.json floor (baseline_version 3.0.0).
 
 # Gate 20: GEN-TYPE-DEGENERACY — generated typed surface isn't all loose aliases
 run_gate "GEN-TYPE-DEGENERACY" "generated types aren't degenerate loose aliases / private-in-public (allowlist honored)" \
@@ -893,6 +894,13 @@ run_gate "GEN-IDIOM" "generated code is not lint-excluded from the idiom linter"
 #          (cpp HAS a publish workflow: release.yml, gates-before-publish)
 run_gate "RELEASE-FRESH" "publish workflow runs gates before publishing" \
     python3 "$PORTING_SDK_DIR/scripts/release_fresh.py" --port cpp --repo .
+
+# Gate 25: SEMVER-DIFF — the CMakeLists project VERSION bump must match the API
+#          surface change vs the committed port_signatures.baseline.json floor
+#          (baseline_version 3.0.0). No public surface change since the last
+#          release ⇒ 'none' required; a bump smaller than the surface delta reds.
+run_gate "SEMVER-DIFF" "version bump matches API surface change vs port_signatures.baseline.json floor" \
+    python3 "$PORTING_SDK_DIR/scripts/semver_diff.py" --port cpp --repo .
 
 # --- §C1 doc/example execution gates ------------------------------------------
 # SNIPPET-COMPILE syntax-checks every cpp fenced block WITH the SDK headers on the

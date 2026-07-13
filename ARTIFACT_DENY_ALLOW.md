@@ -29,6 +29,7 @@ Format: `- path — reason (approver, date)`.
 - audit_coverage.json — root porting-audit artifact; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
 - audit_coverage_baseline.json — root porting-audit artifact; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
 - port_signatures.json — root porting-audit surface oracle; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
+- port_signatures.baseline.json — load-bearing SEMVER-DIFF release-floor file; mirrors port_signatures.json; must be at root, must not ship (orchestrator, 2026-07-13)
 - port_surface.json — root porting-audit surface oracle; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
 - examples/relay_audit_harness.cpp — audit-harness example build-target, not compiled into libsignalwire.a (orchestrator, 2026-07-06)
 - examples/rest_audit_harness.cpp — audit-harness example build-target, not compiled into libsignalwire.a (orchestrator, 2026-07-06)

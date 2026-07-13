@@ -111,22 +111,11 @@ Python-language constructs shown in doc prose/code blocks ported verbatim from
 upstream Python; the C++ port expresses the same capability idiomatically. Not
 an SDK symbol in any language-neutral sense (language/idiom class).
 
-tool: `@AgentBase.tool(...)` Python decorator; C++ uses `define_tool(...)` (which IS in the surface) — Python-decorator idiom only
-super: Python-style `super` keyword shown in an architecture.md contrast block; C++ uses explicit base-class calls — Python-language keyword
-basicConfig: logging.basicConfig() — Python stdlib logging call, shown in a ported configuration doc block
+super: Python-style `super` keyword; the `.name(` regex also picks up `super-secret-password` (web_service.md) and `agent_type":"supervisor` (cli_guide.md) — language keyword / substring false positive, no SDK symbol
 
 ## 8. Python/framework-only symbol referenced in an upstream doc block (no C++ equivalent)
 
-Symbols that are genuinely Python- or framework-specific (a Python-only helper,
-a FastAPI method, an old migration class name). Each is verified ABSENT from
-`port_surface.json` AND from the Python reference oracle's C++-relevant surface,
-so no enumerator captures it and there is nothing to launder. These are
-report-only under IGNORE-LEDGER-VERIFY (they are not a no-divergence stdlib
-class, so they carry no auto-accept category); the CI gate does not run
-`--require-fields`, so they pass. Graduating them to a hard-clean state means
-either rewriting the three upstream Python doc references out of the C++ docs or
-a human sign-off in `IGNORE_LEDGER_ALLOW.md` — NOT a self-stamped approver.
-
-register_default_tools: Python-only skill helper shown in an upstream doc block; C++ registers built-ins via the skill registry, no such method
-include_router: FastAPI `APIRouter.include_router` — Python/FastAPI framework method, no C++ equivalent
-SignalWireClient: OLD 2.x class name shown verbatim in docs/MIGRATION-2.0.md's rename table (renamed to RestClient); intentionally documented migration name, not a live symbol
+_(empty)_ — the upstream Python doc references that previously required entries
+here (`register_default_tools`, the FastAPI `include_router`) were rewritten into
+idiomatic C++ (custom-prefab tutorial + multi-agent `AgentServer` hosting), so
+these dead report-only entries were removed.

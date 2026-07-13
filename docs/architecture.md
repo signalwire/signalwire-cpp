@@ -725,46 +725,63 @@ Users can create their own prefab agents by extending `AgentBase` or any existin
 
 Key steps for creating custom prefabs:
 
-1. **Extend the base class**:
-   ```python
-   class MyCustomPrefab(AgentBase):
-       def __init__(self, custom_param, **kwargs):
-           super().__init__(**kwargs)
-           self._custom_param = custom_param
+1. **Extend the base class**: derive from `agent::AgentBase` (or an existing
+   prefab) and forward the standard `name`/`route`/`host`/`port` arguments to the
+   base constructor, keeping any custom parameters as members. All configuration
+   happens in the constructor body:
+   ```cpp
+   #include <signalwire/agent/agent_base.hpp>
+   #include <signalwire/swaig/function_result.hpp>
+   #include <nlohmann/json.hpp>
+
+   using json = nlohmann::json;
+
+   class MyCustomPrefab : public signalwire::agent::AgentBase {
+    public:
+     explicit MyCustomPrefab(const std::string& custom_param,
+                             const std::string& name = "custom_prefab",
+                             const std::string& route = "/")
+         : AgentBase(name, route), custom_param_(custom_param) {
+       // (2) Configure default prompt sections + built-in behavior.
+       prompt_add_section("Personality", "I am a specialized agent for...");
+       prompt_add_section("Goal", "Help users with...");
+       add_skill("datetime");
+
+       // (3) Register a specialized tool.
+       json params = {
+           {"type", "object"},
+           {"properties", json::object()},
+       };
+       define_tool(
+           "specialized_function", "Do something specialized", params,
+           [](const json& args, const json& raw_data) {
+             return signalwire::swaig::FunctionResult("Function result");
+           });
+     }
+
+    private:
+     std::string custom_param_;
+   };
    ```
 
-2. **Configure defaults**:
-   ```python
-   # Set standard prompt sections
-   self.prompt_add_section("Personality", body="I am a specialized agent for...")
-   self.prompt_add_section("Goal", body="Help users with...")
-   
-   # Add default tools
-   self.register_default_tools()
-   ```
+2. **Configure defaults**: set the standard prompt sections in the constructor
+   with `prompt_add_section`, and pull in any built-in behavior via the skill
+   registry with `add_skill` (in the C++ port, built-ins are opt-in skills rather
+   than auto-registered) — see the constructor body above.
 
-3. **Add specialized tools**:
-   ```python
-   @AgentBase.tool(
-       name="specialized_function", 
-       description="Do something specialized",
-       parameters={...}
-   )
-   def specialized_function(self, args, raw_data):
-       # Implementation
-       return SwaigFunctionResult("Function result")
-   ```
+3. **Add specialized tools**: register each tool with `define_tool(name,
+   description, parameters, handler)`, passing a `swaig::ToolHandler` lambda that
+   returns a `swaig::FunctionResult` — see the `define_tool` call above.
 
-4. **Create a factory method** (optional):
-   ```python
-   @classmethod
-   def create(cls, config_dict, **kwargs):
-       """Create an instance from a configuration dictionary"""
-       return cls(
-           custom_param=config_dict.get("custom_param", "default"),
-           name=config_dict.get("name", "custom_prefab"),
-           **kwargs
-       )
+4. **Provide a factory** (optional): a static factory method reads a
+   configuration object and returns a fully constructed instance, giving callers
+   a config-driven entry point alongside the constructor:
+   ```cpp
+   static MyCustomPrefab from_config(const json& config) {
+     return MyCustomPrefab(config.value("custom_param", "default"),
+                           config.value("name", "custom_prefab"),
+                           config.value("route", "/"));
+   }
    ```
 
 ### Prefab Customization Points
@@ -1077,7 +1094,7 @@ The SDK supports multiple deployment models:
 
 2. **Multi-Agent Mode**
    - Multiple agents on same server with different routes
-   - `app.include_router(agent.as_router(), prefix=agent.route)`
+   - `server::AgentServer srv("0.0.0.0", 3000); srv.register_agent(agent, "/route");`
 
 3. **Reverse Proxy Integration**
    - Set `SWML_PROXY_URL_BASE` for proper webhook URL generation

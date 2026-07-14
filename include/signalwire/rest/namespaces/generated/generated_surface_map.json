@@ -26,6 +26,7 @@
   "PhoneNumbers": "signalwire.rest.namespaces.relay_rest_resources_generated",
   "ProjectNamespace": "signalwire.rest.namespaces._client_tree_generated",
   "ProjectTokens": "signalwire.rest.namespaces.project_resources_generated",
+  "Projects": "signalwire.rest.namespaces.projects_resources_generated",
   "PubSub": "signalwire.rest.namespaces.pubsub_resources_generated",
   "Queues": "signalwire.rest.namespaces.relay_rest_resources_generated",
   "Recordings": "signalwire.rest.namespaces.relay_rest_resources_generated",

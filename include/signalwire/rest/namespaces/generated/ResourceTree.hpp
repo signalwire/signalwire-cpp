@@ -27,6 +27,7 @@
 #include "signalwire/rest/namespaces/generated/NumberGroups.hpp"
 #include "signalwire/rest/namespaces/generated/PhoneNumbers.hpp"
 #include "signalwire/rest/namespaces/generated/ProjectNamespace.hpp"
+#include "signalwire/rest/namespaces/generated/Projects.hpp"
 #include "signalwire/rest/namespaces/generated/PubSub.hpp"
 #include "signalwire/rest/namespaces/generated/Queues.hpp"
 #include "signalwire/rest/namespaces/generated/Recordings.hpp"
@@ -59,6 +60,7 @@ struct ResourceTree {
         sip_profile(http),
         verified_callers(http),
         calling(http),
+        projects(http),
         chat(http),
         pubsub(http),
         registry(http),
@@ -80,6 +82,7 @@ struct ResourceTree {
   SipProfile sip_profile;
   VerifiedCallers verified_callers;
   Calling calling;
+  Projects projects;
   Chat chat;
   PubSub pubsub;
   RegistryNamespace registry;

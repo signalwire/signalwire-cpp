@@ -405,7 +405,8 @@ _TYPES_NS_KEY = {
     "RelayRest": "relay_rest", "Fabric": "fabric", "Calling": "calling",
     "Video": "video", "Datasphere": "datasphere", "Logs": "logs",
     "Message": "message", "Voice": "voice", "Fax": "fax", "Project": "project",
-    "Chat": "chat", "PubSub": "pubsub", "SwmlWebhooks": "swml_webhooks",
+    "Projects": "projects", "Chat": "chat", "PubSub": "pubsub",
+    "SwmlWebhooks": "swml_webhooks",
 }
 GENERATED_PAYLOAD_NS = {
     "signalwire::core::swml_verbs_generated": "signalwire.core.swml_verbs_generated",

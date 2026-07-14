@@ -56,12 +56,110 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _cpp_fmt import format_generated_cpp  # noqa: E402
 
 
-# The 12 real REST spec directories (registry has no own dir — its resources
-# live inside relay-rest via namespace: registry; swml-webhooks is types-only).
-SPEC_DIRS = [
+# ---------------------------------------------------------------------------
+# Spec discovery (§ scan rest-apis/ — no hardcoded namespace list).
+# ---------------------------------------------------------------------------
+# The set of REST spec directories is DISCOVERED by scanning
+# porting-sdk/rest-apis/*/openapi.yaml, exactly like the Python reference
+# (generate_python_rest_types.py). Two derived sets:
+#
+#   RESOURCE specs — a spec that declares at least one ``x-sdk-resource`` in its
+#     paths (the SDK adopts it as a client-tree resource surface). These drive the
+#     per-resource class + container + client-tree emission.
+#   TYPE specs — every RESOURCE spec PLUS any spec with NO REST paths at all
+#     (``paths: {}``) that still carries ``components/schemas`` (swml-webhooks: a
+#     webhook-payload contract, types-only, no client surface). These drive the
+#     method-less wire-type DTO / closed-set emission.
+#
+# A spec that has REST paths but NO x-sdk-resource markup is an UN-ADOPTED REST
+# surface (rest-apis/projects: staged for reference, no SDK implements it — see
+# mock_signalwire SPEC_NAMES) and is EXCLUDED from both sets: the SDK neither wraps
+# its routes nor surfaces its types until the reference adopts it (adding
+# x-sdk-resource markup). Adopting it is then automatic — no edit here.
+#
+# ORDERING is a presentation concern (container-member order, ResourceTree member
+# order), NOT derivable from spec content, so it is pinned by _NS_ORDER below with
+# a fail-loud guard: a newly-discovered spec absent from _NS_ORDER aborts the
+# generator, forcing an explicit (reviewed) placement rather than a silent reorder
+# or drop. CASING for the C++ types-namespace segment is mechanical PascalCase of
+# the dir name, with one acronym override (_NS_PASCAL_OVERRIDE) — pubsub -> PubSub.
+
+# Presentation order for the discovered specs (see above). Any discovered spec not
+# listed here fails loud in discover_spec_dirs(); a listed spec that no longer
+# exists on disk is simply skipped.
+_NS_ORDER = [
     "relay-rest", "fabric", "calling", "video", "datasphere",
     "logs", "message", "voice", "fax", "project", "chat", "pubsub",
+    "swml-webhooks",
 ]
+
+# PascalCase acronym overrides for the C++ types-namespace segment (the mechanical
+# PascalCase of the dir name is wrong only for genuine acronyms). Wire-invisible —
+# affects only the emitted C++ ``namespace <Seg>`` for a spec's generated types.
+_NS_PASCAL_OVERRIDE = {"pubsub": "PubSub"}
+
+
+def _spec_has_resource(doc: dict) -> bool:
+    """A spec is a RESOURCE spec iff any path declares an ``x-sdk-resource`` block."""
+    for item in (doc.get("paths") or {}).values():
+        if isinstance(item, dict) and item.get("x-sdk-resource"):
+            return True
+    return False
+
+
+def _spec_is_typesonly(doc: dict) -> bool:
+    """A spec is TYPES-ONLY iff it has no REST paths at all but carries schemas
+    (swml-webhooks: a webhook-payload contract with ``paths: {}``)."""
+    paths = doc.get("paths") or {}
+    schemas = ((doc.get("components") or {}).get("schemas")) or {}
+    return not paths and bool(schemas)
+
+
+def _ns_pascal(spec_dir: str) -> str:
+    """C++ types-namespace segment for a spec dir: PascalCase of the dir name
+    (``relay-rest`` -> ``RelayRest``), with acronym overrides (``pubsub`` ->
+    ``PubSub``)."""
+    if spec_dir in _NS_PASCAL_OVERRIDE:
+        return _NS_PASCAL_OVERRIDE[spec_dir]
+    return snake_to_pascal(spec_dir.replace("-", "_"))
+
+
+def discover_specs(psdk: Path) -> tuple[list[str], list[tuple[str, str, str]]]:
+    """Scan rest-apis/*/openapi.yaml and return (SPEC_DIRS, TYPE_NS):
+      SPEC_DIRS — ordered resource-spec dir names (x-sdk-resource present).
+      TYPE_NS   — ordered (spec_dir, PascalCase-ns-seg, snake-ns-key) for every
+                  resource spec PLUS each types-only spec.
+    Order follows _NS_ORDER; a discovered spec missing from _NS_ORDER aborts."""
+    rest_apis = psdk / "rest-apis"
+    found = sorted(d.name for d in rest_apis.iterdir()
+                   if (d / "openapi.yaml").is_file())
+    resource_dirs: set[str] = set()
+    type_dirs: set[str] = set()
+    for name in found:
+        doc = yaml.safe_load((rest_apis / name / "openapi.yaml").read_text()) or {}
+        is_resource = _spec_has_resource(doc)
+        if is_resource:
+            resource_dirs.add(name)
+            type_dirs.add(name)
+        elif _spec_is_typesonly(doc):
+            # types-only surface (no client resources), still emit its wire types
+            type_dirs.add(name)
+        # else: un-adopted REST surface (has paths, no x-sdk-resource) — skipped.
+
+    # A discovered spec we would emit but that _NS_ORDER doesn't place is a
+    # drift-loud stop: order is not derivable, so a human must place it.
+    unplaced = sorted((resource_dirs | type_dirs) - set(_NS_ORDER))
+    if unplaced:
+        raise SystemExit(
+            "generate_rest.py: discovered spec(s) not placed in _NS_ORDER: "
+            + ", ".join(unplaced)
+            + " — add them to _NS_ORDER (presentation order is not derivable)."
+        )
+
+    spec_dirs = [n for n in _NS_ORDER if n in resource_dirs]
+    type_ns = [(n, _ns_pascal(n), n.replace("-", "_"))
+               for n in _NS_ORDER if n in type_dirs]
+    return spec_dirs, type_ns
 
 # C++ reserved words (C++17 keywords) that cannot be an identifier. A body/param
 # field whose sanitised name collides gets a trailing ``_`` (the wire key is
@@ -1231,22 +1329,8 @@ def emit_resource_tree(placed) -> str:
 # is emitted for them. Read-side open shapes: typed members (snake wire key, keyword
 # escaped) with a trailing ``json extras`` — no methods, no accessors.
 
-# (spec-dir, C++ namespace segment, oracle <ns>_types_generated leaf).
-TYPE_NS = [
-    ("relay-rest", "RelayRest", "relay_rest"),
-    ("fabric", "Fabric", "fabric"),
-    ("calling", "Calling", "calling"),
-    ("video", "Video", "video"),
-    ("datasphere", "Datasphere", "datasphere"),
-    ("logs", "Logs", "logs"),
-    ("message", "Message", "message"),
-    ("voice", "Voice", "voice"),
-    ("fax", "Fax", "fax"),
-    ("project", "Project", "project"),
-    ("chat", "Chat", "chat"),
-    ("pubsub", "PubSub", "pubsub"),
-    ("swml-webhooks", "SwmlWebhooks", "swml_webhooks"),
-]
+# The (spec-dir, C++ namespace segment, oracle <ns>_types_generated leaf) triples
+# are DISCOVERED by discover_specs() (scanning rest-apis/), not hardcoded.
 
 
 def snake(name: str) -> str:
@@ -1433,11 +1517,11 @@ def emit_type_enum(ns_seg: str, enum_name: str, values: list, ns_key: str, raw_n
     return "\n".join(lines) + "\n"
 
 
-def emit_types(psdk: Path, outs: dict) -> None:
+def emit_types(psdk: Path, outs: dict, type_ns: list[tuple[str, str, str]]) -> None:
     """Emit every <ns>_types_generated data struct / closed-set into
     ``types/<ns>/<snake_name>.hpp`` keys of ``outs`` (relative to the generated
-    dir)."""
-    for spec_dir, ns_seg, ns_key in TYPE_NS:
+    dir). ``type_ns`` is the discovered (spec_dir, ns_seg, ns_key) list."""
+    for spec_dir, ns_seg, ns_key in type_ns:
         schemas = _load_types_schemas(psdk, spec_dir)
         for raw_name, node in schemas.items():
             if not isinstance(node, dict):
@@ -1472,7 +1556,8 @@ def build_outputs(psdk: Path) -> dict[str, str]:
     load_bases(psdk)  # validate x-sdk-bases (fail loud)
     _SIDECAR.clear()
     _RENAMES.clear()
-    specs = [load_spec(psdk, ns) for ns in SPEC_DIRS]
+    spec_dirs, type_ns = discover_specs(psdk)
+    specs = [load_spec(psdk, ns) for ns in spec_dirs]
     outs: dict[str, str] = {}
     for spec in specs:
         for anchor, markup in spec.resources():
@@ -1499,7 +1584,7 @@ def build_outputs(psdk: Path) -> dict[str, str]:
 
     # Item D/H: the <ns>_types_generated wire-type surface (method-less DTOs +
     # closed-sets from each spec's components/schemas).
-    emit_types(psdk, outs)
+    emit_types(psdk, outs, type_ns)
 
     # Committed class -> canonical module map (idiom-blind projection the
     # signature/surface enumerators consume, single source of truth — never
@@ -1538,7 +1623,8 @@ def build_outputs(psdk: Path) -> dict[str, str]:
 
 
 def _print_classes(psdk: Path) -> None:
-    specs = [load_spec(psdk, ns) for ns in SPEC_DIRS]
+    spec_dirs, _ = discover_specs(psdk)
+    specs = [load_spec(psdk, ns) for ns in spec_dirs]
     per_ns: dict[str, list[str]] = {}
     for spec in specs:
         for anchor, markup in spec.resources():
@@ -1552,7 +1638,8 @@ def _print_classes(psdk: Path) -> None:
 
 
 def _print_paths(psdk: Path) -> None:
-    specs = [load_spec(psdk, ns) for ns in SPEC_DIRS]
+    spec_dirs, _ = discover_specs(psdk)
+    specs = [load_spec(psdk, ns) for ns in spec_dirs]
     for spec in specs:
         for anchor, markup in spec.resources():
             if markup.get("kind") == "command-dispatch":

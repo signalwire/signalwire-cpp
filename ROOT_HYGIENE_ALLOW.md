@@ -19,6 +19,7 @@ Format: `- <file> — reason (approver, date)`.
 - audit_coverage.json — porting-audit artifact read at repo root by porting-sdk audit_coverage_map.py (orchestrator, 2026-07-06)
 - audit_coverage_baseline.json — porting-audit artifact read at repo root by porting-sdk audit_coverage_map.py (orchestrator, 2026-07-06)
 - port_signatures.json — porting-audit surface oracle read at repo root by porting-sdk diff/query/drift audit scripts (orchestrator, 2026-07-06)
+- port_signatures.baseline.json — load-bearing SEMVER-DIFF release-floor file; mirrors port_signatures.json; must be at root, must not ship (orchestrator, 2026-07-13)
 - port_surface.json — porting-audit surface oracle read at repo root by porting-sdk audit_docs.py / check_surface_freshness.py and this repo's run-ci.sh (orchestrator, 2026-07-06)
 - ROOT_HYGIENE_ALLOW.md — this gate's own allowlist file (root-hygiene), lives at root by the gate's convention (orchestrator, 2026-07-06)
 - DOC_LANG_ALLOW.md — the doc-lang-purity gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)

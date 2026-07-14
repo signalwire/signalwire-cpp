@@ -16,9 +16,84 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # CI gate — the full run-ci.sh gate set MUST pass before anything is built or
+  # published. `build` declares `needs: ci` and `release` declares `needs: build`,
+  # so a red gate mechanically blocks the release: no tarball, no library asset,
+  # no GitHub Release can be cut without green CI. Mirrors test.yml's gate run so
+  # there is no local/CI drift.
+  # ---------------------------------------------------------------------------
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout signalwire-cpp
+        uses: actions/checkout@v6
+        with:
+          path: signalwire-cpp
+
+      - name: Checkout porting-sdk (mock servers + audit scripts + EMISSION corpus)
+        uses: actions/checkout@v6
+        with:
+          repository: signalwire/porting-sdk
+          path: porting-sdk
+          token: ${{ secrets.PORTING_SDK_TOKEN }}
+
+      - name: Checkout signalwire-python (EMISSION oracle)
+        uses: actions/checkout@v6
+        with:
+          repository: signalwire/signalwire-python
+          path: signalwire-python
+          ref: main
+
+      - name: Setup Python (audit scripts + mock servers + libclang)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install build deps (cmake + g++ + OpenSSL 3 headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev
+
+      - name: Install pinned clang-format + clang-tidy 18.1.8 + clang-18 compiler
+        run: |
+          pip install "clang-format==18.1.8" "clang-tidy==18.1.8"
+          sudo apt-get install -y clang-18
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+
+      - name: Install libclang Python bindings (SIGNATURES gate)
+        run: pip install "clang==18.1.8" "libclang==18.1.1"
+
+      - name: Resolve the matching libclang native lib (SW_LIBCLANG_PATH)
+        run: |
+          SO="$(python -c 'import os, glob, clang; d=os.path.join(os.path.dirname(clang.__file__), "native"); hits=[h for pat in ("libclang.so","libclang.dylib") for h in glob.glob(os.path.join(d, pat))]; print(hits[0] if hits else "")')"
+          test -f "$SO"
+          echo "SW_LIBCLANG_PATH=$SO" >> "$GITHUB_ENV"
+
+      - name: Install Python test harnesses (mock_relay + mock_signalwire)
+        run: |
+          pip install -e porting-sdk/test_harness/mock_relay
+          pip install -e porting-sdk/test_harness/mock_signalwire
+
+      - name: Install signalwire-python (EMISSION oracle) if not importable
+        run: |
+          if python -c "import signalwire.core.function_result" 2>/dev/null; then
+            echo "signalwire-python already importable; skipping install"
+          else
+            pip install ./signalwire-python
+          fi
+
+      - name: Run CI gate script (full gate set)
+        working-directory: signalwire-cpp
+        env:
+          PORTING_SDK: ${{ github.workspace }}/porting-sdk
+        run: bash scripts/run-ci.sh
+
+  # ---------------------------------------------------------------------------
   # Build matrix: Linux x64, Linux ARM64, macOS ARM64
   # ---------------------------------------------------------------------------
   build:
+    needs: ci
     strategy:
       fail-fast: false
       matrix:

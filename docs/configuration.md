@@ -330,10 +330,15 @@ public:
    python -m json.tool config.json
    ```
 
-2. Enable debug logging:
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
+2. Enable debug logging — set the level programmatically on the shared logger,
+   or via the `SIGNALWIRE_LOG_LEVEL` environment variable:
+   ```cpp
+   #include <signalwire/logging.hpp>
+
+   signalwire::Logger::instance().set_level(signalwire::LogLevel::Debug);
+   ```
+   ```bash
+   export SIGNALWIRE_LOG_LEVEL=debug
    ```
 
 3. Check for syntax errors in variable substitution

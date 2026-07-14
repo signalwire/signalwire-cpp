@@ -272,6 +272,17 @@ def snake_to_camel(snake: str) -> str:
     return parts[0] + "".join(w[:1].upper() + w[1:] for w in parts[1:])
 
 
+def snake_to_pascal(snake: str) -> str:
+    """Full PascalCase for a generated TYPE name (e.g. an options-struct):
+    ``play_stop`` -> ``PlayStop``. Single words (``play`` -> ``Play``) are
+    unchanged. Used for ``<Method>Params`` struct names so multi-word commands
+    read ``PlayStopParams`` (matching the single-word ``PlayParams`` siblings),
+    not the half-snake ``Play_stopParams``. The METHOD name stays snake_case
+    (``play_stop()``) for Python parity — only the type name is PascalCased."""
+    camel = snake_to_camel(snake.rstrip("_"))
+    return camel[:1].upper() + camel[1:]
+
+
 def snake_ident(field: str) -> str:
     """A safe C++ identifier for a wire field name (member/param). Non-identifier
     runes fold to ``_``; a leading digit gets a ``_`` prefix; a C++ keyword gets a
@@ -692,7 +703,7 @@ def emit_method(spec: Spec, anchor: str, markup: dict, base: str,
         body_schema = spec.op_body.get(op_id) or {}
         if is_object_body(spec, body_schema):
             fields = object_body_fields(spec, body_schema)
-            struct_name = f"{name.rstrip('_')[:1].upper() + name.rstrip('_')[1:]}Params"
+            struct_name = f"{snake_to_pascal(name)}Params"
             struct_src, build, _ = _params_struct(struct_name, fields, spec, cls, name, id_records)
             structs.append(struct_src)
             sig = ", ".join(id_params + [f"const {struct_name}& p"])
@@ -795,7 +806,7 @@ def emit_set_method(spec: Spec, markup: dict, sm_name: str, sm: dict,
     cls = markup["name"]
     name = snake_to_camel(sm_name)
     args = sm.get("args") or {}
-    struct_name = f"{name[:1].upper() + name[1:]}Params"
+    struct_name = f"{snake_to_pascal(sm_name)}Params"
     struct_fields: list[tuple[str, dict, bool]] = []
     records: list[dict] = [
         {"name": "resource_id", "kind": "positional", "type": "string", "required": True}]
@@ -872,7 +883,7 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
         if with_id:
             records.append({"name": "call_id", "kind": "positional",
                             "type": "string", "required": True})
-        struct_name = f"{mname[:1].upper() + mname[1:]}Params"
+        struct_name = f"{snake_to_pascal(mname)}Params"
         # build options struct
         slines = [f"struct {struct_name} {{"]
         build = ["    json params = json::object();"]

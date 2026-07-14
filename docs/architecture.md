@@ -775,13 +775,32 @@ Key steps for creating custom prefabs:
 
 4. **Provide a factory** (optional): a static factory method reads a
    configuration object and returns a fully constructed instance, giving callers
-   a config-driven entry point alongside the constructor:
+   a config-driven entry point alongside the constructor. Declare it as a `static`
+   member of the prefab (shown here on a minimal class so the fragment stands on
+   its own):
    ```cpp
-   static MyCustomPrefab from_config(const json& config) {
-     return MyCustomPrefab(config.value("custom_param", "default"),
-                           config.value("name", "custom_prefab"),
-                           config.value("route", "/"));
-   }
+   #include <signalwire/agent/agent_base.hpp>
+   #include <nlohmann/json.hpp>
+
+   using json = nlohmann::json;
+
+   class MyCustomPrefab : public signalwire::agent::AgentBase {
+    public:
+     explicit MyCustomPrefab(const std::string& custom_param,
+                             const std::string& name = "custom_prefab",
+                             const std::string& route = "/")
+         : AgentBase(name, route), custom_param_(custom_param) {}
+
+     // Config-driven entry point alongside the constructor.
+     static MyCustomPrefab from_config(const json& config) {
+       return MyCustomPrefab(config.value("custom_param", "default"),
+                             config.value("name", "custom_prefab"),
+                             config.value("route", "/"));
+     }
+
+    private:
+     std::string custom_param_;
+   };
    ```
 
 ### Prefab Customization Points

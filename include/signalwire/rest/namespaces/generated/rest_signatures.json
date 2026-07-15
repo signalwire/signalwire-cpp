@@ -2628,6 +2628,44 @@
         "default": {}
       }
     ],
+    "Projects::create": [
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "Projects::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "Projects::rotateSigningKey": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "Projects::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
     "PubSub::createToken": [
       {
         "name": "ttl",

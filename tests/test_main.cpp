@@ -194,6 +194,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_generated_logs.cpp"
 #include "test_rest_generated_message.cpp"
 #include "test_rest_generated_project.cpp"
+#include "test_rest_generated_projects.cpp"
 #include "test_rest_generated_pubsub.cpp"
 #include "test_rest_generated_relay_rest.cpp"
 #include "test_rest_generated_video.cpp"

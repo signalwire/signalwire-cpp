@@ -3,6 +3,16 @@
 All notable changes to the SignalWire AI Agents SDK for C++ are documented in
 this file. This project adheres to [Semantic Versioning](https://semver.org).
 
+## [3.2.1] - 2026-07-15
+
+### Fixed
+- `datetime` skill: `get_current_time` / `get_current_date` now compute the time
+  in the requested `timezone` instead of always returning UTC. The zone is
+  resolved via the platform tz database (`TZ` + `tzset` + `localtime_r`, with the
+  process-global `TZ` saved and restored under a mutex for thread safety), and an
+  unknown/invalid zone returns an error result rather than a UTC answer labelled
+  as that zone. The tool interface (name/params/required) is unchanged.
+
 ## [3.2.0] - 2026-07-15
 
 ### Added

@@ -71,6 +71,7 @@ class RestClient {
   generated::RegistryNamespace& registry() { return tree_->registry; }
   generated::LogsNamespace& logs() { return tree_->logs; }
   generated::ProjectNamespace& project() { return tree_->project; }
+  generated::Messages& messages() { return tree_->messages; }
   generated::Projects& projects() { return tree_->projects; }
   generated::PubSub& pubsub() { return tree_->pubsub; }
   generated::Chat& chat() { return tree_->chat; }

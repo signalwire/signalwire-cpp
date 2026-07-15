@@ -2102,6 +2102,92 @@
         "default": {}
       }
     ],
+    "Messages::create": [
+      {
+        "name": "to",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "from",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "media",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_as_mms",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_callback",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "custom_variables",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "Messages::update": [
+      {
+        "name": "message_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "body",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "Mfa::call": [
       {
         "name": "to",

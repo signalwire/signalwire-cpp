@@ -3,6 +3,16 @@
 All notable changes to the SignalWire AI Agents SDK for C++ are documented in
 this file. This project adheres to [Semantic Versioning](https://semver.org).
 
+## [3.2.0] - 2026-07-15
+
+### Added
+- `Messages` REST resource (`client.messages()`): send (`create`, POST
+  `/api/messaging/messages`) and redact (`update`, PATCH
+  `/api/messaging/messages/{message_id}`), generated from the canonical
+  `messages` OpenAPI spec and covered by success + error wire tests against the
+  shared mock server. Distinct from the message-logs endpoints exposed at
+  `client.logs().messages`.
+
 ## [3.1.0] - 2026-07-14
 
 ### Added

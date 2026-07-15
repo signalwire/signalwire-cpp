@@ -76,7 +76,7 @@ jobs:
       # save step below runs with if: always().
       - name: Restore clang-tidy cache (ctcache)
         id: ctcache_restore
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ctcache
           key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
@@ -180,7 +180,7 @@ jobs:
       # the next run's restore-keys prefix picks up the most recent.
       - name: Save clang-tidy cache (ctcache)
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ~/.cache/ctcache
           key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}

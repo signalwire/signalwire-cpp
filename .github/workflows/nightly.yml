@@ -77,12 +77,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout signalwire-cpp
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: signalwire-cpp
 
       - name: Checkout porting-sdk (mock servers + audit scripts + EMISSION corpus)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk
@@ -93,7 +93,7 @@ jobs:
       # which pulls fastapi via signalwire/__init__. Check it out as a sibling so
       # the gate has its reference.
       - name: Checkout signalwire-python (EMISSION oracle)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: signalwire/signalwire-python
           path: signalwire-python

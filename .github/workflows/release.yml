@@ -26,19 +26,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout signalwire-cpp
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: signalwire-cpp
 
       - name: Checkout porting-sdk (mock servers + audit scripts + EMISSION corpus)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk
           token: ${{ secrets.PORTING_SDK_TOKEN }}
 
       - name: Checkout signalwire-python (EMISSION oracle)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: signalwire/signalwire-python
           path: signalwire-python
@@ -121,7 +121,7 @@ jobs:
           VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.ref.outputs.ref }}
 
@@ -185,7 +185,7 @@ jobs:
           VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.ref.outputs.ref }}
 

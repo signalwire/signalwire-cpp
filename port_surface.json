@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ f0d661671ef39533dbafbb059742c74ea182db59",
+  "generated_from": "signalwire-cpp @ 1dce76bad0b7be13d900721d34d1224bbfdb44ae",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1780,6 +1780,7 @@
           "imported_numbers",
           "logs",
           "lookup",
+          "messages",
           "mfa",
           "number_groups",
           "phone_numbers",
@@ -1810,6 +1811,7 @@
           "imported_numbers",
           "logs",
           "lookup",
+          "messages",
           "mfa",
           "number_groups",
           "phone_numbers",
@@ -2678,6 +2680,31 @@
         "Types_StatusCodes_StatusCode401": [],
         "Types_StatusCodes_StatusCode404": [],
         "Types_StatusCodes_StatusCode500": []
+      },
+      "functions": []
+    },
+    "signalwire.rest.namespaces.messages_resources_generated": {
+      "classes": {
+        "Messages": [
+          "__init__",
+          "create",
+          "update"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest.namespaces.messages_types_generated": {
+      "classes": {
+        "CreateMessageRequest": [],
+        "Message": [],
+        "MessagesCreateStatusCode422": [],
+        "MessagesUpdateStatusCode422": [],
+        "Types_StatusCodes_RestApiErrorItem": [],
+        "Types_StatusCodes_StatusCode400": [],
+        "Types_StatusCodes_StatusCode401": [],
+        "Types_StatusCodes_StatusCode404": [],
+        "Types_StatusCodes_StatusCode500": [],
+        "UpdateMessageRequest": []
       },
       "functions": []
     },

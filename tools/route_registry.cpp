@@ -466,6 +466,10 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("projects.delete_", c.projects().delete_(id));
   CALL("projects.rotateSigningKey", c.projects().rotateSigningKey(id));
 
+  // ---- messages (/api/messaging/messages send + redact) ----
+  CALL("messages.create", c.messages().create({.to = SENTINEL, .from = SENTINEL}));
+  CALL("messages.update", c.messages().update(id, {.body = SENTINEL}));
+
   // ---- pubsub / chat (token-only) ----
   CALL("pubsub.createToken", c.pubsub().createToken({.ttl = 60, .channels = json::array()}));
   CALL("chat.createToken", c.chat().createToken({.ttl = 60, .channels = json::array()}));

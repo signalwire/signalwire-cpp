@@ -23,6 +23,7 @@
 #include "signalwire/rest/namespaces/generated/ImportedNumbers.hpp"
 #include "signalwire/rest/namespaces/generated/LogsNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/Lookup.hpp"
+#include "signalwire/rest/namespaces/generated/Messages.hpp"
 #include "signalwire/rest/namespaces/generated/Mfa.hpp"
 #include "signalwire/rest/namespaces/generated/NumberGroups.hpp"
 #include "signalwire/rest/namespaces/generated/PhoneNumbers.hpp"
@@ -60,6 +61,7 @@ struct ResourceTree {
         sip_profile(http),
         verified_callers(http),
         calling(http),
+        messages(http),
         projects(http),
         chat(http),
         pubsub(http),
@@ -82,6 +84,7 @@ struct ResourceTree {
   SipProfile sip_profile;
   VerifiedCallers verified_callers;
   Calling calling;
+  Messages messages;
   Projects projects;
   Chat chat;
   PubSub pubsub;

@@ -89,7 +89,7 @@ from _cpp_fmt import format_generated_cpp  # noqa: E402
 # exists on disk is simply skipped.
 _NS_ORDER = [
     "relay-rest", "fabric", "calling", "video", "datasphere",
-    "logs", "message", "voice", "fax", "project", "projects", "chat", "pubsub",
+    "logs", "message", "messages", "voice", "fax", "project", "projects", "chat", "pubsub",
     "swml-webhooks",
 ]
 

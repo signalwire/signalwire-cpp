@@ -2,7 +2,15 @@ cmake_minimum_required(VERSION 3.16)
 project(signalwire VERSION 3.2.1
         HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
         LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 17)
+# C++20: the SDK's documented, idiomatic construction of the generated *Params
+# structs uses designated initializers ({.from = ..., .to = ...}), a C++20 feature
+# used pervasively across the examples + docs (166 sites). GCC/Clang accept it in
+# -std=c++17 only as a non-portable extension (and MSVC /std:c++17 rejects it), so a
+# "C++17 / MSVC 2019+" floor was false. C++20 makes the advertised floor honest and
+# matches the documented API idiom. The SNIPPET-COMPILE gate compiles snippets with
+# -std=c++20 -pedantic-errors so the floor is mechanically enforced (no silently-
+# accepted higher-standard extension can sneak in).
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ccache — compiler-cache launcher, availability-gated so its ABSENCE is a
@@ -208,11 +216,28 @@ target_link_libraries(state_dump signalwire)
 add_executable(http_dump tools/http_dump.cpp)
 target_link_libraries(http_dump signalwire)
 
+# doc_wire_dump is the DOC-WIRE (§2.1) runner: points a RestClient at the shared
+# mock_signalwire (MOCK_SIGNALWIRE_PORT / SIGNALWIRE_MOCK_URL) and replays the
+# documented REST call shapes so the mock journals the exact wire each doc example
+# emits. porting-sdk/scripts/doc_wire.py builds + runs it and reads the journal.
+add_executable(doc_wire_dump tools/doc_wire_dump.cpp)
+target_link_libraries(doc_wire_dump signalwire)
+
 # wire_relay_dump links the RELAY client + stands up an in-process mock WS
 # server (IXWebSocket) to capture the frames the client sends. It uses the
 # IXWebSocket server headers directly, so link ixwebsocket explicitly.
 add_executable(wire_relay_dump tools/wire_relay_dump.cpp)
 target_link_libraries(wire_relay_dump signalwire ixwebsocket)
+
+# wait_liveness_dump is the WAIT-LIVENESS (§2.4) runner: it drives a live
+# mock_relay via the shared relay_mocktest harness, arms deferred completing
+# events, calls Action::wait(), and emits the liveness classification.
+# porting-sdk/scripts/diff_port_wait_liveness.py builds + runs it and compares the
+# classification to the python golden. It reuses tests/relay_mocktest.cpp (the same
+# mock harness the relay tests use) and so needs tests/ on the include path.
+add_executable(wait_liveness_dump tools/wait_liveness_dump.cpp tests/relay_mocktest.cpp)
+target_link_libraries(wait_liveness_dump signalwire)
+target_include_directories(wait_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that

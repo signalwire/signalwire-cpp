@@ -65,6 +65,15 @@ PORT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$PORT_ROOT/.sw-tmp"  # repo-local CI scratch (never /tmp)
 PORT_NAME="signalwire-cpp"
 
+# Gate-enforcement plan (Part D): cpp's widened Wave-A findings are BLOCKING, not
+# report-only. The shared wave-A gate scripts (count_claim / audit_docs /
+# status_claim / semver_diff / dead_public_error) default to report-only when
+# SW_WAVE_A_REPORT_ONLY is unset; setting it to 0 makes every newly-caught wave-A
+# violation count toward the exit code. cpp's wave-A red list has been burned to
+# zero (namespace counts → 22, area_code → areacode wire fix, RELAY status heading,
+# baseline commit anchor), so this stays green while fully enforced.
+export SW_WAVE_A_REPORT_ONLY=0
+
 # Shared tool-environment bootstrap — the SAME _env.sh the canonical
 # run-format.sh / run-lint.sh / run-tests.sh source. It prepends clang-18
 # (llvm@18) to PATH so the FMT gate's clang-format, the LINT gate's clang-tidy
@@ -663,6 +672,84 @@ lint_gate() {
     bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
+# --- gate-enforcement quartet (§2.1-2.4) --------------------------------------
+# DOC-WIRE (§2.1): doc_wire.py spawns the mock in FLAG mode, exports
+# MOCK_SIGNALWIRE_PORT, runs the doc_wire_dump binary (built by the TEST gate; it
+# points a RestClient at the mock and replays the documented REST call SHAPES),
+# then reads the mock's wire_violations journal. The runner is resolved per
+# BUILD_MODE like the other dump binaries (host binary / docker exec / throwaway
+# run). Per-PR: a single quick replay.
+doc_wire_gate() {
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)   dump_cmd="$PORT_ROOT/build/doc_wire_dump" ;;
+        exec:*) dump_cmd="docker exec ${BUILD_MODE#exec:} $SWCPP_CONTAINER_BUILD/doc_wire_dump" ;;
+        run:*)  local img="${BUILD_MODE#run:}"
+                dump_cmd="docker run --rm --network host -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                    'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                     && cmake --build $SWCPP_CONTAINER_BUILD --target doc_wire_dump -j\$(nproc) 1>&2 \
+                     && exec $SWCPP_CONTAINER_BUILD/doc_wire_dump'" ;;
+        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    # host: build the runner if the TEST gate hasn't (it's not in the TEST target set).
+    if [ "$BUILD_MODE" = host ]; then
+        cmake --build "$PORT_ROOT/build" --target doc_wire_dump -j"$(sw_build_jobs)" 1>&2 || return 1
+    fi
+    python3 "$PORTING_SDK_DIR/scripts/doc_wire.py" --port cpp --repo "$PORT_ROOT" \
+        --runner "$dump_cmd"
+}
+
+# WAIT-LIVENESS (§2.4): the RELAY Action::wait() liveness contract — wait() BLOCKS
+# until the deferred completing event arrives (never a no-op at t~=0, never a hang).
+# wait_liveness_dump drives a live mock_relay via the relay_mocktest harness, arms
+# deferred completions, and emits the classification; the differ compares it to the
+# python golden. nightly (a real-time behavioral check). The mock is self-spawned by
+# the dump's relay_mocktest harness (adjacency-discovered) — no gate-side mock.
+wait_liveness_gate() {
+    local dump_cmd
+    case "$BUILD_MODE" in
+        host)   dump_cmd="$PORT_ROOT/build/wait_liveness_dump" ;;
+        exec:*) dump_cmd="docker exec ${BUILD_MODE#exec:} $SWCPP_CONTAINER_BUILD/wait_liveness_dump" ;;
+        run:*)  local img="${BUILD_MODE#run:}"
+                dump_cmd="docker run --rm --network host -v $(dirname "$PORT_ROOT"):/src $img bash -c \
+                    'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                     && cmake --build $SWCPP_CONTAINER_BUILD --target wait_liveness_dump -j\$(nproc) 1>&2 \
+                     && exec $SWCPP_CONTAINER_BUILD/wait_liveness_dump'" ;;
+        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+    if [ "$BUILD_MODE" = host ]; then
+        cmake --build "$PORT_ROOT/build" --target wait_liveness_dump -j"$(sw_build_jobs)" 1>&2 || return 1
+    fi
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_wait_liveness.py" --port cpp \
+        --python-sdk "$PYTHON_SDK_DIR" \
+        --dump-cmd "$dump_cmd"
+}
+
+# STRICT-MOCKS (§2.2): re-run the RELAY mock suite with the mock in STRICT mode
+# (MOCK_RELAY_STRICT=1 → mock_relay 400s an unknown field / duplicate id instead of
+# tolerantly journaling it), so a wire-shape regression the tolerant mock would
+# swallow fails loud. cpp's relay tests self-spawn `python -m mock_relay` via
+# fork+execlp, which INHERITS this env, so exporting MOCK_RELAY_STRICT here reaches
+# the child mock. run_tests was built by the TEST gate; resolve it per BUILD_MODE.
+# nightly (a second full RELAY pass is heavy).
+strict_mocks_gate() {
+    case "$BUILD_MODE" in
+        host)
+            env MOCK_RELAY_STRICT=1 SW_TEST_PARALLEL=1 "$PORT_ROOT/build/run_tests" relay_mock_ ;;
+        exec:*)
+            docker exec -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "${BUILD_MODE#exec:}" \
+                "$SWCPP_CONTAINER_BUILD/run_tests" relay_mock_ ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
+                -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
+                && '$SWCPP_CONTAINER_BUILD/run_tests' relay_mock_" ;;
+        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+}
+
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
 run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
 
@@ -931,6 +1018,23 @@ run_gate "COUNT-CLAIM" "numeric doc claims (skills/namespaces) match reality" \
     python3 "$PORTING_SDK_DIR/scripts/count_claim.py" --port cpp --repo .
 run_gate "ACCESSOR-TRUTH" "documented backtick method() refs exist in source" \
     python3 "$PORTING_SDK_DIR/scripts/accessor_truth.py" --port cpp --repo .
+
+# --- gate-enforcement quartet (§2.1-2.4) --------------------------------------
+# DOC-WIRE + STATUS-CLAIM run per-PR (catch a wrong doc wire key / a false status
+# claim at PR time); WAIT-LIVENESS + STRICT-MOCKS run nightly (a real-time RELAY
+# behavioral check + a second full strict RELAY pass are heavy).
+run_gate "DOC-WIRE" "documented REST call shapes emit no unknown-field/query-param violations against the strict mock" \
+    doc_wire_gate
+
+run_gate "STATUS-CLAIM" "doc status claims (not-implemented/adapter/pending) match shipped reality" \
+    python3 "$PORTING_SDK_DIR/scripts/status_claim.py" --port cpp --repo . \
+        --surface "$PORT_ROOT/port_surface.json"
+
+run_gate "WAIT-LIVENESS" "RELAY Action::wait() blocks-until-event liveness matches the python golden" --tier=nightly \
+    wait_liveness_gate
+
+run_gate "STRICT-MOCKS" "RELAY suite passes with the mock in 400-on-violation strict mode (MOCK_RELAY_STRICT=1)" --tier=nightly \
+    strict_mocks_gate
 
 run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .

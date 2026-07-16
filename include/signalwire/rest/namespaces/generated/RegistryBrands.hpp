@@ -39,12 +39,12 @@ class RegistryBrands : public BaseResource {
     return client_.get(base_path_ + "/" + id, params);
   }
 
-  [[nodiscard]] json listCampaigns(const std::string& id,
-                                   const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_campaigns(const std::string& id,
+                                    const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("campaigns"), params);
   }
 
-  [[nodiscard]] json createCampaign(const std::string& id, const json& body) const {
+  [[nodiscard]] json create_campaign(const std::string& id, const json& body) const {
     return client_.post(base_path_ + "/" + id + "/" + std::string("campaigns"), body);
   }
 };

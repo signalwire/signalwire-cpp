@@ -74,7 +74,7 @@ int main() {
 2. **Build and link** against the static library (`libsignalwire.a`) inside your
    container image:
 ```bash
-g++ -std=c++17 -I include -I deps main.cpp \
+g++ -std=c++20 -I include -I deps main.cpp \
     -L build -lsignalwire -lssl -lcrypto -lpthread -o agent
 ```
 
@@ -321,7 +321,7 @@ Build and run your compiled handler locally, then exercise it with `curl` or
 ```bash
 # Build the static library and your handler
 mkdir -p build && cd build && cmake .. && make -j$(nproc)
-g++ -std=c++17 -I ../include -I ../deps ../main.cpp \
+g++ -std=c++20 -I ../include -I ../deps ../main.cpp \
     -L . -lsignalwire -lssl -lcrypto -lpthread -o agent
 
 # Run it (a Service/AgentBase serve() listens on the configured port)

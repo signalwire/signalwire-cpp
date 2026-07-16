@@ -28,20 +28,20 @@ class Queues : public CrudResource {
   explicit Queues(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/queues", "PUT") {}
 
-  [[nodiscard]] json listMembers(const std::string& queue_id,
-                                 const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_members(const std::string& queue_id,
+                                  const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members"), params);
   }
 
-  [[nodiscard]] json getNextMember(const std::string& queue_id,
-                                   const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json get_next_member(const std::string& queue_id,
+                                     const std::map<std::string, std::string>& params = {}) const {
     return client_.get(
         base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + std::string("next"),
         params);
   }
 
-  [[nodiscard]] json getMember(const std::string& queue_id, const std::string& id,
-                               const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json get_member(const std::string& queue_id, const std::string& id,
+                                const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + queue_id + "/" + std::string("members") + "/" + id,
                        params);
   }

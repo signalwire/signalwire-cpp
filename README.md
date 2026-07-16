@@ -6,7 +6,7 @@
 
 # SignalWire SDK for C++
 
-_Build AI voice agents, control live calls over WebSocket, and manage every SignalWire resource over REST -- all from modern C++17._
+_Build AI voice agents, control live calls over WebSocket, and manage every SignalWire resource over REST -- all from modern C++20._
 
 <p align="center">
   <a href="https://developer.signalwire.com/sdks/agents-sdk" target="_blank">Documentation</a> &middot;
@@ -28,10 +28,10 @@ _Build AI voice agents, control live calls over WebSocket, and manage every Sign
 |-----------|-------------|------------|
 | **AI Agents** | Build voice agents that handle calls autonomously -- the platform runs the AI pipeline, your code defines the persona, tools, and call flow | [Agent Guide](#ai-agents) |
 | **RELAY Client** | Control live calls and SMS/MMS in real time over WebSocket -- answer, play, record, collect DTMF, conference, transfer, and more | [RELAY docs](relay/README.md) |
-| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 20 API namespaces | [REST docs](rest/README.md) |
+| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 22 API namespaces | [REST docs](rest/README.md) |
 
 ```bash
-# Requirements: C++17 compiler, CMake 3.16+, OpenSSL
+# Requirements: C++20 compiler, CMake 3.16+, OpenSSL
 git clone https://github.com/signalwire/signalwire-cpp.git
 cd signalwire-cpp && mkdir build && cd build
 cmake .. && make -j$(nproc)
@@ -171,7 +171,7 @@ int main() {
         .from = "+15559876543", .to = "+15551234567",
         .url = "https://example.com/handler",
     });
-    auto numbers = client.phone_numbers().search({{"area_code", "512"}});
+    auto numbers = client.phone_numbers().search({{"areacode", "512"}});
     auto results = client.datasphere().documents.search({
         .query_string = "billing policy",
     });
@@ -190,7 +190,7 @@ See the **[REST documentation](rest/README.md)** for the full guide, API referen
 
 ### Prerequisites
 
-- C++17 compiler (GCC 8+, Clang 7+, MSVC 2019+)
+- C++20 compiler (GCC 10+, Clang 10+, MSVC 2019 16.10+) — the documented `*Params` designated-initializer idiom is C++20
 - CMake 3.16+
 - OpenSSL 3.0+ development libraries
 - pthreads

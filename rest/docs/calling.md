@@ -87,7 +87,7 @@ Play audio, TTS, silence, or ringtone.
 
 ```cpp
 client.calling().play(call_id, {
-    .play = json::array({{{"type", "tts"}, {"text", "Hello!"}}}),
+    .play = json::array({{{"type", "tts"}, {"params", {{"text", "Hello!"}}}}}),
     .volume = 5.0,
 });
 ```

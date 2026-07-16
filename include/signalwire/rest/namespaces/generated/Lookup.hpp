@@ -27,8 +27,8 @@ class Lookup : public BaseResource {
  public:
   explicit Lookup(const HttpClient& client) : BaseResource(client, "/api/relay/rest/lookup") {}
 
-  [[nodiscard]] json phoneNumber(const std::string& e164,
-                                 const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json phone_number(const std::string& e164,
+                                  const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + std::string("phone_number") + "/" + e164, params);
   }
 };

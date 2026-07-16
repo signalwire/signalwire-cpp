@@ -1,6 +1,6 @@
 # All Namespaces
 
-Reference for every namespace beyond Fabric, Calling, and Compat (which have their own pages).
+Reference for every namespace beyond Fabric and Calling (which have their own pages).
 
 Every accessor is a method on `RestClient` (e.g. `client.phone_numbers()`).
 Create/update bodies are `nlohmann::json` objects; list/get query params are a
@@ -23,10 +23,10 @@ signalwire::rest::RestClient client("example-space", "project-id", "api-token");
 ```cpp
 // List your phone numbers
 auto numbers = client.phone_numbers().list();
-numbers = client.phone_numbers().list({{"name", "Main"}});
+numbers = client.phone_numbers().list({{"filter_name", "Main"}});
 
 // Search available numbers to purchase
-auto available = client.phone_numbers().search({{"area_code", "512"}, {"number_type", "local"}});
+auto available = client.phone_numbers().search({{"areacode", "512"}, {"number_type", "local"}});
 
 // Purchase a number
 auto number = client.phone_numbers().create({{"number", "+15551234567"}});
@@ -70,9 +70,9 @@ client.queues().update("q-uuid", {{"name", "VIP Support"}});
 client.queues().delete_("q-uuid");
 
 // Members
-auto members = client.queues().listMembers("q-uuid");
-auto next_member = client.queues().getNextMember("q-uuid");
-auto member = client.queues().getMember("q-uuid", "member-uuid");
+auto members = client.queues().list_members("q-uuid");
+auto next_member = client.queues().get_next_member("q-uuid");
+auto member = client.queues().get_member("q-uuid", "member-uuid");
 ```
 
 ## Recordings
@@ -93,10 +93,10 @@ client.number_groups().update("ng-uuid", {{"name", "Sales"}});
 client.number_groups().delete_("ng-uuid");
 
 // Memberships
-auto memberships = client.number_groups().listMemberships("ng-uuid");
-client.number_groups().addMembership("ng-uuid", {.phone_number_id = "pn-uuid"});
-auto membership = client.number_groups().getMembership("mem-uuid");
-client.number_groups().deleteMembership("mem-uuid");
+auto memberships = client.number_groups().list_memberships("ng-uuid");
+client.number_groups().add_membership("ng-uuid", {.phone_number_id = "pn-uuid"});
+auto membership = client.number_groups().get_membership("mem-uuid");
+client.number_groups().delete_membership("mem-uuid");
 ```
 
 ## Verified Caller IDs
@@ -109,8 +109,8 @@ client.verified_callers().update("vc-uuid", {{"name", "Main Office"}});
 client.verified_callers().delete_("vc-uuid");
 
 // Verification flow
-client.verified_callers().redialVerification("vc-uuid");
-client.verified_callers().submitVerification("vc-uuid", {.verification_code = "123456"});
+client.verified_callers().redial_verification("vc-uuid");
+client.verified_callers().submit_verification("vc-uuid", {.verification_code = "123456"});
 ```
 
 ## SIP Profile
@@ -128,7 +128,7 @@ client.sip_profile().update({
 ## Phone Number Lookup
 
 ```cpp
-auto info = client.lookup().phoneNumber("+15551234567");
+auto info = client.lookup().phone_number("+15551234567");
 ```
 
 The lookup hits `GET /api/relay/rest/lookup/phone_number/{e164}`.
@@ -177,17 +177,17 @@ auto brand = client.registry().brands.create({{"name", "My Brand"}, {"ein", "12-
 brand = client.registry().brands.get("brand-uuid");
 
 // Campaigns under a brand
-auto campaigns = client.registry().brands.listCampaigns("brand-uuid");
-auto campaign = client.registry().brands.createCampaign("brand-uuid", {{"description", "Alerts"}});
+auto campaigns = client.registry().brands.list_campaigns("brand-uuid");
+auto campaign = client.registry().brands.create_campaign("brand-uuid", {{"description", "Alerts"}});
 
 // Campaign management
 campaign = client.registry().campaigns.get("camp-uuid");
 client.registry().campaigns.update("camp-uuid", {.name = "Updated alerts"});
 
 // Number assignments
-auto numbers = client.registry().campaigns.listNumbers("camp-uuid");
-auto orders = client.registry().campaigns.listOrders("camp-uuid");
-auto order = client.registry().campaigns.createOrder("camp-uuid", {.phone_numbers = json::array({"pn-1"})});
+auto numbers = client.registry().campaigns.list_numbers("camp-uuid");
+auto orders = client.registry().campaigns.list_orders("camp-uuid");
+auto order = client.registry().campaigns.create_order("camp-uuid", {.phone_numbers = json::array({"pn-1"})});
 order = client.registry().orders.get("order-uuid");
 ```
 
@@ -212,9 +212,9 @@ auto results = client.datasphere().documents.search({
 });
 
 // Chunks
-auto chunks = client.datasphere().documents.listChunks("doc-uuid");
-auto chunk = client.datasphere().documents.getChunk("doc-uuid", "chunk-uuid");
-client.datasphere().documents.deleteChunk("doc-uuid", "chunk-uuid");
+auto chunks = client.datasphere().documents.list_chunks("doc-uuid");
+auto chunk = client.datasphere().documents.get_chunk("doc-uuid", "chunk-uuid");
+client.datasphere().documents.delete_chunk("doc-uuid", "chunk-uuid");
 ```
 
 ## Video
@@ -226,8 +226,8 @@ auto room = client.video().rooms.create({{"name", "standup"}, {"max_members", 10
 room = client.video().rooms.get("room-uuid");
 client.video().rooms.update("room-uuid", {{"max_members", 20}});
 client.video().rooms.delete_("room-uuid");
-client.video().rooms.listStreams("room-uuid");
-client.video().rooms.createStream("room-uuid", {.url = "rtmp://example.com/live"});
+client.video().rooms.list_streams("room-uuid");
+client.video().rooms.create_stream("room-uuid", {.url = "rtmp://example.com/live"});
 
 // Room tokens
 auto token = client.video().room_tokens.create({.room_name = "standup", .user_name = "alice"});
@@ -235,14 +235,14 @@ auto token = client.video().room_tokens.create({.room_name = "standup", .user_na
 // Room sessions
 auto sessions = client.video().room_sessions.list({{"room_name", "standup"}});
 auto session = client.video().room_sessions.get("session-uuid");
-auto events = client.video().room_sessions.listEvents("session-uuid");
-auto members = client.video().room_sessions.listMembers("session-uuid");
-auto recordings = client.video().room_sessions.listRecordings("session-uuid");
+auto events = client.video().room_sessions.list_events("session-uuid");
+auto members = client.video().room_sessions.list_members("session-uuid");
+auto recordings = client.video().room_sessions.list_recordings("session-uuid");
 
 // Room recordings (also: room_recordings.delete_ removes one)
 auto recs = client.video().room_recordings.list();
 auto rec = client.video().room_recordings.get("rec-uuid");
-events = client.video().room_recordings.listEvents("rec-uuid");
+events = client.video().room_recordings.list_events("rec-uuid");
 
 // Conferences
 auto confs = client.video().conferences.list();
@@ -250,9 +250,9 @@ auto conf = client.video().conferences.create({{"name", "all-hands"}, {"quality"
 conf = client.video().conferences.get("conf-uuid");
 client.video().conferences.update("conf-uuid", {{"quality", "1080p"}});
 client.video().conferences.delete_("conf-uuid");
-auto tokens = client.video().conferences.listConferenceTokens("conf-uuid");
-client.video().conferences.listStreams("conf-uuid");
-client.video().conferences.createStream("conf-uuid", {.url = "rtmp://example.com/live"});
+auto tokens = client.video().conferences.list_conference_tokens("conf-uuid");
+client.video().conferences.list_streams("conf-uuid");
+client.video().conferences.create_stream("conf-uuid", {.url = "rtmp://example.com/live"});
 
 // Conference tokens
 token = client.video().conference_tokens.get("token-uuid");
@@ -275,7 +275,7 @@ auto log = client.logs().messages.get("log-uuid");
 // Voice logs (with events)
 logs = client.logs().voice.list();
 log = client.logs().voice.get("log-uuid");
-auto events = client.logs().voice.listEvents("log-uuid");
+auto events = client.logs().voice.list_events("log-uuid");
 
 // Fax logs
 logs = client.logs().fax.list();
@@ -299,7 +299,7 @@ client.project().tokens.update("token-uuid", {.name = "renamed-token"});
 ## PubSub Tokens
 
 ```cpp
-auto token = client.pubsub().createToken({
+auto token = client.pubsub().create_token({
     .ttl = 60,
     .channels = json::array({{{"name", "updates"}, {"read", true}, {"write", false}}}),
     .member_id = "user-123",
@@ -309,7 +309,7 @@ auto token = client.pubsub().createToken({
 ## Chat Tokens
 
 ```cpp
-auto token = client.chat().createToken({
+auto token = client.chat().create_token({
     .ttl = 60,
     .channels = json::array({{{"name", "support"}, {"read", true}, {"write", true}}}),
     .member_id = "user-123",

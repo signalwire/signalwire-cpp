@@ -35,7 +35,7 @@ class PubSub : public BaseResource {
 
   explicit PubSub(const HttpClient& client) : BaseResource(client, "/api/pubsub/tokens") {}
 
-  [[nodiscard]] json createToken(const CreateTokenParams& p) const {
+  [[nodiscard]] json create_token(const CreateTokenParams& p) const {
     json body = json::object();
     body["ttl"] = p.ttl;
     body["channels"] = p.channels;

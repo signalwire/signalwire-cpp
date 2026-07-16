@@ -33,17 +33,17 @@ class VideoConferences : public CrudResource {
   explicit VideoConferences(const HttpClient& client)
       : CrudResource(client, "/api/video/conferences", "PUT") {}
 
-  [[nodiscard]] json listConferenceTokens(
+  [[nodiscard]] json list_conference_tokens(
       const std::string& id, const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("conference_tokens"), params);
   }
 
-  [[nodiscard]] json listStreams(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_streams(const std::string& id,
+                                  const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params);
   }
 
-  [[nodiscard]] json createStream(const std::string& id, const CreateStreamParams& p) const {
+  [[nodiscard]] json create_stream(const std::string& id, const CreateStreamParams& p) const {
     json body = json::object();
     body["url"] = p.url;
     if (!p.extras.is_null()) {

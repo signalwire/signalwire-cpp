@@ -4,7 +4,7 @@ Copy this file for your language port and check items off as you go.
 
 The purpose of tests, examples, and docs is to **prove** complete implementation. If a feature has no test and no example, it's not proven to work. Every feature must have at least one test exercising it.
 
-**Target Language:** C++ (C++17, CMake)
+**Target Language:** C++ (C++20, CMake)
 **Start Date:** 2025-08-01
 **Python SDK Reference:** ../signalwire-python (adjacent clone; the source of truth)
 

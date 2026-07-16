@@ -405,18 +405,22 @@ _BASE_CANONICAL_OVERRIDES = {"list_addresses"}
 
 
 def method_ident(method_snake: str) -> str:
-    """C++ method name for a declared method. camelCase the snake name (the port's
-    snake_case-methods idiom keeps python names, but the generated resource methods
-    follow the hand code's camelCase for sub-ops), then escape a C++ keyword with a
-    trailing ``_`` (``delete`` → ``delete_``, matching the enumerator's
-    ``_METHOD_RENAMES``). Recorded as an adapter rename when escaped.
+    """C++ method name for a declared method. cpp's PORT_PHILOSOPHY_CPP.md commits to
+    **snake_case methods** (the std-library / Boost tradition), which also keeps
+    Python's names verbatim so the surface diff is cheapest and the enumerator needs
+    no name translation. The hand-written REST code is uniformly snake_case
+    (``list``/``create``/``get``/``update``/``delete_``/``list_addresses``/
+    ``from_env``); the generated sub-ops MUST match. So emit the snake name as-is,
+    escaping only a C++ keyword clash with a trailing ``_`` (``delete`` →
+    ``delete_``, matching the enumerator's ``_METHOD_RENAMES``). The keyword escape
+    is the sole recorded adapter rename.
 
     A base-provided canonical op (``list_addresses``) that a subclass overrides to
     a divergent sibling path keeps its snake_case base spelling so the override
     HIDES the inherited base member — one canonical name, one route."""
     if method_snake in _BASE_CANONICAL_OVERRIDES:
         return method_snake
-    name = snake_to_camel(method_snake)
+    name = method_snake
     if name in CPP_KEYWORDS:
         name = name + "_"
     return name
@@ -902,7 +906,9 @@ def emit_set_method(spec: Spec, markup: dict, sm_name: str, sm: dict,
     if not handler:
         raise SystemExit(f"{markup['name']}.{sm_name}: set_method missing handler")
     cls = markup["name"]
-    name = snake_to_camel(sm_name)
+    # snake_case method name (PORT_PHILOSOPHY_CPP.md: snake_case methods, matching the
+    # hand code + the plain generated ops via method_ident); keyword-escaped if needed.
+    name = method_ident(sm_name)
     args = sm.get("args") or {}
     struct_name = f"{snake_to_pascal(sm_name)}Params"
     struct_fields: list[tuple[str, dict, bool]] = []

@@ -207,10 +207,10 @@ TEST(rest_mock_gen_projects_create_err) {
   return true;
 }
 
-TEST(rest_mock_gen_projects_rotatesigningkey_ok) {
+TEST(rest_mock_gen_projects_rotate_signing_key_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("projects.rotate_signing_key", 200, json::object());
-  (void)(client.projects().rotateSigningKey("X"));
+  (void)(client.projects().rotate_signing_key("X"));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -222,13 +222,13 @@ TEST(rest_mock_gen_projects_rotatesigningkey_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_projects_rotatesigningkey_err) {
+TEST(rest_mock_gen_projects_rotate_signing_key_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("projects.rotate_signing_key", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.projects().rotateSigningKey("X"));
+    (void)(client.projects().rotate_signing_key("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

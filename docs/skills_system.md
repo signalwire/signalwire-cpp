@@ -423,7 +423,7 @@ agent.add_skill("my_skill", {
 
 2. **Build and run the demo:**
    ```bash
-   g++ -std=c++17 -I include -I deps examples/skills_demo.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o skills_demo
+   g++ -std=c++20 -I include -I deps examples/skills_demo.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o skills_demo
    ./skills_demo
    ```
 

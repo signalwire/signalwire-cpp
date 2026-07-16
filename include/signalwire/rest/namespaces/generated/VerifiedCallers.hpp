@@ -33,12 +33,12 @@ class VerifiedCallers : public CrudResource {
   explicit VerifiedCallers(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/verified_caller_ids", "PUT") {}
 
-  [[nodiscard]] json redialVerification(const std::string& id) const {
+  [[nodiscard]] json redial_verification(const std::string& id) const {
     return client_.post(base_path_ + "/" + id + "/" + std::string("verification"), json::object());
   }
 
-  [[nodiscard]] json submitVerification(const std::string& id,
-                                        const SubmitVerificationParams& p) const {
+  [[nodiscard]] json submit_verification(const std::string& id,
+                                         const SubmitVerificationParams& p) const {
     json body = json::object();
     body["verification_code"] = p.verification_code;
     if (!p.extras.is_null()) {

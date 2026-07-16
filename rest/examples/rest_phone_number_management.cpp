@@ -14,7 +14,7 @@ int main() {
         // Search for numbers
         std::cout << "Searching numbers in area code 512...\n";
         auto available = client.phone_numbers().search({
-            {"area_code", "512"}, {"max_results", "5"}
+            {"areacode", "512"}, {"max_results", "5"}
         });
         std::cout << "Available: " << available.dump(2) << "\n";
 

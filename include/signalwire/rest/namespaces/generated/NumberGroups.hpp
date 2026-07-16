@@ -33,14 +33,14 @@ class NumberGroups : public CrudResource {
   explicit NumberGroups(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/number_groups", "PUT") {}
 
-  [[nodiscard]] json listMemberships(const std::string& NumberGroupId,
-                                     const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_memberships(const std::string& NumberGroupId,
+                                      const std::map<std::string, std::string>& params = {}) const {
     return client_.get(
         base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), params);
   }
 
-  [[nodiscard]] json addMembership(const std::string& NumberGroupId,
-                                   const AddMembershipParams& p) const {
+  [[nodiscard]] json add_membership(const std::string& NumberGroupId,
+                                    const AddMembershipParams& p) const {
     json body = json::object();
     body["phone_number_id"] = p.phone_number_id;
     if (!p.extras.is_null()) {
@@ -50,12 +50,12 @@ class NumberGroups : public CrudResource {
         base_path_ + "/" + NumberGroupId + "/" + std::string("number_group_memberships"), body);
   }
 
-  [[nodiscard]] json getMembership(const std::string& id,
-                                   const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json get_membership(const std::string& id,
+                                    const std::map<std::string, std::string>& params = {}) const {
     return client_.get(std::string("/api/relay/rest/number_group_memberships/") + id, params);
   }
 
-  [[nodiscard]] json deleteMembership(const std::string& id) const {
+  [[nodiscard]] json delete_membership(const std::string& id) const {
     return client_.del(std::string("/api/relay/rest/number_group_memberships/") + id);
   }
 };

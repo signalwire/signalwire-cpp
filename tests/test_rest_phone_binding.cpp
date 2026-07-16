@@ -147,7 +147,7 @@ TEST(phone_binding_swml_webhook_body) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setSwmlWebhook("pn-1", {.url = "https://example.com/swml"});
+    (void)pn.set_swml_webhook("pn-1", {.url = "https://example.com/swml"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -161,7 +161,7 @@ TEST(phone_binding_cxml_webhook_body_minimal) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setCxmlWebhook("pn-1", {.url = "https://example.com/voice.xml"});
+    (void)pn.set_cxml_webhook("pn-1", {.url = "https://example.com/voice.xml"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -177,7 +177,7 @@ TEST(phone_binding_cxml_webhook_body_with_options) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setCxmlWebhook("pn-1", {
+    (void)pn.set_cxml_webhook("pn-1", {
         .url = "https://example.com/voice.xml",
         .fallback_url = "https://example.com/fallback.xml",
         .status_callback_url = "https://example.com/status",
@@ -196,7 +196,7 @@ TEST(phone_binding_cxml_application_body) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setCxmlApplication("pn-1", {.application_id = "app-1"});
+    (void)pn.set_cxml_application("pn-1", {.application_id = "app-1"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -210,7 +210,7 @@ TEST(phone_binding_ai_agent_body) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setAiAgent("pn-1", {.agent_id = "agent-1"});
+    (void)pn.set_ai_agent("pn-1", {.agent_id = "agent-1"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -224,7 +224,7 @@ TEST(phone_binding_call_flow_body_minimal) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setCallFlow("pn-1", {.flow_id = "cf-1"});
+    (void)pn.set_call_flow("pn-1", {.flow_id = "cf-1"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -239,7 +239,7 @@ TEST(phone_binding_call_flow_body_with_version) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setCallFlow("pn-1", {.flow_id = "cf-1", .version = "current_deployed"});
+    (void)pn.set_call_flow("pn-1", {.flow_id = "cf-1", .version = "current_deployed"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -253,7 +253,7 @@ TEST(phone_binding_relay_application_body) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setRelayApplication("pn-1", {.name = "my-app"});
+    (void)pn.set_relay_application("pn-1", {.name = "my-app"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -267,7 +267,7 @@ TEST(phone_binding_relay_topic_body_minimal) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setRelayTopic("pn-1", {.topic = "office"});
+    (void)pn.set_relay_topic("pn-1", {.topic = "office"});
     auto reqs = srv.captured();
     ASSERT_EQ(reqs.size(), 1u);
     json body = json::parse(reqs[0].body);
@@ -281,7 +281,7 @@ TEST(phone_binding_relay_topic_body_with_status_callback) {
     LocalCaptureServer srv;
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
-    (void)pn.setRelayTopic("pn-1", {
+    (void)pn.set_relay_topic("pn-1", {
         .topic = "office",
         .status_callback_url = "https://example.com/status",
     });
@@ -297,7 +297,7 @@ TEST(phone_binding_relay_topic_body_with_status_callback) {
 
 // ---- Regression: the post-mortem happy path ---------------------------------
 //
-// Call ``setSwmlWebhook`` and assert:
+// Call ``set_swml_webhook`` and assert:
 //   - exactly ONE HTTP request was made
 //   - method = PUT
 //   - path = /api/relay/rest/phone_numbers/{sid}
@@ -310,7 +310,7 @@ TEST(phone_binding_regression_swml_single_put) {
     HttpClient http(srv.base_url(), "proj", "tok");
     generated::PhoneNumbers pn(http);
 
-    (void)pn.setSwmlWebhook("pn-1", {.url = "https://example.com/swml"});
+    (void)pn.set_swml_webhook("pn-1", {.url = "https://example.com/swml"});
 
     auto reqs = srv.captured();
     // Exactly one HTTP request — NOT two (no fabric resource pre-creation)

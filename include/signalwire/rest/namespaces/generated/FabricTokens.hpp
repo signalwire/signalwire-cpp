@@ -65,7 +65,7 @@ class FabricTokens : public BaseResource {
 
   explicit FabricTokens(const HttpClient& client) : BaseResource(client, "/api/fabric") {}
 
-  [[nodiscard]] json createSubscriberToken(const CreateSubscriberTokenParams& p) const {
+  [[nodiscard]] json create_subscriber_token(const CreateSubscriberTokenParams& p) const {
     json body = json::object();
     body["reference"] = p.reference;
     if (p.expire_at.has_value()) {
@@ -107,7 +107,7 @@ class FabricTokens : public BaseResource {
     return client_.post(std::string("/api/fabric/subscribers/tokens"), body);
   }
 
-  [[nodiscard]] json refreshSubscriberToken(const RefreshSubscriberTokenParams& p) const {
+  [[nodiscard]] json refresh_subscriber_token(const RefreshSubscriberTokenParams& p) const {
     json body = json::object();
     body["refresh_token"] = p.refresh_token;
     if (!p.extras.is_null()) {
@@ -116,7 +116,7 @@ class FabricTokens : public BaseResource {
     return client_.post(std::string("/api/fabric/subscribers/tokens/refresh"), body);
   }
 
-  [[nodiscard]] json createInviteToken(const CreateInviteTokenParams& p) const {
+  [[nodiscard]] json create_invite_token(const CreateInviteTokenParams& p) const {
     json body = json::object();
     body["address_id"] = p.address_id;
     if (p.expires_at.has_value()) {
@@ -128,7 +128,7 @@ class FabricTokens : public BaseResource {
     return client_.post(std::string("/api/fabric/subscriber/invites"), body);
   }
 
-  [[nodiscard]] json createGuestToken(const CreateGuestTokenParams& p) const {
+  [[nodiscard]] json create_guest_token(const CreateGuestTokenParams& p) const {
     json body = json::object();
     body["allowed_addresses"] = p.allowed_addresses;
     if (p.expire_at.has_value()) {
@@ -140,7 +140,7 @@ class FabricTokens : public BaseResource {
     return client_.post(std::string("/api/fabric/guests/tokens"), body);
   }
 
-  [[nodiscard]] json createEmbedToken(const CreateEmbedTokenParams& p) const {
+  [[nodiscard]] json create_embed_token(const CreateEmbedTokenParams& p) const {
     json body = json::object();
     body["token"] = p.token;
     if (!p.extras.is_null()) {

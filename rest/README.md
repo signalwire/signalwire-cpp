@@ -18,7 +18,7 @@ int main() {
     auto agents = client.fabric().ai_agents.list();
 
     // Search for a phone number
-    auto results = client.phone_numbers().search({{"area_code", "512"}});
+    auto results = client.phone_numbers().search({{"areacode", "512"}});
 
     // Place a call
     auto call = client.calling().dial({
@@ -32,7 +32,7 @@ int main() {
 ## Features
 
 - Single `RestClient` with namespaced sub-objects for every API
-- 21 API namespaces: Fabric, Calling, Phone Numbers, Datasphere, Video, Compat, and more
+- 22 API namespaces: Fabric, Calling, Phone Numbers, Datasphere, Video, Messages, Projects, and more
 - Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - Specialized methods per namespace (dial, search, lookup, publish, etc.)
 - Environment variable configuration (`RestClient::from_env()`)

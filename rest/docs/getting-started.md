@@ -9,7 +9,7 @@ built from this repository — there is no separate package to install. Add the
 `include/` directory to your include path and link the library:
 
 ```bash
-g++ -std=c++17 -I include -I deps your_app.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o your_app
+g++ -std=c++20 -I include -I deps your_app.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o your_app
 ```
 
 The REST client uses the vendored cpp-httplib (header-only) plus OpenSSL 3.0+ for

@@ -35,7 +35,7 @@ namespaces don't cover).
 ## Namespaces
 
 Every API surface is available as a namespace accessor method on the client
-(e.g. `client.fabric()`). There are 21 namespaces.
+(e.g. `client.fabric()`). There are 22 namespaces.
 
 ### Fabric API — `client.fabric()`
 

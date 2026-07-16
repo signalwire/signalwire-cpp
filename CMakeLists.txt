@@ -2,7 +2,15 @@ cmake_minimum_required(VERSION 3.16)
 project(signalwire VERSION 3.2.1
         HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
         LANGUAGES CXX)
-set(CMAKE_CXX_STANDARD 17)
+# C++20: the SDK's documented, idiomatic construction of the generated *Params
+# structs uses designated initializers ({.from = ..., .to = ...}), a C++20 feature
+# used pervasively across the examples + docs (166 sites). GCC/Clang accept it in
+# -std=c++17 only as a non-portable extension (and MSVC /std:c++17 rejects it), so a
+# "C++17 / MSVC 2019+" floor was false. C++20 makes the advertised floor honest and
+# matches the documented API idiom. The SNIPPET-COMPILE gate compiles snippets with
+# -std=c++20 -pedantic-errors so the floor is mechanically enforced (no silently-
+# accepted higher-standard extension can sneak in).
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ccache — compiler-cache launcher, availability-gated so its ABSENCE is a
@@ -126,18 +134,23 @@ install(TARGETS signalwire
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/signalwire
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# Vendored header-only deps the PUBLIC headers pull in (`<nlohmann/json.hpp>`,
-# httplib.h) -> <prefix>/include, so a consumer that only has -I<prefix>/include
-# still resolves them. deps/ is on the build's include path (line ~22); shipping
-# it makes the installed headers self-contained. deps/nlohmann/json.hpp is a
-# RELATIVE symlink to ../json.hpp; install(DIRECTORY) copies it as-is, and since
-# deps/json.hpp is installed too the link still resolves in the install tree
-# (<prefix>/include/nlohmann/json.hpp -> ../json.hpp == <prefix>/include/json.hpp).
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/deps/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING
-        PATTERN "*.h"
-        PATTERN "*.hpp")
+# Vendored header-only dep the PUBLIC headers pull in. The ONLY vendored header a
+# consumer's translation unit actually needs is nlohmann/json.hpp: every public
+# header includes `<nlohmann/json.hpp>` (common.hpp too, normalized off the bare
+# "json.hpp"). httplib is NEVER #included by a public header — the ones that use it
+# only FORWARD-DECLARE `namespace httplib { ... }` and take httplib types by
+# reference — so httplib.h must NOT be shipped: dumping it (and a bare json.hpp)
+# into <prefix>/include pollutes the consumer's include root with unnamespaced
+# `httplib.h` / `json.hpp` that collide with the consumer's own or another lib's
+# vendored copy. Install ONLY nlohmann/json.hpp, and materialize it as a real file
+# (deps/nlohmann/json.hpp is a relative symlink to ../json.hpp; installing the
+# canonical deps/json.hpp AS <prefix>/include/nlohmann/json.hpp dereferences the
+# link so the install tree carries no dangling symlink and no root-level pollutant).
+# Result: <prefix>/include holds exactly `signalwire/` and `nlohmann/json.hpp`, so
+# `-I<prefix>/include` resolves `<nlohmann/json.hpp>` and nothing else leaks.
+install(FILES ${CMAKE_SOURCE_DIR}/deps/json.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlohmann
+    RENAME json.hpp)
 
 # Tests
 enable_testing()
@@ -203,11 +216,28 @@ target_link_libraries(state_dump signalwire)
 add_executable(http_dump tools/http_dump.cpp)
 target_link_libraries(http_dump signalwire)
 
+# doc_wire_dump is the DOC-WIRE (§2.1) runner: points a RestClient at the shared
+# mock_signalwire (MOCK_SIGNALWIRE_PORT / SIGNALWIRE_MOCK_URL) and replays the
+# documented REST call shapes so the mock journals the exact wire each doc example
+# emits. porting-sdk/scripts/doc_wire.py builds + runs it and reads the journal.
+add_executable(doc_wire_dump tools/doc_wire_dump.cpp)
+target_link_libraries(doc_wire_dump signalwire)
+
 # wire_relay_dump links the RELAY client + stands up an in-process mock WS
 # server (IXWebSocket) to capture the frames the client sends. It uses the
 # IXWebSocket server headers directly, so link ixwebsocket explicitly.
 add_executable(wire_relay_dump tools/wire_relay_dump.cpp)
 target_link_libraries(wire_relay_dump signalwire ixwebsocket)
+
+# wait_liveness_dump is the WAIT-LIVENESS (§2.4) runner: it drives a live
+# mock_relay via the shared relay_mocktest harness, arms deferred completing
+# events, calls Action::wait(), and emits the liveness classification.
+# porting-sdk/scripts/diff_port_wait_liveness.py builds + runs it and compares the
+# classification to the python golden. It reuses tests/relay_mocktest.cpp (the same
+# mock harness the relay tests use) and so needs tests/ on the include path.
+add_executable(wait_liveness_dump tools/wait_liveness_dump.cpp tests/relay_mocktest.cpp)
+target_link_libraries(wait_liveness_dump signalwire)
+target_include_directories(wait_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that

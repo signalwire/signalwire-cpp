@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with this C++ codebase.
 
 ## Project Overview
 
-C++17 port of the SignalWire AI Agents SDK. Provides AgentBase, SWML document
+C++20 port of the SignalWire AI Agents SDK. Provides AgentBase, SWML document
 building, SWAIG function results, DataMap tools, Contexts/Steps, Skills, Prefabs,
 REST client, and RELAY client as a single shared library.
 
@@ -32,7 +32,7 @@ cd build && cmake .. && make -j$(nproc)
 mkdir -p build && cd build && cmake .. && make -j$(nproc) && ./run_tests
 
 # Compile a standalone example (outside CMake)
-g++ -std=c++17 -I include -I deps examples/simple_agent.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o simple_agent
+g++ -std=c++20 -I include -I deps examples/simple_agent.cpp -L build -lsignalwire -lssl -lcrypto -lpthread -o simple_agent
 ```
 
 The full local-and-CI gate runner is `bash scripts/run-ci.sh`; its FMT / LINT /

@@ -20,7 +20,7 @@ using nlohmann::json;
 TEST(rest_mock_gen_pubsub_createtoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("pubsub.create_token", 200, json::object());
-  (void)(client.pubsub().createToken({.ttl = 60, .channels = json::array()}));
+  (void)(client.pubsub().create_token({.ttl = 60, .channels = json::array()}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -38,7 +38,7 @@ TEST(rest_mock_gen_pubsub_createtoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.pubsub().createToken({.ttl = 60, .channels = json::array()}));
+    (void)(client.pubsub().create_token({.ttl = 60, .channels = json::array()}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

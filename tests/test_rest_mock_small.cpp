@@ -251,7 +251,7 @@ TEST(rest_mock_sip_profile_update) {
 
 TEST(rest_mock_number_groups_list_memberships) {
     auto client = mocktest::make_client();
-    auto body = client.number_groups().listMemberships("ng-1", {{"page_size", "10"}});
+    auto body = client.number_groups().list_memberships("ng-1", {{"page_size", "10"}});
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("data"));
     ASSERT_TRUE(body["data"].is_array());
@@ -268,7 +268,7 @@ TEST(rest_mock_number_groups_list_memberships) {
 
 TEST(rest_mock_number_groups_delete_membership) {
     auto client = mocktest::make_client();
-    auto body = client.number_groups().deleteMembership("mem-1");
+    auto body = client.number_groups().delete_membership("mem-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -315,7 +315,7 @@ TEST(rest_mock_project_tokens_delete) {
 
 TEST(rest_mock_datasphere_get_chunk) {
     auto client = mocktest::make_client();
-    auto body = client.datasphere().documents.getChunk("doc-1", "chunk-99");
+    auto body = client.datasphere().documents.get_chunk("doc-1", "chunk-99");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
     auto j = mocktest::journal_last();
@@ -331,7 +331,7 @@ TEST(rest_mock_datasphere_get_chunk) {
 
 TEST(rest_mock_queues_get_member) {
     auto client = mocktest::make_client();
-    auto body = client.queues().getMember("q-1", "mem-7");
+    auto body = client.queues().get_member("q-1", "mem-7");
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("queue_id") || body.contains("call_id"));
     auto j = mocktest::journal_last();

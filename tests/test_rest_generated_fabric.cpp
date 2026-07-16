@@ -438,7 +438,7 @@ TEST(rest_mock_gen_fabric_subscribers_delete_err) {
 TEST(rest_mock_gen_fabric_subscribers_deletesipendpoint_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.delete_subscriber_sip_endpoint", 200, json::object());
-  (void)(client.fabric().subscribers.deleteSipEndpoint("X", "X"));
+  (void)(client.fabric().subscribers.delete_sip_endpoint("X", "X"));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -456,7 +456,7 @@ TEST(rest_mock_gen_fabric_subscribers_deletesipendpoint_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.deleteSipEndpoint("X", "X"));
+    (void)(client.fabric().subscribers.delete_sip_endpoint("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -856,7 +856,7 @@ TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
 TEST(rest_mock_gen_fabric_call_flows_listversions_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_call_flow_versions", 200, json::object());
-  (void)(client.fabric().call_flows.listVersions("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -874,7 +874,7 @@ TEST(rest_mock_gen_fabric_call_flows_listversions_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().call_flows.listVersions("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -1996,7 +1996,7 @@ TEST(rest_mock_gen_fabric_subscribers_list_addresses_err) {
 TEST(rest_mock_gen_fabric_subscribers_listsipendpoints_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_subscriber_sip_endpoints", 200, json::object());
-  (void)(client.fabric().subscribers.listSipEndpoints("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().subscribers.list_sip_endpoints("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -2014,7 +2014,7 @@ TEST(rest_mock_gen_fabric_subscribers_listsipendpoints_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.listSipEndpoints("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().subscribers.list_sip_endpoints("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2034,7 +2034,7 @@ TEST(rest_mock_gen_fabric_subscribers_listsipendpoints_err) {
 TEST(rest_mock_gen_fabric_subscribers_getsipendpoint_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.get_subscriber_sip_endpoint", 200, json::object());
-  (void)(client.fabric().subscribers.getSipEndpoint("X", "X"));
+  (void)(client.fabric().subscribers.get_sip_endpoint("X", "X"));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -2052,7 +2052,7 @@ TEST(rest_mock_gen_fabric_subscribers_getsipendpoint_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.getSipEndpoint("X", "X"));
+    (void)(client.fabric().subscribers.get_sip_endpoint("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2490,7 +2490,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_update_err) {
 TEST(rest_mock_gen_fabric_subscribers_updatesipendpoint_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.update_subscriber_sip_endpoint", 200, json::object());
-  (void)(client.fabric().subscribers.updateSipEndpoint("X", "X", {}));
+  (void)(client.fabric().subscribers.update_sip_endpoint("X", "X", {}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PATCH"));
@@ -2508,7 +2508,7 @@ TEST(rest_mock_gen_fabric_subscribers_updatesipendpoint_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.updateSipEndpoint("X", "X", {}));
+    (void)(client.fabric().subscribers.update_sip_endpoint("X", "X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2566,7 +2566,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_update_err) {
 TEST(rest_mock_gen_fabric_tokens_createembedtoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_embeds_token", 200, json::object());
-  (void)(client.fabric().tokens.createEmbedToken({.token = "X"}));
+  (void)(client.fabric().tokens.create_embed_token({.token = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -2584,7 +2584,7 @@ TEST(rest_mock_gen_fabric_tokens_createembedtoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.createEmbedToken({.token = "X"}));
+    (void)(client.fabric().tokens.create_embed_token({.token = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2604,7 +2604,7 @@ TEST(rest_mock_gen_fabric_tokens_createembedtoken_err) {
 TEST(rest_mock_gen_fabric_tokens_createguesttoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_subscriber_guest_token", 200, json::object());
-  (void)(client.fabric().tokens.createGuestToken({.allowed_addresses = json::array()}));
+  (void)(client.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -2622,7 +2622,7 @@ TEST(rest_mock_gen_fabric_tokens_createguesttoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.createGuestToken({.allowed_addresses = json::array()}));
+    (void)(client.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -2680,7 +2680,7 @@ TEST(rest_mock_gen_fabric_ai_agents_create_err) {
 TEST(rest_mock_gen_fabric_call_flows_deployversion_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.deploy_call_flow_version", 200, json::object());
-  (void)(client.fabric().call_flows.deployVersion("X", json::object()));
+  (void)(client.fabric().call_flows.deploy_version("X", json::object()));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -2698,7 +2698,7 @@ TEST(rest_mock_gen_fabric_call_flows_deployversion_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().call_flows.deployVersion("X", json::object()));
+    (void)(client.fabric().call_flows.deploy_version("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3060,7 +3060,7 @@ TEST(rest_mock_gen_fabric_subscribers_create_err) {
 TEST(rest_mock_gen_fabric_subscribers_createsipendpoint_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_subscriber_sip_endpoint", 200, json::object());
-  (void)(client.fabric().subscribers.createSipEndpoint("X", {.username = "X", .password = "X"}));
+  (void)(client.fabric().subscribers.create_sip_endpoint("X", {.username = "X", .password = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3078,7 +3078,7 @@ TEST(rest_mock_gen_fabric_subscribers_createsipendpoint_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.createSipEndpoint("X", {.username = "X", .password = "X"}));
+    (void)(client.fabric().subscribers.create_sip_endpoint("X", {.username = "X", .password = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3174,7 +3174,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_create_err) {
 TEST(rest_mock_gen_fabric_resources_assigndomainapplication_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.assign_resource_domain_application", 200, json::object());
-  (void)(client.fabric().resources.assignDomainApplication("X", {.domain_application_id = "X"}));
+  (void)(client.fabric().resources.assign_domain_application("X", {.domain_application_id = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3192,7 +3192,7 @@ TEST(rest_mock_gen_fabric_resources_assigndomainapplication_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().resources.assignDomainApplication("X", {.domain_application_id = "X"}));
+    (void)(client.fabric().resources.assign_domain_application("X", {.domain_application_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3212,7 +3212,7 @@ TEST(rest_mock_gen_fabric_resources_assigndomainapplication_err) {
 TEST(rest_mock_gen_fabric_resources_assignphoneroute_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.assign_resource_phone_route", 200, json::object());
-  (void)(client.fabric().resources.assignPhoneRoute("X", {.phone_route_id = "X", .handler = "X"}));
+  (void)(client.fabric().resources.assign_phone_route("X", {.phone_route_id = "X", .handler = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3230,7 +3230,7 @@ TEST(rest_mock_gen_fabric_resources_assignphoneroute_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().resources.assignPhoneRoute("X", {.phone_route_id = "X", .handler = "X"}));
+    (void)(client.fabric().resources.assign_phone_route("X", {.phone_route_id = "X", .handler = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3250,7 +3250,7 @@ TEST(rest_mock_gen_fabric_resources_assignphoneroute_err) {
 TEST(rest_mock_gen_fabric_tokens_createinvitetoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_subscriber_invite_token", 200, json::object());
-  (void)(client.fabric().tokens.createInviteToken({.address_id = "X"}));
+  (void)(client.fabric().tokens.create_invite_token({.address_id = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3268,7 +3268,7 @@ TEST(rest_mock_gen_fabric_tokens_createinvitetoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.createInviteToken({.address_id = "X"}));
+    (void)(client.fabric().tokens.create_invite_token({.address_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3288,7 +3288,7 @@ TEST(rest_mock_gen_fabric_tokens_createinvitetoken_err) {
 TEST(rest_mock_gen_fabric_tokens_createsubscribertoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_subscriber_token", 200, json::object());
-  (void)(client.fabric().tokens.createSubscriberToken({.reference = "X"}));
+  (void)(client.fabric().tokens.create_subscriber_token({.reference = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3306,7 +3306,7 @@ TEST(rest_mock_gen_fabric_tokens_createsubscribertoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.createSubscriberToken({.reference = "X"}));
+    (void)(client.fabric().tokens.create_subscriber_token({.reference = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -3326,7 +3326,7 @@ TEST(rest_mock_gen_fabric_tokens_createsubscribertoken_err) {
 TEST(rest_mock_gen_fabric_tokens_refreshsubscribertoken_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.refresh_subscriber_token", 200, json::object());
-  (void)(client.fabric().tokens.refreshSubscriberToken({.refresh_token = "X"}));
+  (void)(client.fabric().tokens.refresh_subscriber_token({.refresh_token = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3344,7 +3344,7 @@ TEST(rest_mock_gen_fabric_tokens_refreshsubscribertoken_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.refreshSubscriberToken({.refresh_token = "X"}));
+    (void)(client.fabric().tokens.refresh_subscriber_token({.refresh_token = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

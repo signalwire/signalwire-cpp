@@ -96,7 +96,7 @@ TEST(rest_mock_gen_logs_voice_get_err) {
 TEST(rest_mock_gen_logs_voice_listevents_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("voice.list_voice_log_events", 200, json::object());
-  (void)(client.logs().voice.listEvents("X", std::map<std::string, std::string>{}));
+  (void)(client.logs().voice.list_events("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -114,7 +114,7 @@ TEST(rest_mock_gen_logs_voice_listevents_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.logs().voice.listEvents("X", std::map<std::string, std::string>{}));
+    (void)(client.logs().voice.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

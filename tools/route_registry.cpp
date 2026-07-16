@@ -173,15 +173,15 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   std::vector<std::pair<std::string, std::string>> skipped;
 
   // ---- fabric tokens (BaseResource operation methods) ----
-  CALL("fabric.tokens.createSubscriberToken",
-       c.fabric().tokens.createSubscriberToken({.reference = SENTINEL}));
-  CALL("fabric.tokens.refreshSubscriberToken",
-       c.fabric().tokens.refreshSubscriberToken({.refresh_token = SENTINEL}));
-  CALL("fabric.tokens.createInviteToken",
-       c.fabric().tokens.createInviteToken({.address_id = SENTINEL}));
-  CALL("fabric.tokens.createGuestToken",
-       c.fabric().tokens.createGuestToken({.allowed_addresses = json::array()}));
-  CALL("fabric.tokens.createEmbedToken", c.fabric().tokens.createEmbedToken({.token = SENTINEL}));
+  CALL("fabric.tokens.create_subscriber_token",
+       c.fabric().tokens.create_subscriber_token({.reference = SENTINEL}));
+  CALL("fabric.tokens.refresh_subscriber_token",
+       c.fabric().tokens.refresh_subscriber_token({.refresh_token = SENTINEL}));
+  CALL("fabric.tokens.create_invite_token",
+       c.fabric().tokens.create_invite_token({.address_id = SENTINEL}));
+  CALL("fabric.tokens.create_guest_token",
+       c.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
+  CALL("fabric.tokens.create_embed_token", c.fabric().tokens.create_embed_token({.token = SENTINEL}));
 
   // ---- fabric CRUD + list_addresses resources (base create(json); explicit
   // per-resource so CALL() captures a usable call literal, not a lambda arg) ----
@@ -259,8 +259,8 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.call_flows.update", c.fabric().call_flows.update(id, body));
   CALL("fabric.call_flows.delete_", c.fabric().call_flows.delete_(id));
   CALL("fabric.call_flows.list_addresses", c.fabric().call_flows.list_addresses(id, q));
-  CALL("fabric.call_flows.listVersions", c.fabric().call_flows.listVersions(id, q));
-  CALL("fabric.call_flows.deployVersion", c.fabric().call_flows.deployVersion(id, body));
+  CALL("fabric.call_flows.list_versions", c.fabric().call_flows.list_versions(id, q));
+  CALL("fabric.call_flows.deploy_version", c.fabric().call_flows.deploy_version(id, body));
 
   // subscribers: CRUD + addresses + sip endpoint sub-resource.
   CALL("fabric.subscribers.list", c.fabric().subscribers.list(q));
@@ -269,13 +269,13 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.subscribers.update", c.fabric().subscribers.update(id, body));
   CALL("fabric.subscribers.delete_", c.fabric().subscribers.delete_(id));
   CALL("fabric.subscribers.list_addresses", c.fabric().subscribers.list_addresses(id, q));
-  CALL("fabric.subscribers.listSipEndpoints", c.fabric().subscribers.listSipEndpoints(id, q));
-  CALL("fabric.subscribers.createSipEndpoint",
-       c.fabric().subscribers.createSipEndpoint(id, {.username = SENTINEL, .password = SENTINEL}));
-  CALL("fabric.subscribers.getSipEndpoint", c.fabric().subscribers.getSipEndpoint(id, id));
-  CALL("fabric.subscribers.updateSipEndpoint",
-       c.fabric().subscribers.updateSipEndpoint(id, id, {}));
-  CALL("fabric.subscribers.deleteSipEndpoint", c.fabric().subscribers.deleteSipEndpoint(id, id));
+  CALL("fabric.subscribers.list_sip_endpoints", c.fabric().subscribers.list_sip_endpoints(id, q));
+  CALL("fabric.subscribers.create_sip_endpoint",
+       c.fabric().subscribers.create_sip_endpoint(id, {.username = SENTINEL, .password = SENTINEL}));
+  CALL("fabric.subscribers.get_sip_endpoint", c.fabric().subscribers.get_sip_endpoint(id, id));
+  CALL("fabric.subscribers.update_sip_endpoint",
+       c.fabric().subscribers.update_sip_endpoint(id, id, {}));
+  CALL("fabric.subscribers.delete_sip_endpoint", c.fabric().subscribers.delete_sip_endpoint(id, id));
 
   // cxml_applications: list/get/update/delete/list_addresses dispatch; create()
   // throws by design (cXML apps cannot be created via this API).
@@ -293,11 +293,11 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.resources.get", c.fabric().resources.get(id));
   CALL("fabric.resources.delete_", c.fabric().resources.delete_(id));
   CALL("fabric.resources.list_addresses", c.fabric().resources.list_addresses(id, q));
-  CALL("fabric.resources.assignDomainApplication",
-       c.fabric().resources.assignDomainApplication(id, {.domain_application_id = SENTINEL}));
+  CALL("fabric.resources.assign_domain_application",
+       c.fabric().resources.assign_domain_application(id, {.domain_application_id = SENTINEL}));
   CALL(
-      "fabric.resources.assignPhoneRoute",
-      c.fabric().resources.assignPhoneRoute(id, {.phone_route_id = SENTINEL, .handler = SENTINEL}));
+      "fabric.resources.assign_phone_route",
+      c.fabric().resources.assign_phone_route(id, {.phone_route_id = SENTINEL, .handler = SENTINEL}));
 
   // fabric addresses (list/get only).
   CALL("fabric.addresses.list", c.fabric().addresses.list(q));
@@ -358,9 +358,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("datasphere.documents.update", c.datasphere().documents.update(id, body));
   CALL("datasphere.documents.delete_", c.datasphere().documents.delete_(id));
   CALL("datasphere.documents.search", c.datasphere().documents.search({.query_string = SENTINEL}));
-  CALL("datasphere.documents.listChunks", c.datasphere().documents.listChunks(id, q));
-  CALL("datasphere.documents.getChunk", c.datasphere().documents.getChunk(id, id));
-  CALL("datasphere.documents.deleteChunk", c.datasphere().documents.deleteChunk(id, id));
+  CALL("datasphere.documents.list_chunks", c.datasphere().documents.list_chunks(id, q));
+  CALL("datasphere.documents.get_chunk", c.datasphere().documents.get_chunk(id, id));
+  CALL("datasphere.documents.delete_chunk", c.datasphere().documents.delete_chunk(id, id));
 
   // ---- video ----
   CALL("video.rooms.list", c.video().rooms.list(q));
@@ -368,26 +368,26 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("video.rooms.get", c.video().rooms.get(id));
   CALL("video.rooms.update", c.video().rooms.update(id, body));
   CALL("video.rooms.delete_", c.video().rooms.delete_(id));
-  CALL("video.rooms.listStreams", c.video().rooms.listStreams(id, q));
-  CALL("video.rooms.createStream", c.video().rooms.createStream(id, {.url = SENTINEL}));
+  CALL("video.rooms.list_streams", c.video().rooms.list_streams(id, q));
+  CALL("video.rooms.create_stream", c.video().rooms.create_stream(id, {.url = SENTINEL}));
   CALL("video.room_tokens.create", c.video().room_tokens.create({.room_name = SENTINEL}));
   CALL("video.room_sessions.list", c.video().room_sessions.list(q));
   CALL("video.room_sessions.get", c.video().room_sessions.get(id));
-  CALL("video.room_sessions.listMembers", c.video().room_sessions.listMembers(id, q));
-  CALL("video.room_sessions.listRecordings", c.video().room_sessions.listRecordings(id, q));
-  CALL("video.room_sessions.listEvents", c.video().room_sessions.listEvents(id, q));
+  CALL("video.room_sessions.list_members", c.video().room_sessions.list_members(id, q));
+  CALL("video.room_sessions.list_recordings", c.video().room_sessions.list_recordings(id, q));
+  CALL("video.room_sessions.list_events", c.video().room_sessions.list_events(id, q));
   CALL("video.room_recordings.list", c.video().room_recordings.list(q));
   CALL("video.room_recordings.get", c.video().room_recordings.get(id));
   CALL("video.room_recordings.delete_", c.video().room_recordings.delete_(id));
-  CALL("video.room_recordings.listEvents", c.video().room_recordings.listEvents(id, q));
+  CALL("video.room_recordings.list_events", c.video().room_recordings.list_events(id, q));
   CALL("video.conferences.list", c.video().conferences.list(q));
   CALL("video.conferences.create", c.video().conferences.create(body));
   CALL("video.conferences.get", c.video().conferences.get(id));
   CALL("video.conferences.update", c.video().conferences.update(id, body));
   CALL("video.conferences.delete_", c.video().conferences.delete_(id));
-  CALL("video.conferences.listConferenceTokens", c.video().conferences.listConferenceTokens(id, q));
-  CALL("video.conferences.listStreams", c.video().conferences.listStreams(id, q));
-  CALL("video.conferences.createStream", c.video().conferences.createStream(id, {.url = SENTINEL}));
+  CALL("video.conferences.list_conference_tokens", c.video().conferences.list_conference_tokens(id, q));
+  CALL("video.conferences.list_streams", c.video().conferences.list_streams(id, q));
+  CALL("video.conferences.create_stream", c.video().conferences.create_stream(id, {.url = SENTINEL}));
   CALL("video.conference_tokens.get", c.video().conference_tokens.get(id));
   CALL("video.conference_tokens.reset", c.video().conference_tokens.reset(id));
   CALL("video.streams.get", c.video().streams.get(id));
@@ -400,9 +400,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("queues.get", c.queues().get(id));
   CALL("queues.update", c.queues().update(id, body));
   CALL("queues.delete_", c.queues().delete_(id));
-  CALL("queues.listMembers", c.queues().listMembers(id, q));
-  CALL("queues.getNextMember", c.queues().getNextMember(id));
-  CALL("queues.getMember", c.queues().getMember(id, id));
+  CALL("queues.list_members", c.queues().list_members(id, q));
+  CALL("queues.get_next_member", c.queues().get_next_member(id));
+  CALL("queues.get_member", c.queues().get_member(id, id));
 
   // ---- number_groups ----
   CALL("number_groups.list", c.number_groups().list(q));
@@ -410,18 +410,18 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("number_groups.get", c.number_groups().get(id));
   CALL("number_groups.update", c.number_groups().update(id, body));
   CALL("number_groups.delete_", c.number_groups().delete_(id));
-  CALL("number_groups.listMemberships", c.number_groups().listMemberships(id, q));
-  CALL("number_groups.addMembership",
-       c.number_groups().addMembership(id, {.phone_number_id = SENTINEL}));
-  CALL("number_groups.getMembership", c.number_groups().getMembership(id));
-  CALL("number_groups.deleteMembership", c.number_groups().deleteMembership(id));
+  CALL("number_groups.list_memberships", c.number_groups().list_memberships(id, q));
+  CALL("number_groups.add_membership",
+       c.number_groups().add_membership(id, {.phone_number_id = SENTINEL}));
+  CALL("number_groups.get_membership", c.number_groups().get_membership(id));
+  CALL("number_groups.delete_membership", c.number_groups().delete_membership(id));
 
   // ---- sip_profile (singleton) ----
   CALL("sip_profile.get", c.sip_profile().get());
   CALL("sip_profile.update", c.sip_profile().update({}));
 
   // ---- lookup (single GET) ----
-  CALL("lookup.phoneNumber", c.lookup().phoneNumber(id));
+  CALL("lookup.phone_number", c.lookup().phone_number(id));
 
   // ---- mfa ----
   CALL("mfa.sms", c.mfa().sms({.to = SENTINEL}));
@@ -432,13 +432,13 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("registry.brands.list", c.registry().brands.list(q));
   CALL("registry.brands.create", c.registry().brands.create(body));
   CALL("registry.brands.get", c.registry().brands.get(id));
-  CALL("registry.brands.listCampaigns", c.registry().brands.listCampaigns(id, q));
-  CALL("registry.brands.createCampaign", c.registry().brands.createCampaign(id, body));
+  CALL("registry.brands.list_campaigns", c.registry().brands.list_campaigns(id, q));
+  CALL("registry.brands.create_campaign", c.registry().brands.create_campaign(id, body));
   CALL("registry.campaigns.get", c.registry().campaigns.get(id));
   CALL("registry.campaigns.update", c.registry().campaigns.update(id, {}));
-  CALL("registry.campaigns.listNumbers", c.registry().campaigns.listNumbers(id, q));
-  CALL("registry.campaigns.listOrders", c.registry().campaigns.listOrders(id, q));
-  CALL("registry.campaigns.createOrder", c.registry().campaigns.createOrder(id, {}));
+  CALL("registry.campaigns.list_numbers", c.registry().campaigns.list_numbers(id, q));
+  CALL("registry.campaigns.list_orders", c.registry().campaigns.list_orders(id, q));
+  CALL("registry.campaigns.create_order", c.registry().campaigns.create_order(id, {}));
   CALL("registry.orders.get", c.registry().orders.get(id));
   CALL("registry.numbers.delete_", c.registry().numbers.delete_(id));
 
@@ -447,7 +447,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("logs.messages.get", c.logs().messages.get(id));
   CALL("logs.voice.list", c.logs().voice.list(q));
   CALL("logs.voice.get", c.logs().voice.get(id));
-  CALL("logs.voice.listEvents", c.logs().voice.listEvents(id, q));
+  CALL("logs.voice.list_events", c.logs().voice.list_events(id, q));
   CALL("logs.fax.list", c.logs().fax.list(q));
   CALL("logs.fax.get", c.logs().fax.get(id));
   CALL("logs.conferences.list", c.logs().conferences.list(q));
@@ -464,15 +464,15 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("projects.get", c.projects().get(id));
   CALL("projects.update", c.projects().update(id, body));
   CALL("projects.delete_", c.projects().delete_(id));
-  CALL("projects.rotateSigningKey", c.projects().rotateSigningKey(id));
+  CALL("projects.rotate_signing_key", c.projects().rotate_signing_key(id));
 
   // ---- messages (/api/messaging/messages send + redact) ----
   CALL("messages.create", c.messages().create({.to = SENTINEL, .from = SENTINEL}));
   CALL("messages.update", c.messages().update(id, {.body = SENTINEL}));
 
   // ---- pubsub / chat (token-only) ----
-  CALL("pubsub.createToken", c.pubsub().createToken({.ttl = 60, .channels = json::array()}));
-  CALL("chat.createToken", c.chat().createToken({.ttl = 60, .channels = json::array()}));
+  CALL("pubsub.create_token", c.pubsub().create_token({.ttl = 60, .channels = json::array()}));
+  CALL("chat.create_token", c.chat().create_token({.ttl = 60, .channels = json::array()}));
 
   // ---- verified callers (CRUD + verification flow) ----
   CALL("verified_callers.list", c.verified_callers().list(q));
@@ -480,9 +480,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("verified_callers.get", c.verified_callers().get(id));
   CALL("verified_callers.update", c.verified_callers().update(id, body));
   CALL("verified_callers.delete_", c.verified_callers().delete_(id));
-  CALL("verified_callers.redialVerification", c.verified_callers().redialVerification(id));
-  CALL("verified_callers.submitVerification",
-       c.verified_callers().submitVerification(id, {.verification_code = SENTINEL}));
+  CALL("verified_callers.redial_verification", c.verified_callers().redial_verification(id));
+  CALL("verified_callers.submit_verification",
+       c.verified_callers().submit_verification(id, {.verification_code = SENTINEL}));
 
   // ---- top-level narrow resources ----
   CALL("addresses.list", c.addresses().list(q));

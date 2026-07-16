@@ -286,7 +286,7 @@ TEST(rest_mock_gen_video_conferences_get_err) {
 TEST(rest_mock_gen_video_conferences_listconferencetokens_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_conference_tokens", 200, json::object());
-  (void)(client.video().conferences.listConferenceTokens("X", std::map<std::string, std::string>{}));
+  (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -304,7 +304,7 @@ TEST(rest_mock_gen_video_conferences_listconferencetokens_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().conferences.listConferenceTokens("X", std::map<std::string, std::string>{}));
+    (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -324,7 +324,7 @@ TEST(rest_mock_gen_video_conferences_listconferencetokens_err) {
 TEST(rest_mock_gen_video_conferences_liststreams_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_conference_streams", 200, json::object());
-  (void)(client.video().conferences.listStreams("X", std::map<std::string, std::string>{}));
+  (void)(client.video().conferences.list_streams("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -342,7 +342,7 @@ TEST(rest_mock_gen_video_conferences_liststreams_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().conferences.listStreams("X", std::map<std::string, std::string>{}));
+    (void)(client.video().conferences.list_streams("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -438,7 +438,7 @@ TEST(rest_mock_gen_video_room_recordings_get_err) {
 TEST(rest_mock_gen_video_room_recordings_listevents_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_room_recording_events", 200, json::object());
-  (void)(client.video().room_recordings.listEvents("X", std::map<std::string, std::string>{}));
+  (void)(client.video().room_recordings.list_events("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -456,7 +456,7 @@ TEST(rest_mock_gen_video_room_recordings_listevents_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().room_recordings.listEvents("X", std::map<std::string, std::string>{}));
+    (void)(client.video().room_recordings.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -552,7 +552,7 @@ TEST(rest_mock_gen_video_room_sessions_get_err) {
 TEST(rest_mock_gen_video_room_sessions_listevents_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_room_session_events", 200, json::object());
-  (void)(client.video().room_sessions.listEvents("X", std::map<std::string, std::string>{}));
+  (void)(client.video().room_sessions.list_events("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -570,7 +570,7 @@ TEST(rest_mock_gen_video_room_sessions_listevents_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().room_sessions.listEvents("X", std::map<std::string, std::string>{}));
+    (void)(client.video().room_sessions.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -590,7 +590,7 @@ TEST(rest_mock_gen_video_room_sessions_listevents_err) {
 TEST(rest_mock_gen_video_room_sessions_listmembers_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_room_session_members", 200, json::object());
-  (void)(client.video().room_sessions.listMembers("X", std::map<std::string, std::string>{}));
+  (void)(client.video().room_sessions.list_members("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -608,7 +608,7 @@ TEST(rest_mock_gen_video_room_sessions_listmembers_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().room_sessions.listMembers("X", std::map<std::string, std::string>{}));
+    (void)(client.video().room_sessions.list_members("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -628,7 +628,7 @@ TEST(rest_mock_gen_video_room_sessions_listmembers_err) {
 TEST(rest_mock_gen_video_room_sessions_listrecordings_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_room_session_recordings", 200, json::object());
-  (void)(client.video().room_sessions.listRecordings("X", std::map<std::string, std::string>{}));
+  (void)(client.video().room_sessions.list_recordings("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -646,7 +646,7 @@ TEST(rest_mock_gen_video_room_sessions_listrecordings_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().room_sessions.listRecordings("X", std::map<std::string, std::string>{}));
+    (void)(client.video().room_sessions.list_recordings("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -742,7 +742,7 @@ TEST(rest_mock_gen_video_rooms_get_err) {
 TEST(rest_mock_gen_video_rooms_liststreams_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_room_streams", 200, json::object());
-  (void)(client.video().rooms.listStreams("X", std::map<std::string, std::string>{}));
+  (void)(client.video().rooms.list_streams("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -760,7 +760,7 @@ TEST(rest_mock_gen_video_rooms_liststreams_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().rooms.listStreams("X", std::map<std::string, std::string>{}));
+    (void)(client.video().rooms.list_streams("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -894,7 +894,7 @@ TEST(rest_mock_gen_video_conferences_create_err) {
 TEST(rest_mock_gen_video_conferences_createstream_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.create_conference_stream", 200, json::object());
-  (void)(client.video().conferences.createStream("X", {.url = "X"}));
+  (void)(client.video().conferences.create_stream("X", {.url = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -912,7 +912,7 @@ TEST(rest_mock_gen_video_conferences_createstream_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().conferences.createStream("X", {.url = "X"}));
+    (void)(client.video().conferences.create_stream("X", {.url = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -1008,7 +1008,7 @@ TEST(rest_mock_gen_video_rooms_create_err) {
 TEST(rest_mock_gen_video_rooms_createstream_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.create_room_stream", 200, json::object());
-  (void)(client.video().rooms.createStream("X", {.url = "X"}));
+  (void)(client.video().rooms.create_stream("X", {.url = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -1026,7 +1026,7 @@ TEST(rest_mock_gen_video_rooms_createstream_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().rooms.createStream("X", {.url = "X"}));
+    (void)(client.video().rooms.create_stream("X", {.url = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

@@ -84,7 +84,7 @@ TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_singular_path) {
 
 TEST(rest_mock_fabric_subscribers_get_sip_endpoint) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.getSipEndpoint("sub-1", "ep-1");
+    auto body = client.fabric().subscribers.get_sip_endpoint("sub-1", "ep-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -96,7 +96,7 @@ TEST(rest_mock_fabric_subscribers_get_sip_endpoint) {
 
 TEST(rest_mock_fabric_subscribers_update_sip_endpoint_uses_patch) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.updateSipEndpoint(
+    auto body = client.fabric().subscribers.update_sip_endpoint(
         "sub-1", "ep-1", {.username = "renamed"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
@@ -110,7 +110,7 @@ TEST(rest_mock_fabric_subscribers_update_sip_endpoint_uses_patch) {
 
 TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().subscribers.deleteSipEndpoint("sub-1", "ep-1");
+    auto body = client.fabric().subscribers.delete_sip_endpoint("sub-1", "ep-1");
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -126,7 +126,7 @@ TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
 
 TEST(rest_mock_fabric_tokens_create_invite_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.createInviteToken(
+    auto body = client.fabric().tokens.create_invite_token(
         {.extras = {{"email", "invitee@example.com"}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
@@ -140,7 +140,7 @@ TEST(rest_mock_fabric_tokens_create_invite_token) {
 
 TEST(rest_mock_fabric_tokens_create_embed_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.createEmbedToken(
+    auto body = client.fabric().tokens.create_embed_token(
         {.extras = {{"allowed_addresses", json::array({"addr-1", "addr-2"})}}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
@@ -157,7 +157,7 @@ TEST(rest_mock_fabric_tokens_create_embed_token) {
 
 TEST(rest_mock_fabric_tokens_refresh_subscriber_token) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.refreshSubscriberToken(
+    auto body = client.fabric().tokens.refresh_subscriber_token(
         {.refresh_token = "abc-123"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
@@ -220,7 +220,7 @@ TEST(rest_mock_fabric_resources_list_addresses) {
 
 TEST(rest_mock_fabric_resources_assign_domain_application) {
     auto client = mocktest::make_client();
-    auto body = client.fabric().resources.assignDomainApplication(
+    auto body = client.fabric().resources.assign_domain_application(
         "res-4", {.domain_application_id = "da-7"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();

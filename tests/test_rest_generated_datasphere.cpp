@@ -58,7 +58,7 @@ TEST(rest_mock_gen_datasphere_documents_delete_err) {
 TEST(rest_mock_gen_datasphere_documents_deletechunk_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.delete_document_chunk", 200, json::object());
-  (void)(client.datasphere().documents.deleteChunk("X", "X"));
+  (void)(client.datasphere().documents.delete_chunk("X", "X"));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("DELETE"));
@@ -76,7 +76,7 @@ TEST(rest_mock_gen_datasphere_documents_deletechunk_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.datasphere().documents.deleteChunk("X", "X"));
+    (void)(client.datasphere().documents.delete_chunk("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -172,7 +172,7 @@ TEST(rest_mock_gen_datasphere_documents_get_err) {
 TEST(rest_mock_gen_datasphere_documents_listchunks_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.list_document_chunks", 200, json::object());
-  (void)(client.datasphere().documents.listChunks("X", std::map<std::string, std::string>{}));
+  (void)(client.datasphere().documents.list_chunks("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -190,7 +190,7 @@ TEST(rest_mock_gen_datasphere_documents_listchunks_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.datasphere().documents.listChunks("X", std::map<std::string, std::string>{}));
+    (void)(client.datasphere().documents.list_chunks("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();
@@ -210,7 +210,7 @@ TEST(rest_mock_gen_datasphere_documents_listchunks_err) {
 TEST(rest_mock_gen_datasphere_documents_getchunk_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.get_document_chunk", 200, json::object());
-  (void)(client.datasphere().documents.getChunk("X", "X"));
+  (void)(client.datasphere().documents.get_chunk("X", "X"));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -228,7 +228,7 @@ TEST(rest_mock_gen_datasphere_documents_getchunk_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.datasphere().documents.getChunk("X", "X"));
+    (void)(client.datasphere().documents.get_chunk("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status();

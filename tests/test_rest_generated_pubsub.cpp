@@ -17,7 +17,7 @@ using namespace signalwire::rest;
 using nlohmann::json;
 }  // namespace
 
-TEST(rest_mock_gen_pubsub_createtoken_ok) {
+TEST(rest_mock_gen_pubsub_create_token_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("pubsub.create_token", 200, json::object());
   (void)(client.pubsub().create_token({.ttl = 60, .channels = json::array()}));
@@ -32,7 +32,7 @@ TEST(rest_mock_gen_pubsub_createtoken_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_pubsub_createtoken_err) {
+TEST(rest_mock_gen_pubsub_create_token_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("pubsub.create_token", 500, json{{"error", "x"}});
   bool threw = false;

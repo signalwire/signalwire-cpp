@@ -55,7 +55,7 @@ TEST(rest_mock_gen_addresses_delete_err) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_deletemembership_ok) {
+TEST(rest_mock_gen_number_groups_delete_membership_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.delete_number_group_membership", 200, json::object());
   (void)(client.number_groups().delete_membership("X"));
@@ -70,7 +70,7 @@ TEST(rest_mock_gen_number_groups_deletemembership_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_deletemembership_err) {
+TEST(rest_mock_gen_number_groups_delete_membership_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.delete_number_group_membership", 500, json{{"error", "x"}});
   bool threw = false;
@@ -397,7 +397,7 @@ TEST(rest_mock_gen_addresses_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_lookup_phonenumber_ok) {
+TEST(rest_mock_gen_lookup_phone_number_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.lookup_phone_number", 200, json::object());
   (void)(client.lookup().phone_number("X"));
@@ -412,7 +412,7 @@ TEST(rest_mock_gen_lookup_phonenumber_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_lookup_phonenumber_err) {
+TEST(rest_mock_gen_lookup_phone_number_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.lookup_phone_number", 500, json{{"error", "x"}});
   bool threw = false;
@@ -435,7 +435,7 @@ TEST(rest_mock_gen_lookup_phonenumber_err) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_getmembership_ok) {
+TEST(rest_mock_gen_number_groups_get_membership_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_number_group_membership", 200, json::object());
   (void)(client.number_groups().get_membership("X"));
@@ -450,7 +450,7 @@ TEST(rest_mock_gen_number_groups_getmembership_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_getmembership_err) {
+TEST(rest_mock_gen_number_groups_get_membership_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_number_group_membership", 500, json{{"error", "x"}});
   bool threw = false;
@@ -549,7 +549,7 @@ TEST(rest_mock_gen_number_groups_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_listmemberships_ok) {
+TEST(rest_mock_gen_number_groups_list_memberships_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_number_group_memberships", 200, json::object());
   (void)(client.number_groups().list_memberships("X", std::map<std::string, std::string>{}));
@@ -564,7 +564,7 @@ TEST(rest_mock_gen_number_groups_listmemberships_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_listmemberships_err) {
+TEST(rest_mock_gen_number_groups_list_memberships_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_number_group_memberships", 500, json{{"error", "x"}});
   bool threw = false;
@@ -777,7 +777,7 @@ TEST(rest_mock_gen_queues_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_listmembers_ok) {
+TEST(rest_mock_gen_queues_list_members_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_queue_members", 200, json::object());
   (void)(client.queues().list_members("X", std::map<std::string, std::string>{}));
@@ -792,7 +792,7 @@ TEST(rest_mock_gen_queues_listmembers_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_listmembers_err) {
+TEST(rest_mock_gen_queues_list_members_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_queue_members", 500, json{{"error", "x"}});
   bool threw = false;
@@ -815,7 +815,7 @@ TEST(rest_mock_gen_queues_listmembers_err) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_getnextmember_ok) {
+TEST(rest_mock_gen_queues_get_next_member_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_next_queue_member", 200, json::object());
   (void)(client.queues().get_next_member("X"));
@@ -830,7 +830,7 @@ TEST(rest_mock_gen_queues_getnextmember_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_getnextmember_err) {
+TEST(rest_mock_gen_queues_get_next_member_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_next_queue_member", 500, json{{"error", "x"}});
   bool threw = false;
@@ -853,7 +853,7 @@ TEST(rest_mock_gen_queues_getnextmember_err) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_getmember_ok) {
+TEST(rest_mock_gen_queues_get_member_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_queue_member", 200, json::object());
   (void)(client.queues().get_member("X", "X"));
@@ -868,7 +868,7 @@ TEST(rest_mock_gen_queues_getmember_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_queues_getmember_err) {
+TEST(rest_mock_gen_queues_get_member_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.retrieve_queue_member", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1043,7 +1043,7 @@ TEST(rest_mock_gen_registry_brands_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_brands_listcampaigns_ok) {
+TEST(rest_mock_gen_registry_brands_list_campaigns_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_campaigns", 200, json::object());
   (void)(client.registry().brands.list_campaigns("X", std::map<std::string, std::string>{}));
@@ -1058,7 +1058,7 @@ TEST(rest_mock_gen_registry_brands_listcampaigns_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_brands_listcampaigns_err) {
+TEST(rest_mock_gen_registry_brands_list_campaigns_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_campaigns", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1119,7 +1119,7 @@ TEST(rest_mock_gen_registry_campaigns_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_listnumbers_ok) {
+TEST(rest_mock_gen_registry_campaigns_list_numbers_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_number_assignments", 200, json::object());
   (void)(client.registry().campaigns.list_numbers("X", std::map<std::string, std::string>{}));
@@ -1134,7 +1134,7 @@ TEST(rest_mock_gen_registry_campaigns_listnumbers_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_listnumbers_err) {
+TEST(rest_mock_gen_registry_campaigns_list_numbers_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_number_assignments", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1157,7 +1157,7 @@ TEST(rest_mock_gen_registry_campaigns_listnumbers_err) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_listorders_ok) {
+TEST(rest_mock_gen_registry_campaigns_list_orders_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_orders", 200, json::object());
   (void)(client.registry().campaigns.list_orders("X", std::map<std::string, std::string>{}));
@@ -1172,7 +1172,7 @@ TEST(rest_mock_gen_registry_campaigns_listorders_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_listorders_err) {
+TEST(rest_mock_gen_registry_campaigns_list_orders_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_orders", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1651,7 +1651,7 @@ TEST(rest_mock_gen_number_groups_create_err) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_addmembership_ok) {
+TEST(rest_mock_gen_number_groups_add_membership_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_number_group_membership", 200, json::object());
   (void)(client.number_groups().add_membership("X", {.phone_number_id = "X"}));
@@ -1666,7 +1666,7 @@ TEST(rest_mock_gen_number_groups_addmembership_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_number_groups_addmembership_err) {
+TEST(rest_mock_gen_number_groups_add_membership_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_number_group_membership", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1803,7 +1803,7 @@ TEST(rest_mock_gen_registry_brands_create_err) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_brands_createcampaign_ok) {
+TEST(rest_mock_gen_registry_brands_create_campaign_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_campaign", 200, json::object());
   (void)(client.registry().brands.create_campaign("X", json::object()));
@@ -1818,7 +1818,7 @@ TEST(rest_mock_gen_registry_brands_createcampaign_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_brands_createcampaign_err) {
+TEST(rest_mock_gen_registry_brands_create_campaign_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_campaign", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1841,7 +1841,7 @@ TEST(rest_mock_gen_registry_brands_createcampaign_err) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_createorder_ok) {
+TEST(rest_mock_gen_registry_campaigns_create_order_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_order", 200, json::object());
   (void)(client.registry().campaigns.create_order("X", {}));
@@ -1856,7 +1856,7 @@ TEST(rest_mock_gen_registry_campaigns_createorder_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_registry_campaigns_createorder_err) {
+TEST(rest_mock_gen_registry_campaigns_create_order_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_order", 500, json{{"error", "x"}});
   bool threw = false;
@@ -1917,7 +1917,7 @@ TEST(rest_mock_gen_verified_callers_create_err) {
   return true;
 }
 
-TEST(rest_mock_gen_verified_callers_redialverification_ok) {
+TEST(rest_mock_gen_verified_callers_redial_verification_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.redial_verification_call", 200, json::object());
   (void)(client.verified_callers().redial_verification("X"));
@@ -1932,7 +1932,7 @@ TEST(rest_mock_gen_verified_callers_redialverification_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_verified_callers_redialverification_err) {
+TEST(rest_mock_gen_verified_callers_redial_verification_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.redial_verification_call", 500, json{{"error", "x"}});
   bool threw = false;
@@ -2221,7 +2221,7 @@ TEST(rest_mock_gen_verified_callers_update_err) {
   return true;
 }
 
-TEST(rest_mock_gen_verified_callers_submitverification_ok) {
+TEST(rest_mock_gen_verified_callers_submit_verification_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.validate_verification_code", 200, json::object());
   (void)(client.verified_callers().submit_verification("X", {.verification_code = "X"}));
@@ -2236,7 +2236,7 @@ TEST(rest_mock_gen_verified_callers_submitverification_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_verified_callers_submitverification_err) {
+TEST(rest_mock_gen_verified_callers_submit_verification_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.validate_verification_code", 500, json{{"error", "x"}});
   bool threw = false;

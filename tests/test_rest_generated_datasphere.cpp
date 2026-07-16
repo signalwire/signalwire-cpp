@@ -55,7 +55,7 @@ TEST(rest_mock_gen_datasphere_documents_delete_err) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_deletechunk_ok) {
+TEST(rest_mock_gen_datasphere_documents_delete_chunk_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.delete_document_chunk", 200, json::object());
   (void)(client.datasphere().documents.delete_chunk("X", "X"));
@@ -70,7 +70,7 @@ TEST(rest_mock_gen_datasphere_documents_deletechunk_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_deletechunk_err) {
+TEST(rest_mock_gen_datasphere_documents_delete_chunk_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.delete_document_chunk", 500, json{{"error", "x"}});
   bool threw = false;
@@ -169,7 +169,7 @@ TEST(rest_mock_gen_datasphere_documents_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_listchunks_ok) {
+TEST(rest_mock_gen_datasphere_documents_list_chunks_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.list_document_chunks", 200, json::object());
   (void)(client.datasphere().documents.list_chunks("X", std::map<std::string, std::string>{}));
@@ -184,7 +184,7 @@ TEST(rest_mock_gen_datasphere_documents_listchunks_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_listchunks_err) {
+TEST(rest_mock_gen_datasphere_documents_list_chunks_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.list_document_chunks", 500, json{{"error", "x"}});
   bool threw = false;
@@ -207,7 +207,7 @@ TEST(rest_mock_gen_datasphere_documents_listchunks_err) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_getchunk_ok) {
+TEST(rest_mock_gen_datasphere_documents_get_chunk_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.get_document_chunk", 200, json::object());
   (void)(client.datasphere().documents.get_chunk("X", "X"));
@@ -222,7 +222,7 @@ TEST(rest_mock_gen_datasphere_documents_getchunk_ok) {
   return true;
 }
 
-TEST(rest_mock_gen_datasphere_documents_getchunk_err) {
+TEST(rest_mock_gen_datasphere_documents_get_chunk_err) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("datasphere.get_document_chunk", 500, json{{"error", "x"}});
   bool threw = false;

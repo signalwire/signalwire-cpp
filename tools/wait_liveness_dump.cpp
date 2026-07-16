@@ -116,9 +116,10 @@ Call* answered_call(RelayClient& client) {
 }  // namespace
 
 int main() {
-    if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
-        ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
-    }
+    // Silence the SDK logger programmatically so ONLY the JSON reaches stdout (the
+    // logger writes INFO to std::cout; an env-only guard is racy against the RELAY
+    // connect log). Mirrors wire_relay_dump.
+    signalwire::Logger::instance().suppress();
     json out = json::object();
 
     // ---- live_play_wait -----------------------------------------------------

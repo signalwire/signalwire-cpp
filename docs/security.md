@@ -75,6 +75,24 @@ testing setups.
 | `SWML_ALLOW_PRIVATE_URLS` | `false` | When `true`/`1`/`yes`, permit webhook / fetch URLs that resolve to private, loopback, or link-local addresses. **Security-critical:** the default (`false`) blocks these to prevent SSRF; only enable it for a trusted local environment. |
 | `SWML_SKIP_SCHEMA_VALIDATION` | `false` | When `true`/`1`/`yes`, skip SWML schema validation of generated documents. **Security-critical:** disabling validation lets malformed / unexpected SWML through; leave it off outside debugging. |
 
+### Webhook Signature Validation
+
+When a signing key is configured, `AgentBase` auto-mounts the SignalWire webhook
+signature validator on its POST routes (`/`, `/swaig`, `/post_prompt`); requests
+that are unsigned or carry a wrong signature get a `403` and never reach the
+handler. The key comes from the Dashboard (API Credentials) and is resolved in
+this order: an explicit `set_signing_key(...)` / constructor `signing_key`
+argument first, then the `SIGNALWIRE_SIGNING_KEY` environment variable as a
+fallback.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SIGNALWIRE_SIGNING_KEY` | - | The SignalWire Signing Key used to validate inbound webhook signatures on the agent's POST routes, honored as a fallback when no explicit key is passed to `AgentBase`. **Security-critical / secret:** it is the shared secret that authenticates webhook callers — keep it out of logs and source control; when neither it nor an explicit key is set, `AgentBase` logs a startup warning and accepts *unsigned* POSTs (a production footgun). |
+
+```bash
+export SIGNALWIRE_SIGNING_KEY=PSK...   # or pass signing_key to the AgentBase constructor
+```
+
 ## Service-Specific Usage
 
 ### SWML Services (AgentBase)

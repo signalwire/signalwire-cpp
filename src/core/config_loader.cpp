@@ -12,8 +12,12 @@
 #include "signalwire/common.hpp"
 #include "signalwire/logging.hpp"
 
-// POSIX environ, for merge_with_env's "iterate all env vars" behavior.
-extern char** environ;
+// POSIX environ, for merge_with_env's "iterate all env vars" behavior. Declared
+// explicitly (not via <unistd.h>) because macOS/libc++ does NOT expose `environ`
+// through <unistd.h> — only via this extern or crt_externs.h/_NSGetEnviron(). The
+// extern is therefore NOT redundant on all platforms; clang-tidy's
+// readability-redundant-declaration only sees the glibc case.
+extern char** environ;  // NOLINT(readability-redundant-declaration)
 
 namespace signalwire {
 namespace core {

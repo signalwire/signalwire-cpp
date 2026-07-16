@@ -181,7 +181,8 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.fabric().tokens.create_invite_token({.address_id = SENTINEL}));
   CALL("fabric.tokens.create_guest_token",
        c.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
-  CALL("fabric.tokens.create_embed_token", c.fabric().tokens.create_embed_token({.token = SENTINEL}));
+  CALL("fabric.tokens.create_embed_token",
+       c.fabric().tokens.create_embed_token({.token = SENTINEL}));
 
   // ---- fabric CRUD + list_addresses resources (base create(json); explicit
   // per-resource so CALL() captures a usable call literal, not a lambda arg) ----
@@ -270,12 +271,14 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.subscribers.delete_", c.fabric().subscribers.delete_(id));
   CALL("fabric.subscribers.list_addresses", c.fabric().subscribers.list_addresses(id, q));
   CALL("fabric.subscribers.list_sip_endpoints", c.fabric().subscribers.list_sip_endpoints(id, q));
-  CALL("fabric.subscribers.create_sip_endpoint",
-       c.fabric().subscribers.create_sip_endpoint(id, {.username = SENTINEL, .password = SENTINEL}));
+  CALL(
+      "fabric.subscribers.create_sip_endpoint",
+      c.fabric().subscribers.create_sip_endpoint(id, {.username = SENTINEL, .password = SENTINEL}));
   CALL("fabric.subscribers.get_sip_endpoint", c.fabric().subscribers.get_sip_endpoint(id, id));
   CALL("fabric.subscribers.update_sip_endpoint",
        c.fabric().subscribers.update_sip_endpoint(id, id, {}));
-  CALL("fabric.subscribers.delete_sip_endpoint", c.fabric().subscribers.delete_sip_endpoint(id, id));
+  CALL("fabric.subscribers.delete_sip_endpoint",
+       c.fabric().subscribers.delete_sip_endpoint(id, id));
 
   // cxml_applications: list/get/update/delete/list_addresses dispatch; create()
   // throws by design (cXML apps cannot be created via this API).
@@ -295,9 +298,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.resources.list_addresses", c.fabric().resources.list_addresses(id, q));
   CALL("fabric.resources.assign_domain_application",
        c.fabric().resources.assign_domain_application(id, {.domain_application_id = SENTINEL}));
-  CALL(
-      "fabric.resources.assign_phone_route",
-      c.fabric().resources.assign_phone_route(id, {.phone_route_id = SENTINEL, .handler = SENTINEL}));
+  CALL("fabric.resources.assign_phone_route",
+       c.fabric().resources.assign_phone_route(id,
+                                               {.phone_route_id = SENTINEL, .handler = SENTINEL}));
 
   // fabric addresses (list/get only).
   CALL("fabric.addresses.list", c.fabric().addresses.list(q));
@@ -385,9 +388,11 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("video.conferences.get", c.video().conferences.get(id));
   CALL("video.conferences.update", c.video().conferences.update(id, body));
   CALL("video.conferences.delete_", c.video().conferences.delete_(id));
-  CALL("video.conferences.list_conference_tokens", c.video().conferences.list_conference_tokens(id, q));
+  CALL("video.conferences.list_conference_tokens",
+       c.video().conferences.list_conference_tokens(id, q));
   CALL("video.conferences.list_streams", c.video().conferences.list_streams(id, q));
-  CALL("video.conferences.create_stream", c.video().conferences.create_stream(id, {.url = SENTINEL}));
+  CALL("video.conferences.create_stream",
+       c.video().conferences.create_stream(id, {.url = SENTINEL}));
   CALL("video.conference_tokens.get", c.video().conference_tokens.get(id));
   CALL("video.conference_tokens.reset", c.video().conference_tokens.reset(id));
   CALL("video.streams.get", c.video().streams.get(id));

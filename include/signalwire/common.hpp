@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <random>
 #include <regex>
@@ -24,8 +25,6 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-#include <nlohmann/json.hpp>
 
 namespace signalwire {
 

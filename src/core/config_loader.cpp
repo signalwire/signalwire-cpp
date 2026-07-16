@@ -12,12 +12,20 @@
 #include "signalwire/common.hpp"
 #include "signalwire/logging.hpp"
 
-// POSIX environ, for merge_with_env's "iterate all env vars" behavior. Declared
-// explicitly (not via <unistd.h>) because macOS/libc++ does NOT expose `environ`
-// through <unistd.h> — only via this extern or crt_externs.h/_NSGetEnviron(). The
-// extern is therefore NOT redundant on all platforms; clang-tidy's
-// readability-redundant-declaration only sees the glibc case.
-extern char** environ;  // NOLINT(readability-redundant-declaration)
+// Portable access to the process environment block (for merge_with_env's
+// "iterate all env vars" behavior). macOS/libc++ does not expose `environ` as a
+// linkable symbol in a shared lib — the sanctioned API is _NSGetEnviron() from
+// <crt_externs.h>. On glibc/POSIX, <unistd.h> declares `environ` directly, so we
+// use it there (declaring our own extern would be redundant — clang-tidy's
+// readability-redundant-declaration). Both branches yield `sw_environ`; no
+// redundant declaration on either platform.
+#if defined(__APPLE__)
+#include <crt_externs.h>
+#define SW_ENVIRON (*_NSGetEnviron())
+#else
+#include <unistd.h>
+#define SW_ENVIRON environ
+#endif
 
 namespace signalwire {
 namespace core {
@@ -216,7 +224,7 @@ json ConfigLoader::merge_with_env(const std::string& env_prefix) const {
   if (!result.is_object()) {
     result = json::object();
   }
-  for (char** e = environ; e != nullptr && *e != nullptr; ++e) {
+  for (char** e = SW_ENVIRON; e != nullptr && *e != nullptr; ++e) {
     std::string entry(*e);
     auto eq = entry.find('=');
     if (eq == std::string::npos) {

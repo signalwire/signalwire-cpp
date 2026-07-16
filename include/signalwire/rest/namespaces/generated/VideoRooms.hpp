@@ -32,12 +32,12 @@ class VideoRooms : public CrudResource {
 
   explicit VideoRooms(const HttpClient& client) : CrudResource(client, "/api/video/rooms", "PUT") {}
 
-  [[nodiscard]] json listStreams(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_streams(const std::string& id,
+                                  const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params);
   }
 
-  [[nodiscard]] json createStream(const std::string& id, const CreateStreamParams& p) const {
+  [[nodiscard]] json create_stream(const std::string& id, const CreateStreamParams& p) const {
     json body = json::object();
     body["url"] = p.url;
     if (!p.extras.is_null()) {

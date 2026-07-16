@@ -57,8 +57,8 @@ class GenericResources : public BaseResource {
     return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params);
   }
 
-  [[nodiscard]] json assignPhoneRoute(const std::string& id,
-                                      const AssignPhoneRouteParams& p) const {
+  [[nodiscard]] json assign_phone_route(const std::string& id,
+                                        const AssignPhoneRouteParams& p) const {
     json body = json::object();
     body["phone_route_id"] = p.phone_route_id;
     body["handler"] = p.handler;
@@ -68,8 +68,8 @@ class GenericResources : public BaseResource {
     return client_.post(base_path_ + "/" + id + "/" + std::string("phone_routes"), body);
   }
 
-  [[nodiscard]] json assignDomainApplication(const std::string& id,
-                                             const AssignDomainApplicationParams& p) const {
+  [[nodiscard]] json assign_domain_application(const std::string& id,
+                                               const AssignDomainApplicationParams& p) const {
     json body = json::object();
     body["domain_application_id"] = p.domain_application_id;
     if (!p.extras.is_null()) {

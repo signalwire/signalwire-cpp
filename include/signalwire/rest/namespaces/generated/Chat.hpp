@@ -35,7 +35,7 @@ class Chat : public BaseResource {
 
   explicit Chat(const HttpClient& client) : BaseResource(client, "/api/chat/tokens") {}
 
-  [[nodiscard]] json createToken(const CreateTokenParams& p) const {
+  [[nodiscard]] json create_token(const CreateTokenParams& p) const {
     json body = json::object();
     body["ttl"] = p.ttl;
     body["channels"] = p.channels;

@@ -72,10 +72,10 @@ To produce an `swml_webhook` or `cxml_webhook` resource, bind a phone number to 
 
 ```cpp
 // Auto-creates an swml_webhook Fabric resource
-client.phone_numbers().setSwmlWebhook(pn_id, {.url = "https://example.com/swml"});
+client.phone_numbers().set_swml_webhook(pn_id, {.url = "https://example.com/swml"});
 
 // Auto-creates a cxml_webhook Fabric resource
-client.phone_numbers().setCxmlWebhook(pn_id, {.url = "https://example.com/voice.xml"});
+client.phone_numbers().set_cxml_webhook(pn_id, {.url = "https://example.com/voice.xml"});
 ```
 
 Full model and all 11 call-handler variants: see **[phone-binding.md](phone-binding.md)**.
@@ -86,7 +86,7 @@ See **[phone-binding.md](phone-binding.md)** for the `PhoneCallHandler` enum, th
 
 ```cpp
 // SWML webhook (your backend returns SWML per call)
-client.phone_numbers().setSwmlWebhook(pn_id, {.url = "https://example.com/swml"});
+client.phone_numbers().set_swml_webhook(pn_id, {.url = "https://example.com/swml"});
 ```
 
 ### `assign_phone_route` is not shipped

@@ -126,18 +126,23 @@ install(TARGETS signalwire
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/signalwire
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-# Vendored header-only deps the PUBLIC headers pull in (`<nlohmann/json.hpp>`,
-# httplib.h) -> <prefix>/include, so a consumer that only has -I<prefix>/include
-# still resolves them. deps/ is on the build's include path (line ~22); shipping
-# it makes the installed headers self-contained. deps/nlohmann/json.hpp is a
-# RELATIVE symlink to ../json.hpp; install(DIRECTORY) copies it as-is, and since
-# deps/json.hpp is installed too the link still resolves in the install tree
-# (<prefix>/include/nlohmann/json.hpp -> ../json.hpp == <prefix>/include/json.hpp).
-install(DIRECTORY ${CMAKE_SOURCE_DIR}/deps/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    FILES_MATCHING
-        PATTERN "*.h"
-        PATTERN "*.hpp")
+# Vendored header-only dep the PUBLIC headers pull in. The ONLY vendored header a
+# consumer's translation unit actually needs is nlohmann/json.hpp: every public
+# header includes `<nlohmann/json.hpp>` (common.hpp too, normalized off the bare
+# "json.hpp"). httplib is NEVER #included by a public header — the ones that use it
+# only FORWARD-DECLARE `namespace httplib { ... }` and take httplib types by
+# reference — so httplib.h must NOT be shipped: dumping it (and a bare json.hpp)
+# into <prefix>/include pollutes the consumer's include root with unnamespaced
+# `httplib.h` / `json.hpp` that collide with the consumer's own or another lib's
+# vendored copy. Install ONLY nlohmann/json.hpp, and materialize it as a real file
+# (deps/nlohmann/json.hpp is a relative symlink to ../json.hpp; installing the
+# canonical deps/json.hpp AS <prefix>/include/nlohmann/json.hpp dereferences the
+# link so the install tree carries no dangling symlink and no root-level pollutant).
+# Result: <prefix>/include holds exactly `signalwire/` and `nlohmann/json.hpp`, so
+# `-I<prefix>/include` resolves `<nlohmann/json.hpp>` and nothing else leaks.
+install(FILES ${CMAKE_SOURCE_DIR}/deps/json.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nlohmann
+    RENAME json.hpp)
 
 # Tests
 enable_testing()

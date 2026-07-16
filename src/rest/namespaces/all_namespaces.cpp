@@ -10,11 +10,11 @@
 // User-facing accessors (unchanged across the generated-surface adoption):
 //   client.fabric().subscribers.list()
 //   client.calling().dial({...})
-//   client.phone_numbers().search({{"area_code", "512"}})
+//   client.phone_numbers().search({{"areacode", "512"}})
 //   client.datasphere().documents.search({...})
 //   client.video().rooms.list()
 //   client.registry().brands.list()
 //   client.logs().messages.list()
 //   client.project().tokens.create({...})
-//   client.pubsub().createToken({...})   // generated camelCase op methods
-//   client.chat().createToken({...})
+//   client.pubsub().create_token({...})   // generated snake_case op methods
+//   client.chat().create_token({...})

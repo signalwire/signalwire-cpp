@@ -65,29 +65,29 @@ std::string pn_id = "pn-uuid";
 
 ```cpp
 // SWML webhook (the common case — your backend returns SWML per call)
-client.phone_numbers().setSwmlWebhook(pn_id, {.url = "https://example.com/swml"});
+client.phone_numbers().set_swml_webhook(pn_id, {.url = "https://example.com/swml"});
 
 // cXML / LAML webhook (Twilio-compat) — fallback_url / status_callback_url optional
-client.phone_numbers().setCxmlWebhook(pn_id, {
+client.phone_numbers().set_cxml_webhook(pn_id, {
     .url                 = "https://example.com/voice.xml",
     .fallback_url        = "https://example.com/fallback.xml",
     .status_callback_url = "https://example.com/status",
 });
 
 // Existing cXML application by ID
-client.phone_numbers().setCxmlApplication(pn_id, {.application_id = "app-uuid"});
+client.phone_numbers().set_cxml_application(pn_id, {.application_id = "app-uuid"});
 
 // AI Agent by ID (agent created via fabric.ai_agents or AgentBase)
-client.phone_numbers().setAiAgent(pn_id, {.agent_id = "agent-uuid"});
+client.phone_numbers().set_ai_agent(pn_id, {.agent_id = "agent-uuid"});
 
 // Call flow (optionally pin a version — default is current_deployed)
-client.phone_numbers().setCallFlow(pn_id, {.flow_id = "flow-uuid", .version = "current_deployed"});
+client.phone_numbers().set_call_flow(pn_id, {.flow_id = "flow-uuid", .version = "current_deployed"});
 
 // Relay application (named routing)
-client.phone_numbers().setRelayApplication(pn_id, {.name = "my-relay-app"});
+client.phone_numbers().set_relay_application(pn_id, {.name = "my-relay-app"});
 
 // Relay topic (RELAY client subscription)
-client.phone_numbers().setRelayTopic(pn_id, {.topic = "office"});
+client.phone_numbers().set_relay_topic(pn_id, {.topic = "office"});
 ```
 
 All helpers return the updated phone number representation. All are thin wrappers over the single underlying `phone_numbers().update(sid, body)` call; use the update form directly when you need an unusual combination.
@@ -107,7 +107,7 @@ client.phone_numbers().update(pn_id, {
 
 Don't construct an SWML/cXML webhook resource manually and then try to attach a phone number to it:
 
-- `fabric().swml_webhooks` and `fabric().cxml_webhooks` are not exposed on this SDK's Fabric namespace. They appear only as **server-derived** resources after you call `phone_numbers().setSwmlWebhook(...)` / `setCxmlWebhook(...)`.
+- `fabric().swml_webhooks` and `fabric().cxml_webhooks` are not exposed on this SDK's Fabric namespace. They appear only as **server-derived** resources after you call `phone_numbers().set_swml_webhook(...)` / `setCxmlWebhook(...)`.
 - There is deliberately no `assign_phone_route` method in this SDK. Other SDKs ship one for legacy reasons; it does not work for SWML/cXML/AI-agent bindings.
 
 If you find yourself writing "create a webhook, then attach a phone number" — stop. The binding *is* the create.

@@ -55,17 +55,17 @@ class RegistryCampaigns : public BaseResource {
     return client_.put(base_path_ + "/" + id, body);
   }
 
-  [[nodiscard]] json listNumbers(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_numbers(const std::string& id,
+                                  const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("numbers"), params);
   }
 
-  [[nodiscard]] json listOrders(const std::string& id,
-                                const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_orders(const std::string& id,
+                                 const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + id + "/" + std::string("orders"), params);
   }
 
-  [[nodiscard]] json createOrder(const std::string& id, const CreateOrderParams& p) const {
+  [[nodiscard]] json create_order(const std::string& id, const CreateOrderParams& p) const {
     json body = json::object();
     if (p.phone_numbers.has_value()) {
       body["phone_numbers"] = *p.phone_numbers;

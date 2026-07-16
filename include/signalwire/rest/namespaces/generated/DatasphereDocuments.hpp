@@ -70,18 +70,18 @@ class DatasphereDocuments : public CrudResource {
     return client_.post(base_path_ + "/" + std::string("search"), body);
   }
 
-  [[nodiscard]] json listChunks(const std::string& documentId,
-                                const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_chunks(const std::string& documentId,
+                                 const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + documentId + "/" + std::string("chunks"), params);
   }
 
-  [[nodiscard]] json getChunk(const std::string& documentId, const std::string& chunkId,
-                              const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json get_chunk(const std::string& documentId, const std::string& chunkId,
+                               const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + documentId + "/" + std::string("chunks") + "/" + chunkId,
                        params);
   }
 
-  [[nodiscard]] json deleteChunk(const std::string& documentId, const std::string& chunkId) const {
+  [[nodiscard]] json delete_chunk(const std::string& documentId, const std::string& chunkId) const {
     return client_.del(base_path_ + "/" + documentId + "/" + std::string("chunks") + "/" + chunkId);
   }
 };

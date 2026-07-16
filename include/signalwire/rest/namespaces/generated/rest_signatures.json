@@ -145,7 +145,7 @@
         "required": true
       }
     ],
-    "CallFlows::deployVersion": [
+    "CallFlows::deploy_version": [
       {
         "name": "id",
         "kind": "positional",
@@ -159,7 +159,7 @@
         "required": true
       }
     ],
-    "CallFlows::listVersions": [
+    "CallFlows::list_addresses": [
       {
         "name": "id",
         "kind": "positional",
@@ -174,7 +174,7 @@
         "default": {}
       }
     ],
-    "CallFlows::list_addresses": [
+    "CallFlows::list_versions": [
       {
         "name": "id",
         "kind": "positional",
@@ -1208,7 +1208,7 @@
         "default": null
       }
     ],
-    "Chat::createToken": [
+    "Chat::create_token": [
       {
         "name": "ttl",
         "kind": "keyword",
@@ -1507,7 +1507,7 @@
         "required": true
       }
     ],
-    "DatasphereDocuments::deleteChunk": [
+    "DatasphereDocuments::delete_chunk": [
       {
         "name": "documentId",
         "kind": "positional",
@@ -1521,7 +1521,7 @@
         "required": true
       }
     ],
-    "DatasphereDocuments::getChunk": [
+    "DatasphereDocuments::get_chunk": [
       {
         "name": "documentId",
         "kind": "positional",
@@ -1542,7 +1542,7 @@
         "default": {}
       }
     ],
-    "DatasphereDocuments::listChunks": [
+    "DatasphereDocuments::list_chunks": [
       {
         "name": "documentId",
         "kind": "positional",
@@ -1668,7 +1668,7 @@
         "default": {}
       }
     ],
-    "FabricTokens::createEmbedToken": [
+    "FabricTokens::create_embed_token": [
       {
         "name": "token",
         "kind": "keyword",
@@ -1690,7 +1690,7 @@
         "default": {}
       }
     ],
-    "FabricTokens::createGuestToken": [
+    "FabricTokens::create_guest_token": [
       {
         "name": "allowed_addresses",
         "kind": "keyword",
@@ -1718,7 +1718,7 @@
         "default": {}
       }
     ],
-    "FabricTokens::createInviteToken": [
+    "FabricTokens::create_invite_token": [
       {
         "name": "address_id",
         "kind": "keyword",
@@ -1746,7 +1746,7 @@
         "default": {}
       }
     ],
-    "FabricTokens::createSubscriberToken": [
+    "FabricTokens::create_subscriber_token": [
       {
         "name": "reference",
         "kind": "keyword",
@@ -1834,7 +1834,7 @@
         "default": {}
       }
     ],
-    "FabricTokens::refreshSubscriberToken": [
+    "FabricTokens::refresh_subscriber_token": [
       {
         "name": "refresh_token",
         "kind": "keyword",
@@ -1911,7 +1911,7 @@
         "required": true
       }
     ],
-    "GenericResources::assignDomainApplication": [
+    "GenericResources::assign_domain_application": [
       {
         "name": "id",
         "kind": "positional",
@@ -1939,7 +1939,7 @@
         "default": {}
       }
     ],
-    "GenericResources::assignPhoneRoute": [
+    "GenericResources::assign_phone_route": [
       {
         "name": "id",
         "kind": "positional",
@@ -2054,7 +2054,7 @@
         "default": {}
       }
     ],
-    "Lookup::phoneNumber": [
+    "Lookup::phone_number": [
       {
         "name": "e164",
         "kind": "positional",
@@ -2332,7 +2332,7 @@
         "default": {}
       }
     ],
-    "NumberGroups::addMembership": [
+    "NumberGroups::add_membership": [
       {
         "name": "NumberGroupId",
         "kind": "positional",
@@ -2376,7 +2376,7 @@
         "required": true
       }
     ],
-    "NumberGroups::deleteMembership": [
+    "NumberGroups::delete_membership": [
       {
         "name": "id",
         "kind": "positional",
@@ -2384,7 +2384,7 @@
         "required": true
       }
     ],
-    "NumberGroups::getMembership": [
+    "NumberGroups::get_membership": [
       {
         "name": "id",
         "kind": "positional",
@@ -2399,7 +2399,7 @@
         "default": {}
       }
     ],
-    "NumberGroups::listMemberships": [
+    "NumberGroups::list_memberships": [
       {
         "name": "NumberGroupId",
         "kind": "positional",
@@ -2453,7 +2453,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setAiAgent": [
+    "PhoneNumbers::set_ai_agent": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2474,7 +2474,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setCallFlow": [
+    "PhoneNumbers::set_call_flow": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2501,7 +2501,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setCxmlApplication": [
+    "PhoneNumbers::set_cxml_application": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2522,7 +2522,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setCxmlWebhook": [
+    "PhoneNumbers::set_cxml_webhook": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2555,7 +2555,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setRelayApplication": [
+    "PhoneNumbers::set_relay_application": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2576,7 +2576,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setRelayTopic": [
+    "PhoneNumbers::set_relay_topic": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2603,7 +2603,7 @@
         "default": {}
       }
     ],
-    "PhoneNumbers::setSwmlWebhook": [
+    "PhoneNumbers::set_swml_webhook": [
       {
         "name": "resource_id",
         "kind": "positional",
@@ -2730,7 +2730,7 @@
         "required": true
       }
     ],
-    "Projects::rotateSigningKey": [
+    "Projects::rotate_signing_key": [
       {
         "name": "id",
         "kind": "positional",
@@ -2752,7 +2752,7 @@
         "required": true
       }
     ],
-    "PubSub::createToken": [
+    "PubSub::create_token": [
       {
         "name": "ttl",
         "kind": "keyword",
@@ -2808,7 +2808,7 @@
         "required": true
       }
     ],
-    "Queues::getMember": [
+    "Queues::get_member": [
       {
         "name": "queue_id",
         "kind": "positional",
@@ -2829,7 +2829,7 @@
         "default": {}
       }
     ],
-    "Queues::getNextMember": [
+    "Queues::get_next_member": [
       {
         "name": "queue_id",
         "kind": "positional",
@@ -2844,7 +2844,7 @@
         "default": {}
       }
     ],
-    "Queues::listMembers": [
+    "Queues::list_members": [
       {
         "name": "queue_id",
         "kind": "positional",
@@ -2913,7 +2913,7 @@
         "required": true
       }
     ],
-    "RegistryBrands::createCampaign": [
+    "RegistryBrands::create_campaign": [
       {
         "name": "id",
         "kind": "positional",
@@ -2951,7 +2951,7 @@
         "default": {}
       }
     ],
-    "RegistryBrands::listCampaigns": [
+    "RegistryBrands::list_campaigns": [
       {
         "name": "id",
         "kind": "positional",
@@ -2966,7 +2966,7 @@
         "default": {}
       }
     ],
-    "RegistryCampaigns::createOrder": [
+    "RegistryCampaigns::create_order": [
       {
         "name": "id",
         "kind": "positional",
@@ -3015,7 +3015,7 @@
         "default": {}
       }
     ],
-    "RegistryCampaigns::listNumbers": [
+    "RegistryCampaigns::list_numbers": [
       {
         "name": "id",
         "kind": "positional",
@@ -3030,7 +3030,7 @@
         "default": {}
       }
     ],
-    "RegistryCampaigns::listOrders": [
+    "RegistryCampaigns::list_orders": [
       {
         "name": "id",
         "kind": "positional",
@@ -3319,7 +3319,7 @@
         "required": true
       }
     ],
-    "Subscribers::createSipEndpoint": [
+    "Subscribers::create_sip_endpoint": [
       {
         "name": "fabric_subscriber_id",
         "kind": "positional",
@@ -3383,7 +3383,7 @@
         "default": {}
       }
     ],
-    "Subscribers::deleteSipEndpoint": [
+    "Subscribers::delete_sip_endpoint": [
       {
         "name": "fabric_subscriber_id",
         "kind": "positional",
@@ -3397,7 +3397,7 @@
         "required": true
       }
     ],
-    "Subscribers::getSipEndpoint": [
+    "Subscribers::get_sip_endpoint": [
       {
         "name": "fabric_subscriber_id",
         "kind": "positional",
@@ -3418,7 +3418,7 @@
         "default": {}
       }
     ],
-    "Subscribers::listSipEndpoints": [
+    "Subscribers::list_sip_endpoints": [
       {
         "name": "fabric_subscriber_id",
         "kind": "positional",
@@ -3447,7 +3447,7 @@
         "required": true
       }
     ],
-    "Subscribers::updateSipEndpoint": [
+    "Subscribers::update_sip_endpoint": [
       {
         "name": "fabric_subscriber_id",
         "kind": "positional",
@@ -3577,7 +3577,7 @@
         "required": true
       }
     ],
-    "VerifiedCallers::redialVerification": [
+    "VerifiedCallers::redial_verification": [
       {
         "name": "id",
         "kind": "positional",
@@ -3585,7 +3585,7 @@
         "required": true
       }
     ],
-    "VerifiedCallers::submitVerification": [
+    "VerifiedCallers::submit_verification": [
       {
         "name": "id",
         "kind": "positional",
@@ -3658,7 +3658,7 @@
         "required": true
       }
     ],
-    "VideoConferences::createStream": [
+    "VideoConferences::create_stream": [
       {
         "name": "id",
         "kind": "positional",
@@ -3694,7 +3694,7 @@
         "required": true
       }
     ],
-    "VideoConferences::listConferenceTokens": [
+    "VideoConferences::list_conference_tokens": [
       {
         "name": "id",
         "kind": "positional",
@@ -3709,7 +3709,7 @@
         "default": {}
       }
     ],
-    "VideoConferences::listStreams": [
+    "VideoConferences::list_streams": [
       {
         "name": "id",
         "kind": "positional",
@@ -3770,7 +3770,7 @@
         "default": {}
       }
     ],
-    "VideoRoomRecordings::listEvents": [
+    "VideoRoomRecordings::list_events": [
       {
         "name": "id",
         "kind": "positional",
@@ -3809,7 +3809,7 @@
         "default": {}
       }
     ],
-    "VideoRoomSessions::listEvents": [
+    "VideoRoomSessions::list_events": [
       {
         "name": "id",
         "kind": "positional",
@@ -3824,7 +3824,7 @@
         "default": {}
       }
     ],
-    "VideoRoomSessions::listMembers": [
+    "VideoRoomSessions::list_members": [
       {
         "name": "id",
         "kind": "positional",
@@ -3839,7 +3839,7 @@
         "default": {}
       }
     ],
-    "VideoRoomSessions::listRecordings": [
+    "VideoRoomSessions::list_recordings": [
       {
         "name": "id",
         "kind": "positional",
@@ -3995,7 +3995,7 @@
         "required": true
       }
     ],
-    "VideoRooms::createStream": [
+    "VideoRooms::create_stream": [
       {
         "name": "id",
         "kind": "positional",
@@ -4031,7 +4031,7 @@
         "required": true
       }
     ],
-    "VideoRooms::listStreams": [
+    "VideoRooms::list_streams": [
       {
         "name": "id",
         "kind": "positional",
@@ -4135,7 +4135,7 @@
         "default": {}
       }
     ],
-    "VoiceLogs::listEvents": [
+    "VoiceLogs::list_events": [
       {
         "name": "id",
         "kind": "positional",

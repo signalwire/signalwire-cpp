@@ -50,14 +50,15 @@ class Subscribers : public FabricResource {
   explicit Subscribers(const HttpClient& client)
       : FabricResource(client, "/api/fabric/resources/subscribers", "PUT") {}
 
-  [[nodiscard]] json listSipEndpoints(const std::string& fabric_subscriber_id,
-                                      const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json list_sip_endpoints(
+      const std::string& fabric_subscriber_id,
+      const std::map<std::string, std::string>& params = {}) const {
     return client_.get(base_path_ + "/" + fabric_subscriber_id + "/" + std::string("sip_endpoints"),
                        params);
   }
 
-  [[nodiscard]] json createSipEndpoint(const std::string& fabric_subscriber_id,
-                                       const CreateSipEndpointParams& p) const {
+  [[nodiscard]] json create_sip_endpoint(const std::string& fabric_subscriber_id,
+                                         const CreateSipEndpointParams& p) const {
     json body = json::object();
     body["username"] = p.username;
     body["password"] = p.password;
@@ -83,16 +84,17 @@ class Subscribers : public FabricResource {
         base_path_ + "/" + fabric_subscriber_id + "/" + std::string("sip_endpoints"), body);
   }
 
-  [[nodiscard]] json getSipEndpoint(const std::string& fabric_subscriber_id, const std::string& id,
-                                    const std::map<std::string, std::string>& params = {}) const {
+  [[nodiscard]] json get_sip_endpoint(const std::string& fabric_subscriber_id,
+                                      const std::string& id,
+                                      const std::map<std::string, std::string>& params = {}) const {
     return client_.get(
         base_path_ + "/" + fabric_subscriber_id + "/" + std::string("sip_endpoints") + "/" + id,
         params);
   }
 
-  [[nodiscard]] json updateSipEndpoint(const std::string& fabric_subscriber_id,
-                                       const std::string& id,
-                                       const UpdateSipEndpointParams& p) const {
+  [[nodiscard]] json update_sip_endpoint(const std::string& fabric_subscriber_id,
+                                         const std::string& id,
+                                         const UpdateSipEndpointParams& p) const {
     json body = json::object();
     if (p.username.has_value()) {
       body["username"] = *p.username;
@@ -123,8 +125,8 @@ class Subscribers : public FabricResource {
         body);
   }
 
-  [[nodiscard]] json deleteSipEndpoint(const std::string& fabric_subscriber_id,
-                                       const std::string& id) const {
+  [[nodiscard]] json delete_sip_endpoint(const std::string& fabric_subscriber_id,
+                                         const std::string& id) const {
     return client_.del(base_path_ + "/" + fabric_subscriber_id + "/" +
                        std::string("sip_endpoints") + "/" + id);
   }

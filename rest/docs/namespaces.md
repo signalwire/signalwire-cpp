@@ -23,7 +23,7 @@ signalwire::rest::RestClient client("example-space", "project-id", "api-token");
 ```cpp
 // List your phone numbers
 auto numbers = client.phone_numbers().list();
-numbers = client.phone_numbers().list({{"name", "Main"}});
+numbers = client.phone_numbers().list({{"filter_name", "Main"}});
 
 // Search available numbers to purchase
 auto available = client.phone_numbers().search({{"areacode", "512"}, {"number_type", "local"}});

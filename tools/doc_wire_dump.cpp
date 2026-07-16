@@ -80,8 +80,10 @@ int main() {
         return client.phone_numbers().search(
             {{"areacode", "512"}, {"number_type", "local"}, {"max_results", "3"}});
     });
+    // Filter param is the spec's `filter_name` (the SDK forwards query keys
+    // verbatim, so a bare `name` would land off-spec — see DOC-WIRE §2.1).
     probe("phone_numbers.list",
-          [&] { return client.phone_numbers().list({{"name", "Main"}}); });
+          [&] { return client.phone_numbers().list({{"filter_name", "Main"}}); });
 
     // ---- Fabric AI agents: create body (rest_manage_resources / api_reference) ----
     probe("fabric.ai_agents.create", [&] {

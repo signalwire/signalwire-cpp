@@ -1,6 +1,7 @@
 {
   "version": "2",
   "generated_from": "signalwire-cpp via libclang",
+  "generated_from_commit": "9817418e2ade14d13fd96698943eb8e7b45c8f31",
   "modules": {
     "signalwire": {
       "functions": {

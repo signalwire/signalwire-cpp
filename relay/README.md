@@ -43,7 +43,7 @@ int main() {
 | `signalwire/relay/action.hpp` | `Action` -- controllable in-progress operations |
 | `signalwire/relay/constants.hpp` | Protocol constants, call states, event types |
 
-## Features (API surface defined, transport pending)
+## Features
 
 - All calling methods: answer, hangup, play, record, collect, connect, detect, tap, etc.
 - SMS/MMS messaging: send outbound, receive inbound, track delivery state

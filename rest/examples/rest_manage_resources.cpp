@@ -25,7 +25,7 @@ int main() {
         std::cout << "  Total agents: " << agents.dump() << "\n";
 
         // Search phone numbers
-        auto numbers = client.phone_numbers().search({{"area_code", "512"}, {"max_results", "3"}});
+        auto numbers = client.phone_numbers().search({{"areacode", "512"}, {"max_results", "3"}});
         std::cout << "  Available numbers: " << numbers.dump() << "\n";
 
         // Place a test call

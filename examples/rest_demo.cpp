@@ -18,7 +18,7 @@ int main() {
 
         // Search phone numbers
         std::cout << "\nSearching phone numbers...\n";
-        auto numbers = client.phone_numbers().search({{"area_code", "512"}});
+        auto numbers = client.phone_numbers().search({{"areacode", "512"}});
         std::cout << "  Results: " << numbers.dump(2) << "\n";
 
         // Place a test call

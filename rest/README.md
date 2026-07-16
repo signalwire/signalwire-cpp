@@ -18,7 +18,7 @@ int main() {
     auto agents = client.fabric().ai_agents.list();
 
     // Search for a phone number
-    auto results = client.phone_numbers().search({{"area_code", "512"}});
+    auto results = client.phone_numbers().search({{"areacode", "512"}});
 
     // Place a call
     auto call = client.calling().dial({

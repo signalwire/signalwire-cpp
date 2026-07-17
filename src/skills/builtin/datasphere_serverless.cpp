@@ -20,7 +20,7 @@ class DatasphereServerlessSkill : public SkillBase {
     params_ = params;
     space_ = get_param_or_env(params, "space_name", "SIGNALWIRE_SPACE_NAME");
     project_id_ = get_param_or_env(params, "project_id", "SIGNALWIRE_PROJECT_ID");
-    token_ = get_param_or_env(params, "token", "SIGNALWIRE_TOKEN");
+    token_ = get_param_or_env(params, "token", "SIGNALWIRE_API_TOKEN");
     doc_id_ = get_param<std::string>(params, "document_id", "");
     tool_name_ = get_param<std::string>(params, "tool_name", "search_knowledge");
     return !space_.empty() && !project_id_.empty() && !token_.empty();

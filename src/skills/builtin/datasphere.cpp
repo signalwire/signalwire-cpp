@@ -31,7 +31,7 @@ class DatasphereSkill : public SkillBase {
     params_ = params;
     space_ = get_param_or_env(params, "space_name", "SIGNALWIRE_SPACE_NAME");
     project_id_ = get_param_or_env(params, "project_id", "SIGNALWIRE_PROJECT_ID");
-    token_ = get_param_or_env(params, "token", "SIGNALWIRE_TOKEN");
+    token_ = get_param_or_env(params, "token", "SIGNALWIRE_API_TOKEN");
     if (token_.empty()) {
       token_ = get_env("DATASPHERE_TOKEN");
     }

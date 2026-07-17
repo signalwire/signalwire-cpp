@@ -3019,7 +3019,7 @@ The SDK supports various environment variables for configuration:
 - `GOOGLE_SEARCH_ENGINE_ID`: Google Custom Search Engine ID
 - `SIGNALWIRE_SPACE_NAME`: DataSphere space name (fallback for the `space_name` skill param)
 - `SIGNALWIRE_PROJECT_ID`: DataSphere project ID (fallback for the `project_id` skill param)
-- `SIGNALWIRE_TOKEN` / `DATASPHERE_TOKEN`: DataSphere access token (fallback for the `token` skill param)
+- `SIGNALWIRE_API_TOKEN` / `DATASPHERE_TOKEN`: DataSphere access token (fallback for the `token` skill param)
 - `SIGNALWIRE_SKILL_PATHS`: Colon-separated list of directories to add to the skill registry's external search path (see [Third-Party Skills](third_party_skills.md)).
 
 ### RELAY Transport (advanced / testing)

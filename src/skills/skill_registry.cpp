@@ -649,7 +649,7 @@ class DatasphereSkillR : public SkillBase {
     params_ = p;
     sp_ = get_param_or_env(p, "space_name", "SIGNALWIRE_SPACE_NAME");
     pi_ = get_param_or_env(p, "project_id", "SIGNALWIRE_PROJECT_ID");
-    tk_ = get_param_or_env(p, "token", "SIGNALWIRE_TOKEN");
+    tk_ = get_param_or_env(p, "token", "SIGNALWIRE_API_TOKEN");
     if (tk_.empty()) {
       tk_ = get_env("DATASPHERE_TOKEN");
     }
@@ -743,7 +743,7 @@ class DatasphereServerlessSkillR : public SkillBase {
     params_ = p;
     sp_ = get_param_or_env(p, "space_name", "SIGNALWIRE_SPACE_NAME");
     pi_ = get_param_or_env(p, "project_id", "SIGNALWIRE_PROJECT_ID");
-    tk_ = get_param_or_env(p, "token", "SIGNALWIRE_TOKEN");
+    tk_ = get_param_or_env(p, "token", "SIGNALWIRE_API_TOKEN");
     return !sp_.empty() && !pi_.empty() && !tk_.empty();
   }
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }

@@ -106,20 +106,6 @@ host_openssl_ge_3() {
 # child process. Avoids the hardcoded-port collisions that hang the mock gate
 # when something else already holds the fixed port. Echos the port; returns 1
 # (printing nothing) if no port could be obtained.
-pick_free_port() {
-    python3 - <<'PY' || return 1
-import socket, sys
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-try:
-    s.bind(("127.0.0.1", 0))
-    print(s.getsockname()[1])
-except OSError as e:
-    sys.stderr.write("pick_free_port: %s\n" % e)
-    sys.exit(1)
-finally:
-    s.close()
-PY
-}
 
 # Decide how the TEST gate builds + runs run_tests. Echos one of:
 #   host                 — build on host (OpenSSL >= 3.0)

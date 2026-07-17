@@ -216,6 +216,18 @@ target_link_libraries(state_dump signalwire)
 add_executable(http_dump tools/http_dump.cpp)
 target_link_libraries(http_dump signalwire)
 
+# envelope_dump is the BEHAVIORAL-ENVELOPE (Layer D) runner: drives the shared
+# REST error-envelope corpus (porting-sdk/scripts/envelope_corpus.py) against a
+# live mock_signalwire via the shared tests/mocktest.hpp harness, plus a
+# dead-port connection-refused case, and emits the reduced artifact for
+# porting-sdk/scripts/diff_port_envelope.py. Reuses tests/mocktest.cpp (the
+# same mock harness the REST mock tests use), so it needs tests/ on the
+# include path, same as wait_liveness_dump reusing relay_mocktest.cpp.
+add_executable(envelope_dump tools/envelope_dump.cpp tests/mocktest.cpp)
+target_link_libraries(envelope_dump signalwire)
+target_include_directories(envelope_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
+target_compile_definitions(envelope_dump PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+
 # doc_wire_dump is the DOC-WIRE (§2.1) runner: points a RestClient at the shared
 # mock_signalwire (MOCK_SIGNALWIRE_PORT / SIGNALWIRE_MOCK_URL) and replays the
 # documented REST call shapes so the mock journals the exact wire each doc example

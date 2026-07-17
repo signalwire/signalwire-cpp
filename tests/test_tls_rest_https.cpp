@@ -78,8 +78,8 @@ TEST(tls_rest_client_https_get) {
     }
 
     // ---- Negative control: a bogus CA must make verification fail. cpp-httplib
-    // raises SignalWireRestError (status 0, "Connection failed") when the TLS
-    // handshake can't verify the server cert.
+    // raises SignalWireRestTransportError (a SignalWireRestError, status 0,
+    // "Connection failed") when the TLS handshake can't verify the server cert.
     {
         ::unsetenv("SSL_CERT_FILE");
         HttpClient http(base, "test_proj", "test_tok");

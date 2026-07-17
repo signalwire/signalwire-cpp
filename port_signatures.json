@@ -18246,6 +18246,36 @@
               "returns": "string"
             }
           }
+        },
+        "SignalWireRestTransportError": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "url",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "method",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "void"
+            }
+          }
         }
       }
     },

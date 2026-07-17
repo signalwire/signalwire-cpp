@@ -235,8 +235,9 @@ SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container
 # Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
 # BUILD_MODE. Each branch produces the same observable result: a built run_tests
 # (+ emit_corpus, reused by the EMISSION gate; + emit_skills, reused by the
-# SKILL-CONTRACT gate; + the five Layer-D dump binaries wire_dump/swml_dump/
-# state_dump/http_dump/wire_relay_dump, reused by the BEHAVIORAL-* gates) and
+# SKILL-CONTRACT gate; + the six Layer-D dump binaries wire_dump/swml_dump/
+# state_dump/http_dump/wire_relay_dump/envelope_dump, reused by the
+# BEHAVIORAL-* gates) and
 # run_tests' exit code. The dump binaries are built here too so the downstream
 # gates don't reconfigure the tree (and so the host / exec modes leave
 # ready-to-run binaries).
@@ -254,14 +255,14 @@ test_gate() {
             # rebuilds run_tests (a near-no-op since it was just built) and runs
             # the full suite.
             cmake --build build --target emit_corpus emit_skills \
-                wire_dump swml_dump state_dump http_dump wire_relay_dump -j"$(sw_build_jobs)" || return 1
+                wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -270,7 +271,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -322,7 +323,7 @@ emission_gate() {
 # execs it so ONLY the JSON reaches stdout. The dumps already emit pure JSON on
 # stdout (logs go to stderr) regardless of ambient SIGNALWIRE_LOG_* env.
 behavioral_gate() {
-    local surface="$1"  # wire | swml | state | http | wire_relay
+    local surface="$1"  # wire | swml | state | http | wire_relay | envelope
     local dump_cmd
     case "$BUILD_MODE" in
         host)
@@ -857,6 +858,8 @@ run_gate "BEHAVIORAL-HTTP" "diff_port_http vs python oracle (Layer D)" \
     behavioral_gate http
 run_gate "BEHAVIORAL-WIRE-RELAY" "diff_port_wire_relay vs python oracle (Layer D)" \
     behavioral_gate wire_relay
+run_gate "BEHAVIORAL-ENVELOPE" "diff_port_envelope vs python oracle (Layer D): typed error incl transport" \
+    behavioral_gate envelope
 
 # Gate 7: FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate

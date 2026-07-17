@@ -41,6 +41,26 @@ class SignalWireRestError : public std::runtime_error {
   std::string method_;
 };
 
+/// Error thrown when a REST request never reached a response — a
+/// transport-level failure (connection refused, DNS failure, connection
+/// reset, TLS error), as opposed to a well-formed non-2xx HTTP response.
+///
+/// A member of the ``SignalWireRestError`` family: ``status()`` is ``0``
+/// (the sentinel this port uses for "no HTTP status" — there is no response
+/// to carry one), and the underlying transport-library error text is
+/// preserved as the exception message. Because it extends
+/// ``SignalWireRestError``, a caller catching that one type handles both an
+/// HTTP-error response and a transport failure with a single ``catch``,
+/// instead of a bare cpp-httplib/curl error leaking through. Mirrors the
+/// Python reference's ``SignalWireRestTransportError(SignalWireRestError)``
+/// (plan 1.3b).
+class SignalWireRestTransportError : public SignalWireRestError {
+ public:
+  SignalWireRestTransportError(const std::string& message, const std::string& url = "",
+                               const std::string& method = "GET")
+      : SignalWireRestError(0, message, "", url, method) {}
+};
+
 /// HTTP client with Basic Auth support using cpp-httplib
 class HttpClient {
  public:

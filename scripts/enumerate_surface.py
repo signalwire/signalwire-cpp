@@ -137,6 +137,7 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "HttpClient": "signalwire.rest._base",
     "CrudResource": "signalwire.rest._base",
     "SignalWireRestError": "signalwire.rest._base",
+    "SignalWireRestTransportError": "signalwire.rest._base",
     "RestClient": "signalwire.rest.client",
     # rest namespaces — C++ has 21 nested ::Namespace structs inside
     # RestClient. Map each to the Python canonical submodule path.

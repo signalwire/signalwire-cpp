@@ -1,5 +1,10 @@
 // REST client tests
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "signalwire/rest/http_client.hpp"
 #include "signalwire/rest/rest_client.hpp"
 
@@ -99,6 +104,64 @@ TEST(rest_error_class) {
     ASSERT_EQ(err.status(), 404);
     ASSERT_EQ(err.body(), "{\"error\":\"not found\"}");
     ASSERT_TRUE(std::string(err.what()).find("Not found") != std::string::npos);
+    return true;
+}
+
+// plan 1.3b: SignalWireRestTransportError is a member of the SignalWireRestError
+// family (status() == 0, the port's "no HTTP status" sentinel for a transport
+// failure) that preserves the underlying transport-library error text as the
+// exception message. Mirrors python's SignalWireRestTransportError(body, url,
+// method) with status_code=None.
+TEST(rest_transport_error_class) {
+    SignalWireRestTransportError err("Connection failed to 127.0.0.1", "/api/fabric/addresses",
+                                     "GET");
+    ASSERT_EQ(err.status(), 0);
+    ASSERT_EQ(err.url(), "/api/fabric/addresses");
+    ASSERT_EQ(err.method(), "GET");
+    ASSERT_TRUE(std::string(err.what()).find("Connection failed") != std::string::npos);
+
+    // It IS-A SignalWireRestError -- a caller catching the base family type
+    // handles both the HTTP-error and the transport-error path with one catch.
+    const SignalWireRestError& base = err;
+    ASSERT_EQ(base.status(), 0);
+    return true;
+}
+
+// plan 1.3b: a REAL connection-refused request (dead port -- bound then
+// released, nothing listening) must raise the TYPED SignalWireRestTransportError,
+// not a bare httplib/generic error. Catching SignalWireRestError (the family
+// base) is sufficient -- and catching the derived type specifically proves the
+// concrete type raised is the transport subclass, not a plain SignalWireRestError.
+TEST(rest_connection_refused_raises_typed_transport_error) {
+    // Bind :0, read back the OS-assigned port, then release it -- a port
+    // nothing is listening on for the rest of this test.
+    int sock = ::socket(AF_INET, SOCK_STREAM, 0);
+    ASSERT_TRUE(sock >= 0);
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    addr.sin_port = 0;
+    ASSERT_EQ(::bind(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
+    socklen_t len = sizeof(addr);
+    ASSERT_EQ(::getsockname(sock, reinterpret_cast<sockaddr*>(&addr), &len), 0);
+    int dead_port = ntohs(addr.sin_port);
+    ::close(sock);
+
+    RestClient client = RestClient::with_base_url(
+        "http://127.0.0.1:" + std::to_string(dead_port), "envelope_proj", "envelope_tok");
+
+    bool threw_typed_transport = false;
+    try {
+        (void)client.fabric().addresses.list();
+    } catch (const SignalWireRestTransportError& e) {
+        threw_typed_transport = true;
+        ASSERT_EQ(e.status(), 0);
+    } catch (const SignalWireRestError&) {
+        // A bare (non-transport-subclass) SignalWireRestError would land here --
+        // fail loudly instead of silently accepting the wrong concrete type.
+        ASSERT_TRUE(false);
+    }
+    ASSERT_TRUE(threw_typed_transport);
     return true;
 }
 

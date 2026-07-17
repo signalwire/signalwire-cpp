@@ -944,7 +944,7 @@ run_gate "IGNORE-LEDGER-VERIFY" "no laundered false-absence entries in DOC_AUDIT
     python3 "$PORTING_SDK_DIR/scripts/ignore_ledger_verify.py" --port cpp --repo . --require-fields
 
 # Gate 18: META-CONSISTENT — package metadata consistency
-run_gate "META-CONSISTENT" "package metadata consistency" \
+run_gate "META-CONSISTENT" "package metadata consistency" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/meta_consistent.py" --port cpp --repo .
 
 # Gate 19: ARTIFACT-DENY — no porting artifacts in the shipped package
@@ -1052,7 +1052,7 @@ run_gate "SUPPRESSION-LEDGER" "no un-ledgered analyzer suppressions" \
 # PACKAGE-SMOKE: build the real cmake --install artifact into a clean prefix, then
 # compile+link+construct RestClient from the INSTALLED headers/lib. Catches
 # missing install() rules the in-tree tests never see. Heaviest gate → runs last.
-run_gate "PACKAGE-SMOKE" "real artifact builds, installs, and imports from a clean prefix" \
+run_gate "PACKAGE-SMOKE" "real artifact builds, installs, and imports from a clean prefix" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/package_smoke.py" --port cpp --repo .
 
 if [ -z "$FAILED_GATES" ]; then

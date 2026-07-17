@@ -289,28 +289,6 @@ test_gate() {
 # throwaway run: mode the container vanishes after test_gate, so the dump-cmd is
 # a self-contained docker run that (re)builds emit_corpus with logs on stderr and
 # execs it so ONLY the JSON object reaches stdout.
-emission_gate() {
-    local dump_cmd
-    case "$BUILD_MODE" in
-        host)
-            dump_cmd="$PORT_ROOT/build/emit_corpus"
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/emit_corpus"
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
-                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                 && cmake --build $SWCPP_CONTAINER_BUILD --target emit_corpus -j\$(nproc) 1>&2 \
-                 && exec $SWCPP_CONTAINER_BUILD/emit_corpus'"
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_emission.py" --dump-cmd "$dump_cmd"
-}
 
 # BEHAVIORAL-<SURFACE> gates (Layer D): run each surface's dump binary and diff its
 # observed behavior against the signalwire-python oracle
@@ -322,32 +300,6 @@ emission_gate() {
 # self-contained docker run that (re)builds the target with logs on stderr and
 # execs it so ONLY the JSON reaches stdout. The dumps already emit pure JSON on
 # stdout (logs go to stderr) regardless of ambient SIGNALWIRE_LOG_* env.
-behavioral_gate() {
-    local surface="$1"  # wire | swml | state | http | wire_relay
-    local dump_cmd
-    case "$BUILD_MODE" in
-        host)
-            dump_cmd="$PORT_ROOT/build/${surface}_dump"
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/${surface}_dump"
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
-                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                 && cmake --build $SWCPP_CONTAINER_BUILD --target ${surface}_dump -j\$(nproc) 1>&2 \
-                 && exec $SWCPP_CONTAINER_BUILD/${surface}_dump'"
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_${surface}.py" \
-        --port cpp \
-        --python-sdk "$PYTHON_SDK_DIR" \
-        --dump-cmd "$dump_cmd"
-}
 
 # SURFACE-FRESH gate: prove the committed port_surface.json (Layer B) still
 # matches a fresh regeneration. run-ci otherwise gates only Layer A
@@ -372,26 +324,6 @@ behavioral_gate() {
 # never /tmp.
 _fresh_surface_cache_path() { echo "$PORT_ROOT/.sw-tmp/fresh_port_surface.json"; }
 
-surface_fresh_gate() {
-    local cache; cache="$(_fresh_surface_cache_path)"
-    mkdir -p "$(dirname "$cache")"
-    rm -f "$cache"
-    # 1. snapshot the committed surface (fallback cp if not tracked at HEAD).
-    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface.json" 2>/dev/null; then
-        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface.json" || return 1
-    fi
-    # 2. regenerate in place via the same host enumerator the SIGNATURES gate
-    #    uses, caching the fresh copy for SURFACE-DIFF to reuse.
-    python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
-    cp port_surface.json "$cache" 2>/dev/null || true
-    # 3. compare committed vs fresh, ignoring the volatile generated_from sha.
-    python3 "$PORTING_SDK_DIR/scripts/check_surface_freshness.py" \
-        --committed "$PORT_ROOT/.sw-tmp/committed_surface.json" --fresh port_surface.json
-    local rc=$?
-    # 4. always restore the working copy (regen rewrote the git-sha provenance).
-    git checkout -- port_surface.json 2>/dev/null
-    return $rc
-}
 
 # SURFACE-DIFF gate: diff the port's public surface against the Python reference
 # (membership: omissions + additions). The signature DRIFT gate (Layer A) checks
@@ -400,31 +332,6 @@ surface_fresh_gate() {
 # port_surface.json in place via the host regex enumerator (no compiler / no
 # mocks / BUILD_MODE-independent), diffs, then restores the committed copy
 # unconditionally so the gate is side-effect free.
-surface_diff_gate() {
-    # Reuse the fresh surface SURFACE-FRESH already regenerated this run (the
-    # enumerator is deterministic on a clean tree, so a second regen would be
-    # byte-identical). Fall back to regenerating if the cache is absent (e.g.
-    # SURFACE-FRESH was skipped or this gate is run standalone). diff_port_surface
-    # reads the file at ./port_surface.json, so point that at the cached fresh
-    # copy for the diff, then restore the committed working copy.
-    local cache; cache="$(_fresh_surface_cache_path)"
-    if ! git show HEAD:port_surface.json > "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" 2>/dev/null; then
-        cp port_surface.json "$PORT_ROOT/.sw-tmp/committed_surface_diff.json" || return 1
-    fi
-    if [ -f "$cache" ]; then
-        cp "$cache" port_surface.json || { git checkout -- port_surface.json 2>/dev/null; return 1; }
-    else
-        python3 scripts/enumerate_surface.py || { git checkout -- port_surface.json 2>/dev/null; return 1; }
-    fi
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_surface.py" \
-        --reference "$PORTING_SDK_DIR/python_surface.json" \
-        --port-surface port_surface.json \
-        --omissions "$PORT_ROOT/PORT_OMISSIONS.md" \
-        --additions "$PORT_ROOT/PORT_ADDITIONS.md"
-    local rc=$?
-    git checkout -- port_surface.json 2>/dev/null
-    return $rc
-}
 
 # SKILL-CONTRACT gate: the surface/drift/emission gates see signatures + symbol
 # names + FunctionResult.to_json(); NONE sees a built-in skill's SWAIG tool
@@ -437,29 +344,6 @@ surface_diff_gate() {
 # param-type / enum / required. Mirrors the EMISSION gate's BUILD_MODE routing:
 # the emit_skills binary is resolved per host/exec/run mode exactly like
 # emit_corpus.
-skill_contract_gate() {
-    local dump_cmd
-    case "$BUILD_MODE" in
-        host)
-            dump_cmd="$PORT_ROOT/build/emit_skills"
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            dump_cmd="docker exec $c $SWCPP_CONTAINER_BUILD/emit_skills"
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            dump_cmd="docker run --rm -v $(dirname "$PORT_ROOT"):/src $img bash -c \
-                'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                 && cmake --build $SWCPP_CONTAINER_BUILD --target emit_skills -j\$(nproc) 1>&2 \
-                 && exec $SWCPP_CONTAINER_BUILD/emit_skills'"
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 "$PORTING_SDK_DIR/scripts/diff_skill_contracts.py" \
-        --dump-cmd "$dump_cmd" --port-repo "$PORT_ROOT"
-}
 
 # REST-COVERAGE gate: every canonical REST route the SDK implements must be
 # exercised with BOTH a success (2xx) AND an error (4xx/5xx) response on the
@@ -476,70 +360,6 @@ skill_contract_gate() {
 # resolved per BUILD_MODE exactly like the EMISSION / SKILL-CONTRACT gates: host
 # uses ./build/run_tests; exec/run modes go through the container. The mock runs
 # on the HOST regardless (the container reaches it via --network host).
-rest_coverage_gate() {
-    local port
-    port="$(pick_free_port)" || { echo "rest_coverage_gate: could not allocate a free port"; return 1; }
-    local mock_pkg_parent="$PORTING_SDK_DIR/test_harness/mock_signalwire"
-    export PYTHONPATH="$mock_pkg_parent${PYTHONPATH:+:$PYTHONPATH}"
-    local mock_log="$PORT_ROOT/.sw-tmp/rest_cov_mock_cpp.$$.log"
-    python3 -m mock_signalwire --host 127.0.0.1 --port "$port" --log-level error \
-        >"$mock_log" 2>&1 &
-    local mock_pid=$!
-    # shellcheck disable=SC2064
-    trap "kill $mock_pid 2>/dev/null" RETURN
-    local i healthy=0
-    for i in $(seq 1 60); do
-        # Fail loud if the mock process died (e.g. port stolen between
-        # pick_free_port and bind) instead of polling a dead pid for 30s.
-        if ! kill -0 "$mock_pid" 2>/dev/null; then
-            echo "rest_coverage_gate: mock_signalwire (pid $mock_pid) exited before becoming healthy on port $port; log follows:"
-            cat "$mock_log" >&2 || true
-            return 1
-        fi
-        if python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:$port/__mock__/health',timeout=1)" 2>/dev/null; then
-            healthy=1
-            break
-        fi
-        sleep 0.5
-    done
-    if [ "$healthy" -ne 1 ]; then
-        echo "rest_coverage_gate: mock_signalwire never became healthy on port $port within 30s; log follows:"
-        cat "$mock_log" >&2 || true
-        return 1
-    fi
-    # Fresh journal + scenarios so only this run's traffic is measured.
-    python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/journal/reset',method='POST'),timeout=5).read()"
-    python3 -c "import urllib.request; urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:$port/__mock__/scenarios/reset',method='POST'),timeout=5).read()"
-    # Run the REST suite serially (one thread => one ordered journal) against the
-    # mock, filtered to the mock-backed rest cases.
-    case "$BUILD_MODE" in
-        host)
-            MOCK_SIGNALWIRE_PORT="$port" SW_TEST_PARALLEL=1 \
-                "$PORT_ROOT/build/run_tests" rest_mock_ || return 1
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            docker exec -e MOCK_SIGNALWIRE_PORT="$port" -e SW_TEST_PARALLEL=1 "$c" \
-                "$SWCPP_CONTAINER_BUILD/run_tests" rest_mock_ || return 1
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
-                -e MOCK_SIGNALWIRE_PORT="$port" -e SW_TEST_PARALLEL=1 "$img" bash -c "
-                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
-                && '$SWCPP_CONTAINER_BUILD/run_tests' rest_mock_" || return 1
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 -m mock_signalwire.rest_coverage \
-        --mock-url "http://127.0.0.1:$port" \
-        --spec-root "$PORTING_SDK_DIR/rest-apis" \
-        --allowlist "$PORTING_SDK_DIR/REST_COVERAGE_BASELINE.md" \
-        --allowlist "$PORT_ROOT/REST_COVERAGE_GAPS.md" \
-        --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md"
-}
 
 # Gate 5c: SPEC-PARITY — the REST surface must match the canonical spec in BOTH
 # directions. REST-COVERAGE (5b) proves every route the SDK *implements* is
@@ -556,36 +376,6 @@ rest_coverage_gate() {
 # go's/java's/rust's gate. The binary was built by the TEST gate; it is resolved
 # per BUILD_MODE exactly like the EMISSION gate (host binary / docker exec /
 # throwaway docker run that rebuilds it).
-spec_parity_gate() {
-    local reg
-    reg="$(mktemp -t cpp_route_registry.XXXXXX.json)"
-    # shellcheck disable=SC2064
-    trap "rm -f '$reg'" RETURN
-    case "$BUILD_MODE" in
-        host)
-            # The TEST gate builds run_tests/emit_corpus/emit_skills but not
-            # route_registry, so build it here before invoking it.
-            cmake --build "$PORT_ROOT/build" --target route_registry -j"$(sw_build_jobs)" 1>&2 || return 1
-            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            docker exec "$c" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            docker run --rm -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
-                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
-                && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 "$PORTING_SDK_DIR/scripts/diff_spec_implementation.py" \
-        --registry-json "$reg" \
-        --gaps "$PORTING_SDK_DIR/SPEC_IMPLEMENTATION_GAPS.md"
-}
 
 # ROUTE-COLLISION gate: cross-references the route-registry (operation ->
 # (method, path)) with the surface enumeration to find latent route-split /
@@ -596,33 +386,6 @@ spec_parity_gate() {
 # reads the registry. The 2 fabric list_addresses route-split entries are the
 # user-approved ROUTE_COLLISION_ALLOW.md exceptions (392bb5b); orphan-dto is
 # report-only inside the gate. Enforcing (no --report-only).
-route_collision_gate() {
-    local reg
-    reg="$(mktemp -t cpp_route_registry.XXXXXX.json)"
-    # shellcheck disable=SC2064
-    trap "rm -f '$reg'" RETURN
-    case "$BUILD_MODE" in
-        host)
-            cmake --build "$PORT_ROOT/build" --target route_registry -j"$(sw_build_jobs)" 1>&2 || return 1
-            "$PORT_ROOT/build/route_registry" >"$reg" || return 1
-            ;;
-        exec:*)
-            local c="${BUILD_MODE#exec:}"
-            docker exec "$c" "$SWCPP_CONTAINER_BUILD/route_registry" >"$reg" || return 1
-            ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            docker run --rm -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
-                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target route_registry -j\"\$(nproc)\" 1>&2 \
-                && exec '$SWCPP_CONTAINER_BUILD/route_registry'" >"$reg" || return 1
-            ;;
-        *)
-            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    python3 "$PORTING_SDK_DIR/scripts/route_collision.py" \
-        --port cpp --repo . --registry-json "$reg"
-}
 
 # FMT gate: the C++ format gate (clang-format, config in .clang-format —
 # Google base / 100-col). Source-style only; proven surface/emission-neutral
@@ -680,25 +443,6 @@ lint_gate() {
 # then reads the mock's wire_violations journal. The runner is resolved per
 # BUILD_MODE like the other dump binaries (host binary / docker exec / throwaway
 # run). Per-PR: a single quick replay.
-doc_wire_gate() {
-    local dump_cmd
-    case "$BUILD_MODE" in
-        host)   dump_cmd="$PORT_ROOT/build/doc_wire_dump" ;;
-        exec:*) dump_cmd="docker exec ${BUILD_MODE#exec:} $SWCPP_CONTAINER_BUILD/doc_wire_dump" ;;
-        run:*)  local img="${BUILD_MODE#run:}"
-                dump_cmd="docker run --rm --network host -v $(dirname "$PORT_ROOT"):/src $img bash -c \
-                    'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                     && cmake --build $SWCPP_CONTAINER_BUILD --target doc_wire_dump -j\$(nproc) 1>&2 \
-                     && exec $SWCPP_CONTAINER_BUILD/doc_wire_dump'" ;;
-        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    # host: build the runner if the TEST gate hasn't (it's not in the TEST target set).
-    if [ "$BUILD_MODE" = host ]; then
-        cmake --build "$PORT_ROOT/build" --target doc_wire_dump -j"$(sw_build_jobs)" 1>&2 || return 1
-    fi
-    python3 "$PORTING_SDK_DIR/scripts/doc_wire.py" --port cpp --repo "$PORT_ROOT" \
-        --runner "$dump_cmd"
-}
 
 # WAIT-LIVENESS (§2.4): the RELAY Action::wait() liveness contract — wait() BLOCKS
 # until the deferred completing event arrives (never a no-op at t~=0, never a hang).
@@ -706,25 +450,6 @@ doc_wire_gate() {
 # deferred completions, and emits the classification; the differ compares it to the
 # python golden. nightly (a real-time behavioral check). The mock is self-spawned by
 # the dump's relay_mocktest harness (adjacency-discovered) — no gate-side mock.
-wait_liveness_gate() {
-    local dump_cmd
-    case "$BUILD_MODE" in
-        host)   dump_cmd="$PORT_ROOT/build/wait_liveness_dump" ;;
-        exec:*) dump_cmd="docker exec ${BUILD_MODE#exec:} $SWCPP_CONTAINER_BUILD/wait_liveness_dump" ;;
-        run:*)  local img="${BUILD_MODE#run:}"
-                dump_cmd="docker run --rm --network host -v $(dirname "$PORT_ROOT"):/src $img bash -c \
-                    'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                     && cmake --build $SWCPP_CONTAINER_BUILD --target wait_liveness_dump -j\$(nproc) 1>&2 \
-                     && exec $SWCPP_CONTAINER_BUILD/wait_liveness_dump'" ;;
-        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-    if [ "$BUILD_MODE" = host ]; then
-        cmake --build "$PORT_ROOT/build" --target wait_liveness_dump -j"$(sw_build_jobs)" 1>&2 || return 1
-    fi
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_wait_liveness.py" --port cpp \
-        --python-sdk "$PYTHON_SDK_DIR" \
-        --dump-cmd "$dump_cmd"
-}
 
 # STRICT-MOCKS (§2.2): re-run the RELAY mock suite with the mock in STRICT mode
 # (MOCK_RELAY_STRICT=1 → mock_relay 400s an unknown field / duplicate id instead of
@@ -733,23 +458,6 @@ wait_liveness_gate() {
 # fork+execlp, which INHERITS this env, so exporting MOCK_RELAY_STRICT here reaches
 # the child mock. run_tests was built by the TEST gate; resolve it per BUILD_MODE.
 # nightly (a second full RELAY pass is heavy).
-strict_mocks_gate() {
-    case "$BUILD_MODE" in
-        host)
-            env MOCK_RELAY_STRICT=1 SW_TEST_PARALLEL=1 "$PORT_ROOT/build/run_tests" relay_mock_ ;;
-        exec:*)
-            docker exec -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "${BUILD_MODE#exec:}" \
-                "$SWCPP_CONTAINER_BUILD/run_tests" relay_mock_ ;;
-        run:*)
-            local img="${BUILD_MODE#run:}"
-            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
-                -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "$img" bash -c "
-                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
-                && '$SWCPP_CONTAINER_BUILD/run_tests' relay_mock_" ;;
-        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
-    esac
-}
 
 # =============================================================================
 # GATE INVOCATIONS

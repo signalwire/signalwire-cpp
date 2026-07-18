@@ -176,15 +176,17 @@ TEST(rest_mock_short_codes_update) {
 // Imported Numbers
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_imported_numbers_create) {
+TEST(wire_regression_pin_imported_numbers_create_extras) {
+    // create_imported_phone_number (POST /api/relay/rest/imported_phone_numbers)
+    // accepts ONLY number, number_type, capabilities -- per the vendored REST spec
+    // ImportPhoneNumberRequest (no additionalProperties), the strict mock's oracle.
+    // sip_username / sip_password / sip_proxy are NOT in the schema (invented), so
+    // pin the real typed fields instead of forwarding invented extras on the wire.
     auto client = mocktest::make_client();
     auto body = client.imported_numbers().create({
         .number = "+15551234567",
-        .extras = {
-            {"sip_username", "alice"},
-            {"sip_password", "secret"},
-            {"sip_proxy", "sip.example.com"},
-        },
+        .number_type = "longcode",
+        .capabilities = json::array({"voice", "sms"}),
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -193,8 +195,11 @@ TEST(rest_mock_imported_numbers_create) {
     ASSERT_EQ(j.path, std::string("/api/relay/rest/imported_phone_numbers"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("number", std::string()), std::string("+15551234567"));
-    ASSERT_EQ(j.body.value("sip_username", std::string()), std::string("alice"));
-    ASSERT_EQ(j.body.value("sip_proxy", std::string()), std::string("sip.example.com"));
+    ASSERT_EQ(j.body.value("number_type", std::string()), std::string("longcode"));
+    ASSERT_TRUE(j.body["capabilities"].is_array());
+    ASSERT_FALSE(j.body.contains("sip_username"));
+    ASSERT_FALSE(j.body.contains("sip_password"));
+    ASSERT_FALSE(j.body.contains("sip_proxy"));
     return true;
 }
 
@@ -204,10 +209,12 @@ TEST(rest_mock_imported_numbers_create) {
 
 TEST(rest_mock_mfa_call) {
     auto client = mocktest::make_client();
+    // Wire key is "from" -- CallParams already types this field; C++ has no
+    // reserved-word conflict with "from", so no "from_" escape is needed here.
     auto body = client.mfa().call({
         .to = "+15551234567",
+        .from = std::string("+15559876543"),
         .message = "Your code is {code}",
-        .extras = {{"from_", "+15559876543"}},
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -216,7 +223,7 @@ TEST(rest_mock_mfa_call) {
     ASSERT_EQ(j.path, std::string("/api/relay/rest/mfa/call"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("to", std::string()), std::string("+15551234567"));
-    ASSERT_EQ(j.body.value("from_", std::string()), std::string("+15559876543"));
+    ASSERT_EQ(j.body.value("from", std::string()), std::string("+15559876543"));
     ASSERT_EQ(j.body.value("message", std::string()),
               std::string("Your code is {code}"));
     return true;
@@ -228,17 +235,19 @@ TEST(rest_mock_mfa_call) {
 
 TEST(rest_mock_sip_profile_update) {
     auto client = mocktest::make_client();
+    // Wire key is domain_identifier (UpdateSipProfileRequest), not a bare
+    // "domain" -- SipProfile::UpdateParams already types this field.
     auto body = client.sip_profile().update({
+        .domain_identifier = std::string("myco.sip.signalwire.com"),
         .default_codecs = json::array({"PCMU", "PCMA"}),
-        .extras = {{"domain", "myco.sip.signalwire.com"}},
     });
     ASSERT_TRUE(body.is_object());
-    ASSERT_TRUE(body.contains("domain") || body.contains("default_codecs"));
+    ASSERT_TRUE(body.contains("domain_identifier") || body.contains("default_codecs"));
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PUT"));
     ASSERT_EQ(j.path, std::string("/api/relay/rest/sip_profile"));
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("domain", std::string()),
+    ASSERT_EQ(j.body.value("domain_identifier", std::string()),
               std::string("myco.sip.signalwire.com"));
     ASSERT_TRUE(j.body.contains("default_codecs"));
     ASSERT_TRUE(j.body["default_codecs"].is_array());

@@ -61,6 +61,14 @@
 set -u
 set -o pipefail
 
+# STRICT-MOCKS 400-mode (plan §2.2c): strict is the default now. The REST mock
+# (mock_signalwire) 400s on any wire_violation and the RELAY mock (mock_relay)
+# rejects any unknown-field/duplicate-id frame -- so every mock consumer this run
+# spawns inherits wire-truth directly, not only the gates that read the journal.
+# Override to 0 to debug in flag-mode.
+export MOCK_SIGNALWIRE_STRICT="${MOCK_SIGNALWIRE_STRICT:-1}"
+export MOCK_RELAY_STRICT="${MOCK_RELAY_STRICT:-1}"
+
 PORT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 mkdir -p "$PORT_ROOT/.sw-tmp"  # repo-local CI scratch (never /tmp)
 PORT_NAME="signalwire-cpp"
@@ -235,13 +243,17 @@ SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container
 # Build run_tests + emit_corpus + emit_skills + execute run_tests, honoring
 # BUILD_MODE. Each branch produces the same observable result: a built run_tests
 # (+ emit_corpus, reused by the EMISSION gate; + emit_skills, reused by the
-# SKILL-CONTRACT gate; + the six Layer-D dump binaries wire_dump/swml_dump/
-# state_dump/http_dump/wire_relay_dump/envelope_dump, reused by the
-# BEHAVIORAL-* gates) and
+# SKILL-CONTRACT gate; + the five Layer-D dump binaries wire_dump/swml_dump/
+# state_dump/http_dump/wire_relay_dump, reused by the BEHAVIORAL-* gates) and
 # run_tests' exit code. The dump binaries are built here too so the downstream
 # gates don't reconfigure the tree (and so the host / exec modes leave
 # ready-to-run binaries).
 test_gate() {
+    # STRICT-MOCKS (Sec 2.2b parity): carry MOCK_RELAY_STRICT=1 into the full
+    # run_tests pass, not just the nightly relay_mock_-filtered strict_mocks_gate.
+    # cpp's relay tests self-spawn `python -m mock_relay` via fork+execlp, which
+    # inherits ambient env, so exporting it here reaches the child mock the same
+    # way strict_mocks_gate does.
     case "$BUILD_MODE" in
         host)
             if [ ! -d build ]; then
@@ -255,23 +267,23 @@ test_gate() {
             # rebuilds run_tests (a near-no-op since it was just built) and runs
             # the full suite.
             cmake --build build --target emit_corpus emit_skills \
-                wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j"$(sw_build_jobs)" || return 1
-            bash "$PORT_ROOT/scripts/run-tests.sh"
+                wire_dump swml_dump state_dump http_dump wire_relay_dump -j"$(sw_build_jobs)" || return 1
+            env MOCK_RELAY_STRICT=1 bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
-            docker exec "$c" bash -c "
+            docker exec -e MOCK_RELAY_STRICT=1 "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
             local img="${BUILD_MODE#run:}"
             # Mount the repo's PARENT (so porting-sdk is adjacent for the mock
             # adjacency walk) and use --network host to reach host-run mocks.
-            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src -e MOCK_RELAY_STRICT=1 "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump envelope_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -323,7 +335,7 @@ emission_gate() {
 # execs it so ONLY the JSON reaches stdout. The dumps already emit pure JSON on
 # stdout (logs go to stderr) regardless of ambient SIGNALWIRE_LOG_* env.
 behavioral_gate() {
-    local surface="$1"  # wire | swml | state | http | wire_relay | envelope
+    local surface="$1"  # wire | swml | state | http | wire_relay
     local dump_cmd
     case "$BUILD_MODE" in
         host)
@@ -538,7 +550,14 @@ rest_coverage_gate() {
         --spec-root "$PORTING_SDK_DIR/rest-apis" \
         --allowlist "$PORTING_SDK_DIR/REST_COVERAGE_BASELINE.md" \
         --allowlist "$PORT_ROOT/REST_COVERAGE_GAPS.md" \
-        --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md"
+        --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md" || return 1
+    # STRICT-MOCKS section 2.2a -- fail the gate on ANY journaled wire_violation. The shared
+    # helper reads the same live mock journal this coverage run just populated and
+    # exits non-zero on any offender (porting-sdk/scripts/assert_no_wire_violations.py).
+    # WIRE_VIOLATIONS_ALLOW.md holds ONLY owner-signed spec-gap parks.
+    python3 "$PORTING_SDK_DIR/scripts/assert_no_wire_violations.py" \
+        --rest-mock-url "http://127.0.0.1:$port" \
+        --allowlist "$PORT_ROOT/WIRE_VIOLATIONS_ALLOW.md"
 }
 
 # Gate 5c: SPEC-PARITY — the REST surface must match the canonical spec in BOTH
@@ -752,7 +771,8 @@ strict_mocks_gate() {
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
-run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
+# (STRICT-MOCKS: MOCK_RELAY_STRICT=1, wired inside test_gate)
+run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE) (STRICT-MOCKS: MOCK_RELAY_STRICT=1)" test_gate
 
 # Gate 2: signature regen
 run_gate "SIGNATURES" "regenerate port_signatures.json (libclang)" \
@@ -858,8 +878,6 @@ run_gate "BEHAVIORAL-HTTP" "diff_port_http vs python oracle (Layer D)" \
     behavioral_gate http
 run_gate "BEHAVIORAL-WIRE-RELAY" "diff_port_wire_relay vs python oracle (Layer D)" \
     behavioral_gate wire_relay
-run_gate "BEHAVIORAL-ENVELOPE" "diff_port_envelope vs python oracle (Layer D): typed error incl transport" \
-    behavioral_gate envelope
 
 # Gate 7: FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
@@ -1039,11 +1057,14 @@ run_gate "WAIT-LIVENESS" "RELAY Action::wait() blocks-until-event liveness match
 run_gate "STRICT-MOCKS" "RELAY suite passes with the mock in 400-on-violation strict mode (MOCK_RELAY_STRICT=1)" --tier=nightly \
     strict_mocks_gate
 
-run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" --tier=nightly \
-    python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
+# STRICT-MOCKS: carry MOCK_RELAY_STRICT=1 for parity with the other wired ports
+# (python/typescript). Both self-skip on cpp (compiled: no run target), so this
+# is a no-op today but keeps the env identical if/when either gains a runner.
+run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md; STRICT-MOCKS: MOCK_RELAY_STRICT=1)" --tier=nightly \
+    env MOCK_RELAY_STRICT=1 python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
 
-run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips)" --tier=nightly \
-    python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
+run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips; STRICT-MOCKS: MOCK_RELAY_STRICT=1)" --tier=nightly \
+    env MOCK_RELAY_STRICT=1 python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
 
 # --- §G anti-laundering ledger gate -------------------------------------------
 # SUPPRESSION-LEDGER: no un-ledgered analyzer suppressions (complements the

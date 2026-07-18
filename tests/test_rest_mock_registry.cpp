@@ -53,15 +53,18 @@ TEST(rest_mock_registry_brands_list_campaigns_uses_brand_subpath) {
 
 TEST(rest_mock_registry_brands_create_campaign_posts_to_brand_subpath) {
     auto client = mocktest::make_client();
+    // Wire key is sms_use_case (CreateManagedCampaignRequest), not "usecase" --
+    // the mock does not enforce the schema's other required fields for a plain
+    // wire-shape probe like this one.
     auto body = client.registry().brands.create_campaign(
         "brand-2",
-        {{"usecase", "LOW_VOLUME"}, {"description", "MFA"}});
+        {{"sms_use_case", "LOW_VOLUME"}, {"description", "MFA"}});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path, kRegBase + "/brands/brand-2/campaigns");
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("usecase", std::string()), std::string("LOW_VOLUME"));
+    ASSERT_EQ(j.body.value("sms_use_case", std::string()), std::string("LOW_VOLUME"));
     ASSERT_EQ(j.body.value("description", std::string()), std::string("MFA"));
     return true;
 }
@@ -80,17 +83,23 @@ TEST(rest_mock_registry_campaigns_get_uses_id_in_path) {
     return true;
 }
 
-TEST(rest_mock_registry_campaigns_update_uses_put) {
+TEST(wire_regression_pin_registry_campaigns_update_extras) {
+    // update_campaign (PUT /api/relay/rest/registry/beta/campaigns/{id}) accepts
+    // ONLY name -- per the vendored REST spec UpdateCampaignRequest (no
+    // additionalProperties), the strict mock's oracle. `description` is NOT in the
+    // schema (invented), so pin the real typed `name` field rather than forward an
+    // invented extra on the wire.
     auto client = mocktest::make_client();
     auto body = client.registry().campaigns.update(
-        "camp-2", {.extras = {{"description", "Updated"}}});
+        "camp-2", {.name = "Updated"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     // Python parity: PUT, not PATCH.
     ASSERT_EQ(j.method, std::string("PUT"));
     ASSERT_EQ(j.path, kRegBase + "/campaigns/camp-2");
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("description", std::string()), std::string("Updated"));
+    ASSERT_EQ(j.body.value("name", std::string()), std::string("Updated"));
+    ASSERT_FALSE(j.body.contains("description"));
     return true;
 }
 
@@ -107,19 +116,21 @@ TEST(rest_mock_registry_campaigns_list_numbers_uses_numbers_subpath) {
 
 TEST(rest_mock_registry_campaigns_create_order_posts_to_orders_subpath) {
     auto client = mocktest::make_client();
+    // Wire key is phone_numbers (CreateOrderRequest), not a bare "numbers" sent
+    // via extras -- CreateOrderParams already types this field, so use it typed.
     auto body = client.registry().campaigns.create_order(
         "camp-4",
-        {.extras = {{"numbers", json::array({"pn-1", "pn-2"})}}});
+        {.phone_numbers = json::array({"pn-1", "pn-2"})});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path, kRegBase + "/campaigns/camp-4/orders");
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_TRUE(j.body.contains("numbers"));
-    ASSERT_TRUE(j.body["numbers"].is_array());
-    ASSERT_EQ(j.body["numbers"].size(), (size_t)2);
-    ASSERT_EQ(j.body["numbers"][0].get<std::string>(), std::string("pn-1"));
-    ASSERT_EQ(j.body["numbers"][1].get<std::string>(), std::string("pn-2"));
+    ASSERT_TRUE(j.body.contains("phone_numbers"));
+    ASSERT_TRUE(j.body["phone_numbers"].is_array());
+    ASSERT_EQ(j.body["phone_numbers"].size(), (size_t)2);
+    ASSERT_EQ(j.body["phone_numbers"][0].get<std::string>(), std::string("pn-1"));
+    ASSERT_EQ(j.body["phone_numbers"][1].get<std::string>(), std::string("pn-2"));
     return true;
 }
 

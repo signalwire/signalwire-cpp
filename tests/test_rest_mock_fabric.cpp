@@ -124,34 +124,44 @@ TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
 // FabricTokens
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_fabric_tokens_create_invite_token) {
+TEST(wire_regression_pin_fabric_tokens_create_invite_token_extras) {
+    // create_subscriber_invite_token (POST /api/fabric/subscriber/invites) accepts
+    // ONLY address_id (required) + expires_at -- per the vendored REST spec
+    // SubscriberInviteTokenCreateRequest (no additionalProperties), which is the
+    // strict mock's request-schema oracle. `email` is NOT accepted here (it is real
+    // on the sibling create_subscriber endpoint, not this one), so there is no
+    // invented extra to forward. Pin the two typed fields the spec declares.
     auto client = mocktest::make_client();
     auto body = client.fabric().tokens.create_invite_token(
-        {.extras = {{"email", "invitee@example.com"}}});
+        {.address_id = "addr-invite-1", .expires_at = 1725513600});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     // subscriber/invites uses the singular 'subscriber' path segment.
     ASSERT_EQ(j.path, std::string("/api/fabric/subscriber/invites"));
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("email", std::string()), std::string("invitee@example.com"));
+    ASSERT_EQ(j.body.value("address_id", std::string()), std::string("addr-invite-1"));
+    ASSERT_EQ(j.body.value("expires_at", 0), 1725513600);
+    ASSERT_FALSE(j.body.contains("email"));
     return true;
 }
 
-TEST(rest_mock_fabric_tokens_create_embed_token) {
+TEST(wire_regression_pin_fabric_tokens_create_embed_token_base_body) {
+    // create_embed_token (POST /api/fabric/embeds/tokens) accepts ONLY `token` --
+    // verified against prime-rails Embed::Tokens::Operations::Create, which reads
+    // solely params[:token] with no contract for allowed_addresses (that field is
+    // real on the sibling create_guest_token endpoint, not this one). There is no
+    // valid extra field to pin here, so this test pins the base token-only body
+    // instead of asserting an invented field on the wire.
     auto client = mocktest::make_client();
-    auto body = client.fabric().tokens.create_embed_token(
-        {.extras = {{"allowed_addresses", json::array({"addr-1", "addr-2"})}}});
+    auto body = client.fabric().tokens.create_embed_token({.token = "embed-token-1"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_EQ(j.path, std::string("/api/fabric/embeds/tokens"));
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_TRUE(j.body.contains("allowed_addresses"));
-    ASSERT_TRUE(j.body["allowed_addresses"].is_array());
-    ASSERT_EQ(j.body["allowed_addresses"].size(), (size_t)2);
-    ASSERT_EQ(j.body["allowed_addresses"][0].get<std::string>(), std::string("addr-1"));
-    ASSERT_EQ(j.body["allowed_addresses"][1].get<std::string>(), std::string("addr-2"));
+    ASSERT_EQ(j.body.value("token", std::string()), std::string("embed-token-1"));
+    ASSERT_FALSE(j.body.contains("allowed_addresses"));
     return true;
 }
 

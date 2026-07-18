@@ -241,6 +241,11 @@ SWCPP_CONTAINER_BUILD="${SWCPP_CONTAINER_BUILD:-/tmp/run-ci-build}"  # container
 # gates don't reconfigure the tree (and so the host / exec modes leave
 # ready-to-run binaries).
 test_gate() {
+    # STRICT-MOCKS (Sec 2.2b parity): carry MOCK_RELAY_STRICT=1 into the full
+    # run_tests pass, not just the nightly relay_mock_-filtered strict_mocks_gate.
+    # cpp's relay tests self-spawn `python -m mock_relay` via fork+execlp, which
+    # inherits ambient env, so exporting it here reaches the child mock the same
+    # way strict_mocks_gate does.
     case "$BUILD_MODE" in
         host)
             if [ ! -d build ]; then
@@ -255,11 +260,11 @@ test_gate() {
             # the full suite.
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump state_dump http_dump wire_relay_dump -j"$(sw_build_jobs)" || return 1
-            bash "$PORT_ROOT/scripts/run-tests.sh"
+            env MOCK_RELAY_STRICT=1 bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
-            docker exec "$c" bash -c "
+            docker exec -e MOCK_RELAY_STRICT=1 "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
                 && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
@@ -268,7 +273,7 @@ test_gate() {
             local img="${BUILD_MODE#run:}"
             # Mount the repo's PARENT (so porting-sdk is adjacent for the mock
             # adjacency walk) and use --network host to reach host-run mocks.
-            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src -e MOCK_RELAY_STRICT=1 "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
                 && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
@@ -537,7 +542,14 @@ rest_coverage_gate() {
         --spec-root "$PORTING_SDK_DIR/rest-apis" \
         --allowlist "$PORTING_SDK_DIR/REST_COVERAGE_BASELINE.md" \
         --allowlist "$PORT_ROOT/REST_COVERAGE_GAPS.md" \
-        --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md"
+        --gap-baseline "$PORTING_SDK_DIR/REST_COVERAGE_GAP_BASELINE.md" || return 1
+    # STRICT-MOCKS section 2.2a -- fail the gate on ANY journaled wire_violation. The shared
+    # helper reads the same live mock journal this coverage run just populated and
+    # exits non-zero on any offender (porting-sdk/scripts/assert_no_wire_violations.py).
+    # WIRE_VIOLATIONS_ALLOW.md holds ONLY owner-signed spec-gap parks.
+    python3 "$PORTING_SDK_DIR/scripts/assert_no_wire_violations.py" \
+        --rest-mock-url "http://127.0.0.1:$port" \
+        --allowlist "$PORT_ROOT/WIRE_VIOLATIONS_ALLOW.md"
 }
 
 # Gate 5c: SPEC-PARITY — the REST surface must match the canonical spec in BOTH
@@ -751,7 +763,8 @@ strict_mocks_gate() {
 }
 
 # Gate 1: build + run tests (host or OpenSSL-3.0 container per BUILD_MODE)
-run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
+# (STRICT-MOCKS: MOCK_RELAY_STRICT=1, wired inside test_gate)
+run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE) (STRICT-MOCKS: MOCK_RELAY_STRICT=1)" test_gate
 
 # Gate 2: signature regen
 run_gate "SIGNATURES" "regenerate port_signatures.json (libclang)" \
@@ -1036,11 +1049,14 @@ run_gate "WAIT-LIVENESS" "RELAY Action::wait() blocks-until-event liveness match
 run_gate "STRICT-MOCKS" "RELAY suite passes with the mock in 400-on-violation strict mode (MOCK_RELAY_STRICT=1)" --tier=nightly \
     strict_mocks_gate
 
-run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md)" --tier=nightly \
-    python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
+# STRICT-MOCKS: carry MOCK_RELAY_STRICT=1 for parity with the other wired ports
+# (python/typescript). Both self-skip on cpp (compiled: no run target), so this
+# is a no-op today but keeps the env identical if/when either gains a runner.
+run_gate "EXAMPLES-RUN" "shipped examples load/start against the mock (modulo EXAMPLES_RUN_ALLOW.md; STRICT-MOCKS: MOCK_RELAY_STRICT=1)" --tier=nightly \
+    env MOCK_RELAY_STRICT=1 python3 "$PORTING_SDK_DIR/scripts/examples_run.py" --port cpp --repo .
 
-run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips)" --tier=nightly \
-    python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
+run_gate "SNIPPET-RUN" "dynamic-port doc snippets run to a zero exit against the mock (compiled port: self-skips; STRICT-MOCKS: MOCK_RELAY_STRICT=1)" --tier=nightly \
+    env MOCK_RELAY_STRICT=1 python3 "$PORTING_SDK_DIR/scripts/snippet_run.py" --port cpp --repo . --report-only
 
 # --- §G anti-laundering ledger gate -------------------------------------------
 # SUPPRESSION-LEDGER: no un-ledgered analyzer suppressions (complements the

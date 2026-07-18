@@ -176,7 +176,7 @@ TEST(rest_mock_short_codes_update) {
 // Imported Numbers
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_imported_numbers_create) {
+TEST(wire_regression_pin_imported_numbers_create_extras) {
     auto client = mocktest::make_client();
     auto body = client.imported_numbers().create({
         .number = "+15551234567",
@@ -204,10 +204,12 @@ TEST(rest_mock_imported_numbers_create) {
 
 TEST(rest_mock_mfa_call) {
     auto client = mocktest::make_client();
+    // Wire key is "from" -- CallParams already types this field; C++ has no
+    // reserved-word conflict with "from", so no "from_" escape is needed here.
     auto body = client.mfa().call({
         .to = "+15551234567",
+        .from = std::string("+15559876543"),
         .message = "Your code is {code}",
-        .extras = {{"from_", "+15559876543"}},
     });
     ASSERT_TRUE(body.is_object());
     ASSERT_TRUE(body.contains("id"));
@@ -216,7 +218,7 @@ TEST(rest_mock_mfa_call) {
     ASSERT_EQ(j.path, std::string("/api/relay/rest/mfa/call"));
     ASSERT_TRUE(j.body.is_object());
     ASSERT_EQ(j.body.value("to", std::string()), std::string("+15551234567"));
-    ASSERT_EQ(j.body.value("from_", std::string()), std::string("+15559876543"));
+    ASSERT_EQ(j.body.value("from", std::string()), std::string("+15559876543"));
     ASSERT_EQ(j.body.value("message", std::string()),
               std::string("Your code is {code}"));
     return true;
@@ -228,17 +230,19 @@ TEST(rest_mock_mfa_call) {
 
 TEST(rest_mock_sip_profile_update) {
     auto client = mocktest::make_client();
+    // Wire key is domain_identifier (UpdateSipProfileRequest), not a bare
+    // "domain" -- SipProfile::UpdateParams already types this field.
     auto body = client.sip_profile().update({
+        .domain_identifier = std::string("myco.sip.signalwire.com"),
         .default_codecs = json::array({"PCMU", "PCMA"}),
-        .extras = {{"domain", "myco.sip.signalwire.com"}},
     });
     ASSERT_TRUE(body.is_object());
-    ASSERT_TRUE(body.contains("domain") || body.contains("default_codecs"));
+    ASSERT_TRUE(body.contains("domain_identifier") || body.contains("default_codecs"));
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("PUT"));
     ASSERT_EQ(j.path, std::string("/api/relay/rest/sip_profile"));
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("domain", std::string()),
+    ASSERT_EQ(j.body.value("domain_identifier", std::string()),
               std::string("myco.sip.signalwire.com"));
     ASSERT_TRUE(j.body.contains("default_codecs"));
     ASSERT_TRUE(j.body["default_codecs"].is_array());

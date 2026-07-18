@@ -6,7 +6,7 @@
 // then walk the iterator, verifying:
 //   1. items collected (across both pages),
 //   2. the journal contains exactly two GETs at the same path,
-//   3. the second fetch carries a parsed cursor=page2 query param.
+//   3. the second fetch carries a parsed page_token=PA_page2 query param.
 //
 // Included by tests/test_main.cpp.
 
@@ -70,7 +70,10 @@ TEST(rest_mock_pagination_iter_returns_self) {
 TEST(rest_mock_pagination_next_pages_through_all_items) {
     auto client = mocktest::make_client();
 
-    // Page 1 -- has a next cursor.
+    // Page 1 -- has a next page. The server's links.next carries the real wire
+    // param the fabric list endpoint round-trips: page_token (a cursor token
+    // that starts with PA/PB), NOT a "cursor" param (which no SignalWire REST
+    // endpoint accepts -- see rest-apis/fabric/openapi.yaml ListFabricAddressesQuery).
     mocktest::scenario_set(
         kFabricAddressesEndpointId, 200,
         {
@@ -78,7 +81,7 @@ TEST(rest_mock_pagination_next_pages_through_all_items) {
                 {{"id", "addr-1"}, {"name", "first"}},
                 {{"id", "addr-2"}, {"name", "second"}},
             })},
-            {"links", {{"next", "http://example.com/api/fabric/addresses?cursor=page2"}}},
+            {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
         });
     // Page 2 -- terminal (no next).
     mocktest::scenario_set(
@@ -108,20 +111,20 @@ TEST(rest_mock_pagination_next_pages_through_all_items) {
     // Journal must have exactly two GETs at the same path.
     auto entries = mocktest::journal();
     int gets = 0;
-    int got_cursor_page2 = 0;
+    int got_page_token_page2 = 0;
     for (const auto& e : entries) {
         if (e.method == "GET" && e.path == kFabricAddressesPath) {
             ++gets;
-            auto cit = e.query_params.find("cursor");
+            auto cit = e.query_params.find("page_token");
             if (cit != e.query_params.end()
                 && !cit->second.empty()
-                && cit->second.front() == "page2") {
-                ++got_cursor_page2;
+                && cit->second.front() == "PA_page2") {
+                ++got_page_token_page2;
             }
         }
     }
     ASSERT_EQ(gets, 2);
-    ASSERT_EQ(got_cursor_page2, 1);
+    ASSERT_EQ(got_page_token_page2, 1);
     return true;
 }
 
@@ -136,7 +139,7 @@ TEST(rest_mock_pagination_next_pages_through_all_items) {
 TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
     auto client = mocktest::make_client();
 
-    // Page 1 -- has a next cursor.
+    // Page 1 -- has a next page (real wire param: page_token, see above).
     mocktest::scenario_set(
         kFabricAddressesEndpointId, 200,
         {
@@ -144,7 +147,7 @@ TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
                 {{"id", "addr-1"}, {"name", "first"}},
                 {{"id", "addr-2"}, {"name", "second"}},
             })},
-            {"links", {{"next", "http://example.com/api/fabric/addresses?cursor=page2"}}},
+            {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
         });
     // Page 2 -- terminal (no next).
     mocktest::scenario_set(
@@ -171,23 +174,23 @@ TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
     ASSERT_EQ(ids[1], std::string("addr-2"));
     ASSERT_EQ(ids[2], std::string("addr-3"));
 
-    // Two GETs at the resource path; the second carries the parsed cursor=page2.
+    // Two GETs at the resource path; the second carries the parsed page_token=PA_page2.
     auto entries = mocktest::journal();
     int gets = 0;
-    int got_cursor_page2 = 0;
+    int got_page_token_page2 = 0;
     for (const auto& e : entries) {
         if (e.method == "GET" && e.path == kFabricAddressesPath) {
             ++gets;
-            auto cit = e.query_params.find("cursor");
+            auto cit = e.query_params.find("page_token");
             if (cit != e.query_params.end()
                 && !cit->second.empty()
-                && cit->second.front() == "page2") {
-                ++got_cursor_page2;
+                && cit->second.front() == "PA_page2") {
+                ++got_page_token_page2;
             }
         }
     }
     ASSERT_EQ(gets, 2);
-    ASSERT_EQ(got_cursor_page2, 1);
+    ASSERT_EQ(got_page_token_page2, 1);
     return true;
 }
 

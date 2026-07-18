@@ -124,7 +124,7 @@ TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
 // FabricTokens
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_fabric_tokens_create_invite_token) {
+TEST(wire_regression_pin_fabric_tokens_create_invite_token_extras) {
     auto client = mocktest::make_client();
     auto body = client.fabric().tokens.create_invite_token(
         {.extras = {{"email", "invitee@example.com"}}});
@@ -138,7 +138,7 @@ TEST(rest_mock_fabric_tokens_create_invite_token) {
     return true;
 }
 
-TEST(rest_mock_fabric_tokens_create_embed_token) {
+TEST(wire_regression_pin_fabric_tokens_create_embed_token_extras) {
     auto client = mocktest::make_client();
     auto body = client.fabric().tokens.create_embed_token(
         {.extras = {{"allowed_addresses", json::array({"addr-1", "addr-2"})}}});

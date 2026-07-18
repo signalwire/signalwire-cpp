@@ -26,3 +26,4 @@ Format: `- <file> — reason (approver, date)`.
 - DOC_LINKS_ALLOW.md — the doc-links gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
 - ARTIFACT_DENY_ALLOW.md — the artifact-deny gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
 - ROUTE_COLLISION_ALLOW.md — the route-collision gate's allowlist file, read at repo root by porting-sdk route_collision.py by that gate's convention (orchestrator, 2026-07-07)
+- WIRE_VIOLATIONS_ALLOW.md — STRICT-MOCKS signed-exception ledger read by porting-sdk assert_no_wire_violations.py / examples_run.py / snippet_run.py at repo root (mike@signalwire.com, 2026-07-18)

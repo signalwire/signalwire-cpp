@@ -84,16 +84,22 @@ TEST(rest_mock_registry_campaigns_get_uses_id_in_path) {
 }
 
 TEST(wire_regression_pin_registry_campaigns_update_extras) {
+    // update_campaign (PUT /api/relay/rest/registry/beta/campaigns/{id}) accepts
+    // ONLY name -- per the vendored REST spec UpdateCampaignRequest (no
+    // additionalProperties), the strict mock's oracle. `description` is NOT in the
+    // schema (invented), so pin the real typed `name` field rather than forward an
+    // invented extra on the wire.
     auto client = mocktest::make_client();
     auto body = client.registry().campaigns.update(
-        "camp-2", {.extras = {{"description", "Updated"}}});
+        "camp-2", {.name = "Updated"});
     ASSERT_TRUE(body.is_object());
     auto j = mocktest::journal_last();
     // Python parity: PUT, not PATCH.
     ASSERT_EQ(j.method, std::string("PUT"));
     ASSERT_EQ(j.path, kRegBase + "/campaigns/camp-2");
     ASSERT_TRUE(j.body.is_object());
-    ASSERT_EQ(j.body.value("description", std::string()), std::string("Updated"));
+    ASSERT_EQ(j.body.value("name", std::string()), std::string("Updated"));
+    ASSERT_FALSE(j.body.contains("description"));
     return true;
 }
 

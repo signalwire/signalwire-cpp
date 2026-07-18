@@ -15144,10 +15144,9 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
+                  "name": "action",
                   "type": "any",
-                  "required": false,
-                  "default": null
+                  "required": true
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -15159,8 +15158,13 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
+                  "name": "action",
                   "type": "any",
+                  "required": true
+                },
+                {
+                  "name": "status_url",
+                  "type": "string",
                   "required": false,
                   "default": null
                 }

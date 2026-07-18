@@ -369,6 +369,20 @@ int main() {
   settle();
   out["relay_send_fax"] = frame("calling.send_fax", mock->last_frame("calling.send_fax"));
 
+  // relay_live_transcribe — the caller's action descriptor MUST be wrapped as
+  // params.action on the wire (schema requires it); this pins that shape.
+  call.live_transcribe(json{{"start", {{"lang", "en"}}}});
+  settle();
+  out["relay_live_transcribe"] =
+      frame("calling.live_transcribe", mock->last_frame("calling.live_transcribe"));
+
+  // relay_live_translate — same action-wrap contract, plus the optional
+  // sibling status_url param.
+  call.live_translate(json{{"start", {{"from_lang", "en"}, {"to_lang", "es"}}}}, "https://x/cb");
+  settle();
+  out["relay_live_translate"] =
+      frame("calling.live_translate", mock->last_frame("calling.live_translate"));
+
   // ---- control-ops (Action methods) ----
   {
     auto pa = call.play(

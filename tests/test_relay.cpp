@@ -623,10 +623,10 @@ TEST(relay_call_methods_without_client) {
     auto a20 = call.collect(json::object());
     ASSERT_TRUE(a20.completed());
 
-    auto a21 = call.live_transcribe();
+    auto a21 = call.live_transcribe(json{{"start", json::object()}});
     ASSERT_TRUE(a21.completed());
 
-    auto a22 = call.live_translate();
+    auto a22 = call.live_translate(json{{"start", json::object()}});
     ASSERT_TRUE(a22.completed());
 
     auto a23 = call.execute_swml(json::object());

@@ -125,9 +125,17 @@ class Call {
   Action stop_tap(const std::string& control_id);
   Action send_digits(const std::string& digits);
   Action transfer(const json& params);
-  Action live_transcribe(const json& params = json::object());
+  // The wire schema (relay-protocol/calling.live_transcribe.params.json,
+  // switchblade PublicCallLiveTranscribeParams.cs) declares `action` REQUIRED --
+  // the caller's action descriptor (e.g. {"start": {...}} / {"stop": {...}})
+  // must be wrapped as params.action, not forwarded flat. Mirrors Python's
+  // Call.live_transcribe(action, **kwargs).
+  Action live_transcribe(const json& action);
   Action transcribe(const json& params = json::object(), const std::string& control_id = "");
-  Action live_translate(const json& params = json::object());
+  // Same contract as live_transcribe -- params.action REQUIRED (switchblade
+  // PublicCallLiveTranslateParams.cs). status_url is an optional sibling param,
+  // mirroring Python's Call.live_translate(action, *, status_url=None, **kwargs).
+  Action live_translate(const json& action, const std::string& status_url = "");
   Action ai(const json& params, const std::string& control_id = "");
   Action pay(const json& params, const std::string& control_id = "");
   Action send_fax(const std::string& document_url, const std::string& header = "",

@@ -135,7 +135,7 @@ json HttpClient::get(const std::string& path,
 
   auto res = cli.Get(full_path, hdrs);
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed to " + host, "", full_path, "GET");
+    throw SignalWireRestTransportError("Connection failed to " + host, full_path, "GET");
   }
   return handle_response(res->status, res->body, full_path, "GET");
 }
@@ -150,7 +150,7 @@ json HttpClient::post(const std::string& path, const json& body) const {
 
   auto res = cli.Post(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed", "", path, "POST");
+    throw SignalWireRestTransportError("Connection failed", path, "POST");
   }
   return handle_response(res->status, res->body, path, "POST");
 }
@@ -165,7 +165,7 @@ json HttpClient::put(const std::string& path, const json& body) const {
 
   auto res = cli.Put(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed", "", path, "PUT");
+    throw SignalWireRestTransportError("Connection failed", path, "PUT");
   }
   return handle_response(res->status, res->body, path, "PUT");
 }
@@ -180,7 +180,7 @@ json HttpClient::patch(const std::string& path, const json& body) const {
 
   auto res = cli.Patch(path, hdrs, body_str, "application/json");
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed", "", path, "PATCH");
+    throw SignalWireRestTransportError("Connection failed", path, "PATCH");
   }
   return handle_response(res->status, res->body, path, "PATCH");
 }
@@ -194,7 +194,7 @@ json HttpClient::del(const std::string& path) const {
 
   auto res = cli.Delete(path, hdrs);
   if (!res) {
-    throw SignalWireRestError(0, "Connection failed", "", path, "DELETE");
+    throw SignalWireRestTransportError("Connection failed", path, "DELETE");
   }
   return handle_response(res->status, res->body, path, "DELETE");
 }

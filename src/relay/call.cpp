@@ -169,11 +169,18 @@ Action Call::unhold() { return execute_simple("unhold"); }
 
 Action Call::transfer(const json& params) { return execute_simple("transfer", params); }
 
-Action Call::live_transcribe(const json& params) {
+Action Call::live_transcribe(const json& action) {
+  json params = {{"action", action}};
   return execute_simple("live_transcribe", params);
 }
 
-Action Call::live_translate(const json& params) { return execute_simple("live_translate", params); }
+Action Call::live_translate(const json& action, const std::string& status_url) {
+  json params = {{"action", action}};
+  if (!status_url.empty()) {
+    params["status_url"] = status_url;
+  }
+  return execute_simple("live_translate", params);
+}
 
 Action Call::sip_refer(const std::string& to_uri) {
   json p;

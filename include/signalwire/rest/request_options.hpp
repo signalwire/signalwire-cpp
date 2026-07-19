@@ -58,12 +58,21 @@ struct RequestOptions {
   /// ``RequestOptions.merge``.
   RequestOptions merge(const RequestOptions& override_opts) const {
     RequestOptions out = *this;
-    if (override_opts.timeout.has_value()) out.timeout = override_opts.timeout;
-    if (override_opts.retries.has_value()) out.retries = override_opts.retries;
-    if (override_opts.retry_on_status.has_value())
+    if (override_opts.timeout.has_value()) {
+      out.timeout = override_opts.timeout;
+    }
+    if (override_opts.retries.has_value()) {
+      out.retries = override_opts.retries;
+    }
+    if (override_opts.retry_on_status.has_value()) {
       out.retry_on_status = override_opts.retry_on_status;
-    if (override_opts.retry_backoff.has_value()) out.retry_backoff = override_opts.retry_backoff;
-    if (override_opts.abort_signal != nullptr) out.abort_signal = override_opts.abort_signal;
+    }
+    if (override_opts.retry_backoff.has_value()) {
+      out.retry_backoff = override_opts.retry_backoff;
+    }
+    if (override_opts.abort_signal != nullptr) {
+      out.abort_signal = override_opts.abort_signal;
+    }
     return out;
   }
 };

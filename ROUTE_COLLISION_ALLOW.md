@@ -4,6 +4,14 @@ Each entry excuses one proven, human-approved (a) route-split / (b) crud-dup
 finding. Gate: `porting-sdk/scripts/route_collision.py`. Key form:
 `<Class>.<canonical_op>`.
 
+> PENDING RETIREMENT (plan a-bar 2026-07-19): porting-sdk's `route_collision.py` is
+> being made SPEC-AWARE on the plan branch — it recognizes the fabric
+> `call_flow`/`conference_room` SINGULAR address sub-paths as spec-faithful directly
+> from `rest-apis/fabric/openapi.yaml`, making both entries below obsolete. They are
+> KEPT here only because this repo's CI pins porting-sdk `main`, whose route_collision
+> still needs them; retiring them now would red the OLD check. Retire both the moment
+> the spec-aware route_collision.py is on porting-sdk main.
+
 ## (a) list_addresses singular-path override — the override is the SOLE live route
 
 `CallFlows` and `ConferenceRooms` serve their addresses (and, for call_flows,

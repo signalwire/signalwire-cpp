@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "signalwire/rest/request_options.hpp"
+
 namespace httplib {
 class Client;
 }
@@ -64,7 +66,8 @@ class SignalWireRestTransportError : public SignalWireRestError {
 /// HTTP client with Basic Auth support using cpp-httplib
 class HttpClient {
  public:
-  HttpClient(const std::string& base_url, const std::string& username, const std::string& password);
+  HttpClient(const std::string& base_url, const std::string& username, const std::string& password,
+             const RequestOptions& request_options = {});
 
   // [[nodiscard]] on every verb: the returned JSON IS the API response.
   // Dropping it discards the call's result (and the only place errors that
@@ -72,19 +75,23 @@ class HttpClient {
 
   /// GET request
   [[nodiscard]] json get(const std::string& path,
-                         const std::map<std::string, std::string>& params = {}) const;
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const;
 
   /// POST request
-  [[nodiscard]] json post(const std::string& path, const json& body = json::object()) const;
+  [[nodiscard]] json post(const std::string& path, const json& body = json::object(),
+                          const RequestOptions& request_options = {}) const;
 
   /// PUT request
-  [[nodiscard]] json put(const std::string& path, const json& body = json::object()) const;
+  [[nodiscard]] json put(const std::string& path, const json& body = json::object(),
+                         const RequestOptions& request_options = {}) const;
 
   /// PATCH request
-  [[nodiscard]] json patch(const std::string& path, const json& body = json::object()) const;
+  [[nodiscard]] json patch(const std::string& path, const json& body = json::object(),
+                           const RequestOptions& request_options = {}) const;
 
   /// DELETE request
-  [[nodiscard]] json del(const std::string& path) const;
+  [[nodiscard]] json del(const std::string& path, const RequestOptions& request_options = {}) const;
 
   /// Set additional default headers
   void set_header(const std::string& key, const std::string& value);
@@ -103,15 +110,23 @@ class HttpClient {
   const std::string& base_url() const { return base_url_; }
 
  private:
+  /// The single funnel every verb routes through: resolves the effective
+  /// options (per-request over client-default over built-in), then runs the
+  /// retry/timeout/abort loop, dispatching the HTTP method. ``body`` is null
+  /// for GET/DELETE; ``params`` is null for the body verbs.
+  json request(const std::string& method, const std::string& path, const json* body,
+               const std::map<std::string, std::string>* params,
+               const RequestOptions& per_request) const;
+
   json handle_response(int status, const std::string& body, const std::string& url,
                        const std::string& method) const;
   std::string build_query_string(const std::map<std::string, std::string>& params) const;
-  void configure_client(httplib::Client& cli) const;
+  void configure_client(httplib::Client& cli, double timeout_seconds) const;
 
   std::string base_url_;
   std::string auth_header_;
   std::map<std::string, std::string> headers_;
-  int timeout_ = 30;
+  RequestOptions request_options_;
   std::string ca_cert_path_;
 };
 

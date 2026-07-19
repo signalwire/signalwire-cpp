@@ -2,15 +2,94 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/rest/http_client.hpp"
 
+#include <chrono>
+#include <cmath>
+#include <set>
+#include <thread>
+
 #include "httplib.h"
 #include "signalwire/common.hpp"
 
 namespace signalwire {
 namespace rest {
 
+namespace {
+
+// Built-in defaults (the contract floor), mirroring Python's
+// signalwire.rest._request_options built-ins. Resolved per-request:
+// per-request over client-default over built-in.
+struct EffectiveOptions {
+  double timeout;
+  int retries;
+  std::set<int> retry_on_status;
+  double retry_backoff;
+  std::atomic<bool>* abort_signal;
+};
+
+constexpr double kBuiltinTimeout = 30.0;
+constexpr int kBuiltinRetries = 0;
+constexpr double kBuiltinRetryBackoff = 0.5;
+
+std::set<int> builtin_retry_on_status() { return {429, 500, 502, 503, 504}; }
+
+// Resolve the effective options: merge per-request over the client default,
+// then fill any unset field from the built-in floor.
+EffectiveOptions resolve(const RequestOptions& client_default, const RequestOptions& per_request) {
+  RequestOptions merged = client_default.merge(per_request);
+  EffectiveOptions eff;
+  eff.timeout = merged.timeout.value_or(kBuiltinTimeout);
+  eff.retries = merged.retries.value_or(kBuiltinRetries);
+  eff.retry_on_status = merged.retry_on_status.value_or(builtin_retry_on_status());
+  eff.retry_backoff = merged.retry_backoff.value_or(kBuiltinRetryBackoff);
+  eff.abort_signal = merged.abort_signal;
+  return eff;
+}
+
+// Idempotency-aware retry policy, mirroring Python's status_is_retryable:
+// idempotent methods retry the full retry_on_status set; non-idempotent
+// methods (POST/PATCH) retry ONLY throttle statuses (429/503).
+bool status_is_retryable(const std::string& method, int status, const EffectiveOptions& eff) {
+  if (eff.retry_on_status.count(status) == 0) {
+    return false;
+  }
+  static const std::set<std::string> kIdempotent = {"GET", "PUT", "DELETE", "HEAD", "OPTIONS"};
+  if (kIdempotent.count(method) != 0) {
+    return true;
+  }
+  return status == 429 || status == 503;
+}
+
+// Parse a Retry-After header (delta-seconds form) into a wait in seconds.
+// Returns -1 when absent or an HTTP-date form (fall back to computed backoff).
+double retry_after_seconds(const httplib::Response& res) {
+  std::string val = res.get_header_value("Retry-After");
+  if (val.empty()) {
+    return -1;
+  }
+  try {
+    size_t consumed = 0;
+    double secs = std::stod(val, &consumed);
+    // Reject a value with trailing non-numeric text (an HTTP-date form).
+    if (consumed != val.size()) {
+      return -1;
+    }
+    return secs;
+  } catch (...) {
+    return -1;
+  }
+}
+
+void sleep_backoff(double seconds) {
+  if (seconds > 0) {
+    std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+  }
+}
+
+}  // namespace
+
 HttpClient::HttpClient(const std::string& base_url, const std::string& username,
-                       const std::string& password)
-    : base_url_(base_url) {
+                       const std::string& password, const RequestOptions& request_options)
+    : base_url_(base_url), request_options_(request_options) {
   auth_header_ = "Basic " + signalwire::base64_encode(username + ":" + password);
   headers_["Content-Type"] = "application/json";
   headers_["Accept"] = "application/json";
@@ -20,7 +99,11 @@ void HttpClient::set_header(const std::string& key, const std::string& value) {
   headers_[key] = value;
 }
 
-void HttpClient::set_timeout(int seconds) { timeout_ = seconds; }
+// Legacy setter — writes into the client-default RequestOptions so it still
+// influences the effective per-attempt timeout resolved at request time.
+void HttpClient::set_timeout(int seconds) {
+  request_options_.timeout = static_cast<double>(seconds);
+}
 
 void HttpClient::set_ca_cert_path(const std::string& path) { ca_cert_path_ = path; }
 
@@ -30,9 +113,15 @@ void HttpClient::set_ca_cert_path(const std::string& path) { ca_cert_path_ = pat
 // system store by default. To trust a private/self-signed CA we point it at an
 // explicit bundle: set_ca_cert_path() if the caller supplied one, else the
 // SSL_CERT_FILE env var (the cross-port idiom). Verification stays ENABLED.
-void HttpClient::configure_client(httplib::Client& cli) const {
-  cli.set_connection_timeout(timeout_, 0);
-  cli.set_read_timeout(timeout_, 0);
+//
+// The timeout is converted to httplib's std::chrono overload (microseconds) —
+// NOT a raw (sec, nsec) pair — so a fractional-second timeout (e.g. 0.1s) is
+// honored exactly instead of being truncated or misread.
+void HttpClient::configure_client(httplib::Client& cli, double timeout_seconds) const {
+  auto micros = std::chrono::microseconds(static_cast<long long>(timeout_seconds * 1e6));
+  cli.set_connection_timeout(micros);
+  cli.set_read_timeout(micros);
+  cli.set_write_timeout(micros);
 
   std::string ca = ca_cert_path_;
   if (ca.empty()) {
@@ -124,79 +213,121 @@ static httplib::Headers make_headers(const std::string& auth,
   return hdrs;
 }
 
-json HttpClient::get(const std::string& path,
-                     const std::map<std::string, std::string>& params) const {
+// The single funnel: resolve effective options, then run the retry/timeout/
+// abort loop, dispatching by method. Mirrors Python's _base.py retry loop —
+// total attempts = retries + 1; before each attempt check the abort signal;
+// on a transport failure retry (backoff) while attempts remain else raise the
+// transport error; on a non-2xx retry (Retry-After or backoff) only when the
+// method+status is retryable and attempts remain, else surface the typed error.
+json HttpClient::request(const std::string& method, const std::string& path, const json* body,
+                         const std::map<std::string, std::string>* params,
+                         const RequestOptions& per_request) const {
+  EffectiveOptions eff = resolve(request_options_, per_request);
+
   auto [scheme, host] = parse_url(base_url_);
-  std::string full_path = path + build_query_string(params);
-  auto hdrs = make_headers(auth_header_, headers_);
 
-  httplib::Client cli(scheme + "://" + host);
-  configure_client(cli);
-
-  auto res = cli.Get(full_path, hdrs);
-  if (!res) {
-    throw SignalWireRestTransportError("Connection failed to " + host, full_path, "GET");
+  // GET encodes params into the path and reports the full path in errors;
+  // the body verbs report the bare path. Preserve that so error urls are
+  // unchanged from the pre-envelope client.
+  std::string full_path = path;
+  if (method == "GET" && params != nullptr) {
+    full_path = path + build_query_string(*params);
   }
-  return handle_response(res->status, res->body, full_path, "GET");
+  const std::string path_for_error = (method == "GET") ? full_path : path;
+
+  std::string body_str;
+  const bool has_body = (body != nullptr);
+  if (has_body) {
+    body_str = body->dump();
+  }
+
+  // scheme/host are loop-invariant — build the client URL once, reuse it to
+  // construct a fresh Client per attempt.
+  std::string client_url = scheme;
+  client_url += "://";
+  client_url += host;
+
+  int attempt = 0;
+  while (true) {
+    ++attempt;
+
+    // Cooperative cancellation: checked BEFORE each attempt (a synchronous
+    // httplib read cannot be interrupted mid-flight without a thread).
+    if (eff.abort_signal != nullptr && eff.abort_signal->load()) {
+      throw SignalWireRestTransportError("request cancelled by abort_signal", path_for_error,
+                                         method);
+    }
+
+    httplib::Client cli(client_url);
+    configure_client(cli, eff.timeout);
+    auto hdrs = make_headers(auth_header_, headers_);
+
+    httplib::Result res;
+    if (method == "GET") {
+      res = cli.Get(full_path, hdrs);
+    } else if (method == "POST") {
+      res = cli.Post(path, hdrs, body_str, "application/json");
+    } else if (method == "PUT") {
+      res = cli.Put(path, hdrs, body_str, "application/json");
+    } else if (method == "PATCH") {
+      res = cli.Patch(path, hdrs, body_str, "application/json");
+    } else {  // DELETE
+      res = cli.Delete(path, hdrs);
+    }
+
+    if (!res) {
+      // Transport failure — retry while attempts remain, else raise the typed
+      // transport error. Preserve the pre-envelope messages so any test that
+      // asserts them still passes (GET -> "...to <host>", others -> bare).
+      if (attempt <= eff.retries) {
+        sleep_backoff(eff.retry_backoff * std::pow(2.0, attempt - 1));
+        continue;
+      }
+      if (method == "GET") {
+        throw SignalWireRestTransportError("Connection failed to " + host, path_for_error, method);
+      }
+      throw SignalWireRestTransportError("Connection failed", path_for_error, method);
+    }
+
+    if (res->status < 200 || res->status >= 300) {
+      if (attempt <= eff.retries && status_is_retryable(method, res->status, eff)) {
+        double delay = retry_after_seconds(*res);
+        if (delay < 0) {
+          delay = eff.retry_backoff * std::pow(2.0, attempt - 1);
+        }
+        sleep_backoff(delay);
+        continue;
+      }
+      // Not retryable / retries exhausted — fall through to handle_response,
+      // which throws the typed SignalWireRestError.
+    }
+
+    return handle_response(res->status, res->body, path_for_error, method);
+  }
 }
 
-json HttpClient::post(const std::string& path, const json& body) const {
-  auto [scheme, host] = parse_url(base_url_);
-  auto hdrs = make_headers(auth_header_, headers_);
-  std::string body_str = body.dump();
-
-  httplib::Client cli(scheme + "://" + host);
-  configure_client(cli);
-
-  auto res = cli.Post(path, hdrs, body_str, "application/json");
-  if (!res) {
-    throw SignalWireRestTransportError("Connection failed", path, "POST");
-  }
-  return handle_response(res->status, res->body, path, "POST");
+json HttpClient::get(const std::string& path, const std::map<std::string, std::string>& params,
+                     const RequestOptions& request_options) const {
+  return request("GET", path, nullptr, &params, request_options);
 }
 
-json HttpClient::put(const std::string& path, const json& body) const {
-  auto [scheme, host] = parse_url(base_url_);
-  auto hdrs = make_headers(auth_header_, headers_);
-  std::string body_str = body.dump();
-
-  httplib::Client cli(scheme + "://" + host);
-  configure_client(cli);
-
-  auto res = cli.Put(path, hdrs, body_str, "application/json");
-  if (!res) {
-    throw SignalWireRestTransportError("Connection failed", path, "PUT");
-  }
-  return handle_response(res->status, res->body, path, "PUT");
+json HttpClient::post(const std::string& path, const json& body,
+                      const RequestOptions& request_options) const {
+  return request("POST", path, &body, nullptr, request_options);
 }
 
-json HttpClient::patch(const std::string& path, const json& body) const {
-  auto [scheme, host] = parse_url(base_url_);
-  auto hdrs = make_headers(auth_header_, headers_);
-  std::string body_str = body.dump();
-
-  httplib::Client cli(scheme + "://" + host);
-  configure_client(cli);
-
-  auto res = cli.Patch(path, hdrs, body_str, "application/json");
-  if (!res) {
-    throw SignalWireRestTransportError("Connection failed", path, "PATCH");
-  }
-  return handle_response(res->status, res->body, path, "PATCH");
+json HttpClient::put(const std::string& path, const json& body,
+                     const RequestOptions& request_options) const {
+  return request("PUT", path, &body, nullptr, request_options);
 }
 
-json HttpClient::del(const std::string& path) const {
-  auto [scheme, host] = parse_url(base_url_);
-  auto hdrs = make_headers(auth_header_, headers_);
+json HttpClient::patch(const std::string& path, const json& body,
+                       const RequestOptions& request_options) const {
+  return request("PATCH", path, &body, nullptr, request_options);
+}
 
-  httplib::Client cli(scheme + "://" + host);
-  configure_client(cli);
-
-  auto res = cli.Delete(path, hdrs);
-  if (!res) {
-    throw SignalWireRestTransportError("Connection failed", path, "DELETE");
-  }
-  return handle_response(res->status, res->body, path, "DELETE");
+json HttpClient::del(const std::string& path, const RequestOptions& request_options) const {
+  return request("DELETE", path, nullptr, nullptr, request_options);
 }
 
 // ============================================================================

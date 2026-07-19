@@ -9,6 +9,7 @@
 
 #include "signalwire/rest/http_client.hpp"
 #include "signalwire/rest/namespaces/generated/ResourceTree.hpp"
+#include "signalwire/rest/request_options.hpp"
 
 namespace signalwire {
 namespace rest {
@@ -28,7 +29,8 @@ using json = nlohmann::json;
 /// re-exports every namespace / flat resource as a stable accessor.
 class RestClient {
  public:
-  RestClient(const std::string& space, const std::string& project_id, const std::string& token);
+  RestClient(const std::string& space, const std::string& project_id, const std::string& token,
+             const RequestOptions& request_options = {});
 
   /// Initialize from environment variables
   [[nodiscard]] static RestClient from_env();
@@ -40,7 +42,8 @@ class RestClient {
   /// production path.
   [[nodiscard]] static RestClient with_base_url(const std::string& base_url,
                                                 const std::string& project_id,
-                                                const std::string& token);
+                                                const std::string& token,
+                                                const RequestOptions& request_options = {});
 
   /// Project ID accessor (read-only).
   const std::string& project_id() const { return project_id_; }

@@ -8,10 +8,10 @@ namespace signalwire {
 namespace rest {
 
 RestClient::RestClient(const std::string& space, const std::string& project_id,
-                       const std::string& token)
+                       const std::string& token, const RequestOptions& request_options)
     : project_id_(project_id) {
   std::string base_url = "https://" + space;
-  client_ = std::make_unique<HttpClient>(base_url, project_id, token);
+  client_ = std::make_unique<HttpClient>(base_url, project_id, token, request_options);
   init_tree();
 }
 
@@ -29,12 +29,13 @@ RestClient RestClient::from_env() {
 }
 
 RestClient RestClient::with_base_url(const std::string& base_url, const std::string& project_id,
-                                     const std::string& token) {
+                                     const std::string& token,
+                                     const RequestOptions& request_options) {
   // Default-construct a placeholder, then re-wire with the pre-built
   // base URL. We deliberately don't add a public ctor that takes a
   // base URL — production callers should use the space form.
   RestClient rc("placeholder", project_id, token);
-  rc.client_ = std::make_unique<HttpClient>(base_url, project_id, token);
+  rc.client_ = std::make_unique<HttpClient>(base_url, project_id, token, request_options);
   rc.project_id_ = project_id;
   rc.init_tree();
   return rc;

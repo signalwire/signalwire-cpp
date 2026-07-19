@@ -94,6 +94,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_prefabs.cpp"
 #include "test_server.cpp"
 #include "test_rest.cpp"
+#include "test_request_options.cpp"
 #include "test_relay.cpp"
 
 // Utils

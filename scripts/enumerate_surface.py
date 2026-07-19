@@ -239,6 +239,14 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # C++ uses ``XxxNamespace`` for all REST namespaces; Python uses
     # ``XxxResource`` for single-resource namespaces and ``XxxNamespace``
     # for multi-resource ones. Map the single-resource cases.
+    # RequestOptions lives in signalwire::rest; the oracle records it in the
+    # private module signalwire.rest._request_options. Route it there (the native
+    # namespace translation would drop the leading underscore). Only merge() is a
+    # method — the value struct's data fields (timeout/retries/…) are not surface
+    # symbols, exactly as the Python dataclass fields aren't (go/ts/ruby/java match).
+    ("signalwire::rest", "RequestOptions"): (
+        "signalwire.rest._request_options", "RequestOptions",
+    ),
     ("signalwire::rest", "AddressesNamespace"): (
         "signalwire.rest.namespaces.addresses", "AddressesResource",
     ),

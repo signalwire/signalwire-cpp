@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 880d5b5dea856ba3e08ac80c446d5137d3b1d3a4",
+  "generated_from": "signalwire-cpp @ f0263ad8e7f19ba17495670b6700443715a92b97",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1765,6 +1765,14 @@
           "next",
           "params",
           "path"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.rest._request_options": {
+      "classes": {
+        "RequestOptions": [
+          "merge"
         ]
       },
       "functions": []

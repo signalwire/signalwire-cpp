@@ -596,9 +596,10 @@ run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comm
 # Part-5 merge race dropped exactly such a line here (the strict_mocks_gate body,
 # round-4 nightly exit 127); if a future merge drops one again, this gate reds
 # instead of shipping a green-but-vacuous strict lane.
-# GUARDED: check_wired_modes.py ships on the porting-sdk plan branch; until that
-# merges to porting-sdk main (which CI clones), skip-with-pass rather than red on a
-# not-yet-landed sibling script. Remove the guard once it's on porting-sdk main.
+# GUARDED: check_wired_modes.py ships on the porting-sdk plan branch. CI pins that
+# branch (workflows: `ref: plan/a-bar-2026-07-18`), so CI takes the real path; the
+# skip-with-pass guard only covers a local sibling still on a pre-plan main.
+# Remove the guard once the engine is on porting-sdk main.
 wired_modes_gate() {
     if [ -f "$PORTING_SDK_DIR/scripts/check_wired_modes.py" ]; then
         python3 "$PORTING_SDK_DIR/scripts/check_wired_modes.py" --port cpp --repo "$PORT_ROOT"

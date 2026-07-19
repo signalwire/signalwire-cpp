@@ -4,50 +4,17 @@ Each entry excuses one proven, human-approved (a) route-split / (b) crud-dup
 finding. Gate: `porting-sdk/scripts/route_collision.py`. Key form:
 `<Class>.<canonical_op>`.
 
-> PENDING RETIREMENT (plan a-bar 2026-07-19): porting-sdk's `route_collision.py` is
-> being made SPEC-AWARE on the plan branch — it recognizes the fabric
-> `call_flow`/`conference_room` SINGULAR address sub-paths as spec-faithful directly
-> from `rest-apis/fabric/openapi.yaml`, making both entries below obsolete. They are
-> KEPT here only because this repo's CI pins porting-sdk `main`, whose route_collision
-> still needs them; retiring them now would red the OLD check. Retire both the moment
-> the spec-aware route_collision.py is on porting-sdk main.
+> RETIRED (plan a-bar 2026-07-19): the two `CallFlows.list_addresses` /
+> `ConferenceRooms.list_addresses` route-split entries this file carried are GONE.
+> porting-sdk's `route_collision.py` is SPEC-AWARE on the plan branch — it recognizes
+> the fabric `call_flow`/`conference_room` SINGULAR address sub-paths as spec-faithful
+> directly from `rest-apis/fabric/openapi.yaml` (DECISIONS RECORD, ROUTE-SPLIT ×4:
+> "fix the check"), so they are no longer findings at all (verified: route-split=0
+> with zero allow entries). This repo's CI pins porting-sdk `plan/a-bar-2026-07-18`
+> (same commit as the retirement), so no lane still runs the old heuristic. If the
+> pin ever reverts to a pre-spec-aware main, the gate reds and the entries come back
+> from git history with re-approval.
 
-## (a) list_addresses singular-path override — the override is the SOLE live route
+## Entries
 
-`CallFlows` and `ConferenceRooms` serve their addresses (and, for call_flows,
-versions) under the SINGULAR sub-path — `/api/fabric/resources/call_flow/{id}/addresses`
-and `/api/fabric/resources/conference_room/{id}/addresses` — while the collection
-itself is the PLURAL `/api/fabric/resources/call_flows` (resp. `/conference_rooms`).
-This is a real platform wire quirk, documented in the authoritative spec:
-
-    porting-sdk/rest-apis/fabric/openapi.yaml:801  "Versions AND addresses live under
-        the SINGULAR call_flow sub-path (a real platform quirk) ... Declaring
-        list_addresses here overrides the FabricResource base method, which would
-        otherwise use the plural collection path."
-    porting-sdk/rest-apis/fabric/openapi.yaml:1074  (same for conference_room)
-
-The Python reference overrides `list_addresses` to this singular path and serves
-exactly ONE route for it. C++ now matches: the generated `CallFlows` /
-`ConferenceRooms` declare `list_addresses` (snake, same name as the base) directly on
-the class, so by C++ name-hiding the inherited `FabricResource::list_addresses`
-(plural path) is UNREACHABLE through a `CallFlows` / `ConferenceRooms` instance. There
-is exactly ONE live route for `list_addresses` on each class: the spec's canonical
-singular path. This is proven by the route-registry capture (the single dispatched
-route is the singular path) and by the wire test in
-`tests/test_rest_mock_fabric.cpp` (asserts the journalled path is
-`/api/fabric/resources/call_flow/cf-1/addresses`, singular).
-
-The gate still flags it because its plural-collection heuristic sees the divergent
-segment; but the surface enumerator now records a single `list_addresses` member and
-there is a single canonical route — the correct (spec/wire) one. This mirrors the
-identical, user-approved exceptions already carried by signalwire-java and
-signalwire-go (both APPROVED by user 2026-07-07).
-
-<!-- HUMAN SIGN-OFF REQUIRED before this gate flips enforcing: the two entries below
-     are a proven-real exception (C++ name-hiding collapses to one live route = the
-     spec's singular path; wire-tested), but per AGENT_RULES §3 an allowlist entry
-     needs explicit written approval. java/go carry the identical entries approved by
-     user 2026-07-07. -->
-
-- CallFlows.list_addresses — spec-declared singular-path override (openapi.yaml:801); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (APPROVED: user 2026-07-07 (same class as go+java) — parity with java/go user-approved 2026-07-07)
-- ConferenceRooms.list_addresses — spec-declared singular-path override (openapi.yaml:1074); C++ name-hiding replaces the base, single live route = canonical singular path (wire-tested). (APPROVED: user 2026-07-07 (same class as go+java) — parity with java/go user-approved 2026-07-07)
+(none)

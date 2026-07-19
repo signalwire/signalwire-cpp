@@ -7,6 +7,7 @@
 #include <string>
 
 #include "signalwire/rest/http_client.hpp"
+#include "signalwire/rest/request_options.hpp"
 
 // Hand-written base hierarchy for the GENERATED REST resource layer
 // (include/signalwire/rest/namespaces/generated/*.hpp). Mirrors Python's
@@ -16,6 +17,11 @@
 // resource class EXTENDS one of these and supplies only its resource-specific
 // operation / command / set_* / sub-collection methods; the shared CRUD verbs
 // live here so the emitted headers stay thin.
+//
+// Every CRUD verb takes a trailing optional RequestOptions so a caller can pass
+// per-request transport options (timeout / retries / abort) that shallow-
+// override the client default. The extra defaulted param adds NO new surface
+// symbol; it simply threads the envelope through to the HTTP verb.
 //
 // These live in ``signalwire::rest::generated``; the generated subclasses
 // resolve the unqualified base name here first.
@@ -46,8 +52,9 @@ class ReadResource : public BaseResource {
   ReadResource(const HttpClient& client, const std::string& base_path)
       : BaseResource(client, base_path) {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
   /// Iterate every item across all pages of this resource's list endpoint.
   ///
@@ -60,8 +67,9 @@ class ReadResource : public BaseResource {
     return PaginatedIterator(client_, base_path_, params, "data");
   }
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 };
 
@@ -73,22 +81,28 @@ class CrudResource : public BaseResource {
                const std::string& update_method = "PATCH")
       : BaseResource(client, base_path), update_method_(update_method) {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
-  [[nodiscard]] json create(const json& data) const { return client_.post(base_path_, data); }
+  [[nodiscard]] json create(const json& data, const RequestOptions& request_options = {}) const {
+    return client_.post(base_path_, data, request_options);
+  }
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
-  [[nodiscard]] json update(const std::string& id, const json& data) const {
-    return (update_method_ == "PUT") ? client_.put(base_path_ + "/" + id, data)
-                                     : client_.patch(base_path_ + "/" + id, data);
+  [[nodiscard]] json update(const std::string& id, const json& data,
+                            const RequestOptions& request_options = {}) const {
+    return (update_method_ == "PUT") ? client_.put(base_path_ + "/" + id, data, request_options)
+                                     : client_.patch(base_path_ + "/" + id, data, request_options);
   }
   /// ``delete_`` — ``delete`` is a C++ keyword; the enumerator renames this to
   /// the canonical ``delete`` (reserved-word rename, wire verb DELETE preserved).
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 
  protected:
@@ -107,8 +121,9 @@ class FabricResource : public CrudResource {
       : CrudResource(client, base_path, update_method) {}
 
   [[nodiscard]] json list_addresses(const std::string& id,
-                                    const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/addresses", params);
+                                    const std::map<std::string, std::string>& params = {},
+                                    const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/addresses", params, request_options);
   }
 };
 

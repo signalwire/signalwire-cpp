@@ -17800,6 +17800,12 @@
                   "name": "data",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17814,6 +17820,12 @@
                   "name": "id",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17834,6 +17846,12 @@
                   "type": "dict<string,string>",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17847,6 +17865,12 @@
                 {
                   "name": "params",
                   "type": "dict<string,string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
                   "required": false,
                   "default": null
                 }
@@ -17868,6 +17892,12 @@
                   "name": "data",
                   "type": "any",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17917,6 +17947,12 @@
                   "type": "dict<string,string>",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17945,6 +17981,12 @@
                   "name": "password",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -17968,6 +18010,12 @@
                   "name": "path",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -17986,6 +18034,12 @@
                 {
                   "name": "params",
                   "type": "dict<string,string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
                   "required": false,
                   "default": null
                 }
@@ -18008,6 +18062,12 @@
                   "type": "any",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -18028,6 +18088,12 @@
                   "type": "any",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -18046,6 +18112,12 @@
                 {
                   "name": "body",
                   "type": "any",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
                   "required": false,
                   "default": null
                 }
@@ -18138,6 +18210,12 @@
                   "type": "dict<string,string>",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "any"
@@ -18151,6 +18229,12 @@
                 {
                   "name": "params",
                   "type": "dict<string,string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
                   "required": false,
                   "default": null
                 }
@@ -18394,6 +18478,37 @@
         }
       }
     },
+    "signalwire.rest._request_options": {
+      "classes": {
+        "RequestOptions": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "merge": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "override_opts",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.rest._request_options.RequestOptions"
+            }
+          }
+        }
+      }
+    },
     "signalwire.rest.client": {
       "classes": {
         "RestClient": {
@@ -18418,6 +18533,12 @@
                   "name": "token",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -18658,6 +18779,12 @@
                   "name": "token",
                   "type": "string",
                   "required": true
+                },
+                {
+                  "name": "request_options",
+                  "type": "class:signalwire.rest._request_options.RequestOptions",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "class:signalwire.rest.client.RestClient"

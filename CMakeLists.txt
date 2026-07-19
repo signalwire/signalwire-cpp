@@ -299,6 +299,14 @@ target_link_libraries(doc_wire_dump signalwire)
 add_executable(wire_relay_dump tools/wire_relay_dump.cpp)
 target_link_libraries(wire_relay_dump signalwire ixwebsocket)
 
+# live_smoke — the 6.5 real-server smoke driver (opt-in, creds-gated: skips
+# cleanly unless SWSDK_LIVE_TESTS=1 + real SIGNALWIRE_* creds are set). Run by
+# .github/workflows/live-smoke.yml nightly; auth + one REST read + one SWML
+# render + one RELAY connect against the REAL platform. Mirrors ruby's
+# scripts/live_smoke.rb. Not installed; a verification program.
+add_executable(live_smoke tools/live_smoke.cpp)
+target_link_libraries(live_smoke signalwire)
+
 # wait_liveness_dump is the WAIT-LIVENESS (§2.4) runner: it drives a live
 # mock_relay via the shared relay_mocktest harness, arms deferred completing
 # events, calls Action::wait(), and emits the liveness classification.

@@ -1,0 +1,119 @@
+name: Multi-OS (nightly)
+
+# 6.4 multi-OS lane: an A-grade cross-platform SDK must be certified on more
+# than ubuntu. This runs the two OS-sensitive suites — TEST (full run_tests
+# against the shared mocks: sockets, TLS, threads, temp files) and
+# PACKAGE-SMOKE (cmake --install into a scratch prefix, compile+link+run a
+# consumer against ONLY the installed artifact) — on macOS on the NIGHTLY tier
+# (runner cost), with a skip-if-unchanged guard.
+#
+# WINDOWS: documented skip, not silent absence. The C++ stack does not build on
+# a Windows runner today for concrete reasons (not a CI toggle):
+#   * every canonical entry point (scripts/run-tests.sh, _env.sh bootstrap,
+#     package_smoke's bash phases) is bash-only;
+#   * the build depends on OpenSSL 3 dev headers + pthreads and the CMake tree
+#     carries no MSVC provisioning (no vcpkg/choco openssl wiring, no
+#     /std:c++20 flags path exercised — the MSVC 16.11 floor in README is a
+#     compiler-capability statement, not a CI-certified platform);
+#   * the ELF/-soname + Apple INSTALL_NAME_DIR install-name logic has no
+#     Windows (import-lib) branch.
+# Making Windows real is a porting work item (owner-visible in PR #45), not a
+# matrix entry that reds every night. When it lands, add `windows-latest` to
+# the matrix below and give package_smoke a cmd/pwsh path.
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  schedule:
+    # Nightly at 07:20 UTC.
+    - cron: '20 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Skip the OS matrix on a scheduled run when the last day had no
+  # code/build-relevant change (docs-only nights don't need macOS runners).
+  changed:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.guard.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: guard
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Any commit in the last 24h touching source/build/test/tooling?
+          since=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
+          if git log --since="$since" --name-only --pretty=format: \
+               | grep -qE '^(src/|include/|tests/|tools/|deps/|scripts/|cmake/|CMakeLists\.txt)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false (docs-only night; skipping OS matrix)"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  os-matrix:
+    needs: changed
+    if: needs.changed.outputs.run == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        # windows-latest intentionally absent — see the header comment.
+        os: [macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout signalwire-cpp
+        uses: actions/checkout@v7
+        with:
+          path: signalwire-cpp
+
+      - name: Checkout porting-sdk alongside (mock servers + package_smoke)
+        uses: actions/checkout@v7
+        with:
+          repository: signalwire/porting-sdk
+          path: porting-sdk
+          # Plan window: depends on porting-sdk plan-branch gate engines. REVERT
+          # to main (drop this ref:) when plan/a-bar-2026-07-18 merges.
+          ref: plan/a-bar-2026-07-18
+          token: ${{ secrets.PORTING_SDK_TOKEN }}
+
+      - name: Set up Python (mock harnesses + package_smoke + clang-format 18)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      - name: Install Python test harnesses (mock_signalwire + mock_relay)
+        run: |
+          pip install -e porting-sdk/test_harness/mock_relay
+          pip install -e porting-sdk/test_harness/mock_signalwire
+
+      # scripts/_env.sh (sourced by run-tests.sh) fails loud unless clang-format
+      # is EXACTLY major 18 — the same pinned pip distribution the ubuntu lane
+      # uses (self-contained binaries on macOS + Linux, zero drift).
+      - name: Install pinned clang-format 18.1.8 (_env.sh version gate)
+        run: pip install "clang-format==18.1.8"
+
+      # macos-latest ships OpenSSL 3 via Homebrew but CMake's FindOpenSSL does
+      # not always resolve it unaided; export the canonical hint.
+      - name: Point CMake at Homebrew OpenSSL 3
+        run: echo "OPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" >> "$GITHUB_ENV"
+
+      # TEST — full build + run_tests against the shared mocks (the
+      # OS-sensitive halves: sockets, TLS, std::thread, temp files, spawn).
+      - name: TEST (build + run_tests against the shared mocks)
+        working-directory: signalwire-cpp
+        run: bash scripts/run-tests.sh
+
+      # PACKAGE-SMOKE — cmake --install into a scratch prefix, then compile,
+      # link, and RUN a consumer against only the installed artifact
+      # (OS-sensitive: install names / dylib loading).
+      - name: PACKAGE-SMOKE (install + consumer compile/link/run)
+        working-directory: signalwire-cpp
+        run: python3 ../porting-sdk/scripts/package_smoke.py --port cpp --repo .

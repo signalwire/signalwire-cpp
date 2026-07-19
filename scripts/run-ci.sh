@@ -422,6 +422,32 @@ lint_gate() {
     bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
+# STRICT-MOCKS (§2.2 / Part 1.4): re-run the RELAY mock suite with mock_relay in
+# STRICT mode (MOCK_RELAY_STRICT=1 → 400s an unknown field / duplicate id instead
+# of tolerantly journaling it) so a wire-shape regression fails loud. cpp's relay
+# tests self-spawn `python -m mock_relay` via fork+execlp which INHERITS this env,
+# so exporting it here reaches the child mock. run_tests was built by the TEST gate;
+# resolve it per BUILD_MODE exactly like the other run_tests invocations.
+# (Round-4 finding: this body was dropped in the strict-mocks × Part-5 merge while
+# the call at the STRICT-MOCKS gate below survived → nightly exit 127. Restored.)
+strict_mocks_gate() {
+    case "$BUILD_MODE" in
+        host)
+            env MOCK_RELAY_STRICT=1 SW_TEST_PARALLEL=1 "$PORT_ROOT/build/run_tests" relay_mock_ ;;
+        exec:*)
+            docker exec -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "${BUILD_MODE#exec:}" \
+                "$SWCPP_CONTAINER_BUILD/run_tests" relay_mock_ ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
+                -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
+                && '$SWCPP_CONTAINER_BUILD/run_tests' relay_mock_" ;;
+        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+}
+
 # --- gate-enforcement quartet (§2.1-2.4) --------------------------------------
 # DOC-WIRE (§2.1): doc_wire.py spawns the mock in FLAG mode, exports
 # MOCK_SIGNALWIRE_PORT, runs the doc_wire_dump binary (built by the TEST gate; it

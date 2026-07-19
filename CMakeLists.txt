@@ -78,16 +78,39 @@ target_compile_definitions(signalwire PUBLIC CPPHTTPLIB_OPENSSL_SUPPORT)
 # on the library (PRIVATE — it's an implementation detail of the .cpp) makes the
 # absolute candidate available wherever the library is linked.
 target_compile_definitions(signalwire PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(signalwire OpenSSL::SSL OpenSSL::Crypto Threads::Threads ixwebsocket)
+include(GNUInstallDirs)  # CMAKE_INSTALL_* used by the INSTALL_INTERFACE below
+# OpenSSL/Threads are PUBLIC: consumers (run_tests, the dump tools, any user
+# binary) instantiate header-only cpp-httplib TLS code in their own TUs (the
+# CPPHTTPLIB_OPENSSL_SUPPORT define above is PUBLIC), so they need the OpenSSL
+# link themselves. The exported package re-finds them via find_dependency() in
+# signalwireConfig.cmake. ixwebsocket is PRIVATE: a static archive absorbed into
+# this SHARED library (only src/relay/websocket.cpp touches its API), so it must
+# NOT leak into the install(EXPORT) interface — a consumer of the installed
+# package has no ixwebsocket target to resolve. The one internal tool that uses
+# IXWebSocket headers directly (wire_relay_dump) links `ixwebsocket` explicitly.
+target_link_libraries(signalwire
+    PUBLIC OpenSSL::SSL OpenSSL::Crypto Threads::Threads
+    PRIVATE ixwebsocket)
 # cpp-httplib >= 0.16 loads the OS trust store natively on Apple platforms
 # (httplib::tls::load_system_certs via SecTrustSettingsCopyCertificates), which
 # needs the CoreFoundation + Security frameworks. PUBLIC so the link propagates
 # to anything that links signalwire (e.g. run_tests / emit_corpus). Harmless on
 # non-Apple hosts (guarded by APPLE).
 if(APPLE)
-    target_link_libraries(signalwire "-framework CoreFoundation" "-framework Security")
+    target_link_libraries(signalwire PUBLIC "-framework CoreFoundation" "-framework Security")
 endif()
-target_include_directories(signalwire PUBLIC ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/deps)
+# BUILD_INTERFACE/INSTALL_INTERFACE split so the target is EXPORTABLE (D9-cpp):
+# install(EXPORT) rejects absolute source-tree include paths; the installed
+# target advertises <prefix>/include instead, where the install() rules below
+# place signalwire/ + nlohmann/json.hpp.
+target_include_directories(signalwire PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+# Namespaced alias so add_subdirectory/FetchContent consumers can use the SAME
+# `signalwire::signalwire` name the installed package exports.
+add_library(signalwire::signalwire ALIAS signalwire)
 # src/ is PRIVATE: internal-only headers (e.g. server/tls_server.hpp, which
 # pulls in httplib.h for SSLServer) live under src/ so they stay out of the
 # public surface AND out of the signature enumerator (which scans include/
@@ -104,7 +127,6 @@ target_include_directories(signalwire PRIVATE ${CMAKE_SOURCE_DIR}/src)
 #          DT_NEEDED is the absolute .so path — ld.so loads it directly without a
 #          DT_RPATH/RUNPATH or LD_LIBRARY_PATH on the consumer side.
 # Uses the absolute libdir so the value is correct regardless of CMAKE_INSTALL_PREFIX.
-include(GNUInstallDirs)
 set_target_properties(signalwire PROPERTIES
     INSTALL_NAME_DIR "${CMAKE_INSTALL_FULL_LIBDIR}")
 if(NOT APPLE AND NOT WIN32)
@@ -123,11 +145,47 @@ endif()
 # intentionally NOT installed; they're build-time verification programs, not part
 # of the package.
 
+# Version header (D9-cpp): generated from cmake/version.hpp.in so the single
+# version source is project(signalwire VERSION ...) above. Emitted into the
+# build tree (NOT include/ — the surface enumerators walk include/ and version
+# macros are not API surface) and installed next to the public headers.
+configure_file(${CMAKE_SOURCE_DIR}/cmake/version.hpp.in
+    ${CMAKE_BINARY_DIR}/generated/include/signalwire/version.hpp @ONLY)
+
 # The library -> <prefix>/lib (libsignalwire.{so,dylib}) / <prefix>/bin on Windows.
-install(TARGETS signalwire
+# EXPORT membership (D9-cpp) makes the installed target consumable via
+# find_package(signalwire) as signalwire::signalwire.
+install(TARGETS signalwire EXPORT signalwireTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# CMake package files (D9-cpp): signalwireTargets.cmake (the exported target) +
+# signalwireConfig.cmake (find_dependency(OpenSSL/Threads) + Targets include) +
+# signalwireConfigVersion.cmake (SameMajorVersion), so
+# `find_package(signalwire CONFIG REQUIRED)` + `target_link_libraries(app
+# signalwire::signalwire)` works against the installed prefix. FetchContent /
+# add_subdirectory consumption is unchanged (same alias in-tree).
+install(EXPORT signalwireTargets
+    NAMESPACE signalwire::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/signalwire)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${CMAKE_SOURCE_DIR}/cmake/signalwireConfig.cmake.in
+    ${CMAKE_BINARY_DIR}/generated/signalwireConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/signalwire)
+write_basic_package_version_file(
+    ${CMAKE_BINARY_DIR}/generated/signalwireConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+install(FILES
+    ${CMAKE_BINARY_DIR}/generated/signalwireConfig.cmake
+    ${CMAKE_BINARY_DIR}/generated/signalwireConfigVersion.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/signalwire)
+
+# The generated version header -> <prefix>/include/signalwire/version.hpp.
+install(FILES ${CMAKE_BINARY_DIR}/generated/include/signalwire/version.hpp
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/signalwire)
 
 # Public headers -> <prefix>/include/signalwire/... (preserves the include tree
 # so `#include <signalwire/rest/rest_client.hpp>` resolves from the install).

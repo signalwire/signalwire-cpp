@@ -1,0 +1,23 @@
+# signalwireConfig.cmake — the find_package(signalwire) entry point (D9-cpp).
+#
+# Installed to <prefix>/lib/cmake/signalwire/ next to signalwireTargets.cmake and
+# signalwireConfigVersion.cmake by the install() rules in the top-level
+# CMakeLists.txt. A consumer does:
+#
+#   find_package(signalwire CONFIG REQUIRED)
+#   target_link_libraries(my_app PRIVATE signalwire::signalwire)
+#
+# FetchContent/add_subdirectory consumption keeps working unchanged (the same
+# signalwire::signalwire alias exists in-tree).
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Public link dependencies of the installed shared library. IXWebSocket is a
+# PRIVATE static dep absorbed into libsignalwire and is NOT re-found here.
+find_dependency(OpenSSL)
+find_dependency(Threads)
+
+include("${CMAKE_CURRENT_LIST_DIR}/signalwireTargets.cmake")
+
+check_required_components(signalwire)

@@ -27,3 +27,5 @@ Format: `- <file> — reason (approver, date)`.
 - ARTIFACT_DENY_ALLOW.md — the artifact-deny gate's allowlist file, lives at root by that gate's convention (orchestrator, 2026-07-06)
 - ROUTE_COLLISION_ALLOW.md — the route-collision gate's allowlist file, read at repo root by porting-sdk route_collision.py by that gate's convention (orchestrator, 2026-07-07)
 - WIRE_VIOLATIONS_ALLOW.md — STRICT-MOCKS signed-exception ledger read by porting-sdk assert_no_wire_violations.py / examples_run.py / snippet_run.py at repo root (mike@signalwire.com, 2026-07-18)
+- WIRED_MODES.md — WIRED-MODES gate manifest declaring the load-bearing run-ci env/mode lines, read by porting-sdk check_wired_modes.py at repo root (plan 1.6/D7, lane-cpp, 2026-07-19)
+- .doc_surface_floor — DOC-SURFACE doxygen-header coverage floor pin, read + ratcheted at repo root by porting-sdk doc_surface.py (plan 6.3, lane-cpp, 2026-07-19)

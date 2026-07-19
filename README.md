@@ -241,6 +241,25 @@ add_executable(my_agent my_agent.cpp)
 target_link_libraries(my_agent signalwire)
 ```
 
+Or install once and consume via `find_package` (the library, public headers,
+`signalwire/version.hpp`, and the CMake package files are installed):
+
+```bash
+cmake -S signalwire-cpp -B signalwire-build
+cmake --build signalwire-build -j
+cmake --install signalwire-build   # add --prefix <dir> for a non-default prefix
+```
+
+```cmake
+find_package(signalwire CONFIG REQUIRED)
+add_executable(my_agent my_agent.cpp)
+target_link_libraries(my_agent signalwire::signalwire)
+```
+
+The same `signalwire::signalwire` namespaced target also exists in the
+`add_subdirectory` / `FetchContent` flows, so consumer code is identical either
+way.
+
 The public headers live under [`include/`](include/) and the vendored
 header-only dependencies (nlohmann/json, cpp-httplib) under [`deps/`](deps/);
 both are added to the `signalwire` target's public include path, so consumers do

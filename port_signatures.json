@@ -18293,6 +18293,12 @@
                   "type": "string",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "headers",
+                  "type": "dict<string,string>",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -18306,7 +18312,25 @@
               ],
               "returns": "string"
             },
+            "headers": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "dict<string,string>"
+            },
             "method": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "request_id": {
               "params": [
                 {
                   "name": "self",

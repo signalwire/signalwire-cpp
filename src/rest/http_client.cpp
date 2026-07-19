@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/rest/http_client.hpp"
 
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <set>
@@ -12,6 +13,54 @@
 
 namespace signalwire {
 namespace rest {
+
+// §6.6 error-observability: the ctor + helpers live here (not inline in the
+// header) so the error carries headers/request_id while the header stays a
+// plain declaration surface.
+SignalWireRestError::SignalWireRestError(int status, const std::string& message,
+                                         const std::string& body, const std::string& url,
+                                         const std::string& method,
+                                         const std::map<std::string, std::string>& headers)
+    : std::runtime_error(with_request_id(message, extract_request_id(headers))),
+      status_(status),
+      body_(body),
+      url_(url),
+      method_(method),
+      headers_(headers),
+      request_id_(extract_request_id(headers)) {}
+
+std::string SignalWireRestError::extract_request_id(
+    const std::map<std::string, std::string>& headers) {
+  // Header names SignalWire (and common proxies) use for the platform request
+  // id, in preference order — matched case-insensitively. Mirrors the Python
+  // reference's _REQUEST_ID_HEADERS.
+  static const char* kNames[] = {"x-request-id", "x-signalwire-request-id", "request-id",
+                                 "x-amzn-requestid"};
+  std::map<std::string, std::string> lowered;
+  for (const auto& [k, v] : headers) {
+    std::string lk = k;
+    for (auto& c : lk) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    lowered.emplace(lk, v);
+  }
+  for (const char* name : kNames) {
+    auto it = lowered.find(name);
+    if (it != lowered.end()) {
+      return it->second;
+    }
+  }
+  return "";
+}
+
+std::string SignalWireRestError::with_request_id(const std::string& message,
+                                                 const std::string& request_id) {
+  if (request_id.empty()) {
+    return message;
+  }
+  // Mirrors python: message += f" (request-id: {id})" when an id is present.
+  return message + " (request-id: " + request_id + ")";
+}
 
 namespace {
 
@@ -154,7 +203,8 @@ std::string HttpClient::build_query_string(const std::map<std::string, std::stri
 }
 
 json HttpClient::handle_response(int status, const std::string& body, const std::string& url,
-                                 const std::string& method) const {
+                                 const std::string& method,
+                                 const std::map<std::string, std::string>& headers) const {
   if (status == 204 || body.empty()) {
     return json::object();
   }
@@ -185,7 +235,7 @@ json HttpClient::handle_response(int status, const std::string& body, const std:
     }
   }
 
-  throw SignalWireRestError(status, msg, body, url, method);
+  throw SignalWireRestError(status, msg, body, url, method, headers);
 }
 
 // Helper to extract scheme and host from base_url
@@ -302,7 +352,10 @@ json HttpClient::request(const std::string& method, const std::string& path, con
       // which throws the typed SignalWireRestError.
     }
 
-    return handle_response(res->status, res->body, path_for_error, method);
+    // §6.6 error-observability: carry the response headers into the typed
+    // error so a non-2xx surfaces the platform request id to the caller.
+    std::map<std::string, std::string> response_headers(res->headers.begin(), res->headers.end());
+    return handle_response(res->status, res->body, path_for_error, method, response_headers);
   }
 }
 

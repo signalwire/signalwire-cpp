@@ -74,7 +74,8 @@ int main() {
 }
 ```
 
-Test locally without running a server:
+Exercise it from a second terminal while it runs — no SignalWire platform
+connection needed (`bin/swaig-test` talks to your local agent over HTTP):
 
 ```bash
 bin/swaig-test http://localhost:3000/agent --list-tools
@@ -125,6 +126,8 @@ Real-time call control and messaging over WebSocket. The RELAY client connects t
 ```cpp
 #include <signalwire/relay/client.hpp>
 
+#include <iostream>
+
 using namespace signalwire::relay;
 
 int main() {
@@ -135,7 +138,9 @@ int main() {
         auto action = call.play({
             {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
         });
-        action.wait();
+        if (!action.wait()) {  // false = call ended before playback finished
+            std::cerr << "playback interrupted\n";
+        }
         call.hangup();
     });
 
@@ -178,8 +183,8 @@ int main() {
 }
 ```
 
-- 20 namespaced API surfaces: Fabric (13 resource types), Calling (37 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
-- Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `del()`
+- 22 namespaced API surfaces: Fabric (13 resource types), Calling (37 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
+- Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - JSON dict returns via nlohmann/json -- no wrapper objects
 
 See the **[REST documentation](rest/README.md)** for the full guide, API reference, and examples.
@@ -190,7 +195,7 @@ See the **[REST documentation](rest/README.md)** for the full guide, API referen
 
 ### Prerequisites
 
-- C++20 compiler (GCC 10+, Clang 10+, MSVC 2019 16.10+) — the documented `*Params` designated-initializer idiom is C++20
+- C++20 compiler (GCC 10+, Clang 10+, MSVC 2019 16.11+ with `/std:c++20`) — the documented `*Params` designated-initializer idiom is C++20
 - CMake 3.16+
 - OpenSSL 3.0+ development libraries
 - pthreads
@@ -320,10 +325,10 @@ mkdir build && cd build
 cmake .. && make -j$(nproc)
 ./run_tests
 
-# Run by category via ctest
-ctest -R agent
-ctest -R relay
-ctest -R rest
+# Run a subset (substring filter on test names)
+./run_tests agent
+./run_tests relay
+./run_tests rest
 ```
 
 The test suite contains 1900+ tests covering all components. The full local-and-CI

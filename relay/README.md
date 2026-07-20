@@ -14,6 +14,8 @@ you imperative control over live phone calls and SMS/MMS messaging.
 ```cpp
 #include <signalwire/relay/client.hpp>
 
+#include <iostream>
+
 using namespace signalwire::relay;
 
 int main() {
@@ -24,7 +26,9 @@ int main() {
         auto action = call.play({
             {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
         });
-        action.wait();
+        if (!action.wait()) {  // false = call ended before playback finished
+            std::cerr << "playback interrupted\n";
+        }
         call.hangup();
     });
 

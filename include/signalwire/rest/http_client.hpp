@@ -23,24 +23,48 @@ using json = nlohmann::json;
 ///
 /// Carries the full request/response envelope — HTTP ``status`` code, response
 /// ``body``, the request ``url`` and ``method`` — mirroring Python's
-/// ``SignalWireRestError(status_code, body, url, method)``. Every field is
-/// exposed so a caller catching the error can inspect exactly which request
-/// failed and how.
+/// ``SignalWireRestError(status_code, body, url, method, headers)``. Every
+/// field is exposed so a caller catching the error can inspect exactly which
+/// request failed and how.
+///
+/// §6.6 error-observability: ``headers()`` is the response header map (empty
+/// for a transport error that produced no response) and ``request_id()`` is
+/// the platform request id pulled from those headers — client-side
+/// observability with NO wire-contract change, so a caller can log/correlate
+/// a failure against SignalWire's own request id.
 class SignalWireRestError : public std::runtime_error {
  public:
+  // Defined in src/rest/http_client.cpp.
   SignalWireRestError(int status, const std::string& message, const std::string& body = "",
-                      const std::string& url = "", const std::string& method = "GET")
-      : std::runtime_error(message), status_(status), body_(body), url_(url), method_(method) {}
+                      const std::string& url = "", const std::string& method = "GET",
+                      const std::map<std::string, std::string>& headers = {});
   int status() const { return status_; }
   const std::string& body() const { return body_; }
   const std::string& url() const { return url_; }
   const std::string& method() const { return method_; }
+  /// Response header map as sent by the server. Empty for a transport
+  /// failure that produced no response (``SignalWireRestTransportError``).
+  const std::map<std::string, std::string>& headers() const { return headers_; }
+  /// Platform request id extracted from the response headers — the first of
+  /// ``x-request-id`` / ``x-signalwire-request-id`` / ``request-id`` /
+  /// ``x-amzn-requestid`` present (matched case-insensitively; the same
+  /// preference order as the Python reference). Empty string when absent.
+  const std::string& request_id() const { return request_id_; }
 
  private:
+  // Defined in src/rest/http_client.cpp: first matching request-id header
+  // (case-insensitive, python-reference preference order), else "".
+  static std::string extract_request_id(const std::map<std::string, std::string>& headers);
+  // Defined in src/rest/http_client.cpp: appends the python-mirrored
+  // request-id suffix to the message when an id is present.
+  static std::string with_request_id(const std::string& message, const std::string& request_id);
+
   int status_;
   std::string body_;
   std::string url_;
   std::string method_;
+  std::map<std::string, std::string> headers_;
+  std::string request_id_;
 };
 
 /// Error thrown when a REST request never reached a response — a
@@ -119,7 +143,8 @@ class HttpClient {
                const RequestOptions& per_request) const;
 
   json handle_response(int status, const std::string& body, const std::string& url,
-                       const std::string& method) const;
+                       const std::string& method,
+                       const std::map<std::string, std::string>& headers = {}) const;
   std::string build_query_string(const std::map<std::string, std::string>& params) const;
   void configure_client(httplib::Client& cli, double timeout_seconds) const;
 

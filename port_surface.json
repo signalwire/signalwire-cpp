@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ f0263ad8e7f19ba17495670b6700443715a92b97",
+  "generated_from": "signalwire-cpp @ 264ae919b6d9d8be8a44c5583b9734a77de463f9",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1742,7 +1742,9 @@
         "SignalWireRestError": [
           "__init__",
           "body",
+          "headers",
           "method",
+          "request_id",
           "status",
           "url"
         ],

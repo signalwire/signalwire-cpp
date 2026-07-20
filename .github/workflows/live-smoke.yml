@@ -1,0 +1,54 @@
+name: Live smoke (nightly, opt-in)
+
+# 6.5 real-server smoke lane: the only check that catches mock↔production drift
+# the spec-sourcing pipeline hasn't closed. Opt-in and creds-gated — the live
+# step is guarded on a SIGNALWIRE_TEST_TOKEN secret so it SKIPS cleanly when
+# secrets are absent (forks, un-provisioned repos). Drives auth + one REST read
+# + one SWML render + one RELAY connect against the REAL platform via the
+# tools/live_smoke.cpp binary (which itself no-ops without SWSDK_LIVE_TESTS=1 +
+# real creds).
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  schedule:
+    # Nightly at 07:35 UTC.
+    - cron: '35 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout signalwire-cpp
+        uses: actions/checkout@v7
+
+      - name: Install build deps (cmake + g++ + OpenSSL 3 headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libssl-dev
+
+      - name: Build the live_smoke driver
+        run: |
+          cmake -S . -B build-live -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-live --target live_smoke -j"$(nproc)"
+
+      # Creds-gate: only run the live drive when the secret is present. Absent
+      # secrets → the step is skipped and the job stays green (no false red on
+      # forks / un-provisioned repos).
+      - name: Live smoke against the real platform
+        if: ${{ secrets.SIGNALWIRE_TEST_TOKEN != '' }}
+        env:
+          SWSDK_LIVE_TESTS: '1'
+          SIGNALWIRE_PROJECT_ID: ${{ secrets.SIGNALWIRE_TEST_PROJECT }}
+          SIGNALWIRE_API_TOKEN: ${{ secrets.SIGNALWIRE_TEST_TOKEN }}
+          SIGNALWIRE_SPACE: ${{ secrets.SIGNALWIRE_TEST_SPACE }}
+        run: ./build-live/live_smoke
+
+      - name: No secrets — live smoke skipped
+        if: ${{ secrets.SIGNALWIRE_TEST_TOKEN == '' }}
+        run: echo "SIGNALWIRE_TEST_TOKEN not configured; live smoke skipped (green)."

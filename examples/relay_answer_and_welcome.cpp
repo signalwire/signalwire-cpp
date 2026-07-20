@@ -34,19 +34,25 @@ int main() {
         // Answer the call.
         call.answer();
 
-        // Play a TTS greeting and wait for it to finish.
+        // Play a TTS greeting and wait for it to finish. wait() returns false
+        // if the call ends before playback completes.
         auto action = call.play({
             json{
                 {"type", "tts"},
                 {"params", json{{"text", "Welcome to SignalWire! How can I help you today?"}}},
             }
         });
-        action.wait();
+        if (!action.wait()) {
+            std::cout << "Greeting interrupted (caller hung up early)\n";
+        }
 
-        // Hang up cleanly.
+        // Hang up cleanly. wait_for_ended() returns false on timeout.
         call.hangup();
-        call.wait_for_ended(10000);
-        std::cout << "Call ended\n";
+        if (call.wait_for_ended(10000)) {
+            std::cout << "Call ended\n";
+        } else {
+            std::cout << "Timed out waiting for call end\n";
+        }
     });
 
     std::cout << "Waiting for inbound calls...\n";

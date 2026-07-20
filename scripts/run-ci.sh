@@ -74,6 +74,14 @@ PORT_NAME="signalwire-cpp"
 # baseline commit anchor), so this stays green while fully enforced.
 export SW_WAVE_A_REPORT_ONLY=0
 
+# D3 strict-mocks endgame: the REST mock 400s an unknown key / wrong type instead of
+# tolerantly journaling it. Exported here (not only in a workflow) so local and CI
+# stay in lockstep; cpp's per-test mocktest harness spawns `python -m mock_signalwire`
+# via fork+execlp, which INHERITS this env, so the strict default reaches every
+# REST-suite mock (TEST + REST-COVERAGE lanes). Declared load-bearing in
+# WIRED_MODES.md (the WIRED-MODES guard reds if a merge drops this line).
+export MOCK_SIGNALWIRE_STRICT=1
+
 # Shared tool-environment bootstrap — the SAME _env.sh the canonical
 # run-format.sh / run-lint.sh / run-tests.sh source. It prepends clang-18
 # (llvm@18) to PATH so the FMT gate's clang-format, the LINT gate's clang-tidy
@@ -422,6 +430,32 @@ lint_gate() {
     bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
+# STRICT-MOCKS (§2.2 / Part 1.4): re-run the RELAY mock suite with mock_relay in
+# STRICT mode (MOCK_RELAY_STRICT=1 → 400s an unknown field / duplicate id instead
+# of tolerantly journaling it) so a wire-shape regression fails loud. cpp's relay
+# tests self-spawn `python -m mock_relay` via fork+execlp which INHERITS this env,
+# so exporting it here reaches the child mock. run_tests was built by the TEST gate;
+# resolve it per BUILD_MODE exactly like the other run_tests invocations.
+# (Round-4 finding: this body was dropped in the strict-mocks × Part-5 merge while
+# the call at the STRICT-MOCKS gate below survived → nightly exit 127. Restored.)
+strict_mocks_gate() {
+    case "$BUILD_MODE" in
+        host)
+            env MOCK_RELAY_STRICT=1 SW_TEST_PARALLEL=1 "$PORT_ROOT/build/run_tests" relay_mock_ ;;
+        exec:*)
+            docker exec -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "${BUILD_MODE#exec:}" \
+                "$SWCPP_CONTAINER_BUILD/run_tests" relay_mock_ ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src \
+                -e MOCK_RELAY_STRICT=1 -e SW_TEST_PARALLEL=1 "$img" bash -c "
+                cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release 1>&2 \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests -j\"\$(nproc)\" 1>&2 \
+                && '$SWCPP_CONTAINER_BUILD/run_tests' relay_mock_" ;;
+        *) echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+}
+
 # --- gate-enforcement quartet (§2.1-2.4) --------------------------------------
 # DOC-WIRE (§2.1): doc_wire.py spawns the mock in FLAG mode, exports
 # MOCK_SIGNALWIRE_PORT, runs the doc_wire_dump binary (built by the TEST gate; it
@@ -555,6 +589,56 @@ run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlis
 # PUBLIC-JARGON — no internal porting jargon in public doc comments
 run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comments" \
     python3 "$PORTING_SDK_DIR/scripts/public_jargon.py" --port cpp --repo .
+
+# WIRED-MODES (plan 1.6 / D7): the merge-coherence guard. WIRED_MODES.md lists the
+# load-bearing env/mode lines this run-ci MUST carry (MOCK_RELAY_STRICT=1, the
+# strict_mocks_gate body, the MOCK_SIGNALWIRE_STRICT export). The strict-mocks ×
+# Part-5 merge race dropped exactly such a line here (the strict_mocks_gate body,
+# round-4 nightly exit 127); if a future merge drops one again, this gate reds
+# instead of shipping a green-but-vacuous strict lane.
+# GUARDED: check_wired_modes.py ships on the porting-sdk plan branch. CI pins that
+# branch (workflows: `ref: plan/a-bar-2026-07-18`), so CI takes the real path; the
+# skip-with-pass guard only covers a local sibling still on a pre-plan main.
+# Remove the guard once the engine is on porting-sdk main.
+wired_modes_gate() {
+    if [ -f "$PORTING_SDK_DIR/scripts/check_wired_modes.py" ]; then
+        python3 "$PORTING_SDK_DIR/scripts/check_wired_modes.py" --port cpp --repo "$PORT_ROOT"
+    else
+        echo "[wired-modes] check_wired_modes.py not on porting-sdk main yet — skip-pass (plan-branch dep)"
+    fi
+}
+run_gate "WIRED-MODES" "load-bearing run-ci modes present (WIRED_MODES.md merge-coherence guard)" \
+    wired_modes_gate
+
+# DOC-SURFACE (plan §6.3): doxygen-header coverage floor on the public surface. The
+# floor is pinned in .doc_surface_floor (90.2% today) and ratchets up via
+# --write-floor; report-only at graduation, so a doc regression is visible without
+# failing the run yet (never-regress is enforced once the floor flips blocking).
+# GUARDED like WIRED-MODES: doc_surface.py is a porting-sdk plan-branch dep.
+doc_surface_gate() {
+    if [ -f "$PORTING_SDK_DIR/scripts/doc_surface.py" ]; then
+        python3 "$PORTING_SDK_DIR/scripts/doc_surface.py" --port cpp --repo "$PORT_ROOT" --report-only
+    else
+        echo "[doc-surface] doc_surface.py not on porting-sdk main yet — skip-pass (plan-branch dep)"
+    fi
+}
+run_gate "DOC-SURFACE" "public doc-comment coverage floor (.doc_surface_floor ratchet; report-only)" \
+    doc_surface_gate
+
+# GATE-INVENTORY NOTE (plan §2.16): porting-sdk/GATE_INVENTORY.md is generated by
+# gen_gate_inventory.py from the REFERENCE port's run-ci.sh (typescript — the
+# canonical copy every port mirrors), so the gates in THIS file that are
+# CPP-SPECIFIC do NOT appear in that generated inventory and that is intentional,
+# not drift:
+#   * WIRED-MODES / DOC-SURFACE — cpp carries load-bearing strict-mode exports and
+#     a doxygen-header coverage floor the ts reference does not have (yet).
+#   * BEHAVIORAL-WIRE-RELAY — cpp's hyphen spelling of the RELAY behavioral rule.
+#   * the STRICT-MOCKS line runs via cpp's strict_mocks_gate body (BUILD_MODE
+#     routing: host/exec/run) and MOCK_SIGNALWIRE_STRICT=1 is exported for the
+#     REST lanes (D3) — both declared in WIRED_MODES.md so a merge can't silently
+#     drop them (that exact drop happened in the strict-mocks × Part-5 race).
+#   * cpp runs gates SERIALLY via run_gate, not the DAG gate_scheduler.sh —
+#     tier=nightly maps to run_gate's leading --tier=nightly.
 
 # --- §C1 doc/example execution gates -----------------------------------------
 # SNIPPET-COMPILE (heavy, ~11min) is nightly; DOC-CLI stays per-PR (cheap

@@ -154,6 +154,7 @@ static std::vector<TestCase>& get_tests() {
 
 // REST split test files
 #include "test_rest_calling.cpp"
+#include "test_rest_error_observability.cpp"
 #include "test_rest_fabric.cpp"
 #include "test_rest_namespaces.cpp"
 #include "test_rest_phone_binding.cpp"

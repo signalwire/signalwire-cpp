@@ -38,7 +38,7 @@ jobs:
           path: porting-sdk
           # Plan window: depends on porting-sdk plan-branch gate engines. REVERT
           # to main (drop this ref:) when plan/a-bar-2026-07-18 merges.
-          ref: plan/a-bar-2026-07-18
+          ref: main
           token: ${{ secrets.PORTING_SDK_TOKEN }}
 
       # The EMISSION gate compares this port's to_value() output

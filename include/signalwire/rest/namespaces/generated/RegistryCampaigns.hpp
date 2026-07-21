@@ -40,11 +40,13 @@ class RegistryCampaigns : public BaseResource {
       : BaseResource(client, "/api/relay/rest/registry/beta/campaigns") {}
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
-  [[nodiscard]] json update(const std::string& id, const UpdateParams& p) const {
+  [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     if (p.name.has_value()) {
       body["name"] = *p.name;
@@ -52,20 +54,25 @@ class RegistryCampaigns : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.put(base_path_ + "/" + id, body);
+    return client_.put(base_path_ + "/" + id, body, request_options);
   }
 
   [[nodiscard]] json list_numbers(const std::string& id,
-                                  const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("numbers"), params);
+                                  const std::map<std::string, std::string>& params = {},
+                                  const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("numbers"), params,
+                       request_options);
   }
 
   [[nodiscard]] json list_orders(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("orders"), params);
+                                 const std::map<std::string, std::string>& params = {},
+                                 const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("orders"), params,
+                       request_options);
   }
 
-  [[nodiscard]] json create_order(const std::string& id, const CreateOrderParams& p) const {
+  [[nodiscard]] json create_order(const std::string& id, const CreateOrderParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json body = json::object();
     if (p.phone_numbers.has_value()) {
       body["phone_numbers"] = *p.phone_numbers;
@@ -76,7 +83,7 @@ class RegistryCampaigns : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + id + "/" + std::string("orders"), body);
+    return client_.post(base_path_ + "/" + id + "/" + std::string("orders"), body, request_options);
   }
 };
 

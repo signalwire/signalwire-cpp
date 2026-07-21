@@ -28,22 +28,27 @@ class VideoRoomRecordings : public BaseResource {
   explicit VideoRoomRecordings(const HttpClient& client)
       : BaseResource(client, "/api/video/room_recordings") {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 
   [[nodiscard]] json list_events(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params);
+                                 const std::map<std::string, std::string>& params = {},
+                                 const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params,
+                       request_options);
   }
 };
 

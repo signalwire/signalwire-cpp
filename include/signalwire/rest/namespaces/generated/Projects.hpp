@@ -27,10 +27,11 @@ class Projects : public CrudResource {
  public:
   explicit Projects(const HttpClient& client) : CrudResource(client, "/api/projects", "PATCH") {}
 
-  [[nodiscard]] json rotate_signing_key(const std::string& id) const {
+  [[nodiscard]] json rotate_signing_key(const std::string& id,
+                                        const RequestOptions& request_options = {}) const {
     return client_.post(
         base_path_ + "/" + id + "/" + std::string("signing-key") + "/" + std::string("rotate"),
-        json::object());
+        json::object(), request_options);
   }
 };
 

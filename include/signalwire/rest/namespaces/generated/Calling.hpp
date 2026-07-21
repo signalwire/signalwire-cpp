@@ -255,7 +255,7 @@ class Calling {
 
   static constexpr const char* kBasePath = "/api/calling/calls";
 
-  [[nodiscard]] json dial(const DialParams& p) const {
+  [[nodiscard]] json dial(const DialParams& p, const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["from"] = p.from;
     params["to"] = p.to;
@@ -286,9 +286,10 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("dial", params);
+    return execute("dial", params, std::nullopt, request_options);
   }
-  [[nodiscard]] json update(const UpdateParams& p) const {
+  [[nodiscard]] json update(const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["id"] = p.id;
     if (p.fallback_url.has_value()) {
@@ -309,9 +310,10 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("update", params);
+    return execute("update", params, std::nullopt, request_options);
   }
-  [[nodiscard]] json end(const std::string& call_id, const EndParams& p) const {
+  [[nodiscard]] json end(const std::string& call_id, const EndParams& p,
+                         const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.reason.has_value()) {
       params["reason"] = *p.reason;
@@ -319,9 +321,10 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.end", params, call_id);
+    return execute("calling.end", params, call_id, request_options);
   }
-  [[nodiscard]] json ai_hold(const std::string& call_id, const AiHoldParams& p) const {
+  [[nodiscard]] json ai_hold(const std::string& call_id, const AiHoldParams& p,
+                             const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.timeout.has_value()) {
       params["timeout"] = *p.timeout;
@@ -332,9 +335,10 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.ai_hold", params, call_id);
+    return execute("calling.ai_hold", params, call_id, request_options);
   }
-  [[nodiscard]] json ai_unhold(const std::string& call_id, const AiUnholdParams& p) const {
+  [[nodiscard]] json ai_unhold(const std::string& call_id, const AiUnholdParams& p,
+                               const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.prompt.has_value()) {
       params["prompt"] = *p.prompt;
@@ -342,9 +346,10 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.ai_unhold", params, call_id);
+    return execute("calling.ai_unhold", params, call_id, request_options);
   }
-  [[nodiscard]] json ai_message(const std::string& call_id, const AiMessageParams& p) const {
+  [[nodiscard]] json ai_message(const std::string& call_id, const AiMessageParams& p,
+                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.role.has_value()) {
       params["role"] = *p.role;
@@ -361,19 +366,19 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.ai_message", params, call_id);
+    return execute("calling.ai_message", params, call_id, request_options);
   }
-  [[nodiscard]] json live_transcribe(const std::string& call_id,
-                                     const LiveTranscribeParams& p) const {
+  [[nodiscard]] json live_transcribe(const std::string& call_id, const LiveTranscribeParams& p,
+                                     const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["action"] = p.action;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.live_transcribe", params, call_id);
+    return execute("calling.live_transcribe", params, call_id, request_options);
   }
-  [[nodiscard]] json live_translate(const std::string& call_id,
-                                    const LiveTranslateParams& p) const {
+  [[nodiscard]] json live_translate(const std::string& call_id, const LiveTranslateParams& p,
+                                    const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["action"] = p.action;
     if (p.status_url.has_value()) {
@@ -382,32 +387,36 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.live_translate", params, call_id);
+    return execute("calling.live_translate", params, call_id, request_options);
   }
-  [[nodiscard]] json transfer(const std::string& call_id, const TransferParams& p) const {
+  [[nodiscard]] json transfer(const std::string& call_id, const TransferParams& p,
+                              const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["dest"] = p.dest;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.transfer", params, call_id);
+    return execute("calling.transfer", params, call_id, request_options);
   }
-  [[nodiscard]] json user_event(const std::string& call_id, const UserEventParams& p) const {
+  [[nodiscard]] json user_event(const std::string& call_id, const UserEventParams& p,
+                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["event"] = p.event;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.user_event", params, call_id);
+    return execute("calling.user_event", params, call_id, request_options);
   }
-  [[nodiscard]] json disconnect(const std::string& call_id, const DisconnectParams& p) const {
+  [[nodiscard]] json disconnect(const std::string& call_id, const DisconnectParams& p,
+                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.disconnect", params, call_id);
+    return execute("calling.disconnect", params, call_id, request_options);
   }
-  [[nodiscard]] json play(const std::string& call_id, const PlayParams& p) const {
+  [[nodiscard]] json play(const std::string& call_id, const PlayParams& p,
+                          const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["play"] = p.play;
     if (p.control_id.has_value()) {
@@ -428,42 +437,47 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.play", params, call_id);
+    return execute("calling.play", params, call_id, request_options);
   }
-  [[nodiscard]] json play_pause(const std::string& call_id, const PlayPauseParams& p) const {
+  [[nodiscard]] json play_pause(const std::string& call_id, const PlayPauseParams& p,
+                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.play.pause", params, call_id);
+    return execute("calling.play.pause", params, call_id, request_options);
   }
-  [[nodiscard]] json play_resume(const std::string& call_id, const PlayResumeParams& p) const {
+  [[nodiscard]] json play_resume(const std::string& call_id, const PlayResumeParams& p,
+                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.play.resume", params, call_id);
+    return execute("calling.play.resume", params, call_id, request_options);
   }
-  [[nodiscard]] json play_stop(const std::string& call_id, const PlayStopParams& p) const {
+  [[nodiscard]] json play_stop(const std::string& call_id, const PlayStopParams& p,
+                               const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.play.stop", params, call_id);
+    return execute("calling.play.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json play_volume(const std::string& call_id, const PlayVolumeParams& p) const {
+  [[nodiscard]] json play_volume(const std::string& call_id, const PlayVolumeParams& p,
+                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     params["volume"] = p.volume;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.play.volume", params, call_id);
+    return execute("calling.play.volume", params, call_id, request_options);
   }
-  [[nodiscard]] json record(const std::string& call_id, const RecordParams& p) const {
+  [[nodiscard]] json record(const std::string& call_id, const RecordParams& p,
+                            const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
@@ -477,33 +491,37 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.record", params, call_id);
+    return execute("calling.record", params, call_id, request_options);
   }
-  [[nodiscard]] json record_pause(const std::string& call_id, const RecordPauseParams& p) const {
+  [[nodiscard]] json record_pause(const std::string& call_id, const RecordPauseParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.record.pause", params, call_id);
+    return execute("calling.record.pause", params, call_id, request_options);
   }
-  [[nodiscard]] json record_resume(const std::string& call_id, const RecordResumeParams& p) const {
+  [[nodiscard]] json record_resume(const std::string& call_id, const RecordResumeParams& p,
+                                   const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.record.resume", params, call_id);
+    return execute("calling.record.resume", params, call_id, request_options);
   }
-  [[nodiscard]] json record_stop(const std::string& call_id, const RecordStopParams& p) const {
+  [[nodiscard]] json record_stop(const std::string& call_id, const RecordStopParams& p,
+                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.record.stop", params, call_id);
+    return execute("calling.record.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json collect(const std::string& call_id, const CollectParams& p) const {
+  [[nodiscard]] json collect(const std::string& call_id, const CollectParams& p,
+                             const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
@@ -526,26 +544,29 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.collect", params, call_id);
+    return execute("calling.collect", params, call_id, request_options);
   }
-  [[nodiscard]] json collect_stop(const std::string& call_id, const CollectStopParams& p) const {
+  [[nodiscard]] json collect_stop(const std::string& call_id, const CollectStopParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.collect.stop", params, call_id);
+    return execute("calling.collect.stop", params, call_id, request_options);
   }
   [[nodiscard]] json collect_start_input_timers(const std::string& call_id,
-                                                const CollectStartInputTimersParams& p) const {
+                                                const CollectStartInputTimersParams& p,
+                                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.collect.start_input_timers", params, call_id);
+    return execute("calling.collect.start_input_timers", params, call_id, request_options);
   }
-  [[nodiscard]] json detect(const std::string& call_id, const DetectParams& p) const {
+  [[nodiscard]] json detect(const std::string& call_id, const DetectParams& p,
+                            const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["detect"] = p.detect;
     if (p.control_id.has_value()) {
@@ -557,17 +578,19 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.detect", params, call_id);
+    return execute("calling.detect", params, call_id, request_options);
   }
-  [[nodiscard]] json detect_stop(const std::string& call_id, const DetectStopParams& p) const {
+  [[nodiscard]] json detect_stop(const std::string& call_id, const DetectStopParams& p,
+                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.detect.stop", params, call_id);
+    return execute("calling.detect.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json tap(const std::string& call_id, const TapParams& p) const {
+  [[nodiscard]] json tap(const std::string& call_id, const TapParams& p,
+                         const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["tap"] = p.tap;
     params["device"] = p.device;
@@ -577,17 +600,19 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.tap", params, call_id);
+    return execute("calling.tap", params, call_id, request_options);
   }
-  [[nodiscard]] json tap_stop(const std::string& call_id, const TapStopParams& p) const {
+  [[nodiscard]] json tap_stop(const std::string& call_id, const TapStopParams& p,
+                              const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.tap.stop", params, call_id);
+    return execute("calling.tap.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json stream(const std::string& call_id, const StreamParams& p) const {
+  [[nodiscard]] json stream(const std::string& call_id, const StreamParams& p,
+                            const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["url"] = p.url;
     if (p.control_id.has_value()) {
@@ -608,31 +633,35 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.stream", params, call_id);
+    return execute("calling.stream", params, call_id, request_options);
   }
-  [[nodiscard]] json stream_stop(const std::string& call_id, const StreamStopParams& p) const {
+  [[nodiscard]] json stream_stop(const std::string& call_id, const StreamStopParams& p,
+                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.stream.stop", params, call_id);
+    return execute("calling.stream.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json denoise(const std::string& call_id, const DenoiseParams& p) const {
+  [[nodiscard]] json denoise(const std::string& call_id, const DenoiseParams& p,
+                             const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.denoise", params, call_id);
+    return execute("calling.denoise", params, call_id, request_options);
   }
-  [[nodiscard]] json denoise_stop(const std::string& call_id, const DenoiseStopParams& p) const {
+  [[nodiscard]] json denoise_stop(const std::string& call_id, const DenoiseStopParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.denoise.stop", params, call_id);
+    return execute("calling.denoise.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json transcribe(const std::string& call_id, const TranscribeParams& p) const {
+  [[nodiscard]] json transcribe(const std::string& call_id, const TranscribeParams& p,
+                                const RequestOptions& request_options = {}) const {
     json params = json::object();
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
@@ -643,43 +672,46 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.transcribe", params, call_id);
+    return execute("calling.transcribe", params, call_id, request_options);
   }
-  [[nodiscard]] json transcribe_stop(const std::string& call_id,
-                                     const TranscribeStopParams& p) const {
+  [[nodiscard]] json transcribe_stop(const std::string& call_id, const TranscribeStopParams& p,
+                                     const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.transcribe.stop", params, call_id);
+    return execute("calling.transcribe.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json ai_stop(const std::string& call_id, const AiStopParams& p) const {
+  [[nodiscard]] json ai_stop(const std::string& call_id, const AiStopParams& p,
+                             const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.ai.stop", params, call_id);
+    return execute("calling.ai.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json send_fax_stop(const std::string& call_id, const SendFaxStopParams& p) const {
+  [[nodiscard]] json send_fax_stop(const std::string& call_id, const SendFaxStopParams& p,
+                                   const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.send_fax.stop", params, call_id);
+    return execute("calling.send_fax.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json receive_fax_stop(const std::string& call_id,
-                                      const ReceiveFaxStopParams& p) const {
+  [[nodiscard]] json receive_fax_stop(const std::string& call_id, const ReceiveFaxStopParams& p,
+                                      const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.receive_fax.stop", params, call_id);
+    return execute("calling.receive_fax.stop", params, call_id, request_options);
   }
-  [[nodiscard]] json refer(const std::string& call_id, const ReferParams& p) const {
+  [[nodiscard]] json refer(const std::string& call_id, const ReferParams& p,
+                           const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["device"] = p.device;
     if (p.status_url.has_value()) {
@@ -688,17 +720,18 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
-    return execute("calling.refer", params, call_id);
+    return execute("calling.refer", params, call_id, request_options);
   }
 
  private:
   [[nodiscard]] json execute(const std::string& command, const json& params,
-                             const std::optional<std::string>& call_id = std::nullopt) const {
+                             const std::optional<std::string>& call_id = std::nullopt,
+                             const RequestOptions& request_options = {}) const {
     json body = {{"command", command}, {"params", params}};
     if (call_id.has_value()) {
       body["id"] = *call_id;
     }
-    return http_.post(kBasePath, body);
+    return http_.post(kBasePath, body, request_options);
   }
 
   const HttpClient& http_;

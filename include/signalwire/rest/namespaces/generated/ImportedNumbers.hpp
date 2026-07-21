@@ -35,7 +35,8 @@ class ImportedNumbers : public BaseResource {
   explicit ImportedNumbers(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/imported_phone_numbers") {}
 
-  [[nodiscard]] json create(const CreateParams& p) const {
+  [[nodiscard]] json create(const CreateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["number"] = p.number;
     body["number_type"] = p.number_type;
@@ -45,7 +46,7 @@ class ImportedNumbers : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 };
 

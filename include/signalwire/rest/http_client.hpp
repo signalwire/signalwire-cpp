@@ -169,9 +169,13 @@ class HttpClient {
 /// Python's ``urllib.parse.urlparse + parse_qs``.
 class PaginatedIterator {
  public:
+  /// ``request_options`` (per-request transport envelope: timeout / retries /
+  /// abort) is the reference's trailing param — it is applied to every page
+  /// fetch this iterator performs. Never part of the query/body.
   PaginatedIterator(const HttpClient& http, const std::string& path,
                     const std::map<std::string, std::string>& params = {},
-                    const std::string& data_key = "data");
+                    const std::string& data_key = "data",
+                    const RequestOptions& request_options = {});
 
   /// Returns true if another item can be fetched. Performs HTTP if
   /// the in-memory buffer is exhausted but more pages remain.
@@ -201,6 +205,8 @@ class PaginatedIterator {
   std::string path_;
   std::map<std::string, std::string> params_;
   std::string data_key_;
+  // Per-request transport envelope applied to every page fetch.
+  RequestOptions request_options_;
   std::vector<json> items_;
   size_t index_ = 0;
   bool done_ = false;

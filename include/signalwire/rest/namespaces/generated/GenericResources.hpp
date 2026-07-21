@@ -39,43 +39,51 @@ class GenericResources : public BaseResource {
   explicit GenericResources(const HttpClient& client)
       : BaseResource(client, "/api/fabric/resources") {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 
   [[nodiscard]] json list_addresses(const std::string& id,
-                                    const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params);
+                                    const std::map<std::string, std::string>& params = {},
+                                    const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params,
+                       request_options);
   }
 
-  [[nodiscard]] json assign_phone_route(const std::string& id,
-                                        const AssignPhoneRouteParams& p) const {
+  [[nodiscard]] json assign_phone_route(const std::string& id, const AssignPhoneRouteParams& p,
+                                        const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["phone_route_id"] = p.phone_route_id;
     body["handler"] = p.handler;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + id + "/" + std::string("phone_routes"), body);
+    return client_.post(base_path_ + "/" + id + "/" + std::string("phone_routes"), body,
+                        request_options);
   }
 
   [[nodiscard]] json assign_domain_application(const std::string& id,
-                                               const AssignDomainApplicationParams& p) const {
+                                               const AssignDomainApplicationParams& p,
+                                               const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["domain_application_id"] = p.domain_application_id;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + id + "/" + std::string("domain_applications"), body);
+    return client_.post(base_path_ + "/" + id + "/" + std::string("domain_applications"), body,
+                        request_options);
   }
 };
 

@@ -28,8 +28,9 @@ class RegistryNumbers : public BaseResource {
   explicit RegistryNumbers(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/numbers") {}
 
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 };
 

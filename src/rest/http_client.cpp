@@ -468,8 +468,13 @@ std::map<std::string, std::string> parse_query_string(const std::string& url) {
 
 PaginatedIterator::PaginatedIterator(const HttpClient& http, const std::string& path,
                                      const std::map<std::string, std::string>& params,
-                                     const std::string& data_key)
-    : http_(http), path_(path), params_(params), data_key_(data_key) {}
+                                     const std::string& data_key,
+                                     const RequestOptions& request_options)
+    : http_(http),
+      path_(path),
+      params_(params),
+      data_key_(data_key),
+      request_options_(request_options) {}
 
 bool PaginatedIterator::has_next() {
   while (index_ >= items_.size()) {
@@ -489,7 +494,7 @@ json PaginatedIterator::next() {
 }
 
 void PaginatedIterator::fetch_next() {
-  auto resp = http_.get(path_, params_);
+  auto resp = http_.get(path_, params_, request_options_);
   if (resp.is_object() && resp.contains(data_key_) && resp[data_key_].is_array()) {
     for (const auto& it : resp[data_key_]) {
       items_.push_back(it);

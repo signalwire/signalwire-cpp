@@ -33,21 +33,24 @@ class VideoStreams : public BaseResource {
   explicit VideoStreams(const HttpClient& client) : BaseResource(client, "/api/video/streams") {}
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
-  [[nodiscard]] json update(const std::string& id, const UpdateParams& p) const {
+  [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["url"] = p.url;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.put(base_path_ + "/" + id, body);
+    return client_.put(base_path_ + "/" + id, body, request_options);
   }
 
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 };
 

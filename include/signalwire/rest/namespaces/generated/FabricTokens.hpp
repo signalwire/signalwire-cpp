@@ -65,7 +65,8 @@ class FabricTokens : public BaseResource {
 
   explicit FabricTokens(const HttpClient& client) : BaseResource(client, "/api/fabric") {}
 
-  [[nodiscard]] json create_subscriber_token(const CreateSubscriberTokenParams& p) const {
+  [[nodiscard]] json create_subscriber_token(const CreateSubscriberTokenParams& p,
+                                             const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["reference"] = p.reference;
     if (p.expire_at.has_value()) {
@@ -104,19 +105,22 @@ class FabricTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(std::string("/api/fabric/subscribers/tokens"), body);
+    return client_.post(std::string("/api/fabric/subscribers/tokens"), body, request_options);
   }
 
-  [[nodiscard]] json refresh_subscriber_token(const RefreshSubscriberTokenParams& p) const {
+  [[nodiscard]] json refresh_subscriber_token(const RefreshSubscriberTokenParams& p,
+                                              const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["refresh_token"] = p.refresh_token;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(std::string("/api/fabric/subscribers/tokens/refresh"), body);
+    return client_.post(std::string("/api/fabric/subscribers/tokens/refresh"), body,
+                        request_options);
   }
 
-  [[nodiscard]] json create_invite_token(const CreateInviteTokenParams& p) const {
+  [[nodiscard]] json create_invite_token(const CreateInviteTokenParams& p,
+                                         const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["address_id"] = p.address_id;
     if (p.expires_at.has_value()) {
@@ -125,10 +129,11 @@ class FabricTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(std::string("/api/fabric/subscriber/invites"), body);
+    return client_.post(std::string("/api/fabric/subscriber/invites"), body, request_options);
   }
 
-  [[nodiscard]] json create_guest_token(const CreateGuestTokenParams& p) const {
+  [[nodiscard]] json create_guest_token(const CreateGuestTokenParams& p,
+                                        const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["allowed_addresses"] = p.allowed_addresses;
     if (p.expire_at.has_value()) {
@@ -137,16 +142,17 @@ class FabricTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(std::string("/api/fabric/guests/tokens"), body);
+    return client_.post(std::string("/api/fabric/guests/tokens"), body, request_options);
   }
 
-  [[nodiscard]] json create_embed_token(const CreateEmbedTokenParams& p) const {
+  [[nodiscard]] json create_embed_token(const CreateEmbedTokenParams& p,
+                                        const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["token"] = p.token;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(std::string("/api/fabric/embeds/tokens"), body);
+    return client_.post(std::string("/api/fabric/embeds/tokens"), body, request_options);
   }
 };
 

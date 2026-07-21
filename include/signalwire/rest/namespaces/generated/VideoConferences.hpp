@@ -33,23 +33,29 @@ class VideoConferences : public CrudResource {
   explicit VideoConferences(const HttpClient& client)
       : CrudResource(client, "/api/video/conferences", "PUT") {}
 
-  [[nodiscard]] json list_conference_tokens(
-      const std::string& id, const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("conference_tokens"), params);
+  [[nodiscard]] json list_conference_tokens(const std::string& id,
+                                            const std::map<std::string, std::string>& params = {},
+                                            const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("conference_tokens"), params,
+                       request_options);
   }
 
   [[nodiscard]] json list_streams(const std::string& id,
-                                  const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params);
+                                  const std::map<std::string, std::string>& params = {},
+                                  const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("streams"), params,
+                       request_options);
   }
 
-  [[nodiscard]] json create_stream(const std::string& id, const CreateStreamParams& p) const {
+  [[nodiscard]] json create_stream(const std::string& id, const CreateStreamParams& p,
+                                   const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["url"] = p.url;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + id + "/" + std::string("streams"), body);
+    return client_.post(base_path_ + "/" + id + "/" + std::string("streams"), body,
+                        request_options);
   }
 };
 

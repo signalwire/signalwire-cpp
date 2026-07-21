@@ -50,7 +50,8 @@ class VideoRoomTokens : public BaseResource {
   explicit VideoRoomTokens(const HttpClient& client)
       : BaseResource(client, "/api/video/room_tokens") {}
 
-  [[nodiscard]] json create(const CreateParams& p) const {
+  [[nodiscard]] json create(const CreateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["room_name"] = p.room_name;
     if (p.user_name.has_value()) {
@@ -107,7 +108,7 @@ class VideoRoomTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 };
 

@@ -40,8 +40,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PORT_ROOT = HERE.parent
-PSDK = Path(os.environ["PORTING_SDK_DIR"]).resolve() if os.environ.get("PORTING_SDK_DIR") \
-    else (PORT_ROOT.parent / "porting-sdk").resolve()
+
+
+def _resolve_psdk() -> Path:
+    # Honour PORTING_SDK_DIR, then PORTING_SDK (run-ci / the gen suite export it),
+    # then the adjacent ``<repo>/../porting-sdk``. The PORTING_SDK fallback lets a
+    # WORKTREE run resolve the real checkout (a worktree's parent has no porting-sdk
+    # sibling); real CI uses adjacency, so this only helps local-worktree runs.
+    for var in ("PORTING_SDK_DIR", "PORTING_SDK"):
+        val = os.environ.get(var)
+        if val and (Path(val) / "scripts").is_dir():
+            return Path(val).resolve()
+    return (PORT_ROOT.parent / "porting-sdk").resolve()
+
+
+PSDK = _resolve_psdk()
 if not PSDK.is_dir():
     raise SystemExit(
         f"porting-sdk not found at {PSDK}; clone it adjacent to this repo "

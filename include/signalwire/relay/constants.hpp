@@ -90,5 +90,11 @@ constexpr int MAX_RECONNECT_ATTEMPTS = 50;
 constexpr int DEFAULT_MAX_ACTIVE_CALLS = 1000;
 constexpr int DEFAULT_MAX_CONNECTIONS = 1;
 
+// Per-request response deadline (ms). A JSON-RPC request whose peer never
+// answers throws after this bound instead of hanging (F2.2 black-hole). 30s
+// default preserves the prior fixed behavior; RelayConfig.request_timeout_ms
+// overrides per client.
+constexpr int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
+
 }  // namespace relay
 }  // namespace signalwire

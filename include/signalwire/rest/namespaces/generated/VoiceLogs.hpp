@@ -28,8 +28,10 @@ class VoiceLogs : public ReadResource {
   explicit VoiceLogs(const HttpClient& client) : ReadResource(client, "/api/voice/logs") {}
 
   [[nodiscard]] json list_events(const std::string& id,
-                                 const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params);
+                                 const std::map<std::string, std::string>& params = {},
+                                 const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params,
+                       request_options);
   }
 };
 

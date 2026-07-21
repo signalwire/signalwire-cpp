@@ -612,6 +612,25 @@ def _canon_type(spec: Spec, schema: dict, required: bool) -> str:
     return "dict<string,any>"
 
 
+# The reference (PY-7/PY-9) types a trailing keyword-only ``request_options`` onto
+# EVERY generated REST verb — a per-request transport-options envelope forwarded to
+# the HTTP layer (timeout / retries / abort) and NEVER folded into the wire body.
+# The C++ idiom is a trailing defaulted ``const RequestOptions& request_options = {}``
+# param; the sidecar records it at the reference's position so the cross-language
+# diff aligns (any port-only trailing extra — the ``params`` GET query-door or the
+# write-verb ``kwargs`` forward-compat door — sits AFTER it and is ignored as an
+# optional trailing extra). Kind ``keyword`` matches the reference's keyword-only
+# slot; type is the concrete RequestOptions class (not a bare ``any``).
+_REQUEST_OPTIONS_TYPE = "optional<class:signalwire.rest._request_options.RequestOptions>"
+_RO_SIG = "const RequestOptions& request_options = {}"
+_RO_ARG = "request_options"
+
+
+def _ro_record() -> dict:
+    return {"name": "request_options", "kind": "keyword",
+            "type": _REQUEST_OPTIONS_TYPE, "required": False, "default": None}
+
+
 def _register_sidecar(cls: str, method: str, records: list[dict]) -> None:
     _SIDECAR[(cls, method)] = records
 
@@ -701,6 +720,12 @@ def _params_struct(struct_name: str, fields: list[tuple[str, dict, bool]], spec:
     lines.append("  json extras = json::object();")
     records.append({"name": "extras", "kind": "keyword",
                     "type": "optional<dict<string,any>>", "required": False, "default": None})
+    # request_options is the reference's trailing keyword-only param — record it
+    # BEFORE the port-only ``kwargs`` forward-compat door so it aligns with the
+    # oracle position (kwargs then sits after it as the ignored trailing extra).
+    # The C++ ``request_options`` param itself is a separate method param, not a
+    # struct member, so there is no struct-field / build line for it here.
+    records.append(_ro_record())
     records.append({"name": "kwargs", "kind": "var_keyword", "type": "any",
                     "required": False, "default": {}})
     build.append("    if (!p.extras.is_null()) {")
@@ -772,12 +797,15 @@ def abs_cpp_path(full: str, id_args: list[str]) -> str:
 
 def _verb_call(recv: str, verb: str, path_expr: str, body_arg: str | None,
                query_arg: str | None) -> str:
+    # Every verb forwards ``request_options`` to the HTTP layer as the trailing
+    # arg — the base HttpClient verbs (get/post/put/patch/del) all take it. It is
+    # transport-only: never written into the wire body/query (EMISSION-neutral).
     fn = {"post": "post", "put": "put", "patch": "patch", "get": "get", "delete": "del"}[verb]
     if verb == "get":
-        return f"return {recv}.{fn}({path_expr}, {query_arg});"
+        return f"return {recv}.{fn}({path_expr}, {query_arg}, {_RO_ARG});"
     if verb == "delete":
-        return f"return {recv}.{fn}({path_expr});"
-    return f"return {recv}.{fn}({path_expr}, {body_arg});"
+        return f"return {recv}.{fn}({path_expr}, {_RO_ARG});"
+    return f"return {recv}.{fn}({path_expr}, {body_arg}, {_RO_ARG});"
 
 
 def emit_method(spec: Spec, anchor: str, markup: dict, base: str,
@@ -806,9 +834,11 @@ def emit_method(spec: Spec, anchor: str, markup: dict, base: str,
         if is_object_body(spec, body_schema):
             fields = object_body_fields(spec, body_schema)
             struct_name = f"{snake_to_pascal(name)}Params"
+            # _params_struct already threads request_options into the sidecar
+            # records (before the kwargs door); add the C++ param to the signature.
             struct_src, build, _ = _params_struct(struct_name, fields, spec, cls, name, id_records)
             structs.append(struct_src)
-            sig = ", ".join(id_params + [f"const {struct_name}& p"])
+            sig = ", ".join(id_params + [f"const {struct_name}& p", _RO_SIG])
             lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
             lines.extend("  " + b for b in build)
             lines.append("  " + _verb_call(recv, verb, path_expr, "body", None))
@@ -816,28 +846,32 @@ def emit_method(spec: Spec, anchor: str, markup: dict, base: str,
         else:
             # §5.2 union body → a single positional ``json body`` param.
             _register_sidecar(cls, name, id_records + [
-                {"name": "body", "kind": "positional", "type": "dict<string,any>", "required": True}])
-            sig = ", ".join(id_params + ["const json& body"])
+                {"name": "body", "kind": "positional", "type": "dict<string,any>", "required": True},
+                _ro_record()])
+            sig = ", ".join(id_params + ["const json& body", _RO_SIG])
             lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
             lines.append("  " + _verb_call(recv, verb, path_expr, "body", None))
             lines.append("  }")
     elif write_verb:
-        _register_sidecar(cls, name, list(id_records))
-        sig = ", ".join(id_params)
+        _register_sidecar(cls, name, id_records + [_ro_record()])
+        sig = ", ".join(id_params + [_RO_SIG])
         lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
         lines.append("  " + _verb_call(recv, verb, path_expr, "json::object()", None))
         lines.append("  }")
     elif verb == "get":
-        # §5.3 GET query door — a trailing var_keyword ``params`` map.
+        # §5.3 GET query door — a trailing var_keyword ``params`` map. request_options
+        # records at the reference position (before ``params``); the C++ signature
+        # keeps the ergonomic order (params then request_options, both defaulted).
         _register_sidecar(cls, name, id_records + [
+            _ro_record(),
             {"name": "params", "kind": "var_keyword", "type": "any", "required": False, "default": {}}])
-        sig = ", ".join(id_params + ["const std::map<std::string, std::string>& params = {}"])
+        sig = ", ".join(id_params + ["const std::map<std::string, std::string>& params = {}", _RO_SIG])
         lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
         lines.append("  " + _verb_call(recv, verb, path_expr, None, "params"))
         lines.append("  }")
     else:  # delete
-        _register_sidecar(cls, name, list(id_records))
-        sig = ", ".join(id_params)
+        _register_sidecar(cls, name, id_records + [_ro_record()])
+        sig = ", ".join(id_params + [_RO_SIG])
         lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
         lines.append("  " + _verb_call(recv, verb, path_expr, None, None))
         lines.append("  }")
@@ -926,6 +960,9 @@ def emit_set_method(spec: Spec, markup: dict, sm_name: str, sm: dict,
         records.append({"name": arg_name, "kind": "positional",
                         "type": _canon_type(spec, field_schemas.get(field, {}), required),
                         "required": required})
+    # request_options at the reference position (before the port-only ``extra``
+    # var_keyword door, which then sits after it as the ignored trailing extra).
+    records.append(_ro_record())
     records.append({"name": "extra", "kind": "var_keyword", "type": "any",
                     "required": False, "default": {}})
     _register_sidecar(cls, name, records)
@@ -950,9 +987,10 @@ def emit_set_method(spec: Spec, markup: dict, sm_name: str, sm: dict,
     build.append("    if (!p.extra.is_null()) { body.update(p.extra); }")
     structs.append("\n".join(slines))
 
-    lines = [f"  [[nodiscard]] json {name}(const std::string& resource_id, const {struct_name}& p) const {{"]
+    lines = [f"  [[nodiscard]] json {name}(const std::string& resource_id, const {struct_name}& p, "
+             f"{_RO_SIG}) const {{"]
     lines.extend("  " + b for b in build)
-    lines.append("    return update(resource_id, body);")
+    lines.append(f"    return update(resource_id, body, {_RO_ARG});")
     lines.append("  }")
     return structs, lines
 
@@ -1009,6 +1047,10 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
         build.append("    if (!p.extras.is_null()) { params.update(p.extras); }")
         records.append({"name": "extras", "kind": "keyword",
                         "type": "optional<dict<string,any>>", "required": False, "default": None})
+        # request_options is the reference's trailing keyword-only command param —
+        # forwarded to the POST via execute(), never merged into the {command,params}
+        # wire body.
+        records.append(_ro_record())
         _register_sidecar(name, mname, records)
         structs.append("\n".join(slines))
 
@@ -1016,14 +1058,14 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
         # No ``= {}`` default: a nested struct with a default member initializer
         # cannot be a default argument inside the enclosing class definition
         # (C++ rule). Callers pass ``{}`` explicitly for the all-optional commands.
-        sig = ", ".join(id_param + [f"const {struct_name}& p"])
+        sig = ", ".join(id_param + [f"const {struct_name}& p", _RO_SIG])
         call_arg = "call_id" if with_id else "std::nullopt"
         methods.append(f"  [[nodiscard]] json {mname}({sig}) const {{")
         methods.extend("  " + b for b in build)
         if with_id:
-            methods.append(f"    return execute({cpp_str(cmd)}, params, call_id);")
+            methods.append(f"    return execute({cpp_str(cmd)}, params, call_id, {_RO_ARG});")
         else:
-            methods.append(f"    return execute({cpp_str(cmd)}, params);")
+            methods.append(f"    return execute({cpp_str(cmd)}, params, std::nullopt, {_RO_ARG});")
         methods.append("  }")
 
     lines = []
@@ -1047,10 +1089,11 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
     lines.append("")
     lines.append(" private:")
     lines.append("  [[nodiscard]] json execute(const std::string& command, const json& params, "
-                 "const std::optional<std::string>& call_id = std::nullopt) const {")
+                 "const std::optional<std::string>& call_id = std::nullopt, "
+                 "const RequestOptions& request_options = {}) const {")
     lines.append("    json body = {{\"command\", command}, {\"params\", params}};")
     lines.append("    if (call_id.has_value()) { body[\"id\"] = *call_id; }")
-    lines.append("    return http_.post(kBasePath, body);")
+    lines.append("    return http_.post(kBasePath, body, request_options);")
     lines.append("  }")
     lines.append("")
     lines.append("  const HttpClient& http_;")
@@ -1153,27 +1196,35 @@ def emit_resource(spec: Spec, anchor: str, markup: dict) -> str:
         "CrudResource": ("create", "update", "delete"),
     }
 
+    # Every inherited base verb also carries the reference's trailing keyword-only
+    # ``request_options`` (PY-7/PY-9). It records at the reference's position — right
+    # after the verb's real params — so the port-only query/body extras (``params``
+    # var_keyword door, the loose ``body``) sit AFTER it as ignored trailing extras.
+    _params_door = {"name": "params", "kind": "var_keyword", "type": "any",
+                    "required": False, "default": {}}
+
     def _verb_records(verb: str) -> list[dict]:
         if verb == "list":
-            return [{"name": "params", "kind": "var_keyword", "type": "any",
-                     "required": False, "default": {}}]
+            return [_ro_record(), dict(_params_door)]
         if verb == "paginate":
-            # ``paginate(**params) -> PaginatedIterator`` (inherited from
-            # ReadResource): same var-keyword params shape as ``list``; the
-            # ``any`` return reconciles with the oracle's PaginatedIterator class.
-            return [{"name": "params", "kind": "var_keyword", "type": "any",
-                     "required": False, "default": {}}]
+            # ``paginate(*, request_options=None, **params) -> PaginatedIterator``
+            # (inherited from ReadResource): request_options then the var-keyword
+            # params door; the ``any`` return reconciles with the oracle's
+            # PaginatedIterator class.
+            return [_ro_record(), dict(_params_door)]
         if verb == "get":
             return [{"name": "id", "kind": "positional", "type": "string", "required": True},
-                    {"name": "params", "kind": "var_keyword", "type": "any",
-                     "required": False, "default": {}}]
+                    _ro_record(), dict(_params_door)]
         if verb == "delete":
-            return [{"name": "id", "kind": "positional", "type": "string", "required": True}]
+            return [{"name": "id", "kind": "positional", "type": "string", "required": True},
+                    _ro_record()]
         if verb == "create":
-            return [{"name": "body", "kind": "positional", "type": "dict<string,any>",
+            return [_ro_record(),
+                    {"name": "body", "kind": "positional", "type": "dict<string,any>",
                      "required": True}]
         # update
         return [{"name": "id", "kind": "positional", "type": "string", "required": True},
+                _ro_record(),
                 {"name": "body", "kind": "positional", "type": "dict<string,any>",
                  "required": True}]
 

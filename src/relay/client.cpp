@@ -67,25 +67,15 @@ RelayClient RelayClient::from_env() {
   return RelayClient(cfg);
 }
 
-bool RelayClient::connect() {
-  if (connected_.load()) {
-    return true;
-  }
-
-  ws_ = std::make_unique<WebSocketClient>();
-
-  ws_->on_message([this](const std::string& msg) { on_ws_message(msg); });
-
-  ws_->on_close([this](int code, const std::string& reason) { on_ws_close(code, reason); });
-
-  ws_->on_error([](const std::string& err) { get_logger().error("WebSocket error: " + err); });
-
-  // Determine TLS vs plain TCP. Production always uses TLS (wss://);
-  // the audit fixture and dev servers use plain TCP. Switch on
-  // SIGNALWIRE_RELAY_SCHEME env var (set by audit_relay_handshake.py).
-  // Also accept "127.0.0.1[:NNN]" / "localhost[:NNN]" host forms,
-  // splitting an embedded port off so we drive WebSocketClient::connect_plain
-  // with the right components.
+// Open the underlying WebSocket to config_.host, honoring the SIGNALWIRE_RELAY_
+// SCHEME override (ws:// for the audit fixture / dev servers; wss:// otherwise)
+// and splitting an embedded ":port" off the host. SHARED by connect() AND
+// reconnect() — previously reconnect() open-coded a bare ws_->connect(host,port)
+// that ignored the scheme (always TLS) and passed the host WITH its embedded
+// port, producing a malformed "wss://127.0.0.1:52993:443/" URL that could never
+// reconnect against a plain-ws peer (F3 reconnect defect the RELAY-LIVENESS
+// suite catches). Requires ws_ to already be constructed with its callbacks set.
+bool RelayClient::open_ws_transport() {
   std::string scheme;
   if (const char* s = std::getenv("SIGNALWIRE_RELAY_SCHEME")) {
     scheme = s;
@@ -102,14 +92,43 @@ bool RelayClient::connect() {
     }
     host = host.substr(0, colon);
   }
-
-  bool ok = false;
   if (scheme == "ws" || scheme == "ws://") {
-    ok = ws_->connect_plain(host, port);
-  } else {
-    ok = ws_->connect(host, port);
+    return ws_->connect_plain(host, port);
   }
-  if (!ok) {
+  return ws_->connect(host, port);
+}
+
+bool RelayClient::connect() {
+  if (connected_.load()) {
+    return true;
+  }
+
+  // A6 credential contract (CPP-5): fail fast PRE-CONNECT with a PER-VARIABLE
+  // actionable error naming exactly which credential is missing and the env var
+  // that supplies it — before any socket work. A combined "project and token"
+  // message misleads when only one is absent; and a silent connect() = false on
+  // empty creds is the "silent exit-0" footgun run() then hides. Throwing (like
+  // Python's ValueError) makes the missing-cred case impossible to ignore.
+  if (config_.project.empty()) {
+    throw std::invalid_argument(
+        "project is required. Pass project=... to RelayClient(...) or set the "
+        "SIGNALWIRE_PROJECT_ID env var.");
+  }
+  if (config_.token.empty()) {
+    throw std::invalid_argument(
+        "token is required. Pass token=... to RelayClient(...) or set the "
+        "SIGNALWIRE_API_TOKEN env var.");
+  }
+
+  ws_ = std::make_unique<WebSocketClient>();
+
+  ws_->on_message([this](const std::string& msg) { on_ws_message(msg); });
+
+  ws_->on_close([this](int code, const std::string& reason) { on_ws_close(code, reason); });
+
+  ws_->on_error([](const std::string& err) { get_logger().error("WebSocket error: " + err); });
+
+  if (!open_ws_transport()) {
     get_logger().error("Failed to connect WebSocket to " + config_.host);
     return false;
   }
@@ -244,8 +263,12 @@ json RelayClient::send_request(const std::string& method, const json& params) {
     throw std::runtime_error("Failed to send WebSocket message");
   }
 
-  // Wait for response with timeout (30 seconds)
-  auto status = future.wait_for(std::chrono::seconds(30));
+  // Wait for response with a BOUNDED timeout. Configurable via
+  // RelayConfig.request_timeout_ms (default 30s) so a black-hole peer (accepts
+  // the request, never answers) errors within a caller-chosen deadline instead
+  // of hanging — the F2.2 bounded-error contract. A request that outlives the
+  // deadline throws (never a silent unbounded hang).
+  auto status = future.wait_for(std::chrono::milliseconds(config_.request_timeout_ms));
   {
     std::lock_guard<std::mutex> lock(pending_mutex_);
     pending_requests_.erase(id);
@@ -275,7 +298,28 @@ json RelayClient::execute(const std::string& method, const json& params) {
   // connect-handshake field, and project identity is carried by the session /
   // the token, not re-sent per RPC. Injecting them here polluted every frame
   // with phantom keys the wire spec (and the reference) doesn't carry.
-  return send_request(method, params);
+  json result = send_request(method, params);
+
+  // A2 relay-contract (CPP-3): a non-2xx server result code is a real failure
+  // the caller MUST see — RAISE it as a RelayError, mirroring python's
+  // relay.client.execute (which raises RelayError on a coded error). The
+  // "call gone" 404/410 swallow is applied one layer up (Call::_execute), so
+  // execute() raises for EVERY non-2xx (incl. 404/410) and Call decides which
+  // to swallow. Previously a 500 was returned as an ordinary result and the
+  // verb silently resolved to an "error" state — the silent-success footgun.
+  if (result.is_object() && result.contains("code")) {
+    std::string code = result.value("code", "");
+    if (!code.empty() && code[0] != '2') {
+      int code_num = 0;
+      try {
+        code_num = std::stoi(code);
+      } catch (...) {
+        code_num = -1;
+      }
+      throw RelayError(code_num, result.value("message", "RELAY error"));
+    }
+  }
+  return result;
 }
 
 void RelayClient::on_ws_message(const std::string& message) {
@@ -836,7 +880,7 @@ bool RelayClient::reconnect() {
     ws_->on_close([this](int code, const std::string& reason) { on_ws_close(code, reason); });
     ws_->on_error([](const std::string& err) { get_logger().error("WebSocket error: " + err); });
 
-    if (ws_->connect(config_.host, config_.port)) {
+    if (open_ws_transport()) {
       if (authenticate()) {
         connected_.store(true);
         reconnect_delay_ms_ = RECONNECT_BASE_DELAY_MS;

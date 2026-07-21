@@ -40,6 +40,19 @@ export SWML_BASIC_AUTH_PASSWORD=mysecurepassword
 | `SWML_DOMAIN` | - | Domain name for SSL (used for URL generation) |
 | `SWML_SSL_VERIFY_MODE` | `CERT_REQUIRED` | SSL verification mode |
 
+### Client TLS trust bundles (REST / RELAY)
+
+The SDK's outbound HTTPS (REST) and secure WebSocket (RELAY) clients verify the
+server certificate against the OS trust store by default. To trust a private or
+self-signed CA, point the transport at a PEM bundle. Certificate verification is
+**never disabled** — these vars only *add* a trust root.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SIGNALWIRE_REST_CA_FILE` | *system trust store* | Path to a PEM CA bundle the REST HTTP client trusts for `https://` API calls. `SSL_CERT_FILE` is a secondary fallback. |
+| `SIGNALWIRE_RELAY_CA_FILE` | *system trust store* | Path to a PEM CA bundle the RELAY WebSocket client trusts for `wss://` connections. `SSL_CERT_FILE` is a secondary fallback. |
+| `SIGNALWIRE_RELAY_PING_INTERVAL_SECS` | `30` | RELAY WebSocket ping-heartbeat interval (seconds). The client pings the peer at this interval and, absent a pong, closes the socket so a half-open peer is detected and reconnection kicks in. A value ≤ 0 or malformed is ignored (keeps the default). |
+
 ### Authentication
 
 | Variable | Default | Description |

@@ -206,6 +206,81 @@ TEST(request_options_post_503_retried) {
 }
 
 // ---------------------------------------------------------------------------
+// Generated per-verb request_options threading (PY-7/PY-9 adoption).
+//
+// The reference types a trailing keyword-only ``request_options`` onto EVERY
+// generated REST verb, forwarded to the HTTP layer and NEVER folded into the
+// wire body. These two tests exercise the GENERATED method
+// (``addresses().create``) — not the raw ``http_client()`` — to prove the
+// generator threads request_options end-to-end.
+// ---------------------------------------------------------------------------
+
+// Positive: a generated create verb that receives request_options with a retry
+// budget retries an armed 503 THROUGH the generated method into the default
+// success — proving request_options reaches the transport layer via the verb.
+TEST(request_options_generated_verb_forwards_to_http) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set(kCreateEndpoint, 503,
+                         json{{"errors", json::array({{{"code", "UNAVAILABLE"},
+                                                       {"message", "throttled"}}})}});
+
+  RequestOptions ro;
+  ro.retries = 1;      // 503 is retryable even for POST (throttle)
+  ro.retry_backoff = 0;
+
+  bool threw = false;
+  try {
+    auto body = client.addresses().create(
+        {.country = "US", .first_name = "Grace", .last_name = "Hopper",
+         .address_type = "commercial"},
+        ro);
+    ASSERT_TRUE(body.is_object());
+  } catch (const SignalWireRestError&) {
+    threw = true;
+  }
+  ASSERT_FALSE(threw);
+  // Two hits == the armed 503 was retried into the 200: the generated verb DID
+  // forward request_options to the HTTP layer.
+  ASSERT_EQ(journal_count_for(kCreatePath), 2);
+  return true;
+}
+
+// Negative (wire-body purity / EMISSION): request_options is transport-only. A
+// generated verb given a fully-populated request_options must emit a wire body
+// carrying ONLY the domain fields — none of request_options' knobs
+// (timeout / retries / retry_backoff / retry_on_status / abort_signal) may leak
+// into the request body.
+TEST(request_options_not_folded_into_wire_body) {
+  auto client = mocktest::make_client();
+
+  RequestOptions ro;
+  ro.timeout = 5.0;
+  ro.retries = 3;
+  ro.retry_backoff = 0.25;
+  ro.retry_on_status = std::set<int>{429, 503};
+
+  auto body = client.addresses().create(
+      {.country = "US", .first_name = "Ada", .last_name = "Lovelace",
+       .address_type = "commercial"},
+      ro);
+  ASSERT_TRUE(body.is_object());
+
+  auto j = mocktest::journal_last();
+  ASSERT_EQ(j.method, std::string("POST"));
+  ASSERT_EQ(j.path, kCreatePath);
+  ASSERT_TRUE(j.body.is_object());
+  // Domain fields present…
+  ASSERT_EQ(j.body.value("address_type", std::string()), std::string("commercial"));
+  ASSERT_EQ(j.body.value("first_name", std::string()), std::string("Ada"));
+  // …and NONE of the request_options knobs leaked into the wire body.
+  for (const char* k : {"timeout", "retries", "retry_backoff", "retry_on_status",
+                        "abort_signal", "request_options"}) {
+    ASSERT_FALSE(j.body.contains(k));
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // abort_signal already set => the request raises the TYPED transport error
 // (status 0) BEFORE anything reaches the mock (journal count == 0).
 // ---------------------------------------------------------------------------

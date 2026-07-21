@@ -29,8 +29,9 @@ class RegistryOrders : public BaseResource {
       : BaseResource(client, "/api/relay/rest/registry/beta/orders") {}
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 };
 

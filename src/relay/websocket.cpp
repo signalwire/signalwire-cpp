@@ -44,6 +44,11 @@ void ensure_net_system() {
 // How long connect() blocks waiting for the WebSocket to open before giving up.
 constexpr int kConnectTimeoutSecs = 15;
 
+// Default WS ping heartbeat interval (seconds). A half-open peer is detected
+// within ~1 interval (no pong -> socket closed). Overridable per-process via
+// SIGNALWIRE_RELAY_PING_INTERVAL_SECS.
+constexpr int kDefaultPingIntervalSecs = 30;
+
 }  // namespace
 
 WebSocketClient::WebSocketClient() { ensure_net_system(); }
@@ -75,17 +80,55 @@ bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) 
   ws_->disableAutomaticReconnection();
   ws_->setHandshakeTimeout(kConnectTimeoutSecs);
 
+  // Ping heartbeat (F2.1 dead-peer). Without a ping interval a half-open peer
+  // (stops responding, sends no FIN) is NEVER detected — the socket looks alive
+  // forever and any wait hangs. IXWebSocket sends a WS ping every interval and,
+  // absent a pong, closes the socket (firing on_close -> RelayClient::reconnect).
+  // Default kDefaultPingIntervalSecs in production; overridable via
+  // SIGNALWIRE_RELAY_PING_INTERVAL_SECS (the liveness dump uses a short one so a
+  // dead peer is detected inside the bounded test window).
+  int ping_secs = kDefaultPingIntervalSecs;
+  if (const char* pv = std::getenv("SIGNALWIRE_RELAY_PING_INTERVAL_SECS")) {
+    if (pv && *pv) {
+      try {
+        int parsed = std::stoi(pv);
+        if (parsed > 0) {
+          ping_secs = parsed;
+        }
+      } catch (const std::exception& e) {
+        // A malformed override is non-fatal: keep the default and log it.
+        get_logger().debug(std::string("Invalid SIGNALWIRE_RELAY_PING_INTERVAL_SECS; "
+                                       "using default: ") +
+                           e.what());
+      }
+    }
+  }
+  ws_->setPingInterval(ping_secs);
+
   if (tls) {
     ix::SocketTLSOptions tlsOpts;
     tlsOpts.tls = true;
-    // Trust a private/self-signed CA when SSL_CERT_FILE points at one
-    // (the cross-port test idiom — see gen_certs.sh). Otherwise leave
-    // caFile at its "SYSTEM" default so production verifies against the
-    // OS trust store. Verification is NEVER disabled.
-    if (const char* ca = std::getenv("SSL_CERT_FILE")) {
-      if (ca && *ca) {
-        tlsOpts.caFile = ca;
+    // A5 fleet CA-var: the RELAY WS transport reads SIGNALWIRE_RELAY_CA_FILE as
+    // its TLS trust root (exact fleet name, no aliases — like python
+    // relay/client.py's websockets.connect ssl= context). SSL_CERT_FILE remains
+    // a secondary fallback (the cross-port test idiom — see gen_certs.sh).
+    // Otherwise caFile stays "SYSTEM" so production verifies against the OS
+    // trust store. Verification is NEVER disabled.
+    std::string ca_path;
+    if (const char* relay_ca = std::getenv("SIGNALWIRE_RELAY_CA_FILE")) {
+      if (relay_ca && *relay_ca) {
+        ca_path = relay_ca;
       }
+    }
+    if (ca_path.empty()) {
+      if (const char* ca = std::getenv("SSL_CERT_FILE")) {
+        if (ca && *ca) {
+          ca_path = ca;
+        }
+      }
+    }
+    if (!ca_path.empty()) {
+      tlsOpts.caFile = ca_path;
     }
     ws_->setTLSOptions(tlsOpts);
   }

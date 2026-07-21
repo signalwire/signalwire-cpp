@@ -54,7 +54,7 @@ class Mfa : public BaseResource {
 
   explicit Mfa(const HttpClient& client) : BaseResource(client, "/api/relay/rest/mfa") {}
 
-  [[nodiscard]] json sms(const SmsParams& p) const {
+  [[nodiscard]] json sms(const SmsParams& p, const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["to"] = p.to;
     if (p.from.has_value()) {
@@ -78,10 +78,10 @@ class Mfa : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + std::string("sms"), body);
+    return client_.post(base_path_ + "/" + std::string("sms"), body, request_options);
   }
 
-  [[nodiscard]] json call(const CallParams& p) const {
+  [[nodiscard]] json call(const CallParams& p, const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["to"] = p.to;
     if (p.from.has_value()) {
@@ -105,16 +105,18 @@ class Mfa : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + std::string("call"), body);
+    return client_.post(base_path_ + "/" + std::string("call"), body, request_options);
   }
 
-  [[nodiscard]] json verify(const std::string& mfa_request_id, const VerifyParams& p) const {
+  [[nodiscard]] json verify(const std::string& mfa_request_id, const VerifyParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["token"] = p.token;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + mfa_request_id + "/" + std::string("verify"), body);
+    return client_.post(base_path_ + "/" + mfa_request_id + "/" + std::string("verify"), body,
+                        request_options);
   }
 };
 

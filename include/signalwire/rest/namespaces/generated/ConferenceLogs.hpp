@@ -28,8 +28,9 @@ class ConferenceLogs : public BaseResource {
   explicit ConferenceLogs(const HttpClient& client)
       : BaseResource(client, "/api/logs/conferences") {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 };
 

@@ -37,11 +37,13 @@ class SipProfile : public BaseResource {
   explicit SipProfile(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/sip_profile") {}
 
-  [[nodiscard]] json get(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json get(const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 
-  [[nodiscard]] json update(const UpdateParams& p) const {
+  [[nodiscard]] json update(const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     if (p.domain_identifier.has_value()) {
       body["domain_identifier"] = *p.domain_identifier;
@@ -61,7 +63,7 @@ class SipProfile : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.put(base_path_, body);
+    return client_.put(base_path_, body, request_options);
   }
 };
 

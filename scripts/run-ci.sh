@@ -248,15 +248,21 @@ test_gate() {
             # scripts/run-tests.sh (self-bootstrapping, host mode). run-tests.sh
             # rebuilds run_tests (a near-no-op since it was just built) and runs
             # the full suite.
+            # pagination_dump (PAGINATION-CORPUS, per-PR) + relay_liveness_dump
+            # (RELAY-LIVENESS, nightly) are built here too so the BEHAVIORAL
+            # suite finds their binaries at build/<name> — without this the
+            # per-PR PAGINATION-CORPUS rule runs a missing binary and reds with
+            # "dump did not emit valid JSON".
             cmake --build build --target emit_corpus emit_skills \
-                wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump -j"$(sw_build_jobs)" || return 1
+                wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump \
+                pagination_dump relay_liveness_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -265,7 +271,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -538,11 +544,17 @@ run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-T
 # BUILD_MODE routing internally.
 run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,DOC-WIRE
+        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE
 
-run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS)" --tier=nightly \
+# BEHAVIORAL-NIGHTLY: the timing-sensitive connection-liveness dumps.
+# WAIT-LIVENESS (Action::wait() blocks-until-event) + RELAY-LIVENESS (the broader
+# RELAY connection+error contract: A6 creds / A2 relay-contract / F2 dead-peer +
+# black-hole / F3 reconnect / max-active-calls). Both spawn a real dump binary
+# (built by the TEST gate) and compare its per-fixture classification to the
+# python golden. tier=nightly (defer=1).
+run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules WAIT-LIVENESS
+        --rules WAIT-LIVENESS,RELAY-LIVENESS
 
 # DOC-TRUTH (one markdown walk): DOC-AUDIT/DOC-LINKS/DOC-LANG-PURITY/DOC-ENV/
 # COUNT-CLAIM/ACCESSOR-TRUTH/STATUS-CLAIM/README-INCLUDE.

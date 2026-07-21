@@ -35,7 +35,8 @@ class Chat : public BaseResource {
 
   explicit Chat(const HttpClient& client) : BaseResource(client, "/api/chat/tokens") {}
 
-  [[nodiscard]] json create_token(const CreateTokenParams& p) const {
+  [[nodiscard]] json create_token(const CreateTokenParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["ttl"] = p.ttl;
     body["channels"] = p.channels;
@@ -48,7 +49,7 @@ class Chat : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 };
 

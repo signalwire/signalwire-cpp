@@ -67,22 +67,23 @@ class PhoneNumbers : public CrudResource {
   explicit PhoneNumbers(const HttpClient& client)
       : CrudResource(client, "/api/relay/rest/phone_numbers", "PUT") {}
 
-  [[nodiscard]] json search(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + std::string("search"), params);
+  [[nodiscard]] json search(const std::map<std::string, std::string>& params = {},
+                            const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + std::string("search"), params, request_options);
   }
 
-  [[nodiscard]] json set_swml_webhook(const std::string& resource_id,
-                                      const SetSwmlWebhookParams& p) const {
+  [[nodiscard]] json set_swml_webhook(const std::string& resource_id, const SetSwmlWebhookParams& p,
+                                      const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "relay_script"}};
     body["call_relay_script_url"] = p.url;
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
-  [[nodiscard]] json set_cxml_webhook(const std::string& resource_id,
-                                      const SetCxmlWebhookParams& p) const {
+  [[nodiscard]] json set_cxml_webhook(const std::string& resource_id, const SetCxmlWebhookParams& p,
+                                      const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "laml_webhooks"}};
     body["call_request_url"] = p.url;
     if (p.fallback_url.has_value()) {
@@ -94,30 +95,32 @@ class PhoneNumbers : public CrudResource {
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
   [[nodiscard]] json set_cxml_application(const std::string& resource_id,
-                                          const SetCxmlApplicationParams& p) const {
+                                          const SetCxmlApplicationParams& p,
+                                          const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "laml_application"}};
     body["call_laml_application_id"] = p.application_id;
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
-  [[nodiscard]] json set_ai_agent(const std::string& resource_id, const SetAiAgentParams& p) const {
+  [[nodiscard]] json set_ai_agent(const std::string& resource_id, const SetAiAgentParams& p,
+                                  const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "ai_agent"}};
     body["call_ai_agent_id"] = p.agent_id;
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
-  [[nodiscard]] json set_call_flow(const std::string& resource_id,
-                                   const SetCallFlowParams& p) const {
+  [[nodiscard]] json set_call_flow(const std::string& resource_id, const SetCallFlowParams& p,
+                                   const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "call_flow"}};
     body["call_flow_id"] = p.flow_id;
     if (p.version.has_value()) {
@@ -126,21 +129,22 @@ class PhoneNumbers : public CrudResource {
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
   [[nodiscard]] json set_relay_application(const std::string& resource_id,
-                                           const SetRelayApplicationParams& p) const {
+                                           const SetRelayApplicationParams& p,
+                                           const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "relay_application"}};
     body["call_relay_application"] = p.name;
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 
-  [[nodiscard]] json set_relay_topic(const std::string& resource_id,
-                                     const SetRelayTopicParams& p) const {
+  [[nodiscard]] json set_relay_topic(const std::string& resource_id, const SetRelayTopicParams& p,
+                                     const RequestOptions& request_options = {}) const {
     json body = {{"call_handler", "relay_topic"}};
     body["call_relay_topic"] = p.topic;
     if (p.status_callback_url.has_value()) {
@@ -149,7 +153,7 @@ class PhoneNumbers : public CrudResource {
     if (!p.extra.is_null()) {
       body.update(p.extra);
     }
-    return update(resource_id, body);
+    return update(resource_id, body, request_options);
   }
 };
 

@@ -168,8 +168,24 @@ from clang.cindex import CursorKind, Index, TranslationUnit
 
 HERE = Path(__file__).resolve().parent
 PORT_ROOT = HERE.parent
-PSDK = Path(os.environ["PORTING_SDK_DIR"]).resolve() if os.environ.get("PORTING_SDK_DIR") \
-    else (PORT_ROOT.parent / "porting-sdk").resolve()
+
+
+def _resolve_psdk() -> Path:
+    # Honour PORTING_SDK_DIR, then PORTING_SDK (the var run-ci / the surface suite
+    # export), then the adjacent ``<repo>/../porting-sdk``. The PORTING_SDK fallback
+    # is what makes a WORKTREE run resolve the real checkout — a worktree's parent
+    # has no porting-sdk sibling, so adjacency-only silently staled the enumerate
+    # (it read the last committed port_signatures.json) and the SIGNATURES/GEN gates
+    # then diffed stale output. Real CI uses adjacency, so this is purely a
+    # local-worktree robustness fix; it never changes the CI-resolved path.
+    for var in ("PORTING_SDK_DIR", "PORTING_SDK"):
+        val = os.environ.get(var)
+        if val and (Path(val) / "type_aliases.yaml").is_file():
+            return Path(val).resolve()
+    return (PORT_ROOT.parent / "porting-sdk").resolve()
+
+
+PSDK = _resolve_psdk()
 
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
@@ -809,6 +825,44 @@ def collect(
         _last = _validate_sig["params"][-1]
         if _last.get("name") == "signing_key":
             _last["kind"] = "keyword"
+
+    # request_options reconciliation for the HAND-WRITTEN base resource classes
+    # (ReadResource.paginate / CrudWithAddresses.list_addresses in
+    # base_resource.hpp — CrudWithAddresses is the oracle name for the C++
+    # FabricResource). The reference (PY-7/PY-9) types ``request_options`` as a
+    # KEYWORD-ONLY slot that PRECEDES the ``**params`` door
+    # (``paginate(*, request_options=None, **params)`` /
+    # ``list_addresses(self, resource_id, *, request_options=None, **params)``).
+    # C++ keeps the ergonomic declaration order (``params`` then a defaulted
+    # ``request_options``) so existing positional callers of ``(id, params)`` still
+    # compile; here we (1) mark the port ``request_options`` param keyword and
+    # (2) MOVE it before any trailing ``params`` var_keyword door, so the recorded
+    # signature aligns with the oracle. Pure call-site-sugar reconciliation, not a
+    # contract change (RULES §2 — idiom via the enumerator, never omission).
+    # ``HttpClient`` records request_options POSITIONAL on every transport verb, so
+    # it is deliberately excluded.
+    _RO_KEYWORD_BASE_CLASSES = {
+        "ReadResource", "CrudResource", "CrudWithAddresses", "FabricResource",
+    }
+    _bm = out_modules.get("signalwire.rest._base", {})
+    for _bcls_name, _bcls in _bm.get("classes", {}).items():
+        if _bcls_name not in _RO_KEYWORD_BASE_CLASSES:
+            continue
+        for _bsig in _bcls.get("methods", {}).values():
+            _bparams = _bsig.get("params", [])
+            _ro_idx = next((i for i, p in enumerate(_bparams)
+                            if p.get("name") == "request_options"), None)
+            if _ro_idx is None:
+                continue
+            _bparams[_ro_idx]["kind"] = "keyword"
+            # Move request_options before a trailing ``params`` query door (recorded
+            # by libclang as a positional ``dict<string,string>`` / var_keyword map),
+            # so request_options lands at the reference's position and ``params`` is
+            # the ignored trailing extra.
+            if _ro_idx == len(_bparams) - 1 and len(_bparams) >= 2 \
+                    and _bparams[_ro_idx - 1].get("name") == "params":
+                _bparams[_ro_idx - 1], _bparams[_ro_idx] = \
+                    _bparams[_ro_idx], _bparams[_ro_idx - 1]
 
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a

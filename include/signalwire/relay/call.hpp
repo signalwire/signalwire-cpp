@@ -271,7 +271,16 @@ class Call {
     RelayClient* client = nullptr;
 
     std::vector<CallEventHandler> event_handlers;
-    std::unordered_map<std::string, Action*> actions;
+    // Guards event_handlers against a data race between on_event()
+    // (user thread mutating the vector) and dispatch_event() (WS reader
+    // thread iterating it) — CPP-2.
+    std::mutex handlers_mutex;
+    // The registry OWNS its Actions by value (CPP-1). An Action holds its
+    // real state in a shared_ptr<SharedState>, so a copy stored here shares
+    // that state with the Action the caller holds — resolving the registry
+    // copy resolves the caller's copy. Storing a raw Action* (as before)
+    // dangled the moment the caller's stack-local Action went out of scope.
+    std::unordered_map<std::string, Action> actions;
     std::mutex actions_mutex;
     std::mutex ended_mutex;
     std::condition_variable ended_cv;

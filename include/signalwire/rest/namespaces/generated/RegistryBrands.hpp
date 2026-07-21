@@ -28,24 +28,32 @@ class RegistryBrands : public BaseResource {
   explicit RegistryBrands(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/brands") {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 
-  [[nodiscard]] json create(const json& body) const { return client_.post(base_path_, body); }
+  [[nodiscard]] json create(const json& body, const RequestOptions& request_options = {}) const {
+    return client_.post(base_path_, body, request_options);
+  }
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
   [[nodiscard]] json list_campaigns(const std::string& id,
-                                    const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id + "/" + std::string("campaigns"), params);
+                                    const std::map<std::string, std::string>& params = {},
+                                    const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("campaigns"), params,
+                       request_options);
   }
 
-  [[nodiscard]] json create_campaign(const std::string& id, const json& body) const {
-    return client_.post(base_path_ + "/" + id + "/" + std::string("campaigns"), body);
+  [[nodiscard]] json create_campaign(const std::string& id, const json& body,
+                                     const RequestOptions& request_options = {}) const {
+    return client_.post(base_path_ + "/" + id + "/" + std::string("campaigns"), body,
+                        request_options);
   }
 };
 

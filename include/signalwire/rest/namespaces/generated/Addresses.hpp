@@ -43,11 +43,13 @@ class Addresses : public BaseResource {
   explicit Addresses(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/addresses") {}
 
-  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_, params);
+  [[nodiscard]] json list(const std::map<std::string, std::string>& params = {},
+                          const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_, params, request_options);
   }
 
-  [[nodiscard]] json create(const CreateParams& p) const {
+  [[nodiscard]] json create(const CreateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["label"] = p.label;
     body["country"] = p.country;
@@ -67,16 +69,18 @@ class Addresses : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 
   [[nodiscard]] json get(const std::string& id,
-                         const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + id, params);
+                         const std::map<std::string, std::string>& params = {},
+                         const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id, params, request_options);
   }
 
-  [[nodiscard]] json delete_(const std::string& id) const {
-    return client_.del(base_path_ + "/" + id);
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
   }
 };
 

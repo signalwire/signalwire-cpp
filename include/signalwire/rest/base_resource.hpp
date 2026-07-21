@@ -62,9 +62,14 @@ class ReadResource : public BaseResource {
   /// raw page; ``paginate()`` returns a ``PaginatedIterator`` that walks
   /// ``resp["data"]`` and follows ``resp["links"]["next"]`` so callers page
   /// through a list endpoint without hand-building the token loop.
-  [[nodiscard]] PaginatedIterator paginate(
-      const std::map<std::string, std::string>& params = {}) const {
-    return PaginatedIterator(client_, base_path_, params, "data");
+  ///
+  /// An optional query ``params`` map and an optional ``request_options``
+  /// transport envelope (both defaulted). request_options (per-request timeout /
+  /// retries / abort) threads through to every page fetch; it is NEVER part of the
+  /// query.
+  [[nodiscard]] PaginatedIterator paginate(const std::map<std::string, std::string>& params = {},
+                                           const RequestOptions& request_options = {}) const {
+    return PaginatedIterator(client_, base_path_, params, "data", request_options);
   }
   [[nodiscard]] json get(const std::string& id,
                          const std::map<std::string, std::string>& params = {},
@@ -120,6 +125,10 @@ class FabricResource : public CrudResource {
                  const std::string& update_method = "PATCH")
       : CrudResource(client, base_path, update_method) {}
 
+  /// ``id`` then an optional query ``params`` map and an optional
+  /// ``request_options`` transport envelope (both defaulted). request_options is
+  /// per-request timeout / retries / abort; it is forwarded to the GET, never part
+  /// of the query.
   [[nodiscard]] json list_addresses(const std::string& id,
                                     const std::map<std::string, std::string>& params = {},
                                     const RequestOptions& request_options = {}) const {

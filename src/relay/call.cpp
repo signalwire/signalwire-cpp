@@ -65,20 +65,23 @@ Action Call::execute_simple(const std::string& method, const json& extra_params)
 
   Action action(method);
   if (s_->client) {
+    // A2 relay-contract (CPP-3): client->execute now RAISES a RelayError on any
+    // non-2xx code. A 404/410 means the call is gone — swallow it (no-op,
+    // resolve finished) per the documented contract. EVERY OTHER error
+    // PROPAGATES to the caller instead of the old silent resolve("error"),
+    // which hid real failures (auth / bad params / server faults) the developer
+    // must see. Mirrors python Call._execute.
     try {
       json result = s_->client->execute("calling." + method, params);
-      std::string code = result.value("code", "");
-      if (!code.empty() && code[0] == '2') {
-        action.resolve("finished", result);
-      } else if (code == "404" || code == "410") {
-        get_logger().info("Call gone during " + method + " (code " + code + ")");
+      action.resolve("finished", result);
+    } catch (const RelayError& e) {
+      if (e.code() == 404 || e.code() == 410) {
+        get_logger().info("Call gone during " + method + " (code " + std::to_string(e.code()) +
+                          ")");
         action.resolve("finished", json::object());
       } else {
-        action.resolve("error", result);
+        throw;  // real failure — propagate
       }
-    } catch (const std::exception& e) {
-      get_logger().info(std::string("Call execute_simple failed: ") + e.what());
-      action.resolve("error", json::object());
     }
   } else {
     action.resolve("finished", json::object());
@@ -114,21 +117,24 @@ Action Call::execute_action(const std::string& method, const json& extra_params)
   register_action(control_id, &action);
 
   if (s_->client) {
+    // A2 relay-contract (CPP-3): client->execute RAISES on non-2xx. 404/410 =
+    // call gone -> unregister + resolve no-op (documented swallow). EVERY other
+    // error unregisters the action (so a failed verb leaves no dangling entry —
+    // mirrors python's "_execute raises -> action removed from _actions") and
+    // PROPAGATES, instead of the old silent resolve("error"). A 2xx leaves the
+    // action registered pending its terminal event.
     try {
       json result = s_->client->execute("calling." + method, params);
-      std::string code = result.value("code", "");
-      if (code == "404" || code == "410") {
-        get_logger().info("Call gone during " + method + " (code " + code + ")");
-        unregister_action(control_id);
-        action.resolve("finished", json::object());
-      } else if (!code.empty() && code[0] != '2') {
-        unregister_action(control_id);
-        action.resolve("error", result);
-      }
-    } catch (const std::exception& e) {
-      get_logger().info(std::string("Call execute_action failed: ") + e.what());
+      (void)result;  // 2xx: keep the action registered for its completing event
+    } catch (const RelayError& e) {
       unregister_action(control_id);
-      action.resolve("error", json::object());
+      if (e.code() == 404 || e.code() == 410) {
+        get_logger().info("Call gone during " + method + " (code " + std::to_string(e.code()) +
+                          ")");
+        action.resolve("finished", json::object());
+      } else {
+        throw;  // real failure — propagate (action already unregistered)
+      }
     }
   } else {
     unregister_action(control_id);
@@ -611,7 +617,14 @@ Action Call::transcribe(const json& params, const std::string& control_id) {
 }
 
 // Event handling
-void Call::on_event(CallEventHandler handler) { s_->event_handlers.push_back(std::move(handler)); }
+void Call::on_event(CallEventHandler handler) {
+  // CPP-2: on_event() runs on the user thread while dispatch_event() iterates
+  // event_handlers on the WS reader thread. Mutating the vector without a lock
+  // is a data race (and can reallocate the buffer mid-iteration -> UB). Guard
+  // the push_back with handlers_mutex.
+  std::lock_guard<std::mutex> lock(s_->handlers_mutex);
+  s_->event_handlers.push_back(std::move(handler));
+}
 
 bool Call::wait_for_ended(int timeout_ms) {
   std::unique_lock<std::mutex> lock(s_->ended_mutex);
@@ -700,7 +713,18 @@ void Call::update_state(const std::string& new_state) {
 }
 
 void Call::dispatch_event(const CallEvent& ev) {
-  for (auto& h : s_->event_handlers) {
+  // CPP-2: snapshot the handler list under the lock, then invoke the copies
+  // WITHOUT holding it. Iterating s_->event_handlers directly races on_event()
+  // (concurrent push_back can reallocate the backing buffer, invalidating the
+  // iterator mid-loop). Copying under the lock removes the race; releasing the
+  // lock before invocation means a handler is free to register another handler
+  // (re-entrant on_event) or block without deadlocking the reader thread.
+  std::vector<CallEventHandler> handlers;
+  {
+    std::lock_guard<std::mutex> lock(s_->handlers_mutex);
+    handlers = s_->event_handlers;
+  }
+  for (auto& h : handlers) {
     try {
       h(ev);
     } catch (const std::exception& e) {
@@ -711,7 +735,14 @@ void Call::dispatch_event(const CallEvent& ev) {
 
 void Call::register_action(const std::string& control_id, Action* action) {
   std::lock_guard<std::mutex> lock(s_->actions_mutex);
-  s_->actions[control_id] = action;
+  // Store a COPY, not the raw pointer (CPP-1). The copy shares SharedState
+  // with *action (Action is shared_ptr-backed), so the registered entry and
+  // the Action the caller keeps refer to the same underlying state — but the
+  // registry no longer depends on the caller's Action outliving the map
+  // entry. `action` may be null in defensive callers; skip in that case.
+  if (action) {
+    s_->actions[control_id] = *action;
+  }
 }
 
 void Call::unregister_action(const std::string& control_id) {
@@ -722,14 +753,17 @@ void Call::unregister_action(const std::string& control_id) {
 Action* Call::find_action(const std::string& control_id) {
   std::lock_guard<std::mutex> lock(s_->actions_mutex);
   auto it = s_->actions.find(control_id);
-  return it != s_->actions.end() ? it->second : nullptr;
+  // Points into the map's owned Action; valid until that entry is erased.
+  // Because the Action is shared_ptr-backed, callers act on the SAME state
+  // the caller's copy holds.
+  return it != s_->actions.end() ? &it->second : nullptr;
 }
 
 void Call::resolve_all_actions(const std::string& final_state) {
   std::lock_guard<std::mutex> lock(s_->actions_mutex);
   for (auto& [id, action] : s_->actions) {
-    if (action && !action->completed()) {
-      action->resolve(final_state, json::object());
+    if (!action.completed()) {
+      action.resolve(final_state, json::object());
     }
   }
   s_->actions.clear();

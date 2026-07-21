@@ -40,7 +40,8 @@ class DatasphereDocuments : public CrudResource {
   explicit DatasphereDocuments(const HttpClient& client)
       : CrudResource(client, "/api/datasphere/documents", "PATCH") {}
 
-  [[nodiscard]] json search(const SearchParams& p) const {
+  [[nodiscard]] json search(const SearchParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["query_string"] = p.query_string;
     if (p.tags.has_value()) {
@@ -67,22 +68,27 @@ class DatasphereDocuments : public CrudResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_ + "/" + std::string("search"), body);
+    return client_.post(base_path_ + "/" + std::string("search"), body, request_options);
   }
 
   [[nodiscard]] json list_chunks(const std::string& documentId,
-                                 const std::map<std::string, std::string>& params = {}) const {
-    return client_.get(base_path_ + "/" + documentId + "/" + std::string("chunks"), params);
+                                 const std::map<std::string, std::string>& params = {},
+                                 const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + documentId + "/" + std::string("chunks"), params,
+                       request_options);
   }
 
   [[nodiscard]] json get_chunk(const std::string& documentId, const std::string& chunkId,
-                               const std::map<std::string, std::string>& params = {}) const {
+                               const std::map<std::string, std::string>& params = {},
+                               const RequestOptions& request_options = {}) const {
     return client_.get(base_path_ + "/" + documentId + "/" + std::string("chunks") + "/" + chunkId,
-                       params);
+                       params, request_options);
   }
 
-  [[nodiscard]] json delete_chunk(const std::string& documentId, const std::string& chunkId) const {
-    return client_.del(base_path_ + "/" + documentId + "/" + std::string("chunks") + "/" + chunkId);
+  [[nodiscard]] json delete_chunk(const std::string& documentId, const std::string& chunkId,
+                                  const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + documentId + "/" + std::string("chunks") + "/" + chunkId,
+                       request_options);
   }
 };
 

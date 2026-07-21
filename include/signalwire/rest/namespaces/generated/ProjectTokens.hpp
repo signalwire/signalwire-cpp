@@ -40,7 +40,8 @@ class ProjectTokens : public BaseResource {
 
   explicit ProjectTokens(const HttpClient& client) : BaseResource(client, "/api/project/tokens") {}
 
-  [[nodiscard]] json create(const CreateParams& p) const {
+  [[nodiscard]] json create(const CreateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["name"] = p.name;
     body["permissions"] = p.permissions;
@@ -50,10 +51,11 @@ class ProjectTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 
-  [[nodiscard]] json update(const std::string& token_id, const UpdateParams& p) const {
+  [[nodiscard]] json update(const std::string& token_id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     if (p.name.has_value()) {
       body["name"] = *p.name;
@@ -64,11 +66,12 @@ class ProjectTokens : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.patch(base_path_ + "/" + token_id, body);
+    return client_.patch(base_path_ + "/" + token_id, body, request_options);
   }
 
-  [[nodiscard]] json delete_(const std::string& token_id) const {
-    return client_.del(base_path_ + "/" + token_id);
+  [[nodiscard]] json delete_(const std::string& token_id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + token_id, request_options);
   }
 };
 

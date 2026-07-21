@@ -43,7 +43,8 @@ class Messages : public BaseResource {
 
   explicit Messages(const HttpClient& client) : BaseResource(client, "/api/messaging/messages") {}
 
-  [[nodiscard]] json create(const CreateParams& p) const {
+  [[nodiscard]] json create(const CreateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["to"] = p.to;
     body["from"] = p.from;
@@ -65,16 +66,17 @@ class Messages : public BaseResource {
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.post(base_path_, body);
+    return client_.post(base_path_, body, request_options);
   }
 
-  [[nodiscard]] json update(const std::string& message_id, const UpdateParams& p) const {
+  [[nodiscard]] json update(const std::string& message_id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["body"] = p.body;
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
-    return client_.patch(base_path_ + "/" + message_id, body);
+    return client_.patch(base_path_ + "/" + message_id, body, request_options);
   }
 };
 

@@ -538,11 +538,17 @@ run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-T
 # BUILD_MODE routing internally.
 run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,DOC-WIRE
+        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE
 
-run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS)" --tier=nightly \
+# BEHAVIORAL-NIGHTLY: the timing-sensitive connection-liveness dumps.
+# WAIT-LIVENESS (Action::wait() blocks-until-event) + RELAY-LIVENESS (the broader
+# RELAY connection+error contract: A6 creds / A2 relay-contract / F2 dead-peer +
+# black-hole / F3 reconnect / max-active-calls). Both spawn a real dump binary
+# (built by the TEST gate) and compare its per-fixture classification to the
+# python golden. tier=nightly (defer=1).
+run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules WAIT-LIVENESS
+        --rules WAIT-LIVENESS,RELAY-LIVENESS
 
 # DOC-TRUTH (one markdown walk): DOC-AUDIT/DOC-LINKS/DOC-LANG-PURITY/DOC-ENV/
 # COUNT-CLAIM/ACCESSOR-TRUTH/STATUS-CLAIM/README-INCLUDE.

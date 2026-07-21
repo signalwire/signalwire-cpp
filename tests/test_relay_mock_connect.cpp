@@ -89,44 +89,60 @@ TEST(relay_mock_connect_journal_event_acks_true) {
 // ---------------------------------------------------------------------------
 
 TEST(relay_mock_connect_with_empty_creds_fails) {
-    // The mock returns AUTH_REQUIRED for empty creds; SDK's connect()
-    // must surface failure (returns false) and stay disconnected.
-    //
-    // A failed connect never yields a sessionid, so this hand-built client
-    // can't scope the harness by session. Instead we read the GLOBAL journal
-    // and pick out THIS attempt by its distinctive empty-creds connect frame —
-    // deterministic under parallel load because no other test connects with an
-    // empty project (every other client uses a non-empty random/fixed project).
+    // A6 credential contract (CPP-5): empty creds fail FAST, PRE-CONNECT, with a
+    // per-variable actionable error — before any socket work — instead of the
+    // old "send an empty-creds frame, let the mock reject it, return false"
+    // (silent-ish) path. connect() throws std::invalid_argument naming the
+    // missing variable and its env var, and no signalwire.connect frame is sent.
     mt::ensure_server();
-    mt::clear_active_session();  // global (unscoped) harness view
+    mt::clear_active_session();
     mt::force_ws_scheme();
 
-    RelayConfig cfg;
-    cfg.project = "";
-    cfg.token = "";
-    cfg.host = "127.0.0.1";
-    cfg.port = mt::resolve_ws_port();
-    cfg.contexts = {"default"};
-
-    RelayClient client(cfg);
-    bool ok = client.connect();
-    ASSERT_FALSE(ok);
-    ASSERT_FALSE(client.is_connected());
-
-    // The journal should still record the connect attempt with empty creds,
-    // proving the request hit the mock and the mock rejected it. Find OUR
-    // attempt (empty project+token) among the global connect frames.
-    bool found = false;
-    for (const auto& e : mt::journal_recv("signalwire.connect")) {
-        if (!e.frame.contains("params")) continue;
-        json auth = e.frame["params"].value("authentication", json::object());
-        if (auth.value("project", "x").empty()
-            && auth.value("token", "x").empty()) {
-            found = true;
-            break;
+    // Missing project → error names "project" + SIGNALWIRE_PROJECT_ID.
+    {
+        RelayConfig cfg;
+        cfg.project = "";
+        cfg.token = "t";
+        cfg.host = "127.0.0.1";
+        cfg.port = mt::resolve_ws_port();
+        cfg.contexts = {"default"};
+        RelayClient client(cfg);
+        bool threw = false;
+        std::string what;
+        try {
+            (void)client.connect();
+        } catch (const std::invalid_argument& e) {
+            threw = true;
+            what = e.what();
         }
+        ASSERT_TRUE(threw);
+        ASSERT_TRUE(what.find("project") != std::string::npos);
+        ASSERT_TRUE(what.find("SIGNALWIRE_PROJECT_ID") != std::string::npos);
+        ASSERT_FALSE(client.is_connected());
     }
-    ASSERT_TRUE(found);
+
+    // Missing token → error names "token" + SIGNALWIRE_API_TOKEN.
+    {
+        RelayConfig cfg;
+        cfg.project = "p";
+        cfg.token = "";
+        cfg.host = "127.0.0.1";
+        cfg.port = mt::resolve_ws_port();
+        cfg.contexts = {"default"};
+        RelayClient client(cfg);
+        bool threw = false;
+        std::string what;
+        try {
+            (void)client.connect();
+        } catch (const std::invalid_argument& e) {
+            threw = true;
+            what = e.what();
+        }
+        ASSERT_TRUE(threw);
+        ASSERT_TRUE(what.find("token") != std::string::npos);
+        ASSERT_TRUE(what.find("SIGNALWIRE_API_TOKEN") != std::string::npos);
+        ASSERT_FALSE(client.is_connected());
+    }
     return true;
 }
 

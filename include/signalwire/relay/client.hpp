@@ -66,6 +66,9 @@ struct RelayConfig {
   std::vector<std::string> contexts = {"default"};
   int max_active_calls = DEFAULT_MAX_ACTIVE_CALLS;
   int max_connections = DEFAULT_MAX_CONNECTIONS;
+  // Per-request response deadline (ms). A request whose peer never answers
+  // throws after this bound rather than hanging (F2.2 black-hole). Default 30s.
+  int request_timeout_ms = DEFAULT_REQUEST_TIMEOUT_MS;
 };
 
 /// Real-time call control and messaging client over WebSocket.
@@ -215,6 +218,11 @@ class RelayClient {
 
   /// Handle messaging events
   void handle_messaging_event(const RelayEvent& ev);
+
+  /// Open the underlying WebSocket to config_.host, honoring the
+  /// SIGNALWIRE_RELAY_SCHEME override and splitting an embedded ":port".
+  /// Shared by connect() and reconnect() so both parse host/scheme identically.
+  bool open_ws_transport();
 
   /// Reconnect with exponential backoff
   bool reconnect();

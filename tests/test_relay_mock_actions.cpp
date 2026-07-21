@@ -492,8 +492,14 @@ TEST(relay_mock_tap_journals_calling_tap) {
     Call* call = setup_answered_call(*client, "call-tap");
     ASSERT_TRUE(call != nullptr);
 
+    // The authoritative calling.tap schema requires tap={type, params} (the
+    // tap descriptor's params are mandatory — same requirement the python
+    // reference tests encode, tap={"type":"audio","params":{...}}). A tap
+    // missing params is a malformed frame the STRICT mock now 400s (surfaced by
+    // the A2 raise); supply the required params.
     json tp;
     tp["tap"]["type"] = "audio";
+    tp["tap"]["params"]["direction"] = "both";
     tp["device"]["type"] = "rtp";
     tp["device"]["params"]["addr"] = "203.0.113.1";
     tp["device"]["params"]["port"] = 4000;
@@ -516,6 +522,7 @@ TEST(relay_mock_tap_stop_journals_tap_stop) {
 
     json tp;
     tp["tap"]["type"] = "audio";
+    tp["tap"]["params"]["direction"] = "both";
     tp["device"]["type"] = "rtp";
     tp["device"]["params"]["addr"] = "203.0.113.1";
     tp["device"]["params"]["port"] = 4000;

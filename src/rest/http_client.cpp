@@ -161,7 +161,9 @@ void HttpClient::set_ca_cert_path(const std::string& path) { ca_cert_path_ = pat
 // scheme is backed by an SSLClient that verifies the server cert against the
 // system store by default. To trust a private/self-signed CA we point it at an
 // explicit bundle: set_ca_cert_path() if the caller supplied one, else the
-// SSL_CERT_FILE env var (the cross-port idiom). Verification stays ENABLED.
+// A5 fleet CA-var SIGNALWIRE_REST_CA_FILE (the canonical cross-port REST trust
+// bundle, like python rest/_base.py session.verify), falling back to the
+// generic SSL_CERT_FILE. Verification stays ENABLED throughout.
 //
 // The timeout is converted to httplib's std::chrono overload (microseconds) —
 // NOT a raw (sec, nsec) pair — so a fractional-second timeout (e.g. 0.1s) is
@@ -173,6 +175,16 @@ void HttpClient::configure_client(httplib::Client& cli, double timeout_seconds) 
   cli.set_write_timeout(micros);
 
   std::string ca = ca_cert_path_;
+  if (ca.empty()) {
+    // A5 fleet CA-var: the REST HTTP client reads SIGNALWIRE_REST_CA_FILE as its
+    // TLS trust bundle (exact fleet name, no aliases). SSL_CERT_FILE remains a
+    // secondary fallback so an existing generic bundle still works.
+    if (const char* rest_ca = std::getenv("SIGNALWIRE_REST_CA_FILE")) {
+      if (rest_ca && *rest_ca) {
+        ca = rest_ca;
+      }
+    }
+  }
   if (ca.empty()) {
     if (const char* env = std::getenv("SSL_CERT_FILE")) {
       if (env && *env) {
@@ -485,10 +497,6 @@ void PaginatedIterator::fetch_next() {
   }
 
   std::string next_url;
-  bool had_data = !resp.is_object() ? false
-                                    : (resp.contains(data_key_) && resp[data_key_].is_array() &&
-                                       !resp[data_key_].empty());
-
   if (resp.is_object() && resp.contains("links") && resp["links"].is_object()) {
     const auto& links = resp["links"];
     if (links.contains("next") && links["next"].is_string()) {
@@ -496,7 +504,24 @@ void PaginatedIterator::fetch_next() {
     }
   }
 
-  if (!next_url.empty() && had_data) {
+  // Termination is driven ONLY by the absence of a next link, NOT by an empty
+  // ``data`` array on this page (CPP-4 / PAGINATION-CORPUS empty_page_with_next).
+  // A page can legitimately carry a ``links.next`` (more pages exist) while
+  // returning zero items on THIS page — e.g. a filtered page matching nothing
+  // here. The old ``next_url && had_data`` gate stopped on such a page and
+  // silently dropped every subsequent page; iterate while a next link exists,
+  // empty page or not. This mirrors Python's _pagination.PaginatedIterator.
+  if (!next_url.empty()) {
+    // Cycle guard: a ``links.next`` already followed means the server is
+    // looping (a repeating cursor). Terminate instead of re-fetching the same
+    // page forever (repeating_cursor_guard) — the empty-page fix above
+    // terminates only on an ABSENT next link, so a repeating next would
+    // otherwise be an infinite loop. Mirrors Python's _seen_next set.
+    if (seen_next_.count(next_url) != 0U) {
+      done_ = true;
+      return;
+    }
+    seen_next_.insert(next_url);
     params_ = parse_query_string(next_url);
   } else {
     done_ = true;

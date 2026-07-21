@@ -25,6 +25,34 @@ if(CCACHE_PROGRAM)
     message(STATUS "ccache enabled: ${CCACHE_PROGRAM}")
 endif()
 
+# Sanitizer lane (CPP-6). SIGNALWIRE_SANITIZE=address|thread|undefined instruments
+# the WHOLE tree (library + run_tests + tools) with the requested sanitizer so the
+# nightly ASAN/TSAN CI lane can catch memory-safety + data-race regressions — the
+# class of bug that CPP-1 (dangling Action* registry UAF) and CPP-2 (unsynchronized
+# event_handlers race) were. Applied via add_compile_options/add_link_options BEFORE
+# any target is declared so it covers every subsequently-defined target uniformly.
+# Default OFF: a plain build is un-instrumented (zero cost); the lane opts in with
+# -DSIGNALWIRE_SANITIZE=address (or thread). -fno-omit-frame-pointer + -g give
+# actionable reports. Multiple sanitizers are mutually exclusive at link time, so
+# the value is a single mode, not a list.
+set(SIGNALWIRE_SANITIZE "" CACHE STRING
+    "Instrument the build with a sanitizer: address | thread | undefined (default: none)")
+if(SIGNALWIRE_SANITIZE)
+    if(SIGNALWIRE_SANITIZE STREQUAL "address")
+        set(_sw_san_flags -fsanitize=address -fno-omit-frame-pointer -g)
+    elseif(SIGNALWIRE_SANITIZE STREQUAL "thread")
+        set(_sw_san_flags -fsanitize=thread -fno-omit-frame-pointer -g)
+    elseif(SIGNALWIRE_SANITIZE STREQUAL "undefined")
+        set(_sw_san_flags -fsanitize=undefined -fno-omit-frame-pointer -g)
+    else()
+        message(FATAL_ERROR
+            "SIGNALWIRE_SANITIZE='${SIGNALWIRE_SANITIZE}' invalid; use address|thread|undefined")
+    endif()
+    add_compile_options(${_sw_san_flags})
+    add_link_options(${_sw_san_flags})
+    message(STATUS "Sanitizer enabled: ${SIGNALWIRE_SANITIZE}")
+endif()
+
 # Header-only deps
 include_directories(${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -316,6 +344,27 @@ target_link_libraries(live_smoke signalwire)
 add_executable(wait_liveness_dump tools/wait_liveness_dump.cpp tests/relay_mocktest.cpp)
 target_link_libraries(wait_liveness_dump signalwire)
 target_include_directories(wait_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
+
+# pagination_dump is the PAGINATION-CORPUS (P#1 killer) runner: it stands up an
+# in-process cpp-httplib server per fixture, serves the corpus page bodies FIFO,
+# drives the REST PaginatedIterator under a bounded watchdog, and emits the
+# per-fixture classification (continued_past_empty / loop_guarded / terminated).
+# porting-sdk/scripts/diff_port_pagination.py builds + runs it and compares to the
+# python golden. No mock harness needed — the fixture server is self-contained.
+add_executable(pagination_dump tools/pagination_dump.cpp)
+target_link_libraries(pagination_dump signalwire)
+
+# relay_liveness_dump is the RELAY-LIVENESS (broader sibling of WAIT-LIVENESS)
+# runner: it drives the RELAY client's connection + error contract (A6 creds, A2
+# relay-contract, F2.1 dead-peer, F2.2 black-hole, F3 reconnect, max-active-calls)
+# against controllable in-process WS servers + the shared mock_relay, and emits
+# the per-fixture classification. porting-sdk/scripts/diff_port_relay_liveness.py
+# builds + runs it and compares to the python golden. Uses the IXWebSocket server
+# headers directly (like wire_relay_dump), so link ixwebsocket explicitly, and
+# reuses the relay_mocktest harness for the mock-backed A2 fixtures.
+add_executable(relay_liveness_dump tools/relay_liveness_dump.cpp tests/relay_mocktest.cpp)
+target_link_libraries(relay_liveness_dump signalwire ixwebsocket)
+target_include_directories(relay_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that

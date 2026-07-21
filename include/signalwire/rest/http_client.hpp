@@ -4,6 +4,7 @@
 
 #include <map>
 #include <nlohmann/json.hpp>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -203,6 +204,11 @@ class PaginatedIterator {
   std::vector<json> items_;
   size_t index_ = 0;
   bool done_ = false;
+  // Cycle guard (CPP-4): next-link cursors already followed. A server that
+  // keeps returning the SAME ``links.next`` would otherwise loop forever, since
+  // termination is now driven only by an ABSENT next link (empty-page fix).
+  // Seeing a repeat terminates iteration. Mirrors Python's _seen_next.
+  std::set<std::string> seen_next_;
 };
 
 }  // namespace rest

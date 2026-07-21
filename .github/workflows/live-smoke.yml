@@ -23,6 +23,8 @@ permissions:
 jobs:
   live-smoke:
     runs-on: ubuntu-latest
+    env:
+      HAS_CREDS: ${{ secrets.SIGNALWIRE_TEST_TOKEN }}
     steps:
       - name: Checkout signalwire-cpp
         uses: actions/checkout@v7
@@ -41,7 +43,7 @@ jobs:
       # secrets → the step is skipped and the job stays green (no false red on
       # forks / un-provisioned repos).
       - name: Live smoke against the real platform
-        if: ${{ secrets.SIGNALWIRE_TEST_TOKEN != '' }}
+        if: ${{ env.HAS_CREDS != '' }}
         env:
           SWSDK_LIVE_TESTS: '1'
           SIGNALWIRE_PROJECT_ID: ${{ secrets.SIGNALWIRE_TEST_PROJECT }}
@@ -50,5 +52,5 @@ jobs:
         run: ./build-live/live_smoke
 
       - name: No secrets — live smoke skipped
-        if: ${{ secrets.SIGNALWIRE_TEST_TOKEN == '' }}
+        if: ${{ env.HAS_CREDS == '' }}
         run: echo "SIGNALWIRE_TEST_TOKEN not configured; live smoke skipped (green)."

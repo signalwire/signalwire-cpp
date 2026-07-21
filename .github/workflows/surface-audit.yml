@@ -42,9 +42,11 @@ jobs:
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk
-          # Plan window: depends on porting-sdk plan-branch gate engines. REVERT
-          # to main (drop this ref:) when plan/a-bar-2026-07-18 merges.
-          ref: main
+          # Wave-1 A+ campaign: pins the porting-sdk gate engines + new
+          # PSDK-3/4/5 BEHAVIORAL rules (PAGINATION-CORPUS/RELAY-LIVENESS/
+          # CA-VAR/SECRET-SCRUB) this PR's run-ci exercises. REVERT to main
+          # (drop this ref:) when porting-sdk wave/1-aplus merges.
+          ref: wave/1-aplus
           token: ${{ secrets.PORTING_SDK_TOKEN }}
 
       - name: Setup Python

@@ -95,8 +95,11 @@ bool WebSocketClient::connect_impl(const std::string& host, int port, bool tls) 
         if (parsed > 0) {
           ping_secs = parsed;
         }
-      } catch (...) {
-        // keep default on a malformed override
+      } catch (const std::exception& e) {
+        // A malformed override is non-fatal: keep the default and log it.
+        get_logger().debug(std::string("Invalid SIGNALWIRE_RELAY_PING_INTERVAL_SECS; "
+                                       "using default: ") +
+                           e.what());
       }
     }
   }

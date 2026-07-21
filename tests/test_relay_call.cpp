@@ -186,8 +186,19 @@ TEST(relay_call_concurrent_on_event_dispatch_no_race) {
     registrar.join();
     dispatcher.join();
     stop.store(true);
-    // Reaching here without a crash / ASAN-TSAN abort is the assertion.
-    ASSERT_TRUE(true);
+
+    // Content-shaped assertion: after the concurrent churn, all 500 registered
+    // handlers must be present and functional. Dispatch ONE more event single-
+    // threaded and assert exactly 500 handlers fire on it — a race that
+    // corrupted the vector (lost/duplicated entries, or a torn buffer) would
+    // yield a wrong count or crash here, so this fails iff the fix is absent.
+    int before = dispatched.load();
+    CallEvent probe;
+    probe.event_type = "calling.call.state";
+    probe.call_id = "c-race";
+    probe.call_state = "ended";
+    call.dispatch_event(probe);
+    ASSERT_EQ(dispatched.load() - before, 500);
     return true;
 }
 

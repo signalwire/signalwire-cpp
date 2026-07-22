@@ -255,14 +255,14 @@ test_gate() {
             # "dump did not emit valid JSON".
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump \
-                pagination_dump relay_liveness_dump -j"$(sw_build_jobs)" || return 1
+                pagination_dump relay_liveness_dump wait_liveness_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -271,7 +271,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)

@@ -584,6 +584,13 @@ run_gate "PACKAGE-NIGHTLY" "package suite, nightly rules (PACKAGE-SMOKE/META-CON
 run_gate "NO-CHEAT" "audit_no_cheat_tests" \
     python3 "$PORTING_SDK_DIR/scripts/audit_no_cheat_tests.py" --root "$PORT_ROOT"
 
+# COORDINATED-PASS — a non-main porting-sdk pin must be declared on the PR
+# (Coordinated-With: line or coordinated-pass label). Reads the branch
+# porting-sdk was actually checked out at (git ground truth); local/no-PR runs
+# are a no-op PASS. See porting-sdk/COORDINATED_PASS.md.
+run_gate "COORDINATED-PASS" "a non-main porting-sdk pin must be declared on the PR (Coordinated-With: line or coordinated-pass label)" \
+    python3 "$PORTING_SDK_DIR/scripts/coordinated_pass.py" --porting-sdk "$PORTING_SDK_DIR"
+
 # FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
 

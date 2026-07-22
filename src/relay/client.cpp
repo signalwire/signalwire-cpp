@@ -154,6 +154,19 @@ void RelayClient::disconnect() {
 
   reject_all_pending();
 
+  // Sweep the call registry on disconnect (r5 F5.4): a connection tear-down
+  // ends every call, so any entry whose terminal event never arrived must not
+  // survive the session and leak into a reconnect. Clear the id->Call map and
+  // the owned-Call storage together.
+  {
+    std::lock_guard<std::mutex> lock(calls_mutex_);
+    calls_.clear();
+  }
+  {
+    std::lock_guard<std::mutex> lock(owned_calls_mutex_);
+    owned_calls_.clear();
+  }
+
   if (ws_) {
     ws_->close();
     ws_.reset();
@@ -458,6 +471,19 @@ void RelayClient::handle_inbound_call(const RelayEvent& ev) {
 
   if (call_id.empty()) {
     return;
+  }
+
+  // MAX_ACTIVE_CALLS cap (r5 F5.4): enforce the bound at insertion time so a
+  // suppressed/dropped terminal event can never grow calls_ without limit. If
+  // the map is already at max_active_calls, drop the inbound call rather than
+  // register it (mirrors python's _handle_inbound_call len-guard).
+  {
+    std::lock_guard<std::mutex> lock(calls_mutex_);
+    if (static_cast<int>(calls_.size()) >= config_.max_active_calls) {
+      get_logger().error("Max active calls (" + std::to_string(config_.max_active_calls) +
+                         ") reached, dropping inbound call " + call_id);
+      return;
+    }
   }
 
   // Create a new Call object

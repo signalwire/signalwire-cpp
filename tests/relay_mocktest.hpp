@@ -17,6 +17,7 @@
 // the MOCK_RELAY_PORT / MOCK_RELAY_HTTP_PORT environment variables.
 #pragma once
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -155,6 +156,13 @@ RelayConfig make_config(const std::string& project = "test_proj",
 std::unique_ptr<RelayClient> make_client(
     const std::string& project = "test_proj",
     const std::string& token = "test_tok",
+    const std::vector<std::string>& contexts = {"default"});
+
+// Same as make_client(), but lets the caller mutate the RelayConfig (e.g. set a
+// small max_active_calls for the MAP-BOUNDS cap test) before connect(). All the
+// connect + session-scoping wiring is identical to make_client().
+std::unique_ptr<RelayClient> make_client_with_config(
+    const std::function<void(RelayConfig&)>& mutate,
     const std::vector<std::string>& contexts = {"default"});
 
 // Wait until at least one session is established on the mock (or timeout).

@@ -23,11 +23,13 @@ struct ParsedUrl {
   std::string error;
 };
 
+std::string redact_url(const std::string& url);
+
 ParsedUrl parse_url(const std::string& url) {
   ParsedUrl out;
   auto pos = url.find("://");
   if (pos == std::string::npos) {
-    out.error = "URL is missing scheme: " + url;
+    out.error = "URL is missing scheme: " + redact_url(url);
     return out;
   }
   auto rest_start = pos + 3;
@@ -54,6 +56,34 @@ httplib::Headers make_headers(const std::map<std::string, std::string>& m) {
   return hdrs;
 }
 
+// Strip the query string (and any `user:pass@` userinfo) from a URL so an
+// error message can name the endpoint WITHOUT leaking a secret. Skill fetches
+// carry credentials in the query (e.g. web_search's Google CSE
+// `?key=<api_key>&...`); these error strings are returned INTO the AI transcript
+// and the logs (web_search.cpp / skill_registry.cpp -> FunctionResult), so the
+// query must never appear there. Redact to scheme://host[:port]/path.
+std::string redact_url(const std::string& url) {
+  std::string out = url;
+  // Drop everything from the first '?' (query) or '#' (fragment).
+  auto cut = out.find_first_of("?#");
+  if (cut != std::string::npos) {
+    out.erase(cut);
+    out += "?<redacted>";
+  }
+  // Drop `user:pass@` userinfo between the scheme and the host, if present.
+  auto scheme = out.find("://");
+  if (scheme != std::string::npos) {
+    auto authority_start = scheme + 3;
+    auto slash = out.find('/', authority_start);
+    auto authority_end = (slash == std::string::npos) ? out.size() : slash;
+    auto at = out.rfind('@', authority_end);
+    if (at != std::string::npos && at >= authority_start && at < authority_end) {
+      out.erase(authority_start, at - authority_start + 1);
+    }
+  }
+  return out;
+}
+
 }  // namespace
 
 SkillHttpResponse http_get(const std::string& url,
@@ -75,14 +105,14 @@ SkillHttpResponse http_get(const std::string& url,
 
     auto res = cli.Get(p.path, make_headers(headers));
     if (!res) {
-      r.error = "HTTP GET failed for " + url;
+      r.error = "HTTP GET failed for " + redact_url(url);
       return r;
     }
     r.status = res->status;
     r.body = res->body;
   } catch (const std::exception& e) {
     r.status = 0;
-    r.error = std::string("HTTP GET error for ") + url + ": " + e.what();
+    r.error = std::string("HTTP GET error for ") + redact_url(url) + ": " + e.what();
   }
   return r;
 }
@@ -112,14 +142,14 @@ SkillHttpResponse http_get_ms(const std::string& url,
 
     auto res = cli.Get(p.path, make_headers(headers));
     if (!res) {
-      r.error = "HTTP GET failed for " + url;
+      r.error = "HTTP GET failed for " + redact_url(url);
       return r;
     }
     r.status = res->status;
     r.body = res->body;
   } catch (const std::exception& e) {
     r.status = 0;
-    r.error = std::string("HTTP GET error for ") + url + ": " + e.what();
+    r.error = std::string("HTTP GET error for ") + redact_url(url) + ": " + e.what();
   }
   return r;
 }
@@ -143,14 +173,14 @@ SkillHttpResponse http_post(const std::string& url, const std::string& body,
 
     auto res = cli.Post(p.path, make_headers(headers), body, content_type);
     if (!res) {
-      r.error = "HTTP POST failed for " + url;
+      r.error = "HTTP POST failed for " + redact_url(url);
       return r;
     }
     r.status = res->status;
     r.body = res->body;
   } catch (const std::exception& e) {
     r.status = 0;
-    r.error = std::string("HTTP POST error for ") + url + ": " + e.what();
+    r.error = std::string("HTTP POST error for ") + redact_url(url) + ": " + e.what();
   }
   return r;
 }

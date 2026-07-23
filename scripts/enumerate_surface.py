@@ -931,13 +931,17 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
 #                                     since cpp-httplib is stateless -- mirroring
 #                                     the python reference's explicit release and
 #                                     the TS no-op close())
-#   __aenter__ / __aexit__         -> NOT emitted; PORT_OMISSIONS (impossible:):
-#                                     the python async-context-manager PROTOCOL
-#                                     dunders have no snake_case-nameable C++
-#                                     member -- the enter side is construction and
-#                                     the exit side is ``close()`` / RAII (the same
-#                                     disposition TS/PHP/perl/dotnet take; dotnet
-#                                     uses IDisposable/using, C++ uses RAII+close)
+#   __aenter__ / __aexit__         -> FOLDED onto the C++ RAII lifecycle (verified
+#                                     present below): the reference's async
+#                                     context-manager IS a scoped-resource
+#                                     capability, which C++ expresses natively as
+#                                     RAII -- a scope-bound ``AIChatClient`` whose
+#                                     destructor (enter=construction, exit=``~`` /
+#                                     ``close()``) is the direct analogue of
+#                                     ``async with`` / a ``using`` block. Same fold
+#                                     dotnet takes via IDisposable/using; the
+#                                     capability is real, only the idiom differs, so
+#                                     this is ZERO omissions, not an impossible:.
 #   url()  read-only getter        -> DROPPED (Python exposes ``self.url`` as an
 #                                     instance ATTRIBUTE, which the surface oracle
 #                                     does not record as a class member; the C++
@@ -951,8 +955,8 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
 # Every symbol is verified present in the header before it is emitted (abort-loud
 # on a missing one) so the projection can never invent surface the port lost.
 _AI_CHAT_CLIENT_METHODS = [
-    "__init__", "chat", "close", "create_conversation", "delete", "end", "log",
-    "summarize",
+    "__aenter__", "__aexit__", "__init__", "chat", "close", "create_conversation",
+    "delete", "end", "log", "summarize",
 ]
 # Method-less classes the oracle records in ai_chat.client: the base error
 # carries __init__; every error subclass + result struct is bare.

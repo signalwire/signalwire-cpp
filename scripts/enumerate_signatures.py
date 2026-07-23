@@ -1222,7 +1222,9 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
                        _p("message", "string", True),
                        _p("role", "string", False, "user"),
                        _p("config_url", "optional<string>", False),
-                       _p("user_metadata", "optional<dict<string,any>>", False)],
+                       _p("user_metadata", "optional<dict<string,any>>", False),
+                       _p("timeout", "optional<int>", False),
+                       _p("reinit", "bool", False, False)],
             "returns": "class:signalwire.ai_chat.client.ChatResponse",
         },
         "create_conversation": {

@@ -632,6 +632,18 @@
                   "type": "optional<dict<string,any>>",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "reinit",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.ai_chat.client.ChatResponse"

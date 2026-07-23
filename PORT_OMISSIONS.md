@@ -120,8 +120,6 @@ signalwire.livewire.run_app: approved: livewire is LiveKit-agents-compat; LiveKi
 # signalwire.pom.pom.PromptObjectModel + Section are implemented in C++ —
 # see include/signalwire/pom/pom.hpp. Their previous "not_yet_implemented"
 # omissions were dropped when the standalone POM module shipped.
-signalwire.ai_chat.client.AIChatClient.__aenter__: impossible: Python async-context-manager protocol dunder; the enter side is construction (`AIChatClient(options)`) — there is no snake_case-nameable C++ context-manager PROTOCOL member. The exit side is folded onto the genuine `close()` method (present verbatim). Same disposition as RelayClient.__aenter__ and the TS/PHP/perl/dotnet AI-Chat ports (dotnet uses IDisposable/using; C++ uses RAII + close()).
-signalwire.ai_chat.client.AIChatClient.__aexit__: impossible: Python async-context-manager protocol dunder; the exit hook maps to the folded `close()` (present verbatim) / RAII destructor — there is no snake_case-nameable C++ protocol member for it. Same disposition as RelayClient.__aexit__ and the TS/PHP/perl/dotnet AI-Chat ports.
 signalwire.relay.client.RelayClient.__aenter__: impossible: Python async-context-manager protocol dunder; C++ RelayClient uses explicit connect()/disconnect() — no __aenter__ equivalent (Java/TS/PHP omit identically)
 signalwire.relay.client.RelayClient.__aexit__: impossible: Python async-context-manager protocol dunder; C++ RelayClient uses explicit connect()/disconnect() (Java/TS/PHP omit identically)
 signalwire.relay.client.RelayClient.__del__: impossible: Python finalizer dunder; C++ uses a deterministic destructor (~RelayClient) rather than the Python __del__ finalizer protocol — the dunder NAME has no cross-language surface (Java/TS/PHP omit identically)

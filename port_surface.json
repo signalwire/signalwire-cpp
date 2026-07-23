@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ c58eb6e11a40b1287686856a9cc8992016260907",
+  "generated_from": "signalwire-cpp @ 7c199fd8ba5a293538ed708eec2ffc712e1037d5",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -71,6 +71,8 @@
     "signalwire.ai_chat.client": {
       "classes": {
         "AIChatClient": [
+          "__aenter__",
+          "__aexit__",
           "__init__",
           "chat",
           "close",

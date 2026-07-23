@@ -18,6 +18,8 @@
 
 #include <map>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -99,6 +101,16 @@ class SchemaUtils {
   [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_document(
       const json& document) const;
 
+  /// Shallow strict-render check: reject unknown/misspelled TOP-LEVEL keys in a
+  /// verb config against the schema's known property set, WITHOUT running the
+  /// full deep schema (which would false-reject legitimate deep emissions such
+  /// as the ai verb's empty prompt.pom or SWAIG defaults). Used for handler
+  /// verbs (the ai verb) whose deep shapes the handler owns. A no-op when
+  /// validation is disabled or when the verb has no enumerable closed key-set.
+  /// Mirrors Python's SchemaUtils.validate_verb_top_level_keys.
+  [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_verb_top_level_keys(
+      const std::string& verb_name, const json& verb_config) const;
+
   /// Generate a Python-style method signature string for a verb.
   /// Mirrors Python's generate_method_signature(verb_name).
   [[nodiscard]] std::string generate_method_signature(const std::string& verb_name) const;
@@ -115,11 +127,23 @@ class SchemaUtils {
   std::pair<bool, std::vector<std::string>> validate_verb_lightweight(
       const std::string& verb_name, const json& verb_config) const;
 
+  /// Resolve the set of KNOWN top-level property names for a verb's config
+  /// object, following a single ``$ref`` (e.g. AI -> AIObject). Returns
+  /// std::nullopt when the verb's config schema is not a closed
+  /// object-with-properties (so no shallow key check applies). Mirrors
+  /// Python's _verb_top_level_property_names.
+  [[nodiscard]] std::optional<std::set<std::string>> verb_top_level_property_names(
+      const std::string& verb_name) const;
+
   json schema_;
   std::string schema_path_;
   bool validation_enabled_;
   std::map<std::string, VerbInfo> verbs_;
   bool full_validator_;
+  /// Whether the focused verb-level strict-render validator (validate_verb_full:
+  /// unknown/misspelled keys, wrong types, required) is active. Distinct from
+  /// full_validator_ (the unwired whole-document JSON-Schema validator).
+  bool strict_verb_validation_ = false;
 };
 
 }  // namespace utils

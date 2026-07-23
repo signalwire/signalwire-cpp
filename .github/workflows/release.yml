@@ -35,10 +35,9 @@ jobs:
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk
-          # Wave-1 A+ campaign: pins the porting-sdk gate engines + new
-          # PSDK-3/4/5 BEHAVIORAL rules (PAGINATION-CORPUS/RELAY-LIVENESS/
-          # CA-VAR/SECRET-SCRUB) this PR's run-ci exercises. REVERT to main
-          # (drop this ref:) when porting-sdk wave/1-aplus merges.
+          # Publish always builds against porting-sdk main — deliberately NOT the
+          # coordinated-pass PORTING_SDK_REF variable, so a release can never ship from
+          # an unmerged wave branch (see porting-sdk/COORDINATED_PASS.md).
           ref: main
           token: ${{ secrets.PORTING_SDK_TOKEN }}
 

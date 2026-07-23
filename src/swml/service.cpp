@@ -30,14 +30,14 @@ Service::Service() {
 
 signalwire::utils::SchemaUtils& Service::schema_utils() {
   if (!schema_utils_) {
-    schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>();
+    schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>("", schema_validation_);
   }
   return *schema_utils_;
 }
 
 const signalwire::utils::SchemaUtils& Service::schema_utils() const {
   if (!schema_utils_) {
-    schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>();
+    schema_utils_ = std::make_unique<signalwire::utils::SchemaUtils>("", schema_validation_);
   }
   return *schema_utils_;
 }
@@ -200,6 +200,50 @@ bool Service::validate_auth(const httplib::Request& req, httplib::Response& res)
 Service& Service::add_verb(const std::string& section, const std::string& verb_name,
                            const json& params) {
   document_.add_verb_to_section(section, verb_name, params);
+  return *this;
+}
+
+Service& Service::add_verb(const std::string& verb_name, const json& config) {
+  // Strict-render add_verb (Python: SWMLService.add_verb(verb_name, config)).
+  // Validate before appending: unknown verb / misspelled+unknown key /
+  // wrong-typed value raises SchemaValidationError. Handler verbs (ai) are
+  // validated by their handler + a shallow unknown-top-level-key check; their
+  // legitimate DEEP shapes are NOT deep-validated (empty prompt.pom, SWAIG
+  // defaults). No-op checks when schema validation is disabled.
+  auto& su = schema_utils();
+
+  bool is_valid = true;
+  std::vector<std::string> errors;
+
+  static const core::VerbHandlerRegistry kVerbRegistry;
+  if (kVerbRegistry.has_handler(verb_name)) {
+    if (schema_validation_) {
+      auto handler = kVerbRegistry.get_handler(verb_name);
+      core::VerbValidationResult vr = handler->validate_config(config);
+      is_valid = vr.valid;
+      errors = vr.errors;
+      // A handler's validate_config carries verb-specific diagnostics but does
+      // NOT reject unknown/misspelled TOP-LEVEL keys — add the shallow check so
+      // a typo'd top-level ai key (temperatur/zzz) is rejected. Deliberately not
+      // the full deep schema (would false-reject the ai verb's legitimate deep
+      // emissions).
+      if (is_valid) {
+        auto [ok, errs] = su.validate_verb_top_level_keys(verb_name, config);
+        is_valid = ok;
+        errors = errs;
+      }
+    }
+  } else {
+    auto [ok, errs] = su.validate_verb(verb_name, config);
+    is_valid = ok;
+    errors = errs;
+  }
+
+  if (!is_valid) {
+    throw signalwire::utils::SchemaValidationError(verb_name, errors);
+  }
+
+  document_.add_verb(verb_name, config);
   return *this;
 }
 

@@ -3,8 +3,10 @@
 #include "signalwire/utils/schema_utils.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <fstream>
+#include <regex>
 #include <set>
 #include <sstream>
 
@@ -198,8 +200,19 @@ void SchemaUtils::extract_verbs() {
 }
 
 void SchemaUtils::init_full_validator() {
-  // Reserved for full-validator wiring (nlohmann/json-schema-validator).
+  // full_validator_ tracks the (still-unwired) whole-DOCUMENT JSON-Schema
+  // validator — kept false; validate_document reports "not initialized" and
+  // full_validation_available() stays false, matching the reference contract
+  // for a port without jsonschema-rs.
   full_validator_ = false;
+  // strict_verb_validation_ enables the focused verb-level strict-render checks
+  // (validate_verb_full: unknown/misspelled keys, wrong types, required) when
+  // the loaded schema is structurally complete (has the document 'sections'
+  // property and an extracted verb set). Partial/mocked schemas fall back to the
+  // lightweight required-props check so a test stub is never a false reject.
+  const bool has_sections = schema_.contains("properties") && schema_["properties"].is_object() &&
+                            schema_["properties"].contains("sections");
+  strict_verb_validation_ = has_sections && !verbs_.empty();
 }
 
 std::vector<std::string> SchemaUtils::get_all_verb_names() const {
@@ -259,16 +272,305 @@ std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb(
   if (verbs_.find(verb_name) == verbs_.end()) {
     return {false, {std::string("Unknown verb: ") + verb_name}};
   }
-  if (full_validator_) {
+  if (strict_verb_validation_) {
     return validate_verb_full(verb_name, verb_config);
   }
   return validate_verb_lightweight(verb_name, verb_config);
 }
 
+namespace {
+
+// A focused recursive JSON-Schema validator for the strict-render contract.
+// Handles the keyword subset the SWML verb schemas use: $ref (into $defs),
+// anyOf / oneOf unions, type (incl. string `pattern`), object `properties` with
+// closure (additionalProperties:false / unevaluatedProperties disallowed) +
+// required, and array `items`. Enough to reject unknown/misspelled keys and
+// wrong-typed values (an integer field given a string, a SWMLVar-pattern string
+// given a plain string) — the surface the strict-render corpus covers — without
+// pulling in a full JSON-Schema engine. Unknown keywords are permissive (they
+// don't reject), so a shape the subset doesn't model is never a false reject.
+
+bool type_keyword_accepts(const std::string& t, const json& value) {
+  if (t == "string") {
+    return value.is_string();
+  }
+  if (t == "integer") {
+    return value.is_number_integer() || value.is_number_unsigned();
+  }
+  if (t == "number") {
+    return value.is_number();
+  }
+  if (t == "boolean") {
+    return value.is_boolean();
+  }
+  if (t == "array") {
+    return value.is_array();
+  }
+  if (t == "object") {
+    return value.is_object();
+  }
+  if (t == "null") {
+    return value.is_null();
+  }
+  return true;  // unknown keyword — don't reject
+}
+
+// Resolve a single-level $ref ("#/$defs/Name") against the schema root. Returns
+// by value (the referenced sub-schema, or the fragment itself when it is not a
+// resolvable $ref) — the fragments are small and a value return sidesteps any
+// dangling-reference hazard when the caller passes a temporary.
+json deref(const json& schema_root, const json& frag) {
+  if (frag.is_object() && frag.contains("$ref") && frag["$ref"].is_string()) {
+    const std::string ref = frag["$ref"].get<std::string>();
+    const std::string name = ref.substr(ref.find_last_of('/') + 1);
+    if (schema_root.contains("$defs") && schema_root["$defs"].contains(name)) {
+      return schema_root["$defs"][name];
+    }
+  }
+  return frag;
+}
+
+// Does `value` validate against schema fragment `frag` (resolving $ref against
+// schema_root)? Recurses through unions, object properties, and array items.
+bool schema_validate(const json& schema_root, const json& frag, const json& value) {
+  if (!frag.is_object()) {
+    return true;  // `true`-schema / no constraint
+  }
+  if (frag.contains("$ref")) {
+    return schema_validate(schema_root, deref(schema_root, frag), value);
+  }
+
+  for (const char* union_key : {"anyOf", "oneOf"}) {
+    auto it = frag.find(union_key);
+    if (it != frag.end() && it->is_array()) {
+      for (const auto& alt : *it) {
+        if (schema_validate(schema_root, alt, value)) {
+          return true;  // matches a branch (oneOf treated as anyOf — for
+                        // strict-render "matches at least one" suffices)
+        }
+      }
+      return false;
+    }
+  }
+
+  // type keyword
+  auto tit = frag.find("type");
+  if (tit != frag.end()) {
+    bool type_ok = false;
+    if (tit->is_string()) {
+      type_ok = type_keyword_accepts(tit->get<std::string>(), value);
+    } else if (tit->is_array()) {
+      for (const auto& t : *tit) {
+        if (t.is_string() && type_keyword_accepts(t.get<std::string>(), value)) {
+          type_ok = true;
+          break;
+        }
+      }
+    } else {
+      type_ok = true;
+    }
+    if (!type_ok) {
+      return false;
+    }
+  }
+
+  // string pattern (e.g. SWMLVar's ${..}/%{..} constraint)
+  if (value.is_string()) {
+    auto pit = frag.find("pattern");
+    if (pit != frag.end() && pit->is_string()) {
+      try {
+        std::regex re(pit->get<std::string>());
+        if (!std::regex_search(value.get<std::string>(), re)) {
+          return false;
+        }
+      } catch (const std::regex_error& e) {
+        // Unsupported pattern syntax in std::regex — treat as "no pattern
+        // constraint we can enforce" rather than rejecting a possibly-valid
+        // value on our own regex-engine limitation.
+        static_cast<void>(e);
+      }
+    }
+  }
+
+  // object: known-key closure + property schemas + required
+  if (value.is_object()) {
+    const bool closes =
+        frag.value("additionalProperties", json()) == json(false) ||
+        frag.value("unevaluatedProperties", json()) == json(false) ||
+        frag.value("unevaluatedProperties", json()) == json{{"not", json::object()}};
+    const json props = frag.contains("properties") && frag["properties"].is_object()
+                           ? frag["properties"]
+                           : json::object();
+    for (auto field = value.begin(); field != value.end(); ++field) {
+      if (props.contains(field.key())) {
+        if (!schema_validate(schema_root, props[field.key()], field.value())) {
+          return false;
+        }
+      } else if (closes) {
+        return false;  // unknown/misspelled key on a closed object
+      }
+    }
+    auto rit = frag.find("required");
+    if (rit != frag.end() && rit->is_array()) {
+      for (const auto& r : *rit) {
+        if (r.is_string() && !value.contains(r.get<std::string>())) {
+          return false;
+        }
+      }
+    }
+  }
+
+  // array: validate each item against `items`
+  if (value.is_array()) {
+    auto iit = frag.find("items");
+    if (iit != frag.end() && iit->is_object()) {
+      for (const auto& elem : value) {
+        if (!schema_validate(schema_root, *iit, elem)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+// The verb config object schema ("answer" -> the {type:object,properties:...}
+// under Answer.properties.answer), following a single $ref (AI -> AIObject).
+// Returns an empty object when it can't be resolved.
+json resolve_verb_body(const json& schema, const json& verb_definition,
+                       const std::string& verb_name) {
+  if (!verb_definition.is_object() || !verb_definition.contains("properties")) {
+    return json::object();
+  }
+  const auto& props = verb_definition["properties"];
+  if (!props.is_object() || !props.contains(verb_name)) {
+    return json::object();
+  }
+  json body = props[verb_name];
+  if (body.is_object() && body.contains("$ref") && body["$ref"].is_string()) {
+    const std::string ref = body["$ref"].get<std::string>();
+    const std::string name = ref.substr(ref.find_last_of('/') + 1);
+    if (schema.contains("$defs") && schema["$defs"].contains(name)) {
+      body = schema["$defs"][name];
+    }
+  }
+  return body.is_object() ? body : json::object();
+}
+
+bool body_closes(const json& body) {
+  if (body.value("additionalProperties", json()) == json(false)) {
+    return true;
+  }
+  auto it = body.find("unevaluatedProperties");
+  if (it != body.end()) {
+    if (*it == json(false)) {
+      return true;
+    }
+    if (*it == json{{"not", json::object()}}) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+std::optional<std::set<std::string>> SchemaUtils::verb_top_level_property_names(
+    const std::string& verb_name) const {
+  auto it = verbs_.find(verb_name);
+  if (it == verbs_.end()) {
+    return std::nullopt;
+  }
+  json body = resolve_verb_body(schema_, it->second.definition, verb_name);
+  if (!body.is_object() || body.value("type", "") != "object") {
+    return std::nullopt;
+  }
+  auto pit = body.find("properties");
+  if (pit == body.end() || !pit->is_object()) {
+    return std::nullopt;
+  }
+  // Only meaningful as a closed-key check when the schema itself closes the
+  // object (additionalProperties:false or unevaluatedProperties disallowed).
+  if (!body_closes(body)) {
+    return std::nullopt;
+  }
+  std::set<std::string> keys;
+  for (auto p = pit->begin(); p != pit->end(); ++p) {
+    keys.insert(p.key());
+  }
+  return keys;
+}
+
+std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_top_level_keys(
+    const std::string& verb_name, const json& verb_config) const {
+  if (!validation_enabled_) {
+    return {true, {}};
+  }
+  if (verbs_.find(verb_name) == verbs_.end()) {
+    return {false, {std::string("Unknown verb: ") + verb_name}};
+  }
+  auto known = verb_top_level_property_names(verb_name);
+  if (!known.has_value()) {
+    // No enumerable closed key-set — nothing shallow to enforce.
+    return {true, {}};
+  }
+  if (!verb_config.is_object()) {
+    return {true, {}};
+  }
+  std::vector<std::string> unknown;
+  for (auto it = verb_config.begin(); it != verb_config.end(); ++it) {
+    if (known->find(it.key()) == known->end()) {
+      unknown.push_back(it.key());
+    }
+  }
+  if (!unknown.empty()) {
+    std::sort(unknown.begin(), unknown.end());
+    std::string msg = "Unknown/misspelled key(s) [";
+    for (size_t i = 0; i < unknown.size(); ++i) {
+      if (i != 0) {
+        msg += ", ";
+      }
+      msg += "'";
+      msg += unknown[i];
+      msg += "'";
+    }
+    msg += "] for verb '";
+    msg += verb_name;
+    msg += "'";
+    return {false, {msg}};
+  }
+  return {true, {}};
+}
+
 std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_full(
     const std::string& verb_name, const json& verb_config) const {
-  // Reserved for full-validator wiring; falls back to lightweight check.
-  return validate_verb_lightweight(verb_name, verb_config);
+  // Focused strict-render validation for standard (non-handler) verbs: validate
+  // the verb config against its schema body (resolving $ref, handling
+  // anyOf/oneOf branches, object closure + property types + required, string
+  // patterns, array items) via the recursive schema_validate below. This is the
+  // C++ analog of the reference's jsonschema-rs pass for the surface the
+  // strict-render contract covers (verb existence, unknown/misspelled keys,
+  // wrong-typed values, missing required). A verb whose body cannot be resolved
+  // to an actual schema falls back to the lightweight required-props check so a
+  // partial/mocked schema is never a false reject.
+  auto it = verbs_.find(verb_name);
+  if (it == verbs_.end()) {
+    return {false, {std::string("Unknown verb: ") + verb_name}};
+  }
+  json body = resolve_verb_body(schema_, it->second.definition, verb_name);
+  if (!body.is_object() ||
+      (!body.contains("properties") && !body.contains("oneOf") && !body.contains("anyOf"))) {
+    // Not a resolvable object/union schema — fall back to lightweight.
+    return validate_verb_lightweight(verb_name, verb_config);
+  }
+  if (schema_validate(schema_, body, verb_config)) {
+    return {true, {}};
+  }
+  std::string msg = "Schema validation error for '";
+  msg += verb_name;
+  msg += "': config does not match schema";
+  return {false, {msg}};
 }
 
 std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_lightweight(

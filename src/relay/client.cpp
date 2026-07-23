@@ -154,9 +154,33 @@ void RelayClient::disconnect() {
 
   reject_all_pending();
 
+  // ORDER IS LOAD-BEARING (use-after-free fix). Tear down the WebSocket FIRST:
+  // ws_->close() joins the IXWebSocket receive thread, so once it returns no
+  // more inbound frames can be dispatched. The receive thread routes events via
+  // a RAW Call* into calls_/owned_calls_ (on_ws_message -> route_event ->
+  // handle_component_event -> Call::dispatch_event, which locks the Call's
+  // SharedState mutex). If we cleared the call registries BEFORE joining, an
+  // in-flight frame's raw Call* (and its SharedState) would be freed underneath
+  // the receive thread mid-dispatch -> a crash in Call::dispatch_event's
+  // lock_guard on freed memory (observed as an intermittent SIGSEGV in the relay
+  // mock tests under CPU contention, which widens the race window). Joining
+  // first makes the subsequent registry clear race-free.
   if (ws_) {
     ws_->close();
     ws_.reset();
+  }
+
+  // Sweep the call registry on disconnect (r5 F5.4): a connection tear-down
+  // ends every call, so any entry whose terminal event never arrived must not
+  // survive the session and leak into a reconnect. Safe now that the receive
+  // thread is joined — no callback can hold a raw Call* into these containers.
+  {
+    std::lock_guard<std::mutex> lock(calls_mutex_);
+    calls_.clear();
+  }
+  {
+    std::lock_guard<std::mutex> lock(owned_calls_mutex_);
+    owned_calls_.clear();
   }
 }
 
@@ -458,6 +482,19 @@ void RelayClient::handle_inbound_call(const RelayEvent& ev) {
 
   if (call_id.empty()) {
     return;
+  }
+
+  // MAX_ACTIVE_CALLS cap (r5 F5.4): enforce the bound at insertion time so a
+  // suppressed/dropped terminal event can never grow calls_ without limit. If
+  // the map is already at max_active_calls, drop the inbound call rather than
+  // register it (mirrors python's _handle_inbound_call len-guard).
+  {
+    std::lock_guard<std::mutex> lock(calls_mutex_);
+    if (static_cast<int>(calls_.size()) >= config_.max_active_calls) {
+      get_logger().error("Max active calls (" + std::to_string(config_.max_active_calls) +
+                         ") reached, dropping inbound call " + call_id);
+      return;
+    }
   }
 
   // Create a new Call object

@@ -234,6 +234,10 @@ class Step {
   [[nodiscard]] json to_json() const;
 
   const std::string& name() const { return name_; }
+  [[nodiscard]] const std::optional<std::variant<std::string, std::vector<std::string>>>&
+  functions() const {
+    return functions_;
+  }
   [[nodiscard]] const std::optional<std::vector<std::string>>& valid_steps() const {
     return valid_steps_;
   }

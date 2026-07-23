@@ -111,6 +111,12 @@ AIChatClient::AIChatClient(const AIChatClientOptions& options)
 
 AIChatClient::~AIChatClient() = default;
 
+// cpp-httplib is stateless (per-request Client), so there is nothing to
+// release -- a well-defined no-op mirroring the python reference's
+// close() (and the TS no-op close()). Kept explicit so the reference's
+// context-manager-exit / explicit-release shape maps 1:1.
+void AIChatClient::close() {}
+
 json AIChatClient::request(const std::string& method, const json& params) {
   ++request_counter_;
   json payload = {

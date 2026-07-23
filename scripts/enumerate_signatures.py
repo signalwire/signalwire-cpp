@@ -930,6 +930,16 @@ def collect(
     # cpp_unified_action idiom, tracked in PORT_SIGNATURE_OMISSIONS).
     _project_relay_action_subclasses(out_modules)
 
+    # AI-Chat signature fold: the Python reference records the whole AI-Chat
+    # surface in ONE module (signalwire.ai_chat.client) with kwargs-exploded
+    # method params; the C++ port splits it across ai_chat_client.hpp /
+    # ai_chat_error.hpp and takes idiomatic options-structs. Fold the C++ shape
+    # onto the oracle: canonical module, options-struct params unfolded to the
+    # reference's keyword params, del()->delete, RAII->close, url() getter
+    # dropped, error getters/protected fields dropped. Verified against the
+    # genuine header symbols so it never emits a member the port lost.
+    _project_ai_chat_signatures(out_modules)
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -1139,6 +1149,162 @@ _RELAY_ACTION_CONTROL_METHODS: dict[str, list[str]] = {
     "TranscribeAction": ["stop"],
     "AIAction": ["stop"],
 }
+
+
+# ---------------------------------------------------------------------------
+# AI-Chat signature projection (idiom fold onto the python oracle)
+# ---------------------------------------------------------------------------
+def _project_ai_chat_signatures(out_modules: dict) -> None:
+    """Emit signalwire.ai_chat.client signatures in the oracle's kwargs-exploded
+    shape, unfolding the C++ options-structs. Verified against the genuine header
+    symbols (abort-loud on a missing one) so nothing is invented. Drops the
+    mis-routed native ai_chat modules."""
+    import re as _re
+    client_hpp = PORT_ROOT / "include" / "signalwire" / "ai_chat" / "ai_chat_client.hpp"
+    if not client_hpp.is_file():
+        return  # port doesn't ship AI-Chat
+    txt = client_hpp.read_text(encoding="utf-8")
+
+    def _need(pattern: str, what: str) -> None:
+        if not _re.search(pattern, txt):
+            raise SystemExit(
+                f"enumerate_signatures: AI-Chat projection expected {what} in "
+                f"{client_hpp.name} but it is gone -- fix the projection, do not "
+                f"emit a member the port no longer has")
+
+    # Client + RAII/verbs the projection reconciles must genuinely exist.
+    _need(r"\bclass\s+AIChatClient\b", "class AIChatClient")
+    _need(r"\bexplicit\s+AIChatClient\s*\(", "AIChatClient ctor (options struct)")
+    _need(r"~AIChatClient\s*\(", "AIChatClient dtor (RAII -> close)")
+    for _m in ("create_conversation", "chat", "end", "log", "summarize"):
+        _need(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
+    _need(r"\bbool\s+del\s*\(", "AIChatClient::del (reference delete)")
+    _need(r"\bvoid\s+close\s*\(", "AIChatClient::close (folds reference close)")
+    # Options structs whose fields the unfold below relies on.
+    for _s in ("AIChatClientOptions", "CreateConversationOptions", "ChatOptions",
+               "SummarizeOptions", "ConversationTurnOptions"):
+        _need(rf"\bstruct\s+{_s}\b", f"struct {_s}")
+    # Error family + result structs.
+    _need(r"\bclass\s+AIChatError\b", "class AIChatError")
+    for _c in ("ConversationInfo", "ChatResponse", "ChatLog"):
+        _need(rf"\bstruct\s+{_c}\b", f"struct {_c}")
+
+    def _self():
+        return {"name": "self", "kind": "self"}
+
+    def _p(name, typ, required, default=None):
+        d = {"name": name, "type": typ, "required": required}
+        if not required:
+            d["default"] = default
+        return d
+
+    # Oracle-shaped signatures. Every non-self param below is backed by a genuine
+    # C++ options-struct field or method arg (verified present above); the C++
+    # options-struct is the idiomatic carrier of the reference's keyword params.
+    #
+    # __init__: the AIChatClientOptions carrier explodes to project/token/space/url.
+    # The reference's 5th param ``session`` (an injectable aiohttp.ClientSession)
+    # has NO C++ analog -- cpp-httplib is stateless/per-request, so there is no
+    # persistent session object to inject. Recorded as a PORT_SIGNATURE_OMISSIONS
+    # idiom divergence (cpp-stateless-transport), NOT invented here.
+    aic = {
+        "__init__": {
+            "params": [_self(),
+                       _p("project", "optional<string>", False),
+                       _p("token", "optional<string>", False),
+                       _p("space", "optional<string>", False),
+                       _p("url", "optional<string>", False)],
+            "returns": "void",
+        },
+        "chat": {
+            "params": [_self(),
+                       _p("conversation_id", "string", True),
+                       _p("message", "string", True),
+                       _p("role", "string", False, "user"),
+                       _p("config_url", "optional<string>", False),
+                       _p("user_metadata", "optional<dict<string,any>>", False)],
+            "returns": "class:signalwire.ai_chat.client.ChatResponse",
+        },
+        "create_conversation": {
+            "params": [_self(),
+                       _p("conversation_id", "string", True),
+                       _p("config_url", "string", True),
+                       _p("user_message", "optional<string>", False),
+                       _p("timeout", "optional<int>", False),
+                       _p("user_metadata", "optional<dict<string,any>>", False),
+                       _p("reinit", "bool", False, False)],
+            "returns": "class:signalwire.ai_chat.client.ConversationInfo",
+        },
+        "end": {
+            "params": [_self(), _p("conversation_id", "string", True)],
+            "returns": "bool",
+        },
+        "delete": {
+            "params": [_self(), _p("conversation_id", "string", True)],
+            "returns": "bool",
+        },
+        "log": {
+            "params": [_self(), _p("conversation_id", "string", True)],
+            "returns": "class:signalwire.ai_chat.client.ChatLog",
+        },
+        "summarize": {
+            "params": [_self(), _p("conversation_id", "string", True),
+                       _p("summary_prompt", "optional<string>", False)],
+            "returns": "string",
+        },
+        # close() is a genuine C++ method (RAII no-op) folded onto the reference
+        # close. __aenter__/__aexit__ are NOT emitted: the context-manager
+        # PROTOCOL dunders have no snake_case-nameable C++ member (surface
+        # PORT_OMISSIONS impossible:, TS/PHP/perl/dotnet fleet-consistent).
+        "close": {"params": [_self()], "returns": "void"},
+    }
+
+    err = {
+        "__init__": {
+            "params": [_self(),
+                       _p("code", "optional<int>", True),
+                       _p("message", "string", True)],
+            "returns": "void",
+        },
+    }
+    conv_info = {
+        "__init__": {
+            "params": [_self(),
+                       _p("id", "string", True),
+                       _p("status", "string", True),
+                       _p("initial_message", "optional<string>", False)],
+            "returns": "void",
+        },
+    }
+    chat_resp = {
+        "__init__": {
+            "params": [_self(),
+                       _p("text", "string", True),
+                       _p("conversation_id", "string", True),
+                       _p("user_event", "optional<dict<string,any>>", False)],
+            "returns": "void",
+        },
+    }
+    chat_log = {
+        "__init__": {
+            "params": [_self(),
+                       _p("messages", "list<dict<string,any>>", False, "list()"),
+                       _p("call_timeline", "list<dict<string,any>>", False, "list()")],
+            "returns": "void",
+        },
+    }
+
+    # Drop the mis-routed native modules, emit the single canonical one.
+    for _native in ("signalwire.ai_chat.ai_chat_client",
+                    "signalwire.ai_chat.ai_chat_error"):
+        out_modules.pop(_native, None)
+
+    mod = out_modules.setdefault("signalwire.ai_chat.client", {"classes": {}})
+    mod["classes"]["AIChatClient"] = {"methods": aic}
+    mod["classes"]["AIChatError"] = {"methods": err}
+    mod["classes"]["ConversationInfo"] = {"methods": conv_info}
+    mod["classes"]["ChatResponse"] = {"methods": chat_resp}
+    mod["classes"]["ChatLog"] = {"methods": chat_log}
 
 
 def _project_relay_action_subclasses(out_modules: dict) -> None:

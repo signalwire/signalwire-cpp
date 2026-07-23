@@ -218,6 +218,22 @@ TEST(ai_chat_throws_when_no_url_or_space) {
   return true;
 }
 
+// close() is a well-defined no-op (cpp-httplib is stateless -- no owned session
+// to release), mirroring the python reference's close() and the TS no-op. It is
+// callable and idempotent, and the client stays usable across a close() (the
+// per-request Client makes each call independent).
+TEST(ai_chat_close_is_idempotent_noop) {
+  AIChatClientOptions opts;
+  opts.project = "p";
+  opts.token = "t";
+  opts.url = "http://local/api/ai/chat";
+  AIChatClient c(opts);
+  c.close();
+  c.close();  // idempotent
+  ASSERT_EQ(c.url(), std::string("http://local/api/ai/chat"));
+  return true;
+}
+
 // ── wire behavior ──────────────────────────────────────────────────────
 
 TEST(ai_chat_basic_auth_project_username_identity_not_in_params) {

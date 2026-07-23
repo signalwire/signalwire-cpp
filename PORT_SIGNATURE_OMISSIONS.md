@@ -203,10 +203,20 @@ diverge from Python's.
   json)>`) to the standard `(args, raw_data)` calling convention rather than
   a bare Python callable.
 
+- `cpp_stateless_transport_no_session`: Python's `AIChatClient.__init__`
+  accepts an optional `session: aiohttp.ClientSession` so a caller can
+  inject a shared, connection-pooled async HTTP session. The C++ client
+  is built on cpp-httplib, which is stateless/per-request — there is no
+  persistent session OBJECT to accept, so the port has no analog for that
+  5th parameter. Every OTHER `__init__` keyword (project/token/space/url)
+  is present via the `AIChatClientOptions` struct; only the session
+  injectable is language-idiom-absent. NEEDS HUMAN APPROVAL.
+
 ## Documented signature divergences
 
 ### __init__ default-only / config-struct construction
 
+signalwire.ai_chat.client.AIChatClient.__init__: cpp_stateless_transport_no_session
 signalwire.agent_server.AgentServer.__init__: cpp_constructor_default_only
 signalwire.core.agent_base.AgentBase.__init__: cpp_constructor_default_only
 signalwire.core.contexts.Context.__init__: cpp_constructor_default_only

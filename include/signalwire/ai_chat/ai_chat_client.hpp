@@ -221,6 +221,15 @@ class AIChatClient {
   /// The fully-qualified endpoint URL requests are POSTed to.
   const std::string& url() const { return url_; }
 
+  /// Release any client-owned transport resources. cpp-httplib is stateless (a
+  /// fresh ``httplib::Client`` is created per request), so there is no persistent
+  /// session to tear down -- this is a well-defined no-op that keeps the
+  /// python reference's explicit-release / context-manager-exit shape
+  /// (``client.close()`` / ``async with client:``) usable verbatim. Mirrors the
+  /// python reference ``AIChatClient.close`` (and the TS no-op ``close()``).
+  /// Idempotent; safe to call more than once. The destructor needs no extra work.
+  void close();
+
   /// Create a conversation (or, with ``reinit``, reinitialize an existing one)
   /// and optionally send its opening user message.
   ConversationInfo create_conversation(const std::string& conversation_id,

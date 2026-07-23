@@ -591,6 +591,11 @@ run_gate "NO-CHEAT" "audit_no_cheat_tests" \
 run_gate "COORDINATED-PASS" "a non-main porting-sdk pin must be declared on the PR (Coordinated-With: line or coordinated-pass label)" \
     python3 "$PORTING_SDK_DIR/scripts/coordinated_pass.py" --porting-sdk "$PORTING_SDK_DIR"
 
+# COORDINATED-REFS — every coordinated-set checkout (porting-sdk + python oracle +
+# matrix ports) must use PORTING_SDK_REF, not a literal ref (else stale-main during a pass).
+run_gate "COORDINATED-REFS" "every coordinated-set checkout uses PORTING_SDK_REF, not a literal ref" \
+    python3 "$PORTING_SDK_DIR/scripts/check_coordinated_refs.py" --repo "$PORT_ROOT"
+
 # FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
 

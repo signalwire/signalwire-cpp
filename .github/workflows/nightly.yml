@@ -101,7 +101,7 @@ jobs:
         with:
           repository: signalwire/signalwire-python
           path: signalwire-python
-          ref: main
+          ref: ${{ vars.PORTING_SDK_REF || 'main' }}
 
       - name: Setup Python (audit scripts + mock servers + libclang)
         uses: actions/setup-python@v6

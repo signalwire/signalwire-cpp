@@ -137,6 +137,16 @@ class Service {
 
   Service& add_verb(const std::string& section, const std::string& verb_name, const json& params);
 
+  /// Add a verb to the main section with strict schema validation (Python:
+  /// ``SWMLService.add_verb(verb_name, config)``). Validates the config before
+  /// appending: an unknown verb, a misspelled/unknown config key, or a
+  /// wrong-typed value throws ``signalwire::utils::SchemaValidationError``. The
+  /// ai (handler) verb is validated by its handler plus a shallow
+  /// unknown-top-level-key check — its legitimate deep shapes (empty prompt.pom,
+  /// SWAIG defaults) are NOT deep-validated. A no-op check when schema
+  /// validation is disabled. Distinct 2-arg overload of the 3-arg section form.
+  Service& add_verb(const std::string& verb_name, const json& config);
+
   // ========================================================================
   // Document access
   // ========================================================================
@@ -399,6 +409,9 @@ class Service {
 
   std::optional<std::string> manual_proxy_url_;
   bool full_validation_ = false;
+  /// Strict schema validation for the 2-arg add_verb (Python: SWMLService
+  /// schema_validation, default True).
+  bool schema_validation_ = true;
   std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
   std::vector<std::shared_ptr<signalwire::core::SWMLVerbHandler>> verb_handlers_;
 

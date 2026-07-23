@@ -311,6 +311,13 @@ target_link_libraries(http_dump signalwire)
 # include path, same as wait_liveness_dump reusing relay_mocktest.cpp.
 add_executable(envelope_dump tools/envelope_dump.cpp tests/mocktest.cpp)
 target_link_libraries(envelope_dump signalwire)
+
+# ai_chat_dump — the AI-CHAT wire-behavioral gate's dump program
+# (porting-sdk/scripts/diff_port_ai_chat.py). Drives the AIChatClient through
+# the shared ai_chat_corpus against porting-sdk's in-process mock_ai_chat
+# (MOCK_AI_CHAT_URL) and prints ONE JSON object to stdout.
+add_executable(ai_chat_dump tools/ai_chat_dump.cpp)
+target_link_libraries(ai_chat_dump signalwire)
 target_include_directories(envelope_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_compile_definitions(envelope_dump PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 

@@ -159,6 +159,10 @@ static std::vector<TestCase>& get_tests() {
 #include "test_rest_namespaces.cpp"
 #include "test_rest_phone_binding.cpp"
 
+// AI Chat client (signalwire::ai_chat::AIChatClient) — mirrors the TS
+// template tests/ai-chat/AIChatClient.test.ts + the python reference.
+#include "test_ai_chat_client.cpp"
+
 // MCP integration tests
 #include "test_mcp.cpp"
 

@@ -59,7 +59,16 @@ jobs:
         # --exit-code` after a fresh regen could never pass because the script
         # embeds the current HEAD SHA, which by definition differs from the
         # SHA recorded when the committed file was generated.
+        #
+        # PORTING_SDK must point at the in-repo porting-sdk checkout: the surface
+        # enumerator now consults the reference oracle (python_surface.json) for the
+        # composition-attribute projection, and its adjacency fallback is
+        # `<repo>/../porting-sdk` — which does not exist in CI's in-repo `./porting-sdk`
+        # layout. Without this, the regen silently degrades (drops the projected
+        # members) and the committed-vs-fresh compare fails as a phantom "stale".
         run: python3 scripts/enumerate_surface.py --check --output port_surface.json
+        env:
+          PORTING_SDK: ${{ github.workspace }}/porting-sdk
 
       - name: Diff against Python reference
         run: |

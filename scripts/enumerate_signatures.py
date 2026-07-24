@@ -940,6 +940,22 @@ def collect(
     # genuine header symbols so it never emits a member the port lost.
     _project_ai_chat_signatures(out_modules)
 
+    # Typed relay Event dataclasses: project their public @dataclass payload fields
+    # as zero-arg getters, gated on the oracle's signalwire.relay.event getter set
+    # (the structs inherit from RelayEvent, so the generated-payload parser can't
+    # reach them — this handles the inheriting form). Field-vs-getter idiom, RULES §2.
+    _project_named_struct_getters(
+        out_modules, "signalwire.relay.event",
+        PORT_ROOT / "include" / "signalwire" / "relay" / "typed_events.hpp")
+
+    # RequestOptions optional-field getters (timeout/retries/retry_on_status/
+    # retry_backoff), gated on the oracle's _request_options getter set. abort_signal
+    # is a pointer field (documented cpp_field_not_property omission) and merge is a
+    # real method libclang already emits — neither is touched here.
+    _project_named_struct_getters(
+        out_modules, "signalwire.rest._request_options",
+        PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp")
+
     sorted_modules = {}
     for k in sorted(out_modules):
         entry = out_modules[k]
@@ -1133,6 +1149,83 @@ def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
     return out
 
 
+# ``struct/class Name[ : bases] { … };`` — captures a named struct body even when
+# it inherits (``: public RelayEvent``), which the generated-payload ``struct Name {``
+# regex above does not. Used for the relay Event dataclasses + RequestOptions.
+_NAMED_STRUCT_RE_SIG = re.compile(
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+
+
+def _named_struct_public_fields(header: Path) -> dict[str, list[str]]:
+    """``{StructName: [wire_field, …]}`` for every named struct/class in
+    ``header`` (inheriting or not), each field mapped to its wire-key name
+    (honouring ``// wire key:``). A method has ``(`` before the first ``=``/``;``;
+    a data-member field carries ``(`` only inside an initializer
+    (``json x = json::object();``) — discriminate on paren position so the
+    ``json …`` payload fields survive while methods are skipped."""
+    out: dict[str, list[str]] = {}
+    if not header.is_file():
+        return out
+    src = header.read_text(encoding="utf-8")
+    for sm in _NAMED_STRUCT_RE_SIG.finditer(src):
+        cls, body = sm.group(1), sm.group(2)
+        fields: list[str] = []
+        for line in body.splitlines():
+            eq, sc = line.find("="), line.find(";")
+            bounds = [i for i in (eq, sc) if i != -1]
+            boundary = min(bounds) if bounds else len(line)
+            lp = line.find("(")
+            if lp != -1 and lp < boundary:
+                continue
+            m = _GEN_FIELD_RE.match(line)
+            if not m:
+                continue
+            ident, comment = m.group(1), m.group(2) or ""
+            wk = _WIRE_KEY_RE.search(comment)
+            fields.append(wk.group(1) if wk else ident)
+        if fields:
+            out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _project_named_struct_getters(out_modules: dict, module: str, header: Path) -> None:
+    """Project a header's named-struct public data-member FIELDS as zero-arg
+    property getters onto ``module``, gated on the oracle's per-class getter set.
+
+    The reference records each @dataclass field as a self-only getter; the C++
+    port carries them as public struct fields libclang emits no method for, so
+    without this every oracle getter reads as missing-port DRIFT. Emit only a
+    field the oracle records as a getter for that class (the intersection guards
+    against inventing surface). Field-vs-getter SHAPE idiom via the enumerator
+    (RULES §2), the analogue of ``_project_gen_payload_getters`` for the
+    inheriting relay Event structs + RequestOptions."""
+    ref = _load_python_signatures()
+    ref_classes = ref.get("modules", {}).get(module, {}).get("classes", {})
+    if not ref_classes:
+        return
+    struct_fields = _named_struct_public_fields(header)
+    if not struct_fields:
+        return
+    mod_entry = out_modules.setdefault(module, {"classes": {}})
+    mod_entry.setdefault("classes", {})
+    for cls, fields in struct_fields.items():
+        ref_cls = ref_classes.get(cls)
+        if not ref_cls:
+            continue
+        oracle_getters = {
+            m for m in ref_cls.get("methods", {}) if m != "__init__"
+        }
+        present = [f for f in fields if f in oracle_getters]
+        if not present:
+            continue
+        cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
+        for field in present:
+            cls_entry["methods"].setdefault(field, {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "any",
+            })
+
+
 # Oracle-recorded control methods per concrete RELAY call-action (mirrors
 # enumerate_surface.RELAY_ACTION_CONTROL_METHODS). Every concrete subclass
 # inherits these from the unified C++ Action.
@@ -1269,6 +1362,14 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
             "returns": "void",
         },
     }
+    # Each result DTO is @dataclass-shaped in the reference: besides ``__init__``
+    # the oracle records every field as a zero-arg property getter. The C++ port
+    # carries them as public struct fields; emit the oracle's getter shape (self-
+    # only, ``any`` return — types_compatible treats ``any`` as compatible with the
+    # oracle's typed getter returns) so the field-idiom folds onto the reference.
+    def _getter() -> dict:
+        return {"params": [_self()], "returns": "any"}
+
     conv_info = {
         "__init__": {
             "params": [_self(),
@@ -1277,6 +1378,9 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
                        _p("initial_message", "optional<string>", False)],
             "returns": "void",
         },
+        "id": _getter(),
+        "status": _getter(),
+        "initial_message": _getter(),
     }
     chat_resp = {
         "__init__": {
@@ -1286,6 +1390,9 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
                        _p("user_event", "optional<dict<string,any>>", False)],
             "returns": "void",
         },
+        "text": _getter(),
+        "conversation_id": _getter(),
+        "user_event": _getter(),
     }
     chat_log = {
         "__init__": {
@@ -1294,6 +1401,8 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
                        _p("call_timeline", "list<dict<string,any>>", False, "list()")],
             "returns": "void",
         },
+        "messages": _getter(),
+        "call_timeline": _getter(),
     }
 
     # Drop the mis-routed native modules, emit the single canonical one.

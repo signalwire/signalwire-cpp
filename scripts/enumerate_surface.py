@@ -1043,6 +1043,14 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
     for _c in _AI_CHAT_EMPTY_CLASSES:
         client_mod["classes"][_c] = []
 
+    # The result DTOs (ChatResponse/ChatLog/ConversationInfo) are @dataclass-shaped
+    # in the reference: their surface members are bare public data fields, which the
+    # C++ port carries as struct fields the method-walker skipped. Emit those fields,
+    # gated on the oracle's per-class set (drops port-internal scalars like
+    # ConversationInfo.has_initial_message that the reference does not record). The
+    # error subclasses stay method-less (they carry no oracle-recorded field).
+    _emit_oracle_gated_fields(modules, "signalwire.ai_chat.client", client_hpp)
+
 
 # ---------------------------------------------------------------------------
 # Parser
@@ -1654,6 +1662,110 @@ def _project_client_tree_members(modules: dict) -> None:
         mod_entry["classes"][cls] = sorted(set(existing) | set(present))
 
 
+# ---------------------------------------------------------------------------
+# Public data-member field projection (field-idiom fold onto the oracle)
+# ---------------------------------------------------------------------------
+# The regex header walker only registers members with a ``(`` (methods). Several
+# reference classes are @dataclass-shaped: their surface members are bare public
+# DATA FIELDS (``std::string call_state;``), which the walker never emits. The
+# reference oracle now records those fields (relay Event dataclasses, the AI-Chat
+# result DTOs, RequestOptions). Fold the C++ field-idiom onto the oracle: parse a
+# named struct/class's public data-member fields and emit exactly the ones the
+# oracle records for that class — never a port-internal helper the reference lacks
+# (the intersection is the guard). Shape idiom reconciled via the enumerator
+# (RULES §2), the surface analogue of the signature side's field projection.
+
+# ``struct/class Name[ : bases] { ... };`` — captures the body of a named struct
+# even when it inherits (``: public RelayEvent``), which the generated-payload
+# parser's ``struct Name {`` regex does not handle. Non-greedy to the matching
+# ``\n};`` at column 0.
+_NAMED_STRUCT_RE = re.compile(
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+
+
+def _struct_public_fields(header_txt: str) -> dict[str, list[str]]:
+    """``{StructName: [field, …]}`` for every named struct/class in ``header_txt``.
+
+    Only bare data-member fields are returned (lines with ``(`` — methods,
+    initializers — are skipped). Honours a ``// wire key: <name>`` comment on a
+    reserved-word rename. Visibility is not tracked; the caller intersects with
+    the oracle, so any private/helper field the reference does not record is
+    dropped anyway."""
+    out: dict[str, list[str]] = {}
+    for sm in _NAMED_STRUCT_RE.finditer(header_txt):
+        cls, body = sm.group(1), sm.group(2)
+        fields: list[str] = []
+        for line in body.splitlines():
+            # A method has ``(`` BEFORE the first ``=``/``;``; a data-member field
+            # may carry ``(`` only inside its initializer (``json x = json::object();``).
+            # Discriminating on paren-position keeps the ``json …`` payload fields
+            # (dropped by a naive ``if "(" in line``) while still skipping methods.
+            eq, sc = line.find("="), line.find(";")
+            bounds = [i for i in (eq, sc) if i != -1]
+            boundary = min(bounds) if bounds else len(line)
+            lp = line.find("(")
+            if lp != -1 and lp < boundary:
+                continue
+            m = _GEN_FIELD_RE_SURF.match(line)
+            if not m:
+                continue
+            ident, comment = m.group(1), m.group(2) or ""
+            wk = _WIRE_KEY_RE_SURF.search(comment)
+            fields.append(wk.group(1) if wk else ident)
+        if fields:
+            out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _emit_oracle_gated_fields(modules: dict, module: str, header: Path) -> None:
+    """Union each struct's public data-member fields into ``module``'s class
+    entries, intersected with the fields the reference oracle records for that
+    class. A field surfaces only if the oracle lists it for the same class, so
+    the port's field-idiom folds exactly onto the reference dataclass fields and
+    never invents surface the reference lacks."""
+    if not header.is_file():
+        return
+    ref = _load_reference_surface()
+    ref_classes = ref.get("modules", {}).get(module, {}).get("classes", {})
+    if not ref_classes:
+        return
+    struct_fields = _struct_public_fields(header.read_text(encoding="utf-8"))
+    if not struct_fields:
+        return
+    mod_entry = modules.setdefault(module, {"classes": {}, "functions": []})
+    for cls, fields in struct_fields.items():
+        ref_members = ref_classes.get(cls)
+        if not ref_members:
+            continue
+        ref_set = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+        present = [f for f in fields if f in ref_set]
+        if not present:
+            continue
+        existing = mod_entry["classes"].get(cls, [])
+        mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
+def _project_relay_event_fields(modules: dict, repo: Path) -> None:
+    """Emit the public data-member fields of the typed relay Event structs
+    (``typed_events.hpp``) as surface members, gated on the oracle's per-class
+    member set for ``signalwire.relay.event``. The structs already surface via
+    ``from_payload``; this adds the @dataclass payload fields (``call_state``,
+    ``control_id``, ``message_state``, …) the walker skipped."""
+    header = repo / "include/signalwire/relay/typed_events.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.relay.event", header)
+
+
+def _project_request_options_fields(modules: dict, repo: Path) -> None:
+    """Emit RequestOptions' public ``std::optional<…>`` data-member fields
+    (``timeout``/``retries``/``retry_on_status``/``retry_backoff``) as surface
+    members, gated on the oracle's ``signalwire.rest._request_options`` set. The
+    ``abort_signal`` pointer + ``merge`` method surface via _ensure_member / the
+    method walker; these four optional fields are what the walker skipped."""
+    header = repo / "include/signalwire/rest/request_options.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.rest._request_options", header)
+
+
 def build_snapshot(repo: Path, include_dir: Path) -> dict:
     global _INCLUDE_ROOT
     # GENERATED_PAYLOAD_NS keys begin at ``signalwire::``; the header for
@@ -1860,6 +1972,14 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # Generated namespace containers: project their resource-accessor data members
     # as surface members (intersected with the oracle's recorded B1 composition attrs).
     _project_client_tree_members(modules)
+
+    # Typed relay Event structs: project their @dataclass payload fields as surface
+    # members (intersected with the oracle's signalwire.relay.event per-class set).
+    _project_relay_event_fields(modules, repo)
+
+    # RequestOptions: project its public std::optional<…> data-member fields as
+    # surface members (intersected with the oracle's _request_options set).
+    _project_request_options_fields(modules, repo)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

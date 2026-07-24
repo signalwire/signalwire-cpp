@@ -348,13 +348,6 @@ signalwire.core.swml_service.SWMLService.get_basic_auth_credentials: cpp_overloa
 signalwire.core.swml_service.SWMLService.serve: cpp_typed_overload_subset
 signalwire.relay.client.RelayClient.send_message: cpp_typed_overload_subset
 signalwire.rest._base.HttpClient.post: cpp_post_no_params
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_ai_agent: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_call_flow: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_cxml_application: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_cxml_webhook: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_relay_application: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_relay_topic: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_swml_webhook: cpp_typed_setter_no_extra_dict
 signalwire.skills.registry.SkillRegistry.register_skill: cpp_register_skill_factory
 
 ### Type / kind divergences
@@ -592,3 +585,48 @@ signalwire.core.mixins.tool_mixin.ToolMixin.tool: cpp_no_decorator: Python @tool
 signalwire.core.mixins.web_mixin.WebMixin.get_app: cpp_no_framework_app: returns a FastAPI/Flask app object; C++ runs httplib directly with no app object to return. Documented under agentbase-family.get_app in PORT_OMISSIONS.md (Java/TS/PHP omit likewise).
 signalwire.pom.pom.PromptObjectModel.sections: cpp_field_not_property: Python PromptObjectModel.sections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as pom.sections — public-collection idiom.
 signalwire.pom.pom.Section.subsections: cpp_field_not_property: Python Section.subsections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as section.subsections — public-collection idiom.
+
+# ---- dual-gate: dead for SURFACE-DIFF (A-fold/G-fold/folded types drop these as
+# surface symbols), but LIVE for this signature DRIFT gate — the signature gate has
+# no SWML-verb / override / base-ctor fold, so the port-only signatures need an
+# explicit signature-omission entry here. Moved from PORT_ADDITIONS during the
+# wave-3 dead-entry sweep. ----
+signalwire.core.agent_base.AgentBase.handle_request: cpp_override_recorded_on_base: Python's AgentBase overrides SWMLService.handle_request (agent_base.py) so the primitive dispatch renders SWML via AgentBase's request-aware path; the Python signature oracle records handle_request only on the base SWMLService (override dedup), so the C++ AgentBase override — genuinely present in both — surfaces here as an addition against the deduped reference. Same (method,url,headers,body)->(status,headers,body) primitive.
+signalwire.core.swml_service.SWMLService.ai: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.amazon_bedrock: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.answer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.cond: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.connect: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.denoise: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.detect_machine: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.enter_queue: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.execute: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.hangup: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.join_conference: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.join_room: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.label: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.live_transcribe: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.live_translate: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.pay: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.play: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.prompt: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.receive_fax: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.record: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.record_call: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.request: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_digits: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_fax: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_sms: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.set: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.sip_refer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.sleep: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_denoise: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_record_call: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_tap: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.tap: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.transfer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.unset: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.user_event: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.rest._base.CrudResource.__init__: cpp_base_ctor: the C++ hand base CrudResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (HttpClient receiver + composed base path); Python's CrudResource inherits __init__ up its base chain and griffe records no own __init__ on it. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
+signalwire.rest._base.ReadResource.__init__: cpp_base_ctor: the C++ hand base ReadResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (receiver + composed base path); Python's ReadResource inherits __init__ from BaseResource and griffe records no own __init__ on ReadResource. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
+signalwire.agent_server.AgentServer.app: cpp_only: Python AgentServer.app exposes the underlying Flask/FastAPI app for advanced HTTP integration; C++ AgentServer uses httplib directly with no analogous app object to surface. End users reach HTTP customization via on_request / on_swml_request / register_route hooks instead. (Signature missing-port: the surface oracle omits `app`, so its former SURFACE omission was dead and was removed; the signature oracle records it, so it is excused here.)

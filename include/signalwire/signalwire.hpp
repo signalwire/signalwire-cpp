@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "signalwire/agent/agent_base.hpp"
+#include "signalwire/ai_chat/ai_chat_client.hpp"
 #include "signalwire/contexts/contexts.hpp"
 #include "signalwire/datamap/datamap.hpp"
 #include "signalwire/logging.hpp"

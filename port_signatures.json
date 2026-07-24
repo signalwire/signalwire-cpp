@@ -562,6 +562,316 @@
         }
       }
     },
+    "signalwire.ai_chat.client": {
+      "classes": {
+        "AIChatClient": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "project",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "token",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "space",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "void"
+            },
+            "chat": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "role",
+                  "type": "string",
+                  "required": false,
+                  "default": "user"
+                },
+                {
+                  "name": "config_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "user_metadata",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "reinit",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
+                }
+              ],
+              "returns": "class:signalwire.ai_chat.client.ChatResponse"
+            },
+            "close": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "create_conversation": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "config_url",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "user_message",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "timeout",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "user_metadata",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "reinit",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
+                }
+              ],
+              "returns": "class:signalwire.ai_chat.client.ConversationInfo"
+            },
+            "delete": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "bool"
+            },
+            "end": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "bool"
+            },
+            "log": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "class:signalwire.ai_chat.client.ChatLog"
+            },
+            "summarize": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "summary_prompt",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "string"
+            }
+          }
+        },
+        "AIChatError": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "code",
+                  "type": "optional<int>",
+                  "required": true
+                },
+                {
+                  "name": "message",
+                  "type": "string",
+                  "required": true
+                }
+              ],
+              "returns": "void"
+            }
+          }
+        },
+        "ChatLog": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "messages",
+                  "type": "list<dict<string,any>>",
+                  "required": false,
+                  "default": "list()"
+                },
+                {
+                  "name": "call_timeline",
+                  "type": "list<dict<string,any>>",
+                  "required": false,
+                  "default": "list()"
+                }
+              ],
+              "returns": "void"
+            }
+          }
+        },
+        "ChatResponse": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "text",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "conversation_id",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "user_event",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "void"
+            }
+          }
+        },
+        "ConversationInfo": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "id",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "status",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "initial_message",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "void"
+            }
+          }
+        }
+      }
+    },
     "signalwire.core.agent.prompt.manager": {
       "classes": {
         "PromptManager": {

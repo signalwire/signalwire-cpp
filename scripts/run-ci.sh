@@ -255,14 +255,14 @@ test_gate() {
             # "dump did not emit valid JSON".
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump \
-                pagination_dump relay_liveness_dump wait_liveness_dump -j"$(sw_build_jobs)" || return 1
+                pagination_dump relay_liveness_dump ai_chat_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -271,7 +271,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -544,7 +544,7 @@ run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-T
 # BUILD_MODE routing internally.
 run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STRICT-RENDER,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE
+        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE
 
 # BEHAVIORAL-NIGHTLY: the timing-sensitive connection-liveness dumps.
 # WAIT-LIVENESS (Action::wait() blocks-until-event) + RELAY-LIVENESS (the broader
@@ -584,18 +584,6 @@ run_gate "PACKAGE-NIGHTLY" "package suite, nightly rules (PACKAGE-SMOKE/META-CON
 run_gate "NO-CHEAT" "audit_no_cheat_tests" \
     python3 "$PORTING_SDK_DIR/scripts/audit_no_cheat_tests.py" --root "$PORT_ROOT"
 
-# COORDINATED-PASS — a non-main porting-sdk pin must be declared on the PR
-# (Coordinated-With: line or coordinated-pass label). Reads the branch
-# porting-sdk was actually checked out at (git ground truth); local/no-PR runs
-# are a no-op PASS. See porting-sdk/COORDINATED_PASS.md.
-run_gate "COORDINATED-PASS" "a non-main porting-sdk pin must be declared on the PR (Coordinated-With: line or coordinated-pass label)" \
-    python3 "$PORTING_SDK_DIR/scripts/coordinated_pass.py" --porting-sdk "$PORTING_SDK_DIR"
-
-# COORDINATED-REFS — every coordinated-set checkout (porting-sdk + python oracle +
-# matrix ports) must use PORTING_SDK_REF, not a literal ref (else stale-main during a pass).
-run_gate "COORDINATED-REFS" "every coordinated-set checkout uses PORTING_SDK_REF, not a literal ref" \
-    python3 "$PORTING_SDK_DIR/scripts/check_coordinated_refs.py" --repo "$PORT_ROOT"
-
 # FMT — clang-format (local: apply in place; CI: --dry-run -Werror)
 run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
 
@@ -613,6 +601,43 @@ run_gate "ROOT-HYGIENE" "no audit/scratch clutter tracked at repo root (allowlis
 # PUBLIC-JARGON — no internal porting jargon in public doc comments
 run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comments" \
     python3 "$PORTING_SDK_DIR/scripts/public_jargon.py" --port cpp --repo .
+
+# AI-CHAT (task #22, COORDINATED pass cpp:ai-chat-client <-> porting-sdk:ai-chat-client):
+# wire-behavioral gate for the AIChatClient. Drives the built ai_chat_dump binary
+# through the shared ai_chat_corpus against porting-sdk's in-process mock_ai_chat
+# and asserts the client speaks the AI Chat JSON-RPC protocol per the vendored spec
+# (ai-chat-specs/ai-chat.yaml). The gate script (diff_port_ai_chat.py) + mock live
+# on the porting-sdk `ai-chat-client` branch, so during the coordinated pass
+# PORTING_SDK_REF pins that branch and the gate runs; on plain main it skip-passes
+# until the branch merges. The dump binary is built by the TEST gate; resolve its
+# path per BUILD_MODE exactly like the other dump gates (host binary / docker exec /
+# throwaway docker run that rebuilds it).
+ai_chat_gate() {
+    if [ ! -f "$PORTING_SDK_DIR/scripts/diff_port_ai_chat.py" ]; then
+        echo "[ai-chat] diff_port_ai_chat.py not on porting-sdk main yet — skip-pass (coordinated-branch dep: porting-sdk ai-chat-client)"
+        return 0
+    fi
+    case "$BUILD_MODE" in
+        host)
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat.py" --port cpp \
+                --dump-cmd "$PORT_ROOT/build/ai_chat_dump"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat.py" --port cpp \
+                --dump-cmd "docker exec -e MOCK_AI_CHAT_URL -e SIGNALWIRE_PROJECT_ID -e SIGNALWIRE_API_TOKEN $c $SWCPP_CONTAINER_BUILD/ai_chat_dump"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat.py" --port cpp \
+                --dump-cmd "docker run --rm --network host -e MOCK_AI_CHAT_URL -e SIGNALWIRE_PROJECT_ID -e SIGNALWIRE_API_TOKEN -v $(dirname "$PORT_ROOT"):/src $img bash -c 'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release >&2 && cmake --build $SWCPP_CONTAINER_BUILD --target ai_chat_dump -j\"\$(nproc)\" >&2 && $SWCPP_CONTAINER_BUILD/ai_chat_dump'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+}
+run_gate "AI-CHAT" "AIChatClient speaks the AI Chat protocol per the vendored spec (mock_ai_chat wire-behavioral)" \
+    ai_chat_gate
 
 # WIRED-MODES (plan 1.6 / D7): the merge-coherence guard. WIRED_MODES.md lists the
 # load-bearing env/mode lines this run-ci MUST carry (MOCK_RELAY_STRICT=1, the

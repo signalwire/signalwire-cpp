@@ -913,6 +913,108 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# AI-Chat surface projection (idiom fold onto the python oracle)
+# ---------------------------------------------------------------------------
+# The Python reference records the whole AI-Chat surface in ONE module,
+# ``signalwire.ai_chat.client`` (client.py holds the client, the typed error
+# family, and the result dataclasses). The C++ port splits it across
+# ``ai_chat_client.hpp`` / ``ai_chat_error.hpp`` and expresses several members
+# idiomatically; the header walker therefore mis-routes the module names, leaks
+# the C++ error getters/protected fields, and drops the method-less error
+# subclasses + result structs (a struct with no public method is never
+# registered). This projection folds the C++ idiom onto the oracle shape:
+#
+#   module  ai_chat.ai_chat_client / ai_chat.ai_chat_error  -> ai_chat.client
+#   AIChatClient ctor              -> __init__       (already emitted)
+#   close()  (genuine method)      -> close          (FOLDED: the client ships a
+#                                     real ``close()`` -- a well-defined no-op,
+#                                     since cpp-httplib is stateless -- mirroring
+#                                     the python reference's explicit release and
+#                                     the TS no-op close())
+#   __aenter__ / __aexit__         -> FOLDED onto the C++ RAII lifecycle (verified
+#                                     present below): the reference's async
+#                                     context-manager IS a scoped-resource
+#                                     capability, which C++ expresses natively as
+#                                     RAII -- a scope-bound ``AIChatClient`` whose
+#                                     destructor (enter=construction, exit=``~`` /
+#                                     ``close()``) is the direct analogue of
+#                                     ``async with`` / a ``using`` block. Same fold
+#                                     dotnet takes via IDisposable/using; the
+#                                     capability is real, only the idiom differs, so
+#                                     this is ZERO omissions, not an impossible:.
+#   url()  read-only getter        -> DROPPED (Python exposes ``self.url`` as an
+#                                     instance ATTRIBUTE, which the surface oracle
+#                                     does not record as a class member; the C++
+#                                     getter is that attribute's idiomatic read,
+#                                     so it folds to "no member")
+#   AIChatError code()/has_code()/server_message() getters + code_/has_code_/
+#     message_ protected fields    -> DROPPED (Python's AIChatError records only
+#                                     __init__; ``code``/``message`` are plain
+#                                     instance attributes, not surface members)
+#
+# Every symbol is verified present in the header before it is emitted (abort-loud
+# on a missing one) so the projection can never invent surface the port lost.
+_AI_CHAT_CLIENT_METHODS = [
+    "__aenter__", "__aexit__", "__init__", "chat", "close", "create_conversation",
+    "delete", "end", "log", "summarize",
+]
+# Method-less classes the oracle records in ai_chat.client: the base error
+# carries __init__; every error subclass + result struct is bare.
+_AI_CHAT_EMPTY_CLASSES = [
+    "AuthenticationError", "ChatInProgressError", "ChatLog", "ChatResponse",
+    "ConversationInfo", "ConversationNotFoundError", "RateLimitError",
+    "SummaryError",
+]
+
+
+def _project_ai_chat(modules: dict, repo: Path) -> None:
+    """Fold the C++ AI-Chat surface onto the oracle's ``signalwire.ai_chat.client``
+    module. Verifies each symbol genuinely exists in the headers, then emits the
+    canonical shape and drops the mis-routed native ai_chat modules."""
+    client_hpp = repo / "include/signalwire/ai_chat/ai_chat_client.hpp"
+    if not client_hpp.is_file():
+        return  # port doesn't ship AI-Chat -- nothing to project
+    txt = client_hpp.read_text(encoding="utf-8")
+
+    def _require(pattern: str, what: str) -> None:
+        if not re.search(pattern, txt):
+            raise SystemExit(
+                f"enumerate_surface: AI-Chat projection expected {what} in "
+                f"{client_hpp.name} but it is gone -- fix the projection, do not "
+                f"emit a symbol the port no longer has")
+
+    # The client class + the RAII lifecycle members the close/enter/exit fold
+    # relies on (a public ctor and a declared destructor) must genuinely exist.
+    _require(r"\bclass\s+AIChatClient\b", "class AIChatClient")
+    _require(r"\bexplicit\s+AIChatClient\s*\(", "AIChatClient constructor")
+    _require(r"~AIChatClient\s*\(", "AIChatClient destructor (RAII)")
+    _require(r"\bvoid\s+close\s*\(", "AIChatClient::close (folds reference close)")
+    # The wire-verb methods the oracle records (del() is the reserved-word
+    # spelling of the reference ``delete``).
+    for _m in ("create_conversation", "chat", "end", "log", "summarize"):
+        _require(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
+    _require(r"\bbool\s+del\s*\(", "AIChatClient::del (reference ``delete``)")
+
+    # The base error + every typed subclass and result struct.
+    _require(r"\bclass\s+AIChatError\b", "class AIChatError")
+    for _c in _AI_CHAT_EMPTY_CLASSES:
+        kind = r"class" if _c.endswith("Error") else r"struct"
+        _require(rf"\b{kind}\s+{_c}\b", f"{kind} {_c}")
+
+    # Drop the mis-routed native modules, then emit the single canonical one.
+    for _native in ("signalwire.ai_chat.ai_chat_client",
+                    "signalwire.ai_chat.ai_chat_error"):
+        modules.pop(_native, None)
+
+    client_mod = modules.setdefault(
+        "signalwire.ai_chat.client", {"classes": {}, "functions": []})
+    client_mod["classes"]["AIChatClient"] = sorted(_AI_CHAT_CLIENT_METHODS)
+    client_mod["classes"]["AIChatError"] = ["__init__"]
+    for _c in _AI_CHAT_EMPTY_CLASSES:
+        client_mod["classes"][_c] = []
+
+
+# ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
 
@@ -1490,6 +1592,11 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # (implementation file, invisible to the header walker), registered at static-init.
     # Project each into its Python-canonical ``signalwire.skills.<name>.skill`` module.
     _project_builtin_skills(modules, repo)
+
+    # AI-Chat surface: fold the split ai_chat_client/ai_chat_error headers +
+    # C++ RAII/getter idioms onto the oracle's single signalwire.ai_chat.client
+    # module (see _project_ai_chat).
+    _project_ai_chat(modules, repo)
 
     # Module-level free functions the header walker can't see (e.g. relay parse_event).
     _project_module_functions(modules, repo)

@@ -8230,7 +8230,7 @@
               ],
               "returns": "list<string>"
             },
-            "goto_section": {
+            "goto": {
               "params": [
                 {
                   "name": "self",
@@ -8694,7 +8694,7 @@
               ],
               "returns": "void"
             },
-            "return_section": {
+            "return": {
               "params": [
                 {
                   "name": "self",
@@ -8954,7 +8954,7 @@
               ],
               "returns": "class:signalwire.core.swml_service.SWMLService"
             },
-            "switch_section": {
+            "switch": {
               "params": [
                 {
                   "name": "self",

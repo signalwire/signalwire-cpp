@@ -53,10 +53,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+def _resolve_psdk() -> Path:
+    """Resolve the porting-sdk checkout (for the reference surface oracle).
+
+    Honours PORTING_SDK_DIR, then PORTING_SDK (the var run-ci / the surface suite
+    export), then the adjacent ``<repo>/../porting-sdk``. The env fallback makes a
+    WORKTREE run resolve the real checkout (a worktree's parent has no porting-sdk
+    sibling); real CI uses adjacency. Mirrors enumerate_signatures._resolve_psdk."""
+    for var in ("PORTING_SDK_DIR", "PORTING_SDK"):
+        val = os.environ.get(var)
+        if val and (Path(val) / "type_aliases.yaml").is_file():
+            return Path(val).resolve()
+    return (Path(__file__).resolve().parent.parent.parent / "porting-sdk").resolve()
 
 # ---------------------------------------------------------------------------
 # Class -> Python module mapping
@@ -428,6 +443,10 @@ GENERATED_PAYLOAD_NS = {
 # parse_header to force-register a zero-method struct so it surfaces).
 GENERATED_TYPE_NS_PREFIXES = (_TYPES_NS_PREFIX.rstrip(":"),) + tuple(GENERATED_PAYLOAD_NS)
 
+# Set at build_snapshot entry: the ``…/include`` root under which the generated
+# payload header namespaces resolve (``signalwire::core::foo`` -> <root>/signalwire/core/foo).
+_INCLUDE_ROOT: Path = Path(".")
+
 
 def generated_type_module(ns_path: str) -> str | None:
     """If ``ns_path`` is one of the generated wire-type / payload namespaces,
@@ -482,6 +501,17 @@ _METHOD_RENAMES: dict[str, str] = {
     # is not reserved in C++, but the trailing underscore disambiguates it from
     # the many ``register_*`` methods and matches the port's escape convention).
     "register_": "register",
+    # SWML keyword-escape verbs. ``goto``/``return``/``switch`` are C++ reserved
+    # words, so swml::Service spells the verbs ``goto_section``/``return_section``/
+    # ``switch_section``. The Python reference routes every SWML verb dynamically
+    # (no per-verb symbol); the G fold (diff-side _fold_swml_verbs) drops a
+    # SWMLService.<verb> whose leaf is a canonical schema verb name. Normalise the
+    # keyword-escaped spelling back to the canonical verb here (emission), so the
+    # fold retires them like the other ~35 typed verbs — idiom fixed at emission,
+    # not an allow-list entry.
+    "goto_section": "goto",
+    "return_section": "return",
+    "switch_section": "switch",
 }
 
 
@@ -1490,7 +1520,146 @@ def _project_generated_rest_methods(modules: dict) -> None:
         mod_entry["classes"][cls] = sorted(existing)
 
 
+# Generated read-side payload structs (swml_verbs_generated, post_prompt_generated,
+# swaig_request_generated, …) are METHOD-LESS PODs: one ``std::optional<T>`` data
+# member per snake wire key. The reference SURFACE oracle records the B1 composition
+# attributes on these classes (a self-only member holding an SDK class / json /
+# optional-wrapped value) as bare members. The regex header walker only emits methods
+# (things with ``(``), so those fields never reach the surface and read as missing-port
+# DRIFT even though the field IS implemented. Project each public data-member field as
+# a surface member — but ONLY the fields the oracle records for that class (never invent
+# surface: the open ``extras`` member and scalar fields the reference does NOT expose are
+# not projected). Field-vs-attribute SHAPE idiom, reconciled via the enumerator (RULES
+# §2) — the surface analogue of the signature side's ``_project_gen_payload_getters``.
+_GEN_FIELD_RE_SURF = re.compile(
+    r"^\s+(?:\[\[[^\]]*\]\]\s*)?[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
+)
+_WIRE_KEY_RE_SURF = re.compile(r"wire key:\s*(\S+)")
+
+
+def _gen_payload_struct_fields_surf(payload_dir: Path) -> dict[str, list[str]]:
+    """``{StructName: [wire_field, …]}`` for the generated payload headers under
+    ``payload_dir``. Honours the ``// wire key: <name>`` comment on reserved-word
+    renames. Lines with ``(`` are skipped (method / initializer, not a data member).
+    Identical parse to enumerate_signatures._gen_payload_struct_fields."""
+    out: dict[str, list[str]] = {}
+    if not payload_dir.is_dir():
+        return out
+    for hdr in sorted(payload_dir.glob("*.hpp")):
+        src_txt = hdr.read_text(encoding="utf-8")
+        for sm in re.finditer(r"struct\s+(\w+)\s*\{(.*?)\n\};", src_txt, re.S):
+            cls, body = sm.group(1), sm.group(2)
+            fields: list[str] = []
+            for line in body.splitlines():
+                if "(" in line:
+                    continue
+                m = _GEN_FIELD_RE_SURF.match(line)
+                if not m:
+                    continue
+                ident, comment = m.group(1), m.group(2) or ""
+                wk = _WIRE_KEY_RE_SURF.search(comment)
+                fields.append(wk.group(1) if wk else ident)
+            if fields:
+                out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _load_reference_surface() -> dict:
+    """The reference ``python_surface.json`` (the surface oracle the diff compares
+    against). Empty dict if unresolvable — the projection then no-ops (safe)."""
+    psdk = _resolve_psdk()
+    path = psdk / "python_surface.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _project_gen_payload_members(modules: dict) -> None:
+    """Emit each generated payload struct's public data-member fields as surface
+    members, intersected with the fields the reference oracle records for that class.
+
+    A field only surfaces if the oracle lists it as a member of the same class — so
+    the port's field-idiom folds exactly onto the reference's B1 composition attributes,
+    never inventing a member the reference lacks (the open ``extras`` member and any
+    scalar field the reference does not expose are dropped)."""
+    ref = _load_reference_surface()
+    if not ref:
+        return
+    ref_modules = ref.get("modules", {})
+    for ns, module in GENERATED_PAYLOAD_NS.items():
+        ref_classes = ref_modules.get(module, {}).get("classes", {})
+        if not ref_classes:
+            continue
+        payload_dir = _INCLUDE_ROOT / Path(*ns.split("::"))
+        struct_fields = _gen_payload_struct_fields_surf(payload_dir)
+        if not struct_fields:
+            continue
+        mod_entry = modules.setdefault(module, {"classes": {}, "functions": []})
+        for cls, fields in struct_fields.items():
+            ref_members = ref_classes.get(cls)
+            if not ref_members:
+                continue
+            ref_set = set(ref_members if isinstance(ref_members, list)
+                          else ref_members.get("members", ref_members))
+            present = [f for f in fields if f in ref_set]
+            if not present:
+                continue
+            existing = mod_entry["classes"].get(cls, [])
+            mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
+_CLIENT_TREE_MODULE = "signalwire.rest.namespaces._client_tree_generated"
+
+
+def _project_client_tree_members(modules: dict) -> None:
+    """Emit each generated namespace container's resource-accessor data members
+    (``FabricAddresses addresses;`` -> ``addresses``) as surface members, intersected
+    with the fields the oracle records for that container class.
+
+    The reference records these B1 composition attributes (a container field holding an
+    SDK resource class) as members. The C++ container declares them as ``<Type> <member>;``
+    public data members; the regex header walker only picks up ctor-init-list entries
+    (and misses the first, e.g. ``addresses``), so parse the real data members. Intersect
+    with the oracle so nothing not in the reference is invented."""
+    ref = _load_reference_surface()
+    if not ref:
+        return
+    ref_classes = ref.get("modules", {}).get(_CLIENT_TREE_MODULE, {}).get("classes", {})
+    if not ref_classes:
+        return
+    gen_dir = _INCLUDE_ROOT / "signalwire" / "rest" / "namespaces" / "generated"
+    if not gen_dir.is_dir():
+        return
+    mod_entry = modules.setdefault(_CLIENT_TREE_MODULE, {"classes": {}, "functions": []})
+    for hdr in sorted(gen_dir.glob("*Namespace.hpp")):
+        srctxt = hdr.read_text(encoding="utf-8")
+        m = re.search(r"(?:class|struct) (\w+Namespace)\s*\{(.*?)\n\};", srctxt, re.S)
+        if not m:
+            continue
+        cls, body = m.group(1), m.group(2)
+        ref_members = ref_classes.get(cls)
+        if not ref_members:
+            continue
+        ref_set = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+        # public data members: ``<TypeName> <member>;`` at 2-space indent.
+        fields = re.findall(r"^\s{2}([A-Z]\w+)\s+([a-z_]\w*);", body, re.M)
+        present = [mem for _t, mem in fields if mem in ref_set]
+        if not present:
+            continue
+        existing = mod_entry["classes"].get(cls, [])
+        mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
 def build_snapshot(repo: Path, include_dir: Path) -> dict:
+    global _INCLUDE_ROOT
+    # GENERATED_PAYLOAD_NS keys begin at ``signalwire::``; the header for
+    # ``signalwire::core::foo`` lives at ``<include>/signalwire/core/foo``. include_dir
+    # is ``<include>/signalwire`` by default, so the base is its parent.
+    _INCLUDE_ROOT = include_dir.parent
     modules: dict[str, dict] = {}
 
     # Walk every .hpp/.h under include/
@@ -1623,7 +1792,7 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # richer C++ surface stays under relay.action as the port addition).
     _action_own = modules.get("signalwire.relay.action", {}).get("classes", {}).get("Action", [])
     if _action_own:
-        proj = sorted({"__init__"} | {m for m in ("is_done", "wait") if m in _action_own})
+        proj = sorted({"__init__"} | {m for m in ("is_done", "wait", "result") if m in _action_own})
         modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
         modules["signalwire.relay.call"]["classes"]["Action"] = proj
 
@@ -1665,12 +1834,32 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             entry.append(member)
             modules[mod]["classes"][cls] = sorted(set(entry))
 
+    # PromptObjectModel.sections / Section.subsections are PUBLIC ``std::vector<Section>``
+    # data members in pom.hpp; the reference records them as the B1 composition attribute.
+    # Same public collection, same name — surface it (the regex walker skips data members).
+    _ensure_member("signalwire.pom.pom", "PromptObjectModel", "sections")
+    _ensure_member("signalwire.pom.pom", "Section", "subsections")
+
+    # RequestOptions exposes the cooperative-cancellation ``abort_signal`` as a public
+    # data member (``std::atomic<bool>* abort_signal``); the reference records it as the
+    # B1 cancellation attribute. Same surface, same name — the regex walker skips data
+    # members, so surface it here (idiom via the enumerator, RULES §2).
+    _ensure_member("signalwire.rest._request_options", "RequestOptions", "abort_signal")
+
     # SWAIGFunction exposes ``operator()`` + ``call`` -> Python ``__call__``.
     _ensure_member("signalwire.core.swaig_function", "SWAIGFunction", "__call__")
     # SkillRegistry is a singleton (private ctor); SkillBase has a defaulted
     # protected ctor. Both genuinely construct — surface ``__init__``.
     _ensure_member("signalwire.skills.registry", "SkillRegistry", "__init__")
     _ensure_member("signalwire.core.skill_base", "SkillBase", "__init__")
+
+    # Generated read-side payload structs: project their public data-member fields
+    # as surface members (intersected with the oracle's recorded B1 composition attrs).
+    _project_gen_payload_members(modules)
+
+    # Generated namespace containers: project their resource-accessor data members
+    # as surface members (intersected with the oracle's recorded B1 composition attrs).
+    _project_client_tree_members(modules)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

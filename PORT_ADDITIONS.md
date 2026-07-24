@@ -1,5 +1,53 @@
 # PORT_ADDITIONS.md -- C++-specific additions not present in the Python reference
 
+<!-- ══════════════════════════════════════════════════════════════════════════
+BEFORE YOU ADD AN ENTRY TO THIS FILE — READ THIS.
+
+Every entry here is a place the parity checker STOPS comparing. That is a real cost:
+a divergence you list is a divergence no gate will ever catch again. So entries must
+be RARE, and each one must earn its place. Default to skepticism: assume the entry is
+NOT needed and make the case that it is.
+
+The order of preference, always:
+  1. FIX THE PORT so it matches the reference (add the missing member; make the
+     signature match).
+  2. FIX THE EMISSION so idiom folds onto the reference shape — the enumerator/emitter
+     canonicalizes your language's spelling onto the oracle's (builder → __init__,
+     getters → attributes, Result<T,E> → the plain return, CamelCase → the reference
+     name, options-object/kwargs → the expanded param list, RAII/dispose → close).
+     MOST divergences are idiom and belong here, not in this file.
+  3. FIX THE REFERENCE if the oracle itself is wrong or stale (a Python-only symbol
+     that leaked into the contract, a param the reference added and the oracle never
+     re-enumerated). Fix Python / the oracle, then re-drift — do not paper over a
+     broken reference with a per-port entry.
+  4. Only when 1–3 genuinely cannot apply does an entry here become justified.
+
+An entry is JUSTIFIED ONLY IF it is irreducible after correct emission — i.e. the
+divergence survives because the two languages genuinely cannot express the same thing,
+not because the emitter hasn't folded the idiom yet. If emission COULD fold it, the
+entry is a bug in this file; go fix the emitter.
+
+Each entry MUST state WHY, concretely, in one of these forms:
+  • ADDITION — this symbol exists in the port but not the reference. Answer: is it
+    genuine port-only surface with NO reference twin (say what it is and why the
+    reference has no equivalent), or is it IDIOM the emitter should have folded (then
+    it does not belong here — fold it)? A convenience/alias/back-compat wrapper is NOT
+    a justification.
+  • OMISSION — this reference symbol has no port member. Answer: WHY can it not exist
+    here — what specific language feature is absent (e.g. no async-context-manager
+    protocol, no __init__ method protocol)? "impossible:" means the construct cannot
+    be expressed at all; if it merely LOOKS different, that's idiom → fold it, don't
+    omit it. Cite a precedent when one exists (e.g. RelayClient omits the same dunder).
+  • SIGNATURE — the symbol matches by name but its parameters differ. Answer: is the
+    difference a foldable idiom collapse (options-object, leading context/self,
+    builder) — then EXPAND it in the signature emitter so names+count match, don't list
+    it — or a genuine reference-only parameter with no cross-language analogue?
+
+If you cannot write a crisp, specific WHY that survives the "could emission fold this?"
+test, the entry is not ready. Prove it's needed before you add it.
+═══════════════════════════════════════════════════════════════════════════════ -->
+
+
 This file is checked by `scripts/enumerate_surface.py` +
 `porting-sdk/scripts/diff_port_surface.py` on every PR. Every C++ symbol
 that has no Python-reference equivalent MUST appear below with a rationale,
@@ -59,7 +107,6 @@ signalwire.agent_server.AgentServer.register_agent: cpp_naming: C++ AgentServer 
 signalwire.agent_server.AgentServer.set_static_dir: cpp_naming: C++ AgentServer method; Python equivalent tracked in PORT_OMISSIONS.md as method-name alias (register_agent <-> register, list_routes <-> get_agents, set_static_dir <-> serve_static_files, map_sip_username <-> setup_sip_routing, enable_sip_routing matches).
 signalwire.agent_server.AgentServer.stop: cpp_naming: C++ AgentServer method; Python equivalent tracked in PORT_OMISSIONS.md as method-name alias (register_agent <-> register, list_routes <-> get_agents, set_static_dir <-> serve_static_files, map_sip_username <-> setup_sip_routing, enable_sip_routing matches).
 signalwire.agent_server.AgentServer.unregister_agent: cpp_naming: C++ AgentServer method; Python equivalent tracked in PORT_OMISSIONS.md as method-name alias (register_agent <-> register, list_routes <-> get_agents, set_static_dir <-> serve_static_files, map_sip_username <-> setup_sip_routing, enable_sip_routing matches).
-signalwire.core.agent_base.AgentBase.add_context: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.add_function_include: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.add_hint: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.add_hints: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
@@ -69,10 +116,6 @@ signalwire.core.agent_base.AgentBase.add_mcp_server: python_mixin_collapsed: por
 signalwire.core.agent_base.AgentBase.add_pattern_hint: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.add_pronunciation: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.add_skill: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.add_swaig_query_param: cpp_typed_helper: add_swaig_query_param is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.auth_password: cpp_typed_helper: auth_password is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.auth_username: cpp_typed_helper: auth_username is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.build_mcp_tool_list: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.define_contexts: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.define_tool: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.enable_debug_events: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
@@ -80,16 +123,11 @@ signalwire.core.agent_base.AgentBase.enable_debug_routes: python_mixin_collapsed
 signalwire.core.agent_base.AgentBase.enable_mcp_server: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.get_language_params: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via AIConfigMixin, and the method is also emitted under the matching signalwire.core.mixins.ai_config_mixin module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.get_prompt: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.handle_mcp_request: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.handle_serverless_request: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via ServerlessMixin, and the method is also emitted under signalwire.core.mixins.serverless_mixin.ServerlessMixin by scripts/enumerate_surface.py — the oracle-matching ServerlessMixin method delegates to the per-platform signalwire::utils dispatchers).
-signalwire.core.agent_base.AgentBase.has_contexts: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.has_skill: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.has_tool: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.is_mcp_server_enabled: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.list_skills: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.list_tools: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.manual_set_proxy_url: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.mcp_servers: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.name: cpp_typed_helper: name is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.on_function_call: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.prompt_add_section: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
@@ -98,14 +136,10 @@ signalwire.core.agent_base.AgentBase.prompt_add_to_section: python_mixin_collaps
 signalwire.core.agent_base.AgentBase.prompt_has_section: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.register_swaig_function: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.remove_skill: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.render_swml: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.render_swml_for_request: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.reset_contexts: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.route: cpp_typed_helper: route is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.run: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.serve: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.session_manager: cpp_typed_helper: session_manager is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.set_auth: cpp_typed_helper: set_auth is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.set_dynamic_config_callback: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_function_includes: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_global_data: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
@@ -113,20 +147,14 @@ signalwire.core.agent_base.AgentBase.set_internal_fillers: python_mixin_collapse
 signalwire.core.agent_base.AgentBase.set_language_params: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via AIConfigMixin, and the method is also emitted under the matching signalwire.core.mixins.ai_config_mixin module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_languages: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_multilingual: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via AIConfigMixin, and the method is also emitted under the matching signalwire.core.mixins.ai_config_mixin module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.set_name: cpp_typed_helper: set_name is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.set_native_functions: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_param: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_params: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_post_prompt: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_post_prompt_llm_params: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.set_post_prompt_url_direct: cpp_typed_helper: set_post_prompt_url_direct is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.set_prompt_llm_params: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_prompt_text: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.agent_base.AgentBase.set_pronunciations: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.set_use_pom: cpp_typed_helper: set_use_pom is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.set_webhook_url: cpp_typed_helper: set_webhook_url is a C++ typed accessor/helper without a Python equivalent.
-signalwire.core.agent_base.AgentBase.stop: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
-signalwire.core.agent_base.AgentBase.supported_internal_filler_names: cpp_typed_helper: supported_internal_filler_names is a C++ typed accessor/helper without a Python equivalent.
 signalwire.core.agent_base.AgentBase.update_global_data: python_mixin_collapsed: ported onto AgentBase directly (Python exposes via mixin, and the method is also emitted under the matching signalwire.core.mixins.* module by scripts/enumerate_surface.py).
 signalwire.core.contexts.Context.has_steps: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.Context.initial_step: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
@@ -557,7 +585,6 @@ signalwire.relay.tts_gender.Gender: cpp_enum_idiom: `enum class Gender` is the T
 
 # C++-only additions on AgentBase / SWMLService surfaced by the signature audit.
 
-signalwire.core.agent_base.AgentBase.create_tool_token: cpp_only: C++ adds a public token-mint helper on AgentBase for SWAIG webhook signing; Python keeps the same logic private inside the security session manager and exposes only validate_tool_token.
 signalwire.core.swml_service.SWMLService.get_basic_auth_credentials_with_source: cpp_only: C++-side overload that returns (user, pass, source) where ``source`` indicates whether credentials came from constructor / env / config; Python ships the same as the optional ``include_source`` flag on get_basic_auth_credentials. Both routes reach the same data — the C++ overload is the typed-overload variant of the Python kwarg flag.
 signalwire.core.swml_service.SWMLService.get_function: cpp_only: typed accessor on SWMLService for the verb-dispatch function map; Python keeps verb_registry exposed as a property and reaches the function via dict-keyed lookup.
 signalwire.core.swml_service.SWMLService.has_function: cpp_only: typed boolean predicate paired with get_function; Python uses ``key in service.verb_registry``.
@@ -568,9 +595,7 @@ signalwire.core.swml_service.SWMLService.validate_basic_auth: cpp_only: SWMLServ
 # Auto-extras: surface emitter additions not yet recorded above.
 # Added as part of fixing surface-audit drift after the enumerator's
 # module-path migration (signalwire.rest.<x>_namespace -> signalwire.rest.namespaces.<x>).
-signalwire.core.agent_base.AgentBase.get_contexts: python_collapsed_mixin: Python fans these methods across PromptMixin/StateMixin/ToolMixin; C++ collapses them onto AgentBase. The mixin-projection rule in scripts/enumerate_surface.py emits the canonical mixin-module location AND the AgentBase view; this entry documents the AgentBase duplicate.
 signalwire.core.agent_base.AgentBase.get_post_prompt: python_collapsed_mixin: Python fans these methods across PromptMixin/StateMixin/ToolMixin; C++ collapses them onto AgentBase. The mixin-projection rule in scripts/enumerate_surface.py emits the canonical mixin-module location AND the AgentBase view; this entry documents the AgentBase duplicate.
-signalwire.core.agent_base.AgentBase.get_raw_prompt: python_collapsed_mixin: Python fans these methods across PromptMixin/StateMixin/ToolMixin; C++ collapses them onto AgentBase. The mixin-projection rule in scripts/enumerate_surface.py emits the canonical mixin-module location AND the AgentBase view; this entry documents the AgentBase duplicate.
 signalwire.core.agent_base.AgentBase.pom: cpp_only_helper: AgentBase.pom() returns the underlying signalwire::pom::Section so callers can inspect/clone POM state; Python composes POM inline and never exposes a getter.
 signalwire.core.agent_base.AgentBase.set_prompt_pom: python_collapsed_mixin: Python fans these methods across PromptMixin/StateMixin/ToolMixin; C++ collapses them onto AgentBase. The mixin-projection rule in scripts/enumerate_surface.py emits the canonical mixin-module location AND the AgentBase view; this entry documents the AgentBase duplicate.
 signalwire.core.agent_base.AgentBase.validate_tool_token: python_collapsed_mixin: Python fans these methods across PromptMixin/StateMixin/ToolMixin; C++ collapses them onto AgentBase. The mixin-projection rule in scripts/enumerate_surface.py emits the canonical mixin-module location AND the AgentBase view; this entry documents the AgentBase duplicate.
@@ -636,9 +661,6 @@ signalwire.utils.schema_utils.SchemaValidationError.errors: cpp_naming: SchemaVa
 signalwire.utils.schema_utils.SchemaValidationError.errors_: cpp_naming: SchemaValidationError exposes both bare and trailing-underscore accessors (errors/errors_, verb_name/verb_name_) so callers can disambiguate the field from the getter; Python uses bare attribute access with no _ alias.
 signalwire.utils.schema_utils.SchemaValidationError.verb_name: cpp_naming: SchemaValidationError exposes both bare and trailing-underscore accessors (errors/errors_, verb_name/verb_name_) so callers can disambiguate the field from the getter; Python uses bare attribute access with no _ alias.
 signalwire.utils.schema_utils.SchemaValidationError.verb_name_: cpp_naming: SchemaValidationError exposes both bare and trailing-underscore accessors (errors/errors_, verb_name/verb_name_) so callers can disambiguate the field from the getter; Python uses bare attribute access with no _ alias.
-signalwire.core.agent_base.AgentBase.set_signing_key: cpp_setter_for_python_attribute: Python sets ``signing_key`` via constructor kwarg + writable instance attribute (``self.signing_key = ...``). C++ uses an explicit setter method per its idiom (no Python-style attribute assignment). Same effect: configure the SignalWire Signing Key for webhook signature validation per porting-sdk/webhooks.md.
-signalwire.core.agent_base.AgentBase.trust_proxy_for_signature: cpp_setter_for_python_attribute: Python uses constructor kwarg ``trust_proxy_for_signature`` + private attribute ``_trust_proxy_for_signature``. C++ exposes a public setter (returns *this for chaining). Same effect: opt in to honoring X-Forwarded-Proto / X-Forwarded-Host when reconstructing the public URL for signature validation.
-signalwire.core.agent_base.AgentBase.signing_key: cpp_accessor: AgentBase exposes signing_key getter (Python keeps it private)
 signalwire.rest.generated.resource_tree.ResourceTree: cpp_only: port-only composition holder — RestClient composes the generated ResourceTree (§8) to own the flat resources + namespace containers. Python's RestClient uses dynamic __getattr__ with no equivalent tree class, so the reference has no analog. Internal wiring only (L6/L3).
 signalwire.rest.generated.resource_tree.ResourceTree.__init__: cpp_only: constructor of the port-only ResourceTree composition holder (see ResourceTree above). Takes the HttpClient and constructs every generated resource/container.
 signalwire.rest._base.ReadResource.__init__: cpp_base_ctor: the C++ hand base ReadResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (receiver + composed base path); Python's ReadResource inherits __init__ from BaseResource and griffe records no own __init__ on ReadResource. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
@@ -732,9 +754,40 @@ signalwire.relay.client.RelayError.message: cpp_field_accessor: read accessor fo
 signalwire.web.web_service.WebService.directories: cpp_field_accessor: read accessor / safety helper on the static-file WebService (directories map, port, file_allowed path-traversal check); Python exposes the equivalent state as attributes / an internal helper (Java ships fileAllowed identically).
 signalwire.web.web_service.WebService.file_allowed: cpp_field_accessor: read accessor / safety helper on the static-file WebService (directories map, port, file_allowed path-traversal check); Python exposes the equivalent state as attributes / an internal helper (Java ships fileAllowed identically).
 signalwire.web.web_service.WebService.port: cpp_field_accessor: read accessor / safety helper on the static-file WebService (directories map, port, file_allowed path-traversal check); Python exposes the equivalent state as attributes / an internal helper (Java ships fileAllowed identically).
-signalwire.core.agent_base.AgentBase.get_global_data: cpp_typed_accessor: read accessor for the accumulated global-data object; Python reads the same state via the `_global_data` attribute. Exposed so the Layer-D STATE differ (porting-sdk diff_port_state) can observe merge semantics through the public API.
-signalwire.core.agent_base.AgentBase.get_sip_usernames: cpp_typed_accessor: read accessor for the registered (lowercased) SIP-username set; Python reads `_sip_usernames`. Exposed for the Layer-D STATE differ.
 signalwire.agent_server.AgentServer.lookup_sip_route: cpp_typed_accessor: case-folding SIP-username -> route lookup; Python's equivalent is the internal `_lookup_sip_route`. Exposed for the Layer-D STATE differ (server_sip_mapping observer).
 signalwire.agent_server.AgentServer.get_sip_username_mapping: cpp_typed_accessor: read accessor for the username->route mapping (lowercased keys); Python reads `_sip_username_mapping`. Exposed for the Layer-D STATE differ.
 signalwire.core.swml_service.SWMLService.get_routing_callback_paths: cpp_typed_accessor: sorted list of the registered (normalized) routing-callback paths; Python reads `_routing_callbacks.keys()`. Exposed for the Layer-D STATE differ.
 signalwire.core.swml_handler.VerbHandlerRegistry.get_verb_names: cpp_typed_accessor: sorted list of registered verb-handler names; Python reads `_handlers.keys()`. Exposed for the Layer-D STATE differ (verb_handler_state observer).
+
+<!-- A-fold (agentbase-family) re-key: the AgentBase family members below are
+     re-keyed from signalwire.core.agent_base.AgentBase.<m> to the folded
+     agentbase-family.<m> token (ALLOWLIST_DISCIPLINE §4c). Each is a genuine
+     port-only member after the fold — verified no agentbase-family reference twin. -->
+agentbase-family.add_context: agentbase-composition-delegate: Python adds a context via the ContextBuilder/PromptManager helper; C++ exposes add_context on AgentBase. No agentbase-family reference twin.
+agentbase-family.add_swaig_query_param: cpp_typed_helper: typed setter for a SWAIG webhook query param on C++ AgentBase; Python appends to the URL directly. No agentbase-family reference twin.
+agentbase-family.auth_password: cpp_typed_accessor: basic-auth password read accessor on C++ AgentBase; Python reads the attribute directly. No agentbase-family reference twin.
+agentbase-family.auth_username: cpp_typed_accessor: basic-auth username read accessor on C++ AgentBase; Python reads the attribute directly. No agentbase-family reference twin.
+agentbase-family.build_mcp_tool_list: cpp_only: MCP tool-list builder helper on AgentBase; Python assembles the list inline. No agentbase-family reference twin.
+agentbase-family.create_tool_token: cpp_only: public token-mint helper on AgentBase for SWAIG webhook signing; Python keeps the logic private in the SessionManager and exposes only validate_tool_token. No agentbase-family reference twin.
+agentbase-family.get_contexts: agentbase-composition-delegate: Python reads contexts through the PromptManager/ContextBuilder helper; C++ exposes get_contexts on AgentBase. No agentbase-family reference twin.
+agentbase-family.get_global_data: agentbase-composition-delegate: Python reads accumulated global-data via the SkillBase/state helper (`_global_data`); C++ exposes get_global_data on AgentBase so the Layer-D STATE differ can observe merge semantics through the public API. No agentbase-family reference twin.
+agentbase-family.get_raw_prompt: agentbase-composition-delegate: Python reads the raw prompt through the PromptManager helper; C++ exposes get_raw_prompt on AgentBase. No agentbase-family reference twin.
+agentbase-family.get_sip_usernames: cpp_typed_accessor: read accessor for the registered (lowercased) SIP-username set; Python reads `_sip_usernames` directly. Exposed for the Layer-D STATE differ. No agentbase-family reference twin.
+agentbase-family.handle_mcp_request: cpp_only: MCP request handler exposed on C++ AgentBase; Python routes MCP through the web layer. No agentbase-family reference twin.
+agentbase-family.has_contexts: agentbase-composition-delegate: contexts-presence predicate the PromptManager exposes in Python; flattened onto C++ AgentBase. No agentbase-family reference twin.
+agentbase-family.is_mcp_server_enabled: cpp_typed_accessor: MCP-enabled predicate on C++ AgentBase; Python reads the flag directly. No agentbase-family reference twin.
+agentbase-family.list_tools: cpp_typed_accessor: read accessor listing registered SWAIG tools; Python reads the tool registry directly. No agentbase-family reference twin.
+agentbase-family.mcp_servers: cpp_typed_accessor: read accessor for the configured MCP servers on C++ AgentBase; Python reads the attribute directly. No agentbase-family reference twin.
+agentbase-family.render_swml: agentbase-composition-delegate: Python renders SWML via the SwmlRenderer helper AgentBase composes; C++ flattens render_swml onto AgentBase. No agentbase-family reference twin (the delegate is a distinct class); foldable only by a composition-delegate fold (ALLOWLIST_DISCIPLINE §4c), not yet built.
+agentbase-family.render_swml_for_request: agentbase-composition-delegate: per-request SWML render delegated to SwmlRenderer in Python; flattened onto C++ AgentBase. No agentbase-family reference twin.
+agentbase-family.session_manager: cpp_typed_accessor: read accessor exposing the composed SessionManager on C++ AgentBase; Python reads the private helper directly. No agentbase-family reference twin.
+agentbase-family.set_auth: cpp_typed_helper: setter configuring basic-auth on C++ AgentBase; Python sets the attributes via constructor kwargs. No agentbase-family reference twin.
+agentbase-family.set_name: cpp_typed_helper: setter for the agent name on C++ AgentBase; Python assigns the attribute directly. No agentbase-family reference twin.
+agentbase-family.set_post_prompt_url_direct: cpp_typed_helper: setter overriding the post-prompt URL on C++ AgentBase; Python assigns the attribute directly. No agentbase-family reference twin.
+agentbase-family.set_signing_key: cpp_setter_for_python_attribute: Python sets `signing_key` via constructor kwarg + writable attribute; C++ uses an explicit setter per its idiom. Configures the SignalWire Signing Key for webhook signature validation (porting-sdk/webhooks.md). No agentbase-family reference twin.
+agentbase-family.set_use_pom: cpp_typed_helper: setter toggling POM use on C++ AgentBase; Python assigns the attribute directly. No agentbase-family reference twin.
+agentbase-family.set_webhook_url: cpp_typed_helper: setter overriding the webhook URL on C++ AgentBase; Python assigns the attribute directly. No agentbase-family reference twin.
+agentbase-family.signing_key: cpp_accessor: signing_key getter on C++ AgentBase (Python keeps it private). No agentbase-family reference twin.
+agentbase-family.stop: cpp_only: lifecycle stop() on C++ AgentBase (mirrors the web-service stop); Python has no public stop on the agentbase family. No agentbase-family reference twin.
+agentbase-family.supported_internal_filler_names: cpp_typed_accessor: read accessor for the supported internal-filler names; Python reads the constant directly. No agentbase-family reference twin.
+agentbase-family.trust_proxy_for_signature: cpp_setter_for_python_attribute: Python uses a constructor kwarg + private `_trust_proxy_for_signature`; C++ exposes a public chaining setter. Opts in to honoring X-Forwarded-Proto/Host when reconstructing the public URL for signature validation. No agentbase-family reference twin.

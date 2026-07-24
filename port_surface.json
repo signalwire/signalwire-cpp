@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 7c199fd8ba5a293538ed708eec2ffc712e1037d5",
+  "generated_from": "signalwire-cpp @ b5b2edbcd479dbf9f0c0894e850fc5aefa953296",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -353,6 +353,7 @@
           "add_gather_question",
           "add_section",
           "clear_sections",
+          "functions",
           "gather_info",
           "name",
           "set_end",
@@ -3485,7 +3486,8 @@
           "get_verb_required_properties",
           "load_schema",
           "validate_document",
-          "validate_verb"
+          "validate_verb",
+          "validate_verb_top_level_keys"
         ],
         "SchemaValidationError": [
           "__init__",

@@ -553,6 +553,27 @@ std::unique_ptr<RelayClient> make_client(const std::string& project,
     return client;
 }
 
+std::unique_ptr<RelayClient> make_client_with_config(
+    const std::function<void(RelayConfig&)>& mutate,
+    const std::vector<std::string>& contexts) {
+    ensure_server();
+    clear_active_session();
+    force_ws_scheme();
+    RelayConfig cfg = make_config();
+    cfg.contexts = contexts;
+    if (mutate) {
+        mutate(cfg);
+    }
+    auto client = std::make_unique<RelayClient>(cfg);
+    if (!client->connect()) {
+        throw std::runtime_error(
+            "relay_mocktest: client connect() failed (mock URL "
+            + http_url_cache() + ")");
+    }
+    set_active_session(client->session_id());
+    return client;
+}
+
 bool wait_for_session(int timeout_ms) {
     auto deadline = std::chrono::steady_clock::now()
                   + std::chrono::milliseconds(timeout_ms);

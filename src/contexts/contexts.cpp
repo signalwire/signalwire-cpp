@@ -3,7 +3,9 @@
 #include "signalwire/contexts/contexts.hpp"
 
 #include <algorithm>
+#include <set>
 #include <stdexcept>
+#include <variant>
 
 namespace signalwire {
 namespace contexts {
@@ -741,6 +743,62 @@ void ContextBuilder::validate() const {
     }
   }
 
+  // Validate step-level valid_steps references resolve to a real step in the
+  // context ("next" is the reserved sequential-advance token).
+  for (const auto& [ctx_name, ctx] : contexts_) {
+    for (const auto& [step_name, step] : ctx.steps()) {
+      if (!step.valid_steps().has_value()) {
+        continue;
+      }
+      for (const auto& vs : *step.valid_steps()) {
+        if (vs != "next" && ctx.steps().find(vs) == ctx.steps().end()) {
+          std::string msg = "Step '";
+          msg += step_name;
+          msg += "' in context '";
+          msg += ctx_name;
+          msg += "' references unknown step '";
+          msg += vs;
+          msg += "'";
+          throw std::runtime_error(msg);
+        }
+      }
+    }
+  }
+
+  // Validate context-level and step-level valid_contexts references resolve to
+  // a real, defined context.
+  for (const auto& [ctx_name, ctx] : contexts_) {
+    if (ctx.valid_contexts().has_value()) {
+      for (const auto& vc : *ctx.valid_contexts()) {
+        if (contexts_.find(vc) == contexts_.end()) {
+          std::string msg = "Context '";
+          msg += ctx_name;
+          msg += "' references unknown context '";
+          msg += vc;
+          msg += "'";
+          throw std::runtime_error(msg);
+        }
+      }
+    }
+    for (const auto& [step_name, step] : ctx.steps()) {
+      if (!step.valid_contexts().has_value()) {
+        continue;
+      }
+      for (const auto& vc : *step.valid_contexts()) {
+        if (contexts_.find(vc) == contexts_.end()) {
+          std::string msg = "Step '";
+          msg += step_name;
+          msg += "' in context '";
+          msg += ctx_name;
+          msg += "' references unknown context '";
+          msg += vc;
+          msg += "'";
+          throw std::runtime_error(msg);
+        }
+      }
+    }
+  }
+
   // Validate that user-defined tools do not collide with reserved native
   // tool names. The runtime auto-injects next_step / change_context /
   // gather_submit when contexts/steps are present, so user tools sharing
@@ -781,6 +839,53 @@ void ContextBuilder::validate() const {
                                "reserved and cannot be used for user-defined SWAIG tools "
                                "when contexts/steps are in use. Rename your tool(s) to "
                                "avoid the collision.");
+    }
+
+    // Validate step set_functions([...]) whitelists against the known tool
+    // universe (registered SWAIG tools + reserved natives). A step that
+    // whitelists a function which is neither a registered tool nor a reserved
+    // native is a DANGLING reference: it renders a step whose active-function
+    // set silently points at nothing. "none" and [] are explicit disable-all,
+    // not references to resolve (functions_ holds a string in that case).
+    std::set<std::string> known_functions(reserved.begin(), reserved.end());
+    for (const auto& name : registered) {
+      known_functions.insert(name);
+    }
+    for (const auto& [ctx_name, ctx] : contexts_) {
+      for (const auto& [step_name, step] : ctx.steps()) {
+        const auto& funcs = step.functions();
+        if (!funcs.has_value() || !std::holds_alternative<std::vector<std::string>>(*funcs)) {
+          continue;  // unset or "none" (string) — no list of refs to resolve
+        }
+        for (const auto& fn : std::get<std::vector<std::string>>(*funcs)) {
+          if (known_functions.find(fn) == known_functions.end()) {
+            std::vector<std::string> available(known_functions.begin(), known_functions.end());
+            std::sort(available.begin(), available.end());
+            std::string avail = "[";
+            for (std::size_t j = 0; j < available.size(); ++j) {
+              if (j > 0) {
+                avail += ", ";
+              }
+              avail += "'";
+              avail += available[j];
+              avail += "'";
+            }
+            avail += "]";
+            std::string msg = "Step '";
+            msg += step_name;
+            msg += "' in context '";
+            msg += ctx_name;
+            msg += "' whitelists function '";
+            msg += fn;
+            msg +=
+                "' via set_functions(), but no such SWAIG tool is registered on the agent and it "
+                "is not a reserved native tool. This would emit a dangling function reference. "
+                "Register the tool (define_tool / a skill) or remove it from the step. Available: ";
+            msg += avail;
+            throw std::runtime_error(msg);
+          }
+        }
+      }
     }
   }
 }

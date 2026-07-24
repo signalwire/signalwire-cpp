@@ -36,11 +36,10 @@ jobs:
         with:
           repository: signalwire/porting-sdk
           path: porting-sdk
-          # Wave-1 A+ campaign: pins the porting-sdk gate engines + new
-          # PSDK-3/4/5 BEHAVIORAL rules (PAGINATION-CORPUS/RELAY-LIVENESS/
-          # CA-VAR/SECRET-SCRUB) this PR's run-ci exercises. REVERT to main
-          # (drop this ref:) when porting-sdk wave/1-aplus merges.
-          ref: main
+          # Coordinated-pass pin: 'main' normally; set the PORTING_SDK_REF repo variable
+          # to a wave branch to test a coordinated porting-sdk change, declared on the PR
+          # (see porting-sdk/COORDINATED_PASS.md). No revert commit.
+          ref: ${{ vars.PORTING_SDK_REF || 'main' }}
           token: ${{ secrets.PORTING_SDK_TOKEN }}
 
       # The EMISSION gate compares this port's to_value() output
@@ -52,7 +51,7 @@ jobs:
         with:
           repository: signalwire/signalwire-python
           path: signalwire-python
-          ref: main
+          ref: ${{ vars.PORTING_SDK_REF || 'main' }}
 
       - name: Setup Python (audit scripts + mock servers + libclang)
         uses: actions/setup-python@v6
@@ -170,6 +169,9 @@ jobs:
         env:
           PORTING_SDK: ${{ github.workspace }}/porting-sdk
           SW_CI_TIER: ${{ steps.tier.outputs.tier }}
+          # COORDINATED-PASS reads the live PR body/labels via 'gh api' to see a
+          # 'Coordinated-With:' declaration edited after the triggering push.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Enables the vendored clang-tidy result cache in the LINT gate
           # (run-lint.sh routes clang-tidy through scripts/clang_tidy_cache.py when

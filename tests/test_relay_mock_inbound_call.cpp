@@ -484,6 +484,47 @@ TEST(relay_mock_inbound_journal_records_calling_call_receive) {
 }
 
 // ---------------------------------------------------------------------------
+// MAP-BOUNDS (r5 F5.4): max_active_calls cap is enforced at insertion time.
+// With a small cap and terminal events SUPPRESSED (never push "ended"), the
+// calls_ registry must not grow past the cap — the overflow inbound call is
+// dropped (never registered), so find_call() returns nullptr for it while the
+// first `cap` calls remain registered.
+// ---------------------------------------------------------------------------
+
+TEST(relay_mock_inbound_respects_max_active_calls_cap) {
+    auto client = mt::make_client_with_config(
+        [](RelayConfig& cfg) { cfg.max_active_calls = 2; });
+
+    std::atomic<int> handled{0};
+    client->on_call([&](Call&) { handled.fetch_add(1); });
+
+    // Drive 2 inbound calls up to the cap. drive_inbound_call waits until the
+    // SDK has registered the Call, and we never push a terminal event so the
+    // entries persist (the leak scenario).
+    Call* a = mt::drive_inbound_call(*client, "cap-1", {"created"});
+    Call* b = mt::drive_inbound_call(*client, "cap-2", {"created"});
+    ASSERT_TRUE(a != nullptr);
+    ASSERT_TRUE(b != nullptr);
+    ASSERT_TRUE(client->find_call("cap-1") != nullptr);
+    ASSERT_TRUE(client->find_call("cap-2") != nullptr);
+
+    // The 3rd inbound call is over the cap — it must be DROPPED, never handled,
+    // never registered.
+    mt::InboundCallOpts over;
+    over.call_id = "cap-3-overflow";
+    over.delay_ms = 5;
+    mt::inbound_call(over);
+
+    // Give the recv loop ample time to (not) register it.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    ASSERT_TRUE(client->find_call("cap-3-overflow") == nullptr);
+    ASSERT_EQ(handled.load(), 2);  // only the 2 under-cap calls dispatched
+
+    client->disconnect();
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Inbound without a registered handler — does not crash
 // ---------------------------------------------------------------------------
 

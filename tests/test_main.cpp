@@ -69,6 +69,7 @@ static std::vector<TestCase>& get_tests() {
 // Include all test files
 // Original test files
 #include "test_swml.cpp"
+#include "test_swml_strict_render.cpp"
 #include "test_swml_service_swaig.cpp"
 #include "test_swml_handler.cpp"
 #include "test_swaig_function.cpp"

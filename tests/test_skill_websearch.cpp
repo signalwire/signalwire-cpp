@@ -180,6 +180,44 @@ TEST(skill_websearch_response_prefix_and_postfix_both_wrap) {
     return true;
 }
 
+// SECURITY (r5 F3.3): a web_search failure must NOT leak the Google CSE api_key
+// into the returned FunctionResult (it flows into the AI transcript + logs). The
+// error string embeds the request URL, which carries `?key=<api_key>&...`; the
+// transport layer must redact the query before it reaches the user-visible error.
+// Drive a real transport failure by pointing the base URL at a closed port, then
+// assert the response contains neither the key nor `key=`.
+TEST(skill_websearch_transport_error_redacts_api_key) {
+    // Bind an ephemeral port, capture it, then release it so the connect refuses.
+    int dead_port = 0;
+    {
+        httplib::Server probe;
+        std::thread pth([&]{ dead_port = probe.bind_to_any_port("127.0.0.1"); });
+        auto dl = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (dead_port == 0 && std::chrono::steady_clock::now() < dl) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        probe.stop();
+        pth.join();
+    }
+    ASSERT_TRUE(dead_port > 0);
+
+    const std::string secret = "AIzaSyLEAKTESTSECRETKEY0123456789";
+    ::setenv("WEB_SEARCH_BASE_URL",
+             ("http://127.0.0.1:" + std::to_string(dead_port)).c_str(), 1);
+    auto skill = sw_skills::SkillRegistry::instance().create("web_search");
+    skill->setup(json::object({{"api_key", secret}, {"search_engine_id", "seid"}}));
+    auto tools = skill->register_tools();
+    auto result = tools[0].handler(json::object({{"query", "test query"}}), json::object());
+    std::string resp = result.to_json()["response"].get<std::string>();
+    ::unsetenv("WEB_SEARCH_BASE_URL");
+
+    // The key must never appear, and neither must the `key=` query param that
+    // would carry it (redaction strips the whole query).
+    ASSERT_TRUE(resp.find(secret) == std::string::npos);
+    ASSERT_TRUE(resp.find("key=") == std::string::npos);
+    return true;
+}
+
 TEST(skill_websearch_has_prompt_sections) {
     auto skill = sw_skills::SkillRegistry::instance().create("web_search");
     skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));

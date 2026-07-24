@@ -296,6 +296,9 @@ target_link_libraries(wire_dump signalwire)
 add_executable(swml_dump tools/swml_dump.cpp)
 target_link_libraries(swml_dump signalwire)
 
+add_executable(strict_render_dump tools/strict_render_dump.cpp)
+target_link_libraries(strict_render_dump signalwire)
+
 add_executable(state_dump tools/state_dump.cpp)
 target_link_libraries(state_dump signalwire)
 

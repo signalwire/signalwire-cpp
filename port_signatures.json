@@ -2936,6 +2936,15 @@
               ],
               "returns": "class:signalwire.core.contexts.Step"
             },
+            "functions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<union<string,list<string>>>"
+            },
             "gather_info": {
               "params": [
                 {
@@ -7903,17 +7912,12 @@
                   "kind": "self"
                 },
                 {
-                  "name": "section",
-                  "type": "string",
-                  "required": true
-                },
-                {
                   "name": "verb_name",
                   "type": "string",
                   "required": true
                 },
                 {
-                  "name": "params",
+                  "name": "config",
                   "type": "any",
                   "required": true
                 }
@@ -28336,6 +28340,25 @@
               "returns": "tuple<bool,list<string>>"
             },
             "validate_verb": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "verb_name",
+                  "type": "string",
+                  "required": true
+                },
+                {
+                  "name": "verb_config",
+                  "type": "any",
+                  "required": true
+                }
+              ],
+              "returns": "tuple<bool,list<string>>"
+            },
+            "validate_verb_top_level_keys": {
               "params": [
                 {
                   "name": "self",

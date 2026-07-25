@@ -38,7 +38,28 @@ using json = nlohmann::json;
 /// can register tools and serve them on /swaig without subclassing AgentBase.
 class Service {
  public:
-  Service();
+  /// Construct a SWML service.
+  ///
+  /// Mirrors the reference ``SWMLService.__init__(name, route, host, port,
+  /// basic_auth, schema_path, config_file, schema_validation)`` — every
+  /// parameter is forwarded to the same collaborator the reference forwards
+  /// it to:
+  ///   * ``schema_path`` + ``schema_validation`` → ``SchemaUtils``
+  ///     (``self.schema_utils``),
+  ///   * ``config_file`` → ``SecurityConfig`` (``self.security``) and the
+  ///     ``service`` section that supplies name/route/host/port defaults,
+  ///   * ``basic_auth`` → the auth credentials (``set_auth``).
+  ///
+  /// ``port``/``basic_auth``/``schema_path``/``config_file`` are optional in
+  /// the reference; an empty ``std::optional`` here means "not supplied",
+  /// which is what lets the PORT env var (port) and the config-file /
+  /// environment fallbacks (auth) still apply.
+  explicit Service(
+      const std::string& name = "service", const std::string& route = "/",
+      const std::string& host = "0.0.0.0", const std::optional<int>& port = std::nullopt,
+      const std::optional<std::pair<std::string, std::string>>& basic_auth = std::nullopt,
+      const std::optional<std::string>& schema_path = std::nullopt,
+      const std::optional<std::string>& config_file = std::nullopt, bool schema_validation = true);
   virtual ~Service();
 
   // ========================================================================
@@ -412,6 +433,20 @@ class Service {
   /// Strict schema validation for the 2-arg add_verb (Python: SWMLService
   /// schema_validation, default True).
   bool schema_validation_ = true;
+  /// Explicit schema path from the constructor, forwarded to SchemaUtils.
+  /// Empty optional = let SchemaUtils run its own discovery (the reference's
+  /// ``_find_schema_path``).
+  std::optional<std::string> schema_path_;
+  /// Config file from the constructor (or auto-discovered for this service
+  /// name), forwarded to SecurityConfig.
+  std::optional<std::string> config_file_;
+
+  // Protected accessors for the three above — the reference's counterparts
+  // are private (``self._schema_validation``) or not stored at all, so these
+  // are NOT public surface.
+  [[nodiscard]] bool schema_validation() const { return schema_validation_; }
+  [[nodiscard]] const std::optional<std::string>& schema_path() const { return schema_path_; }
+  [[nodiscard]] const std::optional<std::string>& config_file() const { return config_file_; }
   std::map<std::string, RoutingCallback> routing_callbacks_;  // path -> callback
   std::vector<std::shared_ptr<signalwire::core::SWMLVerbHandler>> verb_handlers_;
 

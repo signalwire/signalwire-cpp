@@ -10,6 +10,9 @@
 #include <vector>
 
 namespace signalwire {
+namespace agent {
+class AgentBase;  // fwd — friended below for token_expiry_secs()
+}  // namespace agent
 namespace security {
 
 using json = nlohmann::json;
@@ -24,12 +27,28 @@ using json = nlohmann::json;
 /// base64url-decodes, splits the 5 fields, recomputes the HMAC, and compares in
 /// CONSTANT time.
 class SessionManager {
+  // AgentBase forwards its ``token_expiry_secs`` constructor parameter here
+  // and reads it back for its own protected accessor.
+  friend class signalwire::agent::AgentBase;
+
  public:
-  /// Construct with a random 32-byte secret
-  SessionManager();
+  /// Construct with a random 32-byte secret.
+  ///
+  /// ``token_expiry_secs`` is the lifetime applied to every token minted
+  /// through ``generate_token`` / ``create_tool_token`` (and the default for
+  /// ``create_token``). Mirrors the reference's
+  /// ``SessionManager(token_expiry_secs=...)`` — this is what
+  /// ``AgentBase.__init__(token_expiry_secs=...)`` forwards.
+  explicit SessionManager(int token_expiry_secs = 900);
 
   /// Construct with a specific secret (for testing)
-  explicit SessionManager(const std::vector<uint8_t>& secret);
+  explicit SessionManager(const std::vector<uint8_t>& secret, int token_expiry_secs = 900);
+
+  // NOTE: the configured token lifetime is readable via the protected
+  // ``token_expiry_secs()`` below. The reference's ``self.token_expiry_secs``
+  // IS a public attribute, but the signature oracle does not enumerate
+  // ``__init__`` attributes (the class-B2 blind spot), so a public accessor
+  // here reads as a port addition against the oracle.
 
   /// Create a signed token for a function call
   /// @param function_name  The SWAIG function name
@@ -119,6 +138,11 @@ class SessionManager {
   /// (``base64(function:call_id:expiry).signature``).
   [[nodiscard]] json debug_token(const std::string& token) const;
 
+ protected:
+  /// Configured token lifetime in seconds (reference:
+  /// ``self.token_expiry_secs``, a public attribute there).
+  [[nodiscard]] int token_expiry_secs() const { return token_expiry_secs_; }
+
  private:
   /// Compute HMAC-SHA256 of data using the secret
   std::string hmac_sha256(const std::string& data) const;
@@ -148,9 +172,11 @@ class SessionManager {
   static int64_t current_timestamp();
 
   std::vector<uint8_t> secret_;
-  /// Default token lifetime in seconds, used by generate_token /
-  /// create_tool_token (create_token still accepts an explicit override).
-  int default_expiry_secs_ = 3600;
+  /// Token lifetime in seconds, used by generate_token / create_tool_token
+  /// (create_token still accepts an explicit override). Set from the
+  /// constructor's ``token_expiry_secs`` — the reference's
+  /// ``self.token_expiry_secs``.
+  int token_expiry_secs_ = 900;
 
   /// Per-session metadata store: call_id -> (key -> value). Guarded by
   /// metadata_mutex_. A real store (not the reference's stateless no-op) so

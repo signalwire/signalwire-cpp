@@ -84,10 +84,51 @@ TEST(typed_event_conference_fields) {
 }
 
 TEST(typed_event_error_fields) {
+    // The wire carries ``code`` as a STRING (reference: CallingErrorEvent.code: str).
     json p = make_payload("calling.error",
-                          json::object({{"code", 42}, {"message", "boom"}}));
+                          json::object({{"code", "42"}, {"message", "boom"}}));
     tev::CallingErrorEvent ev = tev::CallingErrorEvent::from_payload(p);
-    ASSERT_EQ(ev.code, 42);
+    ASSERT_EQ(ev.code, "42");
     ASSERT_EQ(ev.message, "boom");
+    return true;
+}
+
+// Ports the reference's TestReferEvent::test_from_payload
+// (signalwire-python tests/unit/relay/test_event.py:283-298): the SIP response
+// codes arrive on the wire as STRINGS and must round-trip as strings.
+TEST(typed_event_refer_fields) {
+    json p = make_payload("calling.call.refer",
+                          json::object({{"call_id", "c1"},
+                                        {"state", "success"},
+                                        {"sip_refer_to", "sip:user@example.com"},
+                                        {"sip_refer_response_code", "202"},
+                                        {"sip_notify_response_code", "200"}}));
+    tev::ReferEvent ev = tev::ReferEvent::from_payload(p);
+    ASSERT_EQ(ev.state, "success");
+    ASSERT_EQ(ev.sip_refer_to, "sip:user@example.com");
+    ASSERT_EQ(ev.sip_refer_response_code, "202");
+    ASSERT_EQ(ev.sip_notify_response_code, "200");
+    return true;
+}
+
+// Reference declares TranscribeEvent.duration as ``float`` — a fractional wire
+// value must survive intact, not truncate to a whole second.
+TEST(typed_event_transcribe_fractional_duration) {
+    json p = make_payload("calling.call.transcribe",
+                          json::object({{"control_id", "ctrl-1"},
+                                        {"state", "finished"},
+                                        {"duration", 12.5},
+                                        {"size", 4096}}));
+    tev::TranscribeEvent ev = tev::TranscribeEvent::from_payload(p);
+    ASSERT_EQ(ev.duration, 12.5);
+    ASSERT_EQ(ev.size, 4096);
+    return true;
+}
+
+TEST(typed_event_refer_defaults_empty) {
+    json p = make_payload("calling.call.refer", json::object({{"call_id", "c1"}}));
+    tev::ReferEvent ev = tev::ReferEvent::from_payload(p);
+    ASSERT_EQ(ev.sip_refer_response_code, "");
+    ASSERT_EQ(ev.sip_notify_response_code, "");
     return true;
 }

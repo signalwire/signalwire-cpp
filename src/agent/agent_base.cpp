@@ -17,6 +17,7 @@
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/common.hpp"
+#include "signalwire/core/config_loader.hpp"
 #include "signalwire/security/webhook_middleware.hpp"
 #include "signalwire/skills/skill_registry.hpp"
 
@@ -27,40 +28,166 @@ namespace agent {
 // Constructor / Destructor
 // ============================================================================
 
-AgentBase::AgentBase(const std::string& name, const std::string& route, const std::string& host,
-                     int port) {
-  name_ = name;
-  route_ = route;
-  host_ = host;
-  port_ = port;
-  if (!route_.empty() && route_.front() != '/') {
-    route_ = "/" + route_;
+namespace {
+
+/// Load the ``service`` section of the agent's config file, mirroring the
+/// reference's ``AgentBase._load_service_config(config_file, name)``: use the
+/// explicit path when given, else discover one for this service name; return
+/// an empty object when nothing loads.
+json load_service_config(const std::optional<std::string>& config_file,
+                         const std::string& service_name) {
+  std::optional<std::string> path = config_file;
+  if (!path.has_value() || path->empty()) {
+    path = core::ConfigLoader::find_config_file(service_name);
   }
-  // Set default port from env
-  std::string env_port = get_env("PORT", "");
-  if (!env_port.empty()) {
-    try {
-      port_ = std::stoi(env_port);
-    } catch (const std::exception&) {
-      // best-effort: keep the existing port_ if PORT is not a valid integer
-      get_logger().debug("Ignoring invalid PORT env value: " + env_port);
+  if (!path.has_value() || path->empty()) {
+    return json::object();
+  }
+  core::ConfigLoader loader(std::vector<std::string>{*path});
+  if (!loader.has_config()) {
+    return json::object();
+  }
+  json section = loader.get_section("service");
+  return section.is_object() ? section : json::object();
+}
+
+/// Read a string field out of the loaded ``service`` section.
+std::optional<std::string> config_str(const json& cfg, const char* key) {
+  auto it = cfg.find(key);
+  if (it != cfg.end() && it->is_string()) {
+    return it->get<std::string>();
+  }
+  return std::nullopt;
+}
+
+}  // namespace
+
+AgentBase::AgentBase(const std::string& name, const std::string& route, const std::string& host,
+                     const std::optional<int>& port,
+                     const std::optional<std::pair<std::string, std::string>>& basic_auth,
+                     bool use_pom, int token_expiry_secs, bool auto_answer, bool record_call,
+                     const std::string& record_format, bool record_stereo,
+                     const std::optional<std::string>& default_webhook_url,
+                     const std::optional<std::string>& agent_id,
+                     const std::optional<std::vector<std::string>>& native_functions,
+                     const std::optional<std::string>& schema_path, bool suppress_logs,
+                     bool enable_post_prompt_override, bool check_for_input_override,
+                     const std::optional<std::string>& config_file, bool schema_validation,
+                     const std::optional<std::string>& signing_key, bool trust_proxy_for_signature)
+    // reference: AgentBase.__init__ passes token_expiry_secs straight into
+    // SessionManager(token_expiry_secs=...). The manager holds a mutex, so it
+    // is not assignable — construct it with the value here.
+    : session_manager_(token_expiry_secs) {
+  // ---- config-file defaults (reference: _load_service_config) -------------
+  // Constructor arguments take precedence; the config file only fills in a
+  // value the caller left at its default. This is exactly the reference's
+  // ``route if route != "/" else service_config.get("route", route)`` shape.
+  const json service_config = load_service_config(config_file, name);
+
+  std::string final_name = name;
+  if (auto v = config_str(service_config, "name")) {
+    final_name = *v;  // reference: config wins outright for ``name``
+  }
+  std::string final_route = route;
+  if (route == "/") {
+    if (auto v = config_str(service_config, "route")) {
+      final_route = *v;
+    }
+  }
+  std::string final_host = host;
+  if (host == "0.0.0.0") {
+    if (auto v = config_str(service_config, "host")) {
+      final_host = *v;
+    }
+  }
+  std::optional<int> final_port = port;
+  if (!final_port.has_value()) {
+    auto it = service_config.find("port");
+    if (it != service_config.end() && it->is_number_integer()) {
+      final_port = it->get<int>();
     }
   }
 
-  // Webhook signature validation (the SignalWire webhook signature spec):
-  // pick up SIGNALWIRE_SIGNING_KEY at construction time as a fallback;
-  // explicit set_signing_key(...) wins. The actual route mounting + the
-  // "disabled" warning is emitted at serve() time so callers who set
-  // the key after construction don't get the misleading warning.
-  std::string env_key = get_env("SIGNALWIRE_SIGNING_KEY", "");
-  if (!env_key.empty()) {
-    signing_key_ = env_key;
+  // ---- forward to the SWMLService base (reference: super().__init__) ------
+  // Service's own constructor already applies the route normalization, the
+  // PORT env fallback, the basic_auth credentials, and hands schema_path +
+  // schema_validation to SchemaUtils. Assign through its fields rather than a
+  // base-initializer so this stays a single construction path.
+  name_ = final_name;
+  route_ = final_route;
+  while (route_.size() > 1 && route_.back() == '/') {
+    route_.pop_back();
   }
+  if (!route_.empty() && route_.front() != '/') {
+    route_ = "/" + route_;
+  }
+  host_ = final_host;
+  schema_validation_ = schema_validation;
+  schema_path_ = schema_path;
+  config_file_ = config_file;
+
+  if (final_port.has_value()) {
+    port_ = *final_port;
+  } else {
+    std::string env_port = get_env("PORT", "");
+    if (!env_port.empty()) {
+      try {
+        port_ = std::stoi(env_port);
+      } catch (const std::exception&) {
+        // best-effort: keep the existing port_ if PORT is not a valid integer
+        get_logger().debug("Ignoring invalid PORT env value: " + env_port);
+      }
+    }
+  }
+
+  if (basic_auth.has_value()) {
+    set_auth(basic_auth->first, basic_auth->second);
+  }
+
+  if (schema_path_.has_value() && !schema_path_->empty()) {
+    schema_utils_ =
+        std::make_unique<signalwire::utils::SchemaUtils>(*schema_path_, schema_validation_);
+  }
+
+  // ---- agent-local state the reference stores on self --------------------
+  use_pom_ = use_pom;
+  auto_answer_ = auto_answer;
+  record_call_ = record_call;
+  record_format_ = record_format;
+  record_stereo_ = record_stereo;
+  default_webhook_url_ = default_webhook_url;
+  suppress_logs_ = suppress_logs;
+  enable_post_prompt_override_ = enable_post_prompt_override;
+  check_for_input_override_ = check_for_input_override;
+  if (native_functions.has_value()) {
+    native_functions_ = *native_functions;
+  }
+  // reference: ``self.agent_id = agent_id or str(uuid.uuid4())``
+  agent_id_ =
+      (agent_id.has_value() && !agent_id->empty()) ? *agent_id : signalwire::generate_uuid();
+
+  // Webhook signature validation (the SignalWire webhook signature spec):
+  // explicit constructor arg wins, then SIGNALWIRE_SIGNING_KEY at
+  // construction time. The actual route mounting + the "disabled" warning is
+  // emitted at serve() time so callers who set the key after construction
+  // don't get the misleading warning.
+  if (signing_key.has_value() && !signing_key->empty()) {
+    signing_key_ = *signing_key;
+  } else {
+    std::string env_key = get_env("SIGNALWIRE_SIGNING_KEY", "");
+    if (!env_key.empty()) {
+      signing_key_ = env_key;
+    }
+  }
+  trust_proxy_for_signature_ = trust_proxy_for_signature;
 }
 
 AgentBase::~AgentBase() { stop(); }
 
-AgentBase::AgentBase(const AgentBase& other) {
+AgentBase::AgentBase(const AgentBase& other)
+    // The clone gets a FRESH token secret (deliberate) but must keep the
+    // source's configured token lifetime.
+    : session_manager_(other.session_manager_.token_expiry_secs()) {
   // Service-level state copied through the protected fields the parent owns.
   name_ = other.name_;
   route_ = other.route_;
@@ -112,7 +239,23 @@ AgentBase::AgentBase(const AgentBase& other) {
   signing_key_ = other.signing_key_;
   signing_key_warning_emitted_ = other.signing_key_warning_emitted_;
   trust_proxy_for_signature_ = other.trust_proxy_for_signature_;
-  // Note: server_ is NOT copied; session_manager_ gets a new secret
+
+  // Construction parameters (the reference's dynamic-config copy carries the
+  // same per-instance state onto the request-scoped clone).
+  agent_id_ = other.agent_id_;
+  auto_answer_ = other.auto_answer_;
+  record_call_ = other.record_call_;
+  record_format_ = other.record_format_;
+  record_stereo_ = other.record_stereo_;
+  default_webhook_url_ = other.default_webhook_url_;
+  suppress_logs_ = other.suppress_logs_;
+  enable_post_prompt_override_ = other.enable_post_prompt_override_;
+  check_for_input_override_ = other.check_for_input_override_;
+  schema_validation_ = other.schema_validation_;
+  schema_path_ = other.schema_path_;
+  config_file_ = other.config_file_;
+  // Note: server_ is NOT copied; session_manager_ gets a new secret (its
+  // token lifetime carries over via the member-initializer above).
 }
 
 // ============================================================================
@@ -1432,6 +1575,12 @@ json AgentBase::build_ai_verb(const std::string& webhook_url) const {
 
   // SWAIG
   json swaig_section;
+  // ``defaults.web_hook_url`` — the constructor's ``default_webhook_url``
+  // applies to every function that does not carry its own (same shape the
+  // SwmlRenderer emits).
+  if (default_webhook_url_.has_value() && !default_webhook_url_->empty()) {
+    swaig_section["defaults"] = json::object({{"web_hook_url", *default_webhook_url_}});
+  }
   json functions = build_swaig_functions(webhook_url);
   if (!functions.empty()) {
     swaig_section["functions"] = functions;
@@ -1597,16 +1746,24 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
     doc.main().add_verb(v);
   }
 
-  // Phase 2: Answer verb
-  if (answer_verbs_.empty()) {
-    doc.main().add_verb("answer", json::object({{"max_duration", 3600}}));
-  } else {
-    for (const auto& v : answer_verbs_) {
-      doc.main().add_verb(v);
+  // Phase 2: Answer verb — only when auto_answer is enabled (reference:
+  // ``if agent_to_use._auto_answer: add_verb("answer", ...)``). Explicitly
+  // configured answer verbs still win over the default config.
+  if (auto_answer_) {
+    if (answer_verbs_.empty()) {
+      doc.main().add_verb("answer", json::object({{"max_duration", 3600}}));
+    } else {
+      for (const auto& v : answer_verbs_) {
+        doc.main().add_verb(v);
+      }
     }
   }
 
-  // Phase 3: Post-answer verbs
+  // Phase 3: Post-answer verbs — recording first, as in the reference.
+  if (record_call_) {
+    doc.main().add_verb("record_call",
+                        json::object({{"format", record_format_}, {"stereo", record_stereo_}}));
+  }
   for (const auto& v : post_answer_verbs_) {
     doc.main().add_verb(v);
   }

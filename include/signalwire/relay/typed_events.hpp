@@ -309,8 +309,8 @@ struct DialEvent : public RelayEvent {
 struct ReferEvent : public RelayEvent {
   std::string state;
   std::string sip_refer_to;
-  long sip_refer_response_code = 0;
-  long sip_notify_response_code = 0;
+  std::string sip_refer_response_code;
+  std::string sip_notify_response_code;
   [[nodiscard]] static ReferEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
     ReferEvent e;
@@ -321,8 +321,8 @@ struct ReferEvent : public RelayEvent {
     const json& p = base.params;
     e.state = p.value("state", std::string());
     e.sip_refer_to = p.value("sip_refer_to", std::string());
-    e.sip_refer_response_code = p.value<long>("sip_refer_response_code", 0);
-    e.sip_notify_response_code = p.value<long>("sip_notify_response_code", 0);
+    e.sip_refer_response_code = p.value("sip_refer_response_code", std::string());
+    e.sip_notify_response_code = p.value("sip_notify_response_code", std::string());
     return e;
   }
 };
@@ -409,7 +409,7 @@ struct TranscribeEvent : public RelayEvent {
   std::string state;
   std::string url;
   std::string recording_id;
-  long duration = 0;
+  double duration = 0.0;
   long size = 0;
   [[nodiscard]] static TranscribeEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -423,7 +423,7 @@ struct TranscribeEvent : public RelayEvent {
     e.state = p.value("state", std::string());
     e.url = p.value("url", std::string());
     e.recording_id = p.value("recording_id", std::string());
-    e.duration = p.value<long>("duration", 0);
+    e.duration = p.value("duration", 0.0);
     e.size = p.value<long>("size", 0);
     return e;
   }
@@ -467,7 +467,7 @@ struct ConferenceEvent : public RelayEvent {
 
 /// Typed event for the matching signalwire.event type.
 struct CallingErrorEvent : public RelayEvent {
-  long code = 0;
+  std::string code;
   std::string message;
   [[nodiscard]] static CallingErrorEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);
@@ -477,7 +477,7 @@ struct CallingErrorEvent : public RelayEvent {
     e.call_id = base.call_id;
     e.timestamp = base.timestamp;
     const json& p = base.params;
-    e.code = p.value<long>("code", 0);
+    e.code = p.value("code", std::string());
     e.message = p.value("message", std::string());
     return e;
   }

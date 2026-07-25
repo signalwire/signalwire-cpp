@@ -36,13 +36,15 @@ std::string iso8601_utc(int64_t ts) {
 }
 }  // namespace
 
-SessionManager::SessionManager() : secret_(32) {
+SessionManager::SessionManager(int token_expiry_secs)
+    : secret_(32), token_expiry_secs_(token_expiry_secs) {
   if (RAND_bytes(secret_.data(), 32) != 1) {
     throw std::runtime_error("Failed to generate random secret for SessionManager");
   }
 }
 
-SessionManager::SessionManager(const std::vector<uint8_t>& secret) : secret_(secret) {
+SessionManager::SessionManager(const std::vector<uint8_t>& secret, int token_expiry_secs)
+    : secret_(secret), token_expiry_secs_(token_expiry_secs) {
   if (secret_.size() < 16) {
     throw std::invalid_argument("Secret must be at least 16 bytes");
   }
@@ -248,7 +250,7 @@ bool SessionManager::validate_token(std::string_view token, std::string_view fun
 
 std::string SessionManager::generate_token(const std::string& function_name,
                                            const std::string& call_id) const {
-  return create_token(function_name, call_id, default_expiry_secs_);
+  return create_token(function_name, call_id, token_expiry_secs_);
 }
 
 std::string SessionManager::create_tool_token(const std::string& function_name,

@@ -24,8 +24,57 @@ namespace {
 const std::regex kSwaigFnName("^[a-zA-Z_][a-zA-Z0-9_]*$");
 }
 
-Service::Service() {
+Service::Service(const std::string& name, const std::string& route, const std::string& host,
+                 const std::optional<int>& port,
+                 const std::optional<std::pair<std::string, std::string>>& basic_auth,
+                 const std::optional<std::string>& schema_path,
+                 const std::optional<std::string>& config_file, bool schema_validation) {
   static_cast<void>(schema_.load_embedded());  // best-effort; result intentionally ignored
+
+  schema_validation_ = schema_validation;
+  schema_path_ = schema_path;
+  config_file_ = config_file;
+
+  name_ = name;
+  route_ = route;
+  // The reference does ``route.rstrip("/")``; keep a leading slash so the
+  // route stays absolute (matching AgentBase's existing normalization).
+  while (route_.size() > 1 && route_.back() == '/') {
+    route_.pop_back();
+  }
+  if (!route_.empty() && route_.front() != '/') {
+    route_ = "/" + route_;
+  }
+  host_ = host;
+
+  // Port precedence mirrors the reference: explicit param, else the PORT env
+  // var, else the 3000 default already on the member.
+  if (port.has_value()) {
+    port_ = *port;
+  } else {
+    std::string env_port = get_env("PORT", "");
+    if (!env_port.empty()) {
+      try {
+        port_ = std::stoi(env_port);
+      } catch (const std::exception&) {
+        get_logger().debug("Ignoring invalid PORT env value: " + env_port);
+      }
+    }
+  }
+
+  // ``basic_auth`` short-circuits the lazy env/generated credential
+  // resolution — the reference passes the tuple straight through.
+  if (basic_auth.has_value()) {
+    set_auth(basic_auth->first, basic_auth->second);
+  }
+
+  // ``schema_path`` + ``schema_validation`` are what the reference hands to
+  // SchemaUtils. Build it eagerly when a path was supplied so the caller's
+  // path is honored rather than SchemaUtils' own discovery.
+  if (schema_path_.has_value() && !schema_path_->empty()) {
+    schema_utils_ =
+        std::make_unique<signalwire::utils::SchemaUtils>(*schema_path_, schema_validation_);
+  }
 }
 
 signalwire::utils::SchemaUtils& Service::schema_utils() {

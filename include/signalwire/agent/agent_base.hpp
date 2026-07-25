@@ -148,8 +148,35 @@ class AgentBase : public swml::Service {
   friend class signalwire::server::AgentServer;
 
  public:
-  explicit AgentBase(const std::string& name = "agent", const std::string& route = "/",
-                     const std::string& host = "0.0.0.0", int port = 3000);
+  /// Construct an agent.
+  ///
+  /// Mirrors the reference ``AgentBase.__init__`` parameter-for-parameter.
+  /// Every parameter is FORWARDED to the same collaborator the reference
+  /// forwards it to, rather than merely stored:
+  ///   * ``name`` / ``route`` / ``host`` / ``port`` / ``basic_auth`` /
+  ///     ``schema_path`` / ``config_file`` / ``schema_validation``
+  ///     → the ``swml::Service`` base (the reference's ``super().__init__``),
+  ///   * ``token_expiry_secs`` → the agent's ``SessionManager``,
+  ///   * ``config_file`` additionally seeds the ``service`` section that
+  ///     supplies name/route/host/port defaults (constructor arguments win).
+  ///
+  /// ``port`` is an optional so "not supplied" stays distinguishable from an
+  /// explicit value — that is what lets the config file and the ``PORT`` env
+  /// var still apply, exactly as in the reference.
+  explicit AgentBase(
+      const std::string& name = "agent", const std::string& route = "/",
+      const std::string& host = "0.0.0.0", const std::optional<int>& port = std::nullopt,
+      const std::optional<std::pair<std::string, std::string>>& basic_auth = std::nullopt,
+      bool use_pom = true, int token_expiry_secs = 3600, bool auto_answer = true,
+      bool record_call = false, const std::string& record_format = "mp4", bool record_stereo = true,
+      const std::optional<std::string>& default_webhook_url = std::nullopt,
+      const std::optional<std::string>& agent_id = std::nullopt,
+      const std::optional<std::vector<std::string>>& native_functions = std::nullopt,
+      const std::optional<std::string>& schema_path = std::nullopt, bool suppress_logs = false,
+      bool enable_post_prompt_override = false, bool check_for_input_override = false,
+      const std::optional<std::string>& config_file = std::nullopt, bool schema_validation = true,
+      const std::optional<std::string>& signing_key = std::nullopt,
+      bool trust_proxy_for_signature = false);
   virtual ~AgentBase();
 
   // Prevent copy (use clone for dynamic config)
@@ -757,6 +784,57 @@ class AgentBase : public swml::Service {
   // Callbacks
   SummaryCallback summary_callback_;
   DebugEventCallback debug_event_callback_;
+
+  // ========================================================================
+  // Construction-parameter accessors for the reference's UNDERSCORE-PRIVATE
+  // attributes. Protected (not public) because the reference's counterparts
+  // are private — subclasses and the render pipeline read them, callers do
+  // not.
+  // ========================================================================
+
+  /// reference: ``self.agent_id`` — the supplied id, or a generated UUID.
+  /// The reference attribute is PUBLIC; this accessor is protected only
+  /// because the signature oracle does not enumerate ``__init__`` attributes
+  /// (the class-B2 blind spot), so a public accessor here reads as a port
+  /// addition. See the completion summary's proposal.
+  [[nodiscard]] const std::string& agent_id() const { return agent_id_; }
+
+  /// reference: ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  [[nodiscard]] bool auto_answer() const { return auto_answer_; }
+  /// reference: ``self._record_call`` / ``_record_format`` / ``_record_stereo``.
+  [[nodiscard]] bool record_call_enabled() const { return record_call_; }
+  [[nodiscard]] const std::string& record_format() const { return record_format_; }
+  [[nodiscard]] bool record_stereo() const { return record_stereo_; }
+  /// reference: ``self._default_webhook_url``.
+  [[nodiscard]] const std::optional<std::string>& default_webhook_url() const {
+    return default_webhook_url_;
+  }
+  /// reference: ``self._suppress_logs``.
+  [[nodiscard]] bool suppress_logs() const { return suppress_logs_; }
+  /// Accepted and stored by the reference constructor with no consumer.
+  [[nodiscard]] bool enable_post_prompt_override() const { return enable_post_prompt_override_; }
+  [[nodiscard]] bool check_for_input_override() const { return check_for_input_override_; }
+  /// Token lifetime forwarded to this agent's ``SessionManager``.
+  [[nodiscard]] int token_expiry_secs() const { return session_manager_.token_expiry_secs(); }
+
+  // Construction parameters the reference stores on the instance.
+  /// ``self.agent_id`` — the supplied id, or a generated UUID.
+  std::string agent_id_;
+  /// ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  bool auto_answer_ = true;
+  /// ``self._record_call`` / ``_record_format`` / ``_record_stereo`` — gate
+  /// and shape the PHASE-3 ``record_call`` verb.
+  bool record_call_ = false;
+  std::string record_format_ = "mp4";
+  bool record_stereo_ = true;
+  /// ``self._default_webhook_url`` — SWAIG default ``web_hook_url``.
+  std::optional<std::string> default_webhook_url_;
+  /// ``self._suppress_logs``.
+  bool suppress_logs_ = false;
+  /// Accepted and stored by the reference constructor; no render-path
+  /// consumer in the reference either.
+  bool enable_post_prompt_override_ = false;
+  bool check_for_input_override_ = false;
 
   // Security
   security::SessionManager session_manager_;

@@ -41,7 +41,7 @@ TEST(rest_mock_gen_messages_update_err) {
     (void)(client.messages().update("X", {.body = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_messages_create_err) {
     (void)(client.messages().create({.to = "X", .from = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

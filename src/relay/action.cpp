@@ -11,6 +11,16 @@ namespace relay {
 
 Action::Action() : state_(std::make_shared<SharedState>()) {}
 
+Call* Action::call() const {
+  // The client's registry owns the Call; resolving through it (rather than
+  // storing a Call*) is what keeps a long-lived Action from dangling after the
+  // call ends — an ended call is unregistered and this returns nullptr.
+  if (state_->client == nullptr || state_->call_id.empty()) {
+    return nullptr;
+  }
+  return state_->client->find_call(state_->call_id);
+}
+
 Action::Action(const std::string& control_id) : state_(std::make_shared<SharedState>()) {
   state_->control_id = control_id;
 }

@@ -76,6 +76,9 @@ class Service {
 
   /// Set the host to bind to
   Service& set_host(const std::string& host);
+  /// The host this service binds to (reference: ``self.host``) — the twin of
+  /// the existing ``port()`` accessor.
+  const std::string& host() const { return host_; }
 
   /// Set the port to listen on
   Service& set_port(int port);

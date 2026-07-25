@@ -63,6 +63,32 @@ class SurveyAgent : public agent::AgentBase {
   SurveyAgent& set_questions(const std::vector<json>& questions);
   SurveyAgent& set_completion_message(const std::string& msg);
   SurveyAgent& set_intro_message(const std::string& msg);
+  /// The survey's display name (reference: ``self.survey_name``), used in the
+  /// default introduction.
+  SurveyAgent& set_survey_name(const std::string& name);
+  /// The brand/company name (reference: ``self.brand_name``, default
+  /// "Our Company").
+  SurveyAgent& set_brand_name(const std::string& name);
+  /// Maximum retries for an invalid answer (reference: ``self.max_retries``,
+  /// default 2).
+  SurveyAgent& set_max_retries(int retries);
+
+  // Configuration the reference keeps as public instance attributes; a caller
+  // supplies each of these, so a caller reads each back.
+  /// reference: ``self.survey_name``
+  [[nodiscard]] const std::string& survey_name() const { return survey_name_; }
+  /// reference: ``self.questions`` — the question objects driving the survey.
+  [[nodiscard]] const std::vector<json>& questions() const { return survey_questions_; }
+  /// reference: ``self.brand_name``
+  [[nodiscard]] const std::string& brand_name() const { return brand_name_; }
+  /// reference: ``self.introduction`` — the opening line; defaults to
+  /// "Welcome to our <survey_name>. We appreciate your participation."
+  [[nodiscard]] const std::string& introduction() const { return introduction_; }
+  /// reference: ``self.conclusion`` — the closing line; defaults to
+  /// "Thank you for completing our survey. Your feedback is valuable to us."
+  [[nodiscard]] const std::string& conclusion() const { return conclusion_; }
+  /// reference: ``self.max_retries``
+  [[nodiscard]] int max_retries() const { return max_retries_; }
 
   /// Register a post-prompt summary callback (Python SurveyAgent.on_summary).
   /// Wires through to AgentBase::on_summary.
@@ -79,6 +105,11 @@ class SurveyAgent : public agent::AgentBase {
 
  private:
   std::vector<json> survey_questions_;
+  std::string survey_name_;
+  std::string brand_name_ = "Our Company";
+  std::string introduction_ = "Welcome to our survey. We appreciate your participation.";
+  std::string conclusion_ = "Thank you for completing our survey. Your feedback is valuable to us.";
+  int max_retries_ = 2;
   json find_question_by_id(const std::string& id) const;
 };
 
@@ -108,6 +139,18 @@ class FAQBotAgent : public agent::AgentBase {
   FAQBotAgent& set_faqs(const std::vector<json>& faqs);
   FAQBotAgent& set_no_match_message(const std::string& msg);
   FAQBotAgent& set_suggest_related(bool suggest);
+  /// The bot's personality description (reference: ``self.persona``).
+  FAQBotAgent& set_persona(const std::string& persona);
+
+  // Configuration the reference keeps as public instance attributes.
+  /// reference: ``self.faqs`` — the FAQ items ({question, answer, categories}).
+  [[nodiscard]] const std::vector<json>& faqs() const { return faqs_; }
+  /// reference: ``self.suggest_related`` — whether related questions are
+  /// suggested alongside an answer (default true).
+  [[nodiscard]] bool suggest_related() const { return suggest_related_; }
+  /// reference: ``self.persona`` — defaults to "You are a helpful FAQ bot that
+  /// provides accurate answers to common questions."
+  [[nodiscard]] const std::string& persona() const { return persona_; }
 
   /// Register a post-prompt summary callback (Python FAQBotAgent.on_summary).
   /// Wires through to AgentBase::on_summary.
@@ -120,6 +163,9 @@ class FAQBotAgent : public agent::AgentBase {
 
  private:
   std::vector<json> faqs_;
+  bool suggest_related_ = true;
+  std::string persona_ =
+      "You are a helpful FAQ bot that provides accurate answers to common questions.";
 };
 
 /// Venue concierge with amenity info
@@ -131,6 +177,27 @@ class ConciergeAgent : public agent::AgentBase {
   ConciergeAgent& set_venue_name(const std::string& name);
   ConciergeAgent& set_amenities(const std::vector<json>& amenities);
   ConciergeAgent& set_hours(const json& hours);
+  /// The services the venue offers (reference: ``self.services``).
+  ConciergeAgent& set_services(const std::vector<std::string>& services);
+  /// Extra guidance folded into the prompt (reference:
+  /// ``self.special_instructions``).
+  ConciergeAgent& set_special_instructions(const std::vector<std::string>& instructions);
+
+  // Configuration the reference keeps as public instance attributes.
+  /// reference: ``self.venue_name``
+  [[nodiscard]] const std::string& venue_name() const { return venue_name_; }
+  /// reference: ``self.amenities`` — the amenity objects ({name, description,
+  /// location, …}).
+  [[nodiscard]] const std::vector<json>& amenities() const { return amenities_; }
+  /// reference: ``self.services``
+  [[nodiscard]] const std::vector<std::string>& services() const { return services_; }
+  /// reference: ``self.hours_of_operation`` — day -> hours; defaults to
+  /// ``{"default": "9 AM - 5 PM"}``.
+  [[nodiscard]] const json& hours_of_operation() const { return hours_of_operation_; }
+  /// reference: ``self.special_instructions``
+  [[nodiscard]] const std::vector<std::string>& special_instructions() const {
+    return special_instructions_;
+  }
 
   /// SWAIG tool handler: check availability of an amenity/service on a date
   /// and time. Returns an availability confirmation when the amenity is
@@ -149,6 +216,9 @@ class ConciergeAgent : public agent::AgentBase {
  private:
   std::string venue_name_;
   std::vector<json> amenities_;
+  std::vector<std::string> services_;
+  json hours_of_operation_ = json::object({{"default", "9 AM - 5 PM"}});
+  std::vector<std::string> special_instructions_;
 };
 
 }  // namespace prefabs

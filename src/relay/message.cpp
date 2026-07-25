@@ -22,10 +22,12 @@ Message Message::from_params(const json& params) {
   Message msg;
   msg.message_id = params.value("message_id", "");
   msg.set_state(params.value("message_state", params.value("state", "")));
-  msg.from = params.value("from_number", "");
-  msg.to = params.value("to_number", "");
+  msg.from_number = params.value("from_number", "");
+  msg.to_number = params.value("to_number", "");
   msg.body = params.value("body", "");
   msg.direction = params.value("direction", "");
+  msg.context = params.value("context", "");
+  msg.segments = params.value("segments", 0);
   msg.region = params.value("region", "");
   if (params.contains("media") && params["media"].is_array()) {
     for (const auto& m : params["media"]) {

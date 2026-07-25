@@ -41,7 +41,7 @@ TEST(rest_mock_gen_datasphere_documents_delete_err) {
     (void)(client.datasphere().documents.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_datasphere_documents_delete_chunk_err) {
     (void)(client.datasphere().documents.delete_chunk("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_datasphere_documents_list_err) {
     (void)(client.datasphere().documents.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -155,7 +155,7 @@ TEST(rest_mock_gen_datasphere_documents_get_err) {
     (void)(client.datasphere().documents.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -193,7 +193,7 @@ TEST(rest_mock_gen_datasphere_documents_list_chunks_err) {
     (void)(client.datasphere().documents.list_chunks("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -231,7 +231,7 @@ TEST(rest_mock_gen_datasphere_documents_get_chunk_err) {
     (void)(client.datasphere().documents.get_chunk("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -269,7 +269,7 @@ TEST(rest_mock_gen_datasphere_documents_update_err) {
     (void)(client.datasphere().documents.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -307,7 +307,7 @@ TEST(rest_mock_gen_datasphere_documents_create_err) {
     (void)(client.datasphere().documents.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -345,7 +345,7 @@ TEST(rest_mock_gen_datasphere_documents_search_err) {
     (void)(client.datasphere().documents.search({.query_string = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

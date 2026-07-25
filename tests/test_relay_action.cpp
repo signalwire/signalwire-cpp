@@ -135,3 +135,15 @@ TEST(relay_action_stop_pause_resume_without_client) {
     action.resume();
     return true;
 }
+
+// Reference parity: Action.__init__(call, control_id, …) stores `self.call`
+// and `self.control_id` as public instance attributes — a handler holding an
+// Action reaches its Call through them. The port carried control_id but had no
+// way back to the Call at all.
+TEST(relay_action_call_backreference_and_control_id) {
+    Action bare("ctl-42");
+    ASSERT_EQ(bare.control_id(), "ctl-42");
+    // No client attached: there is no registry to resolve through.
+    ASSERT_TRUE(bare.call() == nullptr);
+    return true;
+}

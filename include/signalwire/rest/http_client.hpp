@@ -39,7 +39,9 @@ class SignalWireRestError : public std::runtime_error {
   SignalWireRestError(int status, const std::string& message, const std::string& body = "",
                       const std::string& url = "", const std::string& method = "GET",
                       const std::map<std::string, std::string>& headers = {});
-  int status() const { return status_; }
+  /// HTTP status of the failing response (reference: ``self.status_code``).
+  /// ``0`` for a transport failure that never reached a response.
+  int status_code() const { return status_; }
   const std::string& body() const { return body_; }
   const std::string& url() const { return url_; }
   const std::string& method() const { return method_; }

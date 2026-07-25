@@ -64,6 +64,11 @@ class SchemaUtils {
   /// Pass schema_path = "" to use the embedded schema.
   SchemaUtils(const std::string& schema_path = "", bool schema_validation = true);
 
+  /// The schema file path in use (reference: ``self.schema_path``) — the
+  /// caller-supplied path, or the resolved default when none was given.
+  /// Empty means the embedded schema is used.
+  [[nodiscard]] const std::string& schema_path() const { return schema_path_; }
+
   /// Whether full JSON Schema validation is wired up.
   /// Mirrors Python's full_validation_available property.
   [[nodiscard]] bool full_validation_available() const;

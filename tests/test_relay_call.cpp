@@ -54,6 +54,31 @@ TEST(relay_call_set_all_properties) {
     return true;
 }
 
+// Reference parity: Call.__init__ stores project_id / context / device /
+// segment_id as public instance attributes, all populated by RelayClient from
+// the inbound `calling.call.receive` params. The port carried none of them, so
+// a C++ handler could not tell which project, context, device or SIP segment a
+// call arrived on.
+TEST(relay_call_project_context_device_segment) {
+    Call call("c-b2", "n-b2");
+    ASSERT_EQ(call.project_id(), "");
+    ASSERT_EQ(call.context(), "");
+    ASSERT_EQ(call.segment_id(), "");
+    ASSERT_TRUE(call.device().is_object());
+    ASSERT_TRUE(call.device().empty());
+
+    call.set_project_id("proj-1");
+    call.set_context("support");
+    call.set_segment_id("seg-9");
+    call.set_device(json{{"type", "phone"}, {"params", {{"from_number", "+1555"}}}});
+
+    ASSERT_EQ(call.project_id(), "proj-1");
+    ASSERT_EQ(call.context(), "support");
+    ASSERT_EQ(call.segment_id(), "seg-9");
+    ASSERT_EQ(call.device()["type"], "phone");
+    return true;
+}
+
 TEST(relay_call_action_register_find_unregister) {
     Call call("c-4", "n-4");
     Action a1("ctl-1");

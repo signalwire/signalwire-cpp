@@ -223,6 +223,14 @@ class FunctionResult {
   // Core
   // ========================================================================
 
+  /// The spoken/returned text (reference: ``self.response``) — emitted as the
+  /// ``response`` key when non-empty. Readable back after construction or a
+  /// ``set_response`` call.
+  [[nodiscard]] const std::string& response() const { return response_; }
+  /// Whether the AI processes the result before speaking (reference:
+  /// ``self.post_process``) — emitted only alongside an action.
+  [[nodiscard]] bool post_process() const { return post_process_; }
+
   FunctionResult& set_response(const std::string& response);
   FunctionResult& set_post_process(bool pp);
   FunctionResult& add_action(const std::string& name, const json& data);

@@ -41,7 +41,7 @@ TEST(rest_mock_gen_calling_dial_err) {
     (void)(client.calling().dial({.from = "X", .to = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

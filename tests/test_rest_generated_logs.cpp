@@ -41,7 +41,7 @@ TEST(rest_mock_gen_logs_conferences_list_err) {
     (void)(client.logs().conferences.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

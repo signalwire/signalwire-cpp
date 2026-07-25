@@ -41,7 +41,7 @@ TEST(rest_mock_gen_addresses_delete_err) {
     (void)(client.addresses().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_number_groups_delete_membership_err) {
     (void)(client.number_groups().delete_membership("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_number_groups_delete_err) {
     (void)(client.number_groups().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -155,7 +155,7 @@ TEST(rest_mock_gen_phone_numbers_delete_err) {
     (void)(client.phone_numbers().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -193,7 +193,7 @@ TEST(rest_mock_gen_queues_delete_err) {
     (void)(client.queues().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -231,7 +231,7 @@ TEST(rest_mock_gen_recordings_delete_err) {
     (void)(client.recordings().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -269,7 +269,7 @@ TEST(rest_mock_gen_registry_numbers_delete_err) {
     (void)(client.registry().numbers.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -307,7 +307,7 @@ TEST(rest_mock_gen_verified_callers_delete_err) {
     (void)(client.verified_callers().delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -345,7 +345,7 @@ TEST(rest_mock_gen_addresses_list_err) {
     (void)(client.addresses().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -383,7 +383,7 @@ TEST(rest_mock_gen_addresses_get_err) {
     (void)(client.addresses().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -421,7 +421,7 @@ TEST(rest_mock_gen_lookup_phone_number_err) {
     (void)(client.lookup().phone_number("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -459,7 +459,7 @@ TEST(rest_mock_gen_number_groups_get_membership_err) {
     (void)(client.number_groups().get_membership("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -497,7 +497,7 @@ TEST(rest_mock_gen_number_groups_list_err) {
     (void)(client.number_groups().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -535,7 +535,7 @@ TEST(rest_mock_gen_number_groups_get_err) {
     (void)(client.number_groups().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -573,7 +573,7 @@ TEST(rest_mock_gen_number_groups_list_memberships_err) {
     (void)(client.number_groups().list_memberships("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -611,7 +611,7 @@ TEST(rest_mock_gen_phone_numbers_list_err) {
     (void)(client.phone_numbers().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -649,7 +649,7 @@ TEST(rest_mock_gen_phone_numbers_search_err) {
     (void)(client.phone_numbers().search(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -687,7 +687,7 @@ TEST(rest_mock_gen_phone_numbers_get_err) {
     (void)(client.phone_numbers().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -725,7 +725,7 @@ TEST(rest_mock_gen_queues_list_err) {
     (void)(client.queues().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -763,7 +763,7 @@ TEST(rest_mock_gen_queues_get_err) {
     (void)(client.queues().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -801,7 +801,7 @@ TEST(rest_mock_gen_queues_list_members_err) {
     (void)(client.queues().list_members("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -839,7 +839,7 @@ TEST(rest_mock_gen_queues_get_next_member_err) {
     (void)(client.queues().get_next_member("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -877,7 +877,7 @@ TEST(rest_mock_gen_queues_get_member_err) {
     (void)(client.queues().get_member("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -915,7 +915,7 @@ TEST(rest_mock_gen_recordings_list_err) {
     (void)(client.recordings().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -953,7 +953,7 @@ TEST(rest_mock_gen_recordings_get_err) {
     (void)(client.recordings().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -991,7 +991,7 @@ TEST(rest_mock_gen_registry_brands_list_err) {
     (void)(client.registry().brands.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1029,7 +1029,7 @@ TEST(rest_mock_gen_registry_brands_get_err) {
     (void)(client.registry().brands.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1067,7 +1067,7 @@ TEST(rest_mock_gen_registry_brands_list_campaigns_err) {
     (void)(client.registry().brands.list_campaigns("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1105,7 +1105,7 @@ TEST(rest_mock_gen_registry_campaigns_get_err) {
     (void)(client.registry().campaigns.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1143,7 +1143,7 @@ TEST(rest_mock_gen_registry_campaigns_list_numbers_err) {
     (void)(client.registry().campaigns.list_numbers("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1181,7 +1181,7 @@ TEST(rest_mock_gen_registry_campaigns_list_orders_err) {
     (void)(client.registry().campaigns.list_orders("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1219,7 +1219,7 @@ TEST(rest_mock_gen_registry_orders_get_err) {
     (void)(client.registry().orders.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1257,7 +1257,7 @@ TEST(rest_mock_gen_short_codes_list_err) {
     (void)(client.short_codes().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1295,7 +1295,7 @@ TEST(rest_mock_gen_short_codes_get_err) {
     (void)(client.short_codes().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1333,7 +1333,7 @@ TEST(rest_mock_gen_sip_profile_get_err) {
     (void)(client.sip_profile().get());
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1371,7 +1371,7 @@ TEST(rest_mock_gen_verified_callers_list_err) {
     (void)(client.verified_callers().list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1409,7 +1409,7 @@ TEST(rest_mock_gen_verified_callers_get_err) {
     (void)(client.verified_callers().get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1447,7 +1447,7 @@ TEST(rest_mock_gen_addresses_create_err) {
     (void)(client.addresses().create({.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1485,7 +1485,7 @@ TEST(rest_mock_gen_imported_numbers_create_err) {
     (void)(client.imported_numbers().create({.number = "X", .number_type = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1523,7 +1523,7 @@ TEST(rest_mock_gen_mfa_call_err) {
     (void)(client.mfa().call({.to = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1561,7 +1561,7 @@ TEST(rest_mock_gen_mfa_sms_err) {
     (void)(client.mfa().sms({.to = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1599,7 +1599,7 @@ TEST(rest_mock_gen_mfa_verify_err) {
     (void)(client.mfa().verify("X", {.token = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1637,7 +1637,7 @@ TEST(rest_mock_gen_number_groups_create_err) {
     (void)(client.number_groups().create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1675,7 +1675,7 @@ TEST(rest_mock_gen_number_groups_add_membership_err) {
     (void)(client.number_groups().add_membership("X", {.phone_number_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1713,7 +1713,7 @@ TEST(rest_mock_gen_phone_numbers_create_err) {
     (void)(client.phone_numbers().create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1751,7 +1751,7 @@ TEST(rest_mock_gen_queues_create_err) {
     (void)(client.queues().create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1789,7 +1789,7 @@ TEST(rest_mock_gen_registry_brands_create_err) {
     (void)(client.registry().brands.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1827,7 +1827,7 @@ TEST(rest_mock_gen_registry_brands_create_campaign_err) {
     (void)(client.registry().brands.create_campaign("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1865,7 +1865,7 @@ TEST(rest_mock_gen_registry_campaigns_create_order_err) {
     (void)(client.registry().campaigns.create_order("X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1903,7 +1903,7 @@ TEST(rest_mock_gen_verified_callers_create_err) {
     (void)(client.verified_callers().create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1941,7 +1941,7 @@ TEST(rest_mock_gen_verified_callers_redial_verification_err) {
     (void)(client.verified_callers().redial_verification("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1979,7 +1979,7 @@ TEST(rest_mock_gen_number_groups_update_err) {
     (void)(client.number_groups().update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2017,7 +2017,7 @@ TEST(rest_mock_gen_phone_numbers_update_err) {
     (void)(client.phone_numbers().update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2055,7 +2055,7 @@ TEST(rest_mock_gen_queues_update_err) {
     (void)(client.queues().update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2093,7 +2093,7 @@ TEST(rest_mock_gen_registry_campaigns_update_err) {
     (void)(client.registry().campaigns.update("X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2131,7 +2131,7 @@ TEST(rest_mock_gen_short_codes_update_err) {
     (void)(client.short_codes().update("X", {.name = "X", .message_handler = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2169,7 +2169,7 @@ TEST(rest_mock_gen_sip_profile_update_err) {
     (void)(client.sip_profile().update({}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2207,7 +2207,7 @@ TEST(rest_mock_gen_verified_callers_update_err) {
     (void)(client.verified_callers().update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2245,7 +2245,7 @@ TEST(rest_mock_gen_verified_callers_submit_verification_err) {
     (void)(client.verified_callers().submit_verification("X", {.verification_code = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

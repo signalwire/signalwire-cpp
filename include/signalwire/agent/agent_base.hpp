@@ -415,6 +415,16 @@ class AgentBase : public swml::Service {
   /// Returns a copy; an empty object when nothing has been set.
   [[nodiscard]] json get_global_data() const;
   AgentBase& set_native_functions(const std::vector<std::string>& funcs);
+  /// The native SWAIG functions this agent declares (reference:
+  /// ``self.native_functions``) — rendered into the SWML ``ai.SWAIG
+  /// .native_functions`` array when non-empty. A caller supplies these at
+  /// construction or via ``set_native_functions``, so a caller reads them back.
+  [[nodiscard]] const std::vector<std::string>& native_functions() const {
+    return native_functions_;
+  }
+  /// This agent's id (reference: ``self.agent_id``) — the id supplied at
+  /// construction, or a generated UUID when none was given.
+  [[nodiscard]] const std::string& agent_id() const { return agent_id_; }
   /// The complete set of internal SWAIG function names that accept
   /// fillers, matching the SWAIGInternalFiller schema definition.
   /// Any name outside this set is silently ignored by the runtime —
@@ -792,12 +802,9 @@ class AgentBase : public swml::Service {
   // not.
   // ========================================================================
 
-  /// reference: ``self.agent_id`` — the supplied id, or a generated UUID.
-  /// The reference attribute is PUBLIC; this accessor is protected only
-  /// because the signature oracle does not enumerate ``__init__`` attributes
-  /// (the class-B2 blind spot), so a public accessor here reads as a port
-  /// addition. See the completion summary's proposal.
-  [[nodiscard]] const std::string& agent_id() const { return agent_id_; }
+  // NOTE: ``agent_id()`` / ``token_expiry_secs()`` are PUBLIC (above) — the
+  // reference attributes are public, and the oracle's class-B2 rule now
+  // records them.
 
   /// reference: ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
   [[nodiscard]] bool auto_answer() const { return auto_answer_; }
@@ -814,7 +821,12 @@ class AgentBase : public swml::Service {
   /// Accepted and stored by the reference constructor with no consumer.
   [[nodiscard]] bool enable_post_prompt_override() const { return enable_post_prompt_override_; }
   [[nodiscard]] bool check_for_input_override() const { return check_for_input_override_; }
-  /// Token lifetime forwarded to this agent's ``SessionManager``.
+  /// Token lifetime forwarded to this agent's ``SessionManager``. PROTECTED,
+  /// unlike ``agent_id()``: the reference's AgentBase does NOT keep a
+  /// ``self.token_expiry_secs`` — it forwards the ctor param straight into
+  /// ``SessionManager(token_expiry_secs=…)``, where it IS public
+  /// (``SessionManager::token_expiry_secs()``). A public accessor here would be
+  /// surface the reference's AgentBase does not have.
   [[nodiscard]] int token_expiry_secs() const { return session_manager_.token_expiry_secs(); }
 
   // Construction parameters the reference stores on the instance.

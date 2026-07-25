@@ -29,8 +29,22 @@ using json = nlohmann::json;
 /// Multi-agent hosting server
 class AgentServer {
  public:
-  explicit AgentServer(const std::string& host = "0.0.0.0", int port = 3000);
+  /// @param log_level Logging level (debug, info, warning, error, critical),
+  ///   stored lowercased exactly as the reference does and applied to the
+  ///   process logger — the reference forwards it to uvicorn.
+  explicit AgentServer(const std::string& host = "0.0.0.0", int port = 3000,
+                       const std::string& log_level = "info");
   ~AgentServer();
+
+  // Construction parameters the reference keeps as public instance attributes
+  // (`self.host` / `self.port` / `self.log_level`) and reads back in `run()`.
+  /// reference: ``self.host`` — the bind host.
+  [[nodiscard]] const std::string& host() const { return host_; }
+  /// reference: ``self.port`` — the bind port (a set ``PORT`` env var wins,
+  /// so this reports the port that will actually be bound).
+  [[nodiscard]] int port() const { return port_; }
+  /// reference: ``self.log_level`` — the lowercased level string.
+  [[nodiscard]] const std::string& log_level() const { return log_level_; }
 
   /// Register an agent at a specific route
   AgentServer& register_agent(std::shared_ptr<agent::AgentBase> agent, const std::string& route);
@@ -113,6 +127,7 @@ class AgentServer {
 
   std::string host_;
   int port_;
+  std::string log_level_;
   std::map<std::string, std::shared_ptr<agent::AgentBase>> agents_;
   std::map<std::string, std::string> sip_routes_;  // username -> route
   std::string static_dir_;

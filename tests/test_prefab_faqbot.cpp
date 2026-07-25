@@ -57,3 +57,33 @@ TEST(prefab_faqbot_renders_swml) {
     ASSERT_TRUE(swml.contains("version"));
     return true;
 }
+
+// Reference parity: FAQBotAgent.__init__ stores faqs / suggest_related /
+// persona as public instance attributes. The port published suggest_related
+// to global data without keeping it and had no persona at all.
+TEST(prefab_faqbot_construction_params_readable) {
+    FAQBotAgent agent;
+    ASSERT_TRUE(agent.suggest_related());  // reference default: True
+    ASSERT_EQ(agent.persona(),
+              "You are a helpful FAQ bot that provides accurate answers to common questions.");
+    ASSERT_EQ(agent.faqs().size(), 0u);
+
+    agent.set_faqs({json::object({{"question", "Hours?"}, {"answer", "9-5"}})});
+    agent.set_suggest_related(false);
+    agent.set_persona("You are a terse FAQ bot.");
+
+    ASSERT_EQ(agent.faqs().size(), 1u);
+    ASSERT_EQ(agent.faqs()[0]["question"], "Hours?");
+    ASSERT_FALSE(agent.suggest_related());
+    ASSERT_EQ(agent.persona(), "You are a terse FAQ bot.");
+    return true;
+}
+
+// An empty persona falls back to the reference default (`persona or "…"`).
+TEST(prefab_faqbot_persona_empty_falls_back) {
+    FAQBotAgent agent;
+    agent.set_persona("");
+    ASSERT_EQ(agent.persona(),
+              "You are a helpful FAQ bot that provides accurate answers to common questions.");
+    return true;
+}

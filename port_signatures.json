@@ -120,6 +120,12 @@
                   "type": "int",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "log_level",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -171,6 +177,15 @@
               ],
               "returns": "dict<string,string>"
             },
+            "host": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "list_routes": {
               "params": [
                 {
@@ -179,6 +194,15 @@
                 }
               ],
               "returns": "list<string>"
+            },
+            "log_level": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "lookup_sip_route": {
               "params": [
@@ -212,6 +236,15 @@
                 }
               ],
               "returns": "class:signalwire.agent_server.AgentServer"
+            },
+            "port": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
             },
             "register": {
               "params": [
@@ -761,6 +794,15 @@
                 }
               ],
               "returns": "string"
+            },
+            "url": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             }
           }
         },
@@ -784,6 +826,24 @@
                 }
               ],
               "returns": "void"
+            },
+            "code": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "message": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             }
           }
         },
@@ -974,12 +1034,129 @@
                 },
                 {
                   "name": "port",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "basic_auth",
+                  "type": "optional<tuple<string,string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "use_pom",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "token_expiry_secs",
                   "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "auto_answer",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_call",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_format",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_stereo",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "default_webhook_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "agent_id",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "native_functions",
+                  "type": "optional<list<string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_path",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "suppress_logs",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "enable_post_prompt_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "check_for_input_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "config_file",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_validation",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "signing_key",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "trust_proxy_for_signature",
+                  "type": "bool",
                   "required": false,
                   "default": null
                 }
               ],
               "returns": "void"
+            },
+            "agent": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "define_contexts": {
               "params": [
@@ -1199,12 +1376,129 @@
                 },
                 {
                   "name": "port",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "basic_auth",
+                  "type": "optional<tuple<string,string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "use_pom",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "token_expiry_secs",
                   "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "auto_answer",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_call",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_format",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_stereo",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "default_webhook_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "agent_id",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "native_functions",
+                  "type": "optional<list<string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_path",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "suppress_logs",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "enable_post_prompt_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "check_for_input_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "config_file",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_validation",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "signing_key",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "trust_proxy_for_signature",
+                  "type": "bool",
                   "required": false,
                   "default": null
                 }
               ],
               "returns": "void"
+            },
+            "agent": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "define_tool": {
               "params": [
@@ -1354,7 +1648,115 @@
                 },
                 {
                   "name": "port",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "basic_auth",
+                  "type": "optional<tuple<string,string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "use_pom",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "token_expiry_secs",
                   "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "auto_answer",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_call",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_format",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "record_stereo",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "default_webhook_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "agent_id",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "native_functions",
+                  "type": "optional<list<string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_path",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "suppress_logs",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "enable_post_prompt_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "check_for_input_override",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "config_file",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_validation",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "signing_key",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "trust_proxy_for_signature",
+                  "type": "bool",
                   "required": false,
                   "default": null
                 }
@@ -1483,6 +1885,15 @@
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
+            },
+            "agent_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "auth_password": {
               "params": [
@@ -1718,6 +2129,15 @@
               ],
               "returns": "list<any>"
             },
+            "native_functions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
             "on_debug_event": {
               "params": [
                 {
@@ -1866,20 +2286,6 @@
                 },
                 {
                   "name": "url",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.agent_base.AgentBase"
-            },
-            "set_signing_key": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "key",
                   "type": "string",
                   "required": true
                 }
@@ -2055,6 +2461,15 @@
               ],
               "returns": "callable<list<dict<string,string>>,class:signalwire.core.auth_result.AuthResult>"
             },
+            "security_config": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.core.security_config.SecurityConfig"
+            },
             "verify_api_key": {
               "params": [
                 {
@@ -2119,6 +2534,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "config_paths": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
             },
             "find_config_file": {
               "params": [
@@ -2952,7 +3376,52 @@
               ],
               "returns": "void"
             },
+            "confirm": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "functions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
+            "isolated": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<bool>"
+            },
             "key": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "prompt": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "question": {
               "params": [
                 {
                   "name": "self",
@@ -2969,6 +3438,15 @@
                 }
               ],
               "returns": "any"
+            },
+            "type": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             }
           }
         },
@@ -3469,6 +3947,15 @@
                 }
               ],
               "returns": "class:signalwire.core.data_map.DataMap"
+            },
+            "function_name": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "global_error_keys": {
               "params": [
@@ -4174,6 +4661,15 @@
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
             },
+            "post_process": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
             "record_call": {
               "params": [
                 {
@@ -4286,6 +4782,15 @@
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
+            },
+            "response": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "rpc_ai_message": {
               "params": [
@@ -6220,6 +6725,18 @@
                 {
                   "name": "self",
                   "kind": "self"
+                },
+                {
+                  "name": "token_expiry_secs",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "secret_key",
+                  "type": "string",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -6358,6 +6875,15 @@
               ],
               "returns": "any"
             },
+            "secret_key": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "set_debug_mode": {
               "params": [
                 {
@@ -6410,6 +6936,15 @@
                 }
               ],
               "returns": "bool"
+            },
+            "token_expiry_secs": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
             },
             "validate_token": {
               "params": [
@@ -6817,6 +7352,15 @@
               ],
               "returns": "void"
             },
+            "agent": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.core.agent_base.AgentBase"
+            },
             "cleanup": {
               "params": [
                 {
@@ -6959,6 +7503,15 @@
               ],
               "returns": "any"
             },
+            "params": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "register_tools": {
               "params": [
                 {
@@ -7089,6 +7642,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "agent": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.core.agent_base.AgentBase"
             },
             "cleanup_all": {
               "params": [
@@ -8030,6 +8592,54 @@
                 {
                   "name": "self",
                   "kind": "self"
+                },
+                {
+                  "name": "name",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "route",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "host",
+                  "type": "string",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "port",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "basic_auth",
+                  "type": "optional<tuple<string,string>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_path",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "config_file",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "schema_validation",
+                  "type": "bool",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "void"
@@ -8460,6 +9070,15 @@
                 }
               ],
               "returns": "bool"
+            },
+            "host": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "join_conference": {
               "params": [
@@ -8952,62 +9571,6 @@
                 },
                 {
                   "name": "password",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.swml_service.SWMLService"
-            },
-            "set_host": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "host",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.swml_service.SWMLService"
-            },
-            "set_name": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "name",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.swml_service.SWMLService"
-            },
-            "set_port": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "port",
-                  "type": "int",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.swml_service.SWMLService"
-            },
-            "set_route": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "route",
                   "type": "string",
                   "required": true
                 }
@@ -13911,6 +14474,15 @@
               ],
               "returns": "class:signalwire.pom.pom.Section"
             },
+            "debug": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "find_section": {
               "params": [
                 {
@@ -13962,6 +14534,15 @@
                 }
               ],
               "returns": "string"
+            },
+            "sections": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "to_dict": {
               "params": [
@@ -14069,6 +14650,42 @@
               ],
               "returns": "class:signalwire.pom.pom.Section"
             },
+            "body": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "bullets": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "numbered": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "numberedBullets": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "render_markdown": {
               "params": [
                 {
@@ -14110,6 +14727,24 @@
                 }
               ],
               "returns": "string"
+            },
+            "subsections": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "title": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "to_dict": {
               "params": [
@@ -14170,6 +14805,15 @@
               ],
               "returns": "void"
             },
+            "amenities": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<any>"
+            },
             "check_availability": {
               "params": [
                 {
@@ -14208,6 +14852,15 @@
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
             },
+            "hours_of_operation": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "on_summary": {
               "params": [
                 {
@@ -14222,19 +14875,14 @@
               ],
               "returns": "class:signalwire.prefabs.concierge.ConciergeAgent"
             },
-            "set_amenities": {
+            "services": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "amenities",
-                  "type": "list<any>",
-                  "required": true
                 }
               ],
-              "returns": "class:signalwire.prefabs.concierge.ConciergeAgent"
+              "returns": "list<string>"
             },
             "set_hours": {
               "params": [
@@ -14250,19 +14898,23 @@
               ],
               "returns": "class:signalwire.prefabs.concierge.ConciergeAgent"
             },
-            "set_venue_name": {
+            "special_instructions": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "name",
-                  "type": "string",
-                  "required": true
                 }
               ],
-              "returns": "class:signalwire.prefabs.concierge.ConciergeAgent"
+              "returns": "list<string>"
+            },
+            "venue_name": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             }
           }
         }
@@ -14305,6 +14957,15 @@
               ],
               "returns": "void"
             },
+            "faqs": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<any>"
+            },
             "on_summary": {
               "params": [
                 {
@@ -14318,6 +14979,15 @@
                 }
               ],
               "returns": "class:signalwire.prefabs.faq_bot.FAQBotAgent"
+            },
+            "persona": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "search_faqs": {
               "params": [
@@ -14338,20 +15008,6 @@
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
             },
-            "set_faqs": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "faqs",
-                  "type": "list<any>",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.prefabs.faq_bot.FAQBotAgent"
-            },
             "set_no_match_message": {
               "params": [
                 {
@@ -14366,19 +15022,14 @@
               ],
               "returns": "class:signalwire.prefabs.faq_bot.FAQBotAgent"
             },
-            "set_suggest_related": {
+            "suggest_related": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "suggest",
-                  "type": "bool",
-                  "required": true
                 }
               ],
-              "returns": "class:signalwire.prefabs.faq_bot.FAQBotAgent"
+              "returns": "bool"
             }
           }
         }
@@ -14677,6 +15328,33 @@
               ],
               "returns": "void"
             },
+            "brand_name": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "conclusion": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "introduction": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "log_response": {
               "params": [
                 {
@@ -14696,6 +15374,15 @@
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
             },
+            "max_retries": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
+            },
             "on_summary": {
               "params": [
                 {
@@ -14709,6 +15396,15 @@
                 }
               ],
               "returns": "class:signalwire.prefabs.survey.SurveyAgent"
+            },
+            "questions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<any>"
             },
             "set_completion_message": {
               "params": [
@@ -14738,19 +15434,14 @@
               ],
               "returns": "class:signalwire.prefabs.survey.SurveyAgent"
             },
-            "set_questions": {
+            "survey_name": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "questions",
-                  "type": "list<any>",
-                  "required": true
                 }
               ],
-              "returns": "class:signalwire.prefabs.survey.SurveyAgent"
+              "returns": "string"
             },
             "validate_response": {
               "params": [
@@ -15102,6 +15793,70 @@
             }
           }
         },
+        "Action": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "call": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "class:signalwire.relay.call.Call"
+            },
+            "control_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
+            "is_done": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "result": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "wait": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                },
+                {
+                  "name": "timeout_ms",
+                  "type": "int",
+                  "required": false,
+                  "default": null
+                }
+              ],
+              "returns": "bool"
+            }
+          }
+        },
         "Call": {
           "methods": {
             "__init__": {
@@ -15309,6 +16064,15 @@
               ],
               "returns": "class:signalwire.relay.action.Action"
             },
+            "context": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "denoise": {
               "params": [
                 {
@@ -15409,6 +16173,15 @@
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
+            },
+            "device": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "direction": {
               "params": [
@@ -15843,6 +16616,15 @@
               ],
               "returns": "class:signalwire.relay.action.Action"
             },
+            "project_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "prompt": {
               "params": [
                 {
@@ -16081,6 +16863,15 @@
               ],
               "returns": "void"
             },
+            "segment_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "send_digits": {
               "params": [
                 {
@@ -16141,20 +16932,6 @@
               ],
               "returns": "void"
             },
-            "set_direction": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "dir",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "void"
-            },
             "set_from": {
               "params": [
                 {
@@ -16163,20 +16940,6 @@
                 },
                 {
                   "name": "f",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "void"
-            },
-            "set_tag": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "t",
                   "type": "string",
                   "required": true
                 }
@@ -16795,6 +17558,15 @@
               ],
               "returns": "bool"
             },
+            "contexts": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
             "dial": {
               "params": [
                 {
@@ -16873,6 +17645,15 @@
               "params": [],
               "returns": "class:signalwire.relay.client.RelayClient"
             },
+            "host": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "is_connected": {
               "params": [
                 {
@@ -16881,6 +17662,15 @@
                 }
               ],
               "returns": "bool"
+            },
+            "jwt_token": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "on_call": {
               "params": [
@@ -16923,6 +17713,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "project": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "receive": {
               "params": [
@@ -17064,6 +17863,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "token": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
             },
             "unreceive": {
               "params": [
@@ -18665,6 +19473,42 @@
               ],
               "returns": "string"
             },
+            "body": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "context": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "direction": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "from_number": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "from_params": {
               "params": [
                 {
@@ -18710,6 +19554,24 @@
                 }
               ],
               "returns": "bool"
+            },
+            "media": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "message_id": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "message_state": {
               "params": [
@@ -18766,33 +19628,14 @@
               ],
               "returns": "any"
             },
-            "set_reason": {
+            "segments": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "r",
-                  "type": "string",
-                  "required": true
                 }
               ],
-              "returns": "void"
-            },
-            "set_state": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "s",
-                  "type": "string",
-                  "required": true
-                }
-              ],
-              "returns": "void"
+              "returns": "any"
             },
             "state": {
               "params": [
@@ -18802,6 +19645,24 @@
                 }
               ],
               "returns": "string"
+            },
+            "tags": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "to_number": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "update_state": {
               "params": [
@@ -19657,7 +20518,7 @@
               ],
               "returns": "string"
             },
-            "status": {
+            "status_code": {
               "params": [
                 {
                   "name": "self",
@@ -19838,6 +20699,15 @@
                 }
               ],
               "returns": "void"
+            },
+            "abort_signal": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             },
             "merge": {
               "params": [
@@ -29350,6 +30220,15 @@
               ],
               "returns": "any"
             },
+            "schema_path": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "string"
+            },
             "validate_document": {
               "params": [
                 {
@@ -29553,6 +30432,24 @@
               ],
               "returns": "void"
             },
+            "allowed_extensions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<list<string>>"
+            },
+            "blocked_extensions": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
+            },
             "directories": {
               "params": [
                 {
@@ -29561,6 +30458,24 @@
                 }
               ],
               "returns": "dict<string,string>"
+            },
+            "enable_cors": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "enable_directory_browsing": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
             },
             "file_allowed": {
               "params": [
@@ -29575,6 +30490,15 @@
                 }
               ],
               "returns": "bool"
+            },
+            "max_file_size": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
             },
             "port": {
               "params": [
@@ -29690,6 +30614,10 @@
     "signalwire.agent_server.AgentServer": {
       "params": {
         "host": {
+          "type": "string",
+          "required": false
+        },
+        "log_level": {
           "type": "string",
           "required": false
         },
@@ -29833,6 +30761,34 @@
     },
     "signalwire.core.agent.prompt.manager.PromptManager": {
       "params": {
+        "agent_id": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "auto_answer": {
+          "type": "bool",
+          "required": false
+        },
+        "basic_auth": {
+          "type": "optional<tuple<string,string>>",
+          "required": false
+        },
+        "check_for_input_override": {
+          "type": "bool",
+          "required": false
+        },
+        "config_file": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "default_webhook_url": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "enable_post_prompt_override": {
+          "type": "bool",
+          "required": false
+        },
         "host": {
           "type": "string",
           "required": false
@@ -29841,8 +30797,12 @@
           "type": "string",
           "required": false
         },
+        "native_functions": {
+          "type": "optional<list<string>>",
+          "required": false
+        },
         "port": {
-          "type": "int",
+          "type": "optional<int>",
           "required": false
         },
         "post_prompt": {
@@ -29857,14 +30817,82 @@
           "type": "string",
           "required": false
         },
+        "record_call": {
+          "type": "bool",
+          "required": false
+        },
+        "record_format": {
+          "type": "string",
+          "required": false
+        },
+        "record_stereo": {
+          "type": "bool",
+          "required": false
+        },
         "route": {
           "type": "string",
+          "required": false
+        },
+        "schema_path": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "schema_validation": {
+          "type": "bool",
+          "required": false
+        },
+        "signing_key": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "suppress_logs": {
+          "type": "bool",
+          "required": false
+        },
+        "token_expiry_secs": {
+          "type": "int",
+          "required": false
+        },
+        "trust_proxy_for_signature": {
+          "type": "bool",
+          "required": false
+        },
+        "use_pom": {
+          "type": "bool",
           "required": false
         }
       }
     },
     "signalwire.core.agent.tools.registry.ToolRegistry": {
       "params": {
+        "agent_id": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "auto_answer": {
+          "type": "bool",
+          "required": false
+        },
+        "basic_auth": {
+          "type": "optional<tuple<string,string>>",
+          "required": false
+        },
+        "check_for_input_override": {
+          "type": "bool",
+          "required": false
+        },
+        "config_file": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "default_webhook_url": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "enable_post_prompt_override": {
+          "type": "bool",
+          "required": false
+        },
         "host": {
           "type": "string",
           "required": false
@@ -29873,18 +30901,90 @@
           "type": "string",
           "required": false
         },
+        "native_functions": {
+          "type": "optional<list<string>>",
+          "required": false
+        },
         "port": {
-          "type": "int",
+          "type": "optional<int>",
+          "required": false
+        },
+        "record_call": {
+          "type": "bool",
+          "required": false
+        },
+        "record_format": {
+          "type": "string",
+          "required": false
+        },
+        "record_stereo": {
+          "type": "bool",
           "required": false
         },
         "route": {
           "type": "string",
+          "required": false
+        },
+        "schema_path": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "schema_validation": {
+          "type": "bool",
+          "required": false
+        },
+        "signing_key": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "suppress_logs": {
+          "type": "bool",
+          "required": false
+        },
+        "token_expiry_secs": {
+          "type": "int",
+          "required": false
+        },
+        "trust_proxy_for_signature": {
+          "type": "bool",
+          "required": false
+        },
+        "use_pom": {
+          "type": "bool",
           "required": false
         }
       }
     },
     "signalwire.core.agent_base.AgentBase": {
       "params": {
+        "agent_id": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "auto_answer": {
+          "type": "bool",
+          "required": false
+        },
+        "basic_auth": {
+          "type": "optional<tuple<string,string>>",
+          "required": false
+        },
+        "check_for_input_override": {
+          "type": "bool",
+          "required": false
+        },
+        "config_file": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "default_webhook_url": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "enable_post_prompt_override": {
+          "type": "bool",
+          "required": false
+        },
         "host": {
           "type": "string",
           "required": false
@@ -29893,8 +30993,12 @@
           "type": "string",
           "required": false
         },
+        "native_functions": {
+          "type": "optional<list<string>>",
+          "required": false
+        },
         "port": {
-          "type": "int",
+          "type": "optional<int>",
           "required": false
         },
         "post_prompt_url": {
@@ -29905,12 +31009,44 @@
           "type": "string",
           "required": false
         },
+        "record_call": {
+          "type": "bool",
+          "required": false
+        },
+        "record_format": {
+          "type": "string",
+          "required": false
+        },
+        "record_stereo": {
+          "type": "bool",
+          "required": false
+        },
         "route": {
           "type": "string",
           "required": false
         },
+        "schema_path": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "schema_validation": {
+          "type": "bool",
+          "required": false
+        },
         "signing_key": {
-          "type": "string",
+          "type": "optional<string>",
+          "required": false
+        },
+        "suppress_logs": {
+          "type": "bool",
+          "required": false
+        },
+        "token_expiry_secs": {
+          "type": "int",
+          "required": false
+        },
+        "trust_proxy_for_signature": {
+          "type": "bool",
           "required": false
         },
         "use_pom": {
@@ -30228,6 +31364,14 @@
         "debug_mode": {
           "type": "bool",
           "required": false
+        },
+        "secret_key": {
+          "type": "string",
+          "required": false
+        },
+        "token_expiry_secs": {
+          "type": "int",
+          "required": false
         }
       }
     },
@@ -30329,6 +31473,14 @@
     },
     "signalwire.core.swml_service.SWMLService": {
       "params": {
+        "basic_auth": {
+          "type": "optional<tuple<string,string>>",
+          "required": false
+        },
+        "config_file": {
+          "type": "optional<string>",
+          "required": false
+        },
         "host": {
           "type": "string",
           "required": false
@@ -30338,11 +31490,19 @@
           "required": false
         },
         "port": {
-          "type": "int",
+          "type": "optional<int>",
           "required": false
         },
         "route": {
           "type": "string",
+          "required": false
+        },
+        "schema_path": {
+          "type": "optional<string>",
+          "required": false
+        },
+        "schema_validation": {
+          "type": "bool",
           "required": false
         }
       }
@@ -30405,10 +31565,6 @@
     },
     "signalwire.prefabs.concierge.ConciergeAgent": {
       "params": {
-        "amenities": {
-          "type": "list<any>",
-          "required": false
-        },
         "host": {
           "type": "string",
           "required": false
@@ -30428,19 +31584,11 @@
         "route": {
           "type": "string",
           "required": false
-        },
-        "venue_name": {
-          "type": "string",
-          "required": false
         }
       }
     },
     "signalwire.prefabs.faq_bot.FAQBotAgent": {
       "params": {
-        "faqs": {
-          "type": "list<any>",
-          "required": false
-        },
         "host": {
           "type": "string",
           "required": false
@@ -30459,10 +31607,6 @@
         },
         "route": {
           "type": "string",
-          "required": false
-        },
-        "suggest_related": {
-          "type": "bool",
           "required": false
         }
       }
@@ -30557,10 +31701,6 @@
           "type": "int",
           "required": false
         },
-        "questions": {
-          "type": "list<any>",
-          "required": false
-        },
         "route": {
           "type": "string",
           "required": false
@@ -30593,15 +31733,7 @@
           "type": "class:signalwire.relay.client.RelayClient",
           "required": false
         },
-        "direction": {
-          "type": "string",
-          "required": false
-        },
         "from": {
-          "type": "string",
-          "required": false
-        },
-        "tag": {
           "type": "string",
           "required": false
         },
@@ -30642,6 +31774,10 @@
           "required": false
         },
         "host": {
+          "type": "string",
+          "required": false
+        },
+        "jwt_token": {
           "type": "string",
           "required": false
         },
@@ -30786,7 +31922,7 @@
     "signalwire.relay.event.CallingErrorEvent": {
       "params": {
         "code": {
-          "type": "int",
+          "type": "string",
           "required": false
         },
         "message": {
@@ -31082,11 +32218,11 @@
     "signalwire.relay.event.ReferEvent": {
       "params": {
         "sip_notify_response_code": {
-          "type": "int",
+          "type": "string",
           "required": false
         },
         "sip_refer_response_code": {
-          "type": "int",
+          "type": "string",
           "required": false
         },
         "sip_refer_to": {
@@ -31178,7 +32314,7 @@
           "required": false
         },
         "duration": {
-          "type": "int",
+          "type": "float",
           "required": false
         },
         "recording_id": {
@@ -31205,11 +32341,15 @@
           "type": "string",
           "required": false
         },
+        "context": {
+          "type": "string",
+          "required": false
+        },
         "direction": {
           "type": "string",
           "required": false
         },
-        "from": {
+        "from_number": {
           "type": "string",
           "required": false
         },
@@ -31221,23 +32361,19 @@
           "type": "string",
           "required": false
         },
-        "reason": {
-          "type": "string",
-          "required": false
-        },
         "region": {
           "type": "string",
           "required": false
         },
-        "state": {
-          "type": "string",
+        "segments": {
+          "type": "int",
           "required": false
         },
         "tags": {
           "type": "list<string>",
           "required": false
         },
-        "to": {
+        "to_number": {
           "type": "string",
           "required": false
         }

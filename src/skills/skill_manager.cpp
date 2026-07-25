@@ -43,6 +43,11 @@ bool SkillManager::load_skill(const std::string& skill_name, const json& params,
     }
   }
 
+  // Bind the loading agent + params onto the instance BEFORE setup, mirroring
+  // the reference's `SkillClass(agent, params)` construction — a skill's setup
+  // and register_tools may read agent()/params().
+  skill->bind(&agent, params);
+
   // Setup
   if (!skill->setup(params)) {
     get_logger().error("Skill setup failed: " + skill_name);

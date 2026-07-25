@@ -371,9 +371,9 @@ int main() {
       // A member of the typed error family (HTTP error OR transport error).
       artifact["raised"] = true;
       artifact["error_kind"] = "typed";
-      // status() == 0 => a transport failure (no HTTP response); report null
+      // status_code() == 0 => a transport failure (no HTTP response); report null
       // so the artifact matches the oracle (python raises status_code=None).
-      artifact["status_code"] = e.status() == 0 ? json(nullptr) : json(e.status());
+      artifact["status_code"] = e.status_code() == 0 ? json(nullptr) : json(e.status_code());
       artifact["body_error_code"] = decode_body_error_code(e.body());
     } catch (const std::exception& e) {
       // A leaked, non-family exception -- the contract violation the gate

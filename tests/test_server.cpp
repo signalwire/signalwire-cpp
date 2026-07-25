@@ -14,6 +14,28 @@ TEST(server_creation) {
     return true;
 }
 
+// Reference parity: AgentServer.__init__ stores host / port / log_level as
+// public instance attributes (`self.host = host`, …), and `run()` reads them
+// back. A caller who hands them in must be able to read them back.
+TEST(server_construction_params_readable) {
+    AgentServer server("127.0.0.1", 3099, "debug");
+    ASSERT_EQ(server.host(), "127.0.0.1");
+    ASSERT_EQ(server.port(), 3099);
+    ASSERT_EQ(server.log_level(), "debug");
+    return true;
+}
+
+// The reference lowercases log_level (`log_level.lower()`) and defaults it to
+// "info"; host/port default to 0.0.0.0/3000.
+TEST(server_construction_params_defaults_and_lowercasing) {
+    AgentServer defaults;
+    ASSERT_EQ(defaults.host(), "0.0.0.0");
+    ASSERT_EQ(defaults.log_level(), "info");
+    AgentServer shouty("0.0.0.0", 3000, "WARNING");
+    ASSERT_EQ(shouty.log_level(), "warning");
+    return true;
+}
+
 TEST(server_register_agent) {
     AgentServer server;
     auto agent = std::make_shared<AgentBase>("agent1", "/agent1");

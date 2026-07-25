@@ -41,7 +41,7 @@ TEST(rest_mock_gen_video_conferences_delete_err) {
     (void)(client.video().conferences.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_video_room_recordings_delete_err) {
     (void)(client.video().room_recordings.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_video_rooms_delete_err) {
     (void)(client.video().rooms.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -155,7 +155,7 @@ TEST(rest_mock_gen_video_streams_delete_err) {
     (void)(client.video().streams.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -193,7 +193,7 @@ TEST(rest_mock_gen_video_conference_tokens_get_err) {
     (void)(client.video().conference_tokens.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -231,7 +231,7 @@ TEST(rest_mock_gen_video_conferences_list_err) {
     (void)(client.video().conferences.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -269,7 +269,7 @@ TEST(rest_mock_gen_video_conferences_get_err) {
     (void)(client.video().conferences.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -307,7 +307,7 @@ TEST(rest_mock_gen_video_conferences_list_conference_tokens_err) {
     (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -345,7 +345,7 @@ TEST(rest_mock_gen_video_conferences_list_streams_err) {
     (void)(client.video().conferences.list_streams("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -383,7 +383,7 @@ TEST(rest_mock_gen_video_room_recordings_list_err) {
     (void)(client.video().room_recordings.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -421,7 +421,7 @@ TEST(rest_mock_gen_video_room_recordings_get_err) {
     (void)(client.video().room_recordings.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -459,7 +459,7 @@ TEST(rest_mock_gen_video_room_recordings_list_events_err) {
     (void)(client.video().room_recordings.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -497,7 +497,7 @@ TEST(rest_mock_gen_video_room_sessions_list_err) {
     (void)(client.video().room_sessions.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -535,7 +535,7 @@ TEST(rest_mock_gen_video_room_sessions_get_err) {
     (void)(client.video().room_sessions.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -573,7 +573,7 @@ TEST(rest_mock_gen_video_room_sessions_list_events_err) {
     (void)(client.video().room_sessions.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -611,7 +611,7 @@ TEST(rest_mock_gen_video_room_sessions_list_members_err) {
     (void)(client.video().room_sessions.list_members("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -649,7 +649,7 @@ TEST(rest_mock_gen_video_room_sessions_list_recordings_err) {
     (void)(client.video().room_sessions.list_recordings("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -687,7 +687,7 @@ TEST(rest_mock_gen_video_rooms_list_err) {
     (void)(client.video().rooms.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -725,7 +725,7 @@ TEST(rest_mock_gen_video_rooms_get_err) {
     (void)(client.video().rooms.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -763,7 +763,7 @@ TEST(rest_mock_gen_video_rooms_list_streams_err) {
     (void)(client.video().rooms.list_streams("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -801,7 +801,7 @@ TEST(rest_mock_gen_video_streams_get_err) {
     (void)(client.video().streams.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -839,7 +839,7 @@ TEST(rest_mock_gen_video_conference_tokens_reset_err) {
     (void)(client.video().conference_tokens.reset("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -877,7 +877,7 @@ TEST(rest_mock_gen_video_conferences_create_err) {
     (void)(client.video().conferences.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -915,7 +915,7 @@ TEST(rest_mock_gen_video_conferences_create_stream_err) {
     (void)(client.video().conferences.create_stream("X", {.url = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -953,7 +953,7 @@ TEST(rest_mock_gen_video_room_tokens_create_err) {
     (void)(client.video().room_tokens.create({.room_name = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -991,7 +991,7 @@ TEST(rest_mock_gen_video_rooms_create_err) {
     (void)(client.video().rooms.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1029,7 +1029,7 @@ TEST(rest_mock_gen_video_rooms_create_stream_err) {
     (void)(client.video().rooms.create_stream("X", {.url = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1067,7 +1067,7 @@ TEST(rest_mock_gen_video_conferences_update_err) {
     (void)(client.video().conferences.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1105,7 +1105,7 @@ TEST(rest_mock_gen_video_rooms_update_err) {
     (void)(client.video().rooms.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1143,7 +1143,7 @@ TEST(rest_mock_gen_video_streams_update_err) {
     (void)(client.video().streams.update("X", {.url = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

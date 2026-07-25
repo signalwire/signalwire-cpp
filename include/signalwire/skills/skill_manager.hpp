@@ -26,6 +26,15 @@ class SkillManager {
  public:
   SkillManager() = default;
 
+  /// Construct bound to the agent this manager loads skills into. Mirrors the
+  /// reference's ``SkillManager(agent)``.
+  explicit SkillManager(agent::AgentBase& agent) : agent_(&agent) {}
+
+  /// The agent this manager loads skills into (reference: ``self.agent``).
+  /// ``nullptr`` for a default-constructed manager, which takes the agent
+  /// per ``load_skill`` call instead.
+  [[nodiscard]] agent::AgentBase* agent() const { return agent_; }
+
   /// Load a skill by name with params and register it with the agent
   [[nodiscard]] bool load_skill(const std::string& skill_name, const json& params,
                                 agent::AgentBase& agent);
@@ -64,6 +73,8 @@ class SkillManager {
   };
 
   std::vector<LoadedSkill> loaded_skills_;
+  /// The bound agent — non-owning; the agent owns this manager.
+  agent::AgentBase* agent_ = nullptr;
 };
 
 }  // namespace skills

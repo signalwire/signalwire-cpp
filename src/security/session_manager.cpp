@@ -36,16 +36,22 @@ std::string iso8601_utc(int64_t ts) {
 }
 }  // namespace
 
-SessionManager::SessionManager(int token_expiry_secs)
-    : secret_(32), token_expiry_secs_(token_expiry_secs) {
-  if (RAND_bytes(secret_.data(), 32) != 1) {
-    throw std::runtime_error("Failed to generate random secret for SessionManager");
+SessionManager::SessionManager(int token_expiry_secs, const std::string& secret_key)
+    : secret_key_(secret_key), token_expiry_secs_(token_expiry_secs) {
+  if (secret_key_.empty()) {
+    // Reference: `secret_key or secrets.token_hex(32)` — 32 random bytes
+    // rendered as 64 lowercase hex chars.
+    std::vector<uint8_t> raw(32);
+    if (RAND_bytes(raw.data(), 32) != 1) {
+      throw std::runtime_error("Failed to generate random secret for SessionManager");
+    }
+    secret_key_ = hex_encode(raw);
   }
 }
 
 SessionManager::SessionManager(const std::vector<uint8_t>& secret, int token_expiry_secs)
-    : secret_(secret), token_expiry_secs_(token_expiry_secs) {
-  if (secret_.size() < 16) {
+    : secret_key_(hex_encode(secret)), token_expiry_secs_(token_expiry_secs) {
+  if (secret.size() < 16) {
     throw std::invalid_argument("Secret must be at least 16 bytes");
   }
 }
@@ -154,7 +160,9 @@ int64_t SessionManager::current_timestamp() { return static_cast<int64_t>(std::t
 std::string SessionManager::hmac_sha256(const std::string& data) const {
   unsigned int len = 0;
   unsigned char result[EVP_MAX_MD_SIZE];
-  HMAC(EVP_sha256(), secret_.data(), static_cast<int>(secret_.size()),
+  // Reference: `hmac.new(self.secret_key.encode(), …)` — the KEY is the
+  // secret_key string's bytes.
+  HMAC(EVP_sha256(), secret_key_.data(), static_cast<int>(secret_key_.size()),
        reinterpret_cast<const unsigned char*>(data.data()), data.size(), result, &len);
   return std::string(reinterpret_cast<char*>(result), len);
 }

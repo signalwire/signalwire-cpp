@@ -61,6 +61,11 @@ using EventHandler = std::function<void(const RelayEvent&)>;
 struct RelayConfig {
   std::string project;
   std::string token;
+  /// JWT bearer credential — the alternative to project/token. When set, the
+  /// connect frame authenticates with ``{"jwt_token": …}`` and project/token
+  /// are not required (the project id is inside the token). Mirrors the
+  /// reference's ``RelayClient(jwt_token=…)`` / ``SIGNALWIRE_JWT_TOKEN``.
+  std::string jwt_token;
   std::string host = DEFAULT_HOST;
   int port = DEFAULT_PORT;
   std::vector<std::string> contexts = {"default"};
@@ -163,6 +168,22 @@ class RelayClient {
   // Accessors
   const RelayConfig& config() const { return config_; }
   const std::string& relay_protocol() const { return protocol_; }
+
+  // Construction parameters the reference keeps as public instance attributes
+  // (`self.project` / `self.token` / `self.jwt_token` / `self.host` /
+  // `self.contexts`). The port stores them in `config_`; these read them back
+  // under the reference's flat names.
+  /// reference: ``self.project`` — the SignalWire project id (empty under JWT auth).
+  const std::string& project() const { return config_.project; }
+  /// reference: ``self.token`` — the API token (unused under JWT auth).
+  const std::string& token() const { return config_.token; }
+  /// reference: ``self.jwt_token`` — the JWT credential; when non-empty the
+  /// connect frame authenticates with it instead of project/token.
+  const std::string& jwt_token() const { return config_.jwt_token; }
+  /// reference: ``self.host`` — the RELAY host (a bare hostname, not a URL).
+  const std::string& host() const { return config_.host; }
+  /// reference: ``self.contexts`` — the contexts subscribed at connect.
+  const std::vector<std::string>& contexts() const { return config_.contexts; }
 
   /// Server-assigned session id captured from the `signalwire.connect`
   /// handshake result (`result.sessionid`). Empty until a successful

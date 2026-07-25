@@ -871,6 +871,20 @@ def collect(
             out_modules.setdefault(target_mod, {"classes": {}})
             out_modules[target_mod]["classes"].setdefault(target_cls, {"methods": {}})
             out_modules[target_mod]["classes"][target_cls]["methods"].update(present)
+            # ``agent``: the reference constructs each synthetic helper with a
+            # back-reference to the owning agent (``PromptManager(self)``,
+            # stored as ``self.agent`` — a ctor param the oracle's class-B2 rule
+            # records). C++ does not extract the helper as a separate OBJECT at
+            # all: its methods are declared directly on AgentBase, which is
+            # exactly what this projection encodes. When the helper and its
+            # agent are the SAME object the back-reference is ``*this`` — as
+            # available in C++ as in Python, simply already in hand. Emitted
+            # only for the synthetic targets, and only when the projection
+            # really produced the merged class.
+            if retarget_returns:
+                out_modules[target_mod]["classes"][target_cls]["methods"].setdefault(
+                    "agent", {"params": [{"name": "self", "kind": "self"}],
+                              "returns": "any"})
             projected.update(present)
         for n in projected:
             # ``__init__`` is COPIED to the synthetic projection targets
@@ -1071,6 +1085,25 @@ def collect(
     # dropped, error getters/protected fields dropped. Verified against the
     # genuine header symbols so it never emits a member the port lost.
     _project_ai_chat_signatures(out_modules)
+
+    # GENERAL public-data-field projection. Every class libclang walked carries
+    # its public data members in ``struct_fields``; the reference records such
+    # caller-readable state as a self-only getter (a public ``__init__``
+    # attribute under the oracle's class-B2 rule, or a @dataclass field).
+    # Project each field as a zero-arg getter wherever the oracle records that
+    # name on the SAME class — the intersection is what keeps a port-internal
+    # public field from becoming invented surface. This is the signature-side
+    # twin of enumerate_surface's ``_gate_field_members``; the per-header
+    # ``_project_named_struct_getters`` calls below remain for the structs
+    # libclang does not reach.
+    _project_public_fields_as_getters(out_modules, struct_fields)
+
+    # ``set_<x>`` writers fold onto ``<x>`` where the reference records ``<x>``
+    # on the same class — the reference spells caller-supplied configuration as
+    # a plain attribute (read AND write), C++ splits it into accessor + fluent
+    # setter. Same capability, different shape: idiom, folded at emission
+    # (ALLOWLIST_DISCIPLINE §0). Twin of enumerate_surface's ``_fold_setters``.
+    _fold_setter_signatures(out_modules)
 
     # Typed relay Event dataclasses: project their public @dataclass payload fields
     # as zero-arg getters, gated on the oracle's signalwire.relay.event getter set
@@ -1536,6 +1569,91 @@ def _named_struct_public_fields(header: Path) -> dict[str, list[str]]:
     return out
 
 
+def _oracle_class_members(module: str, cls: str) -> set[str]:
+    """Every member the reference oracle records on ``module.Class`` (methods,
+    which is how the signature oracle spells an attribute too). Empty when the
+    reference has no such class.
+
+    For an ``agentbase-family`` class the diff collapses the ``module.Class``
+    prefix away entirely, so an AgentBase member may be recorded by the
+    reference on ANY family class (a mixin) — union the whole family there."""
+    ref = _load_python_signatures()
+    ref_modules = ref.get("modules", {})
+    ref_cls = ref_modules.get(module, {}).get("classes", {}).get(cls)
+    out: set[str] = set(ref_cls.get("methods", {})) if ref_cls else set()
+    if module == "signalwire.core.agent_base":
+        for mod, entry in ref_modules.items():
+            if mod != "signalwire.core.agent_base" and \
+                    not mod.startswith("signalwire.core.mixins."):
+                continue
+            for cls_entry in entry.get("classes", {}).values():
+                out |= set(cls_entry.get("methods", {}))
+    return out
+
+
+def _project_public_fields_as_getters(out_modules: dict, struct_fields: dict) -> None:
+    """Emit every public data-member FIELD as a zero-arg getter, gated on the
+    oracle recording that name on the SAME class.
+
+    A field and a zero-arg accessor are the same read surface; the reference
+    spells both as a plain ``self.<name>`` attribute the signature oracle
+    records as a self-only method. libclang emits no method cursor for a field,
+    so without this a genuinely-implemented member reads as missing-port drift.
+    The same-class oracle gate is what prevents inventing surface (RULES §2 /
+    ALLOWLIST_DISCIPLINE §0a)."""
+    for key, fields in struct_fields.items():
+        mod, _, cls = key.rpartition(".")
+        if not mod or not cls:
+            continue
+        allowed = _oracle_class_members(mod, cls)
+        if not allowed:
+            continue
+        cls_entry = out_modules.get(mod, {}).get("classes", {}).get(cls)
+        if cls_entry is None:
+            continue
+        for field in fields:
+            if field in allowed:
+                cls_entry["methods"].setdefault(field, {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                })
+
+
+def _fold_setter_signatures(out_modules: dict) -> None:
+    """Collapse a ``set_<x>`` writer onto ``<x>`` when the reference oracle
+    records ``<x>`` — but not ``set_<x>`` itself — on the SAME class.
+
+    See ``enumerate_surface._fold_setters``: the writer is the C++ half of the
+    reference's plain public attribute, so it is idiom folded at emission, not
+    additional surface. A ``set_<x>`` the oracle records verbatim
+    (``FunctionResult.set_response``) is left alone; so is one whose ``<x>``
+    the reference lacks on this class, which keeps the fold from laundering
+    genuinely port-only surface and avoids the cross-class fold RULES §4
+    forbids."""
+    for mod, entry in out_modules.items():
+        for cls, cls_entry in entry.get("classes", {}).items():
+            allowed = _oracle_class_members(mod, cls)
+            if not allowed:
+                continue
+            methods = cls_entry.get("methods", {})
+            for name in list(methods):
+                if not name.startswith("set_"):
+                    continue
+                target = name[4:]
+                if name in allowed or target not in allowed:
+                    continue
+                methods.pop(name)
+                # The reference's ``<x>`` is a plain public ATTRIBUTE, which the
+                # signature oracle records as a self-only member. Fold to that
+                # shape — carrying the setter's ``(self, value) -> Self``
+                # signature over would be a spurious arity/return mismatch
+                # against an attribute.
+                methods.setdefault(target, {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                })
+
+
 def _project_named_struct_getters(out_modules: dict, module: str, header: Path) -> None:
     """Project a header's named-struct public data-member FIELDS as zero-arg
     property getters onto ``module``, gated on the oracle's per-class getter set.
@@ -1621,6 +1739,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
         _need(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
     _need(r"\bbool\s+del\s*\(", "AIChatClient::del (reference delete)")
     _need(r"\bvoid\s+close\s*\(", "AIChatClient::close (folds reference close)")
+    # The class-B2 ctor-param reads the projection emits below.
+    _need(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference self.url)")
+    _need(r"\bint\s+code\s*\(\s*\)\s*const", "AIChatError::code")
+    _need(r"\bserver_message\s*\(\s*\)\s*const",
+          "AIChatError::server_message (reference message)")
     # Options structs whose fields the unfold below relies on.
     for _s in ("AIChatClientOptions", "CreateConversationOptions", "ChatOptions",
                "SummarizeOptions", "ConversationTurnOptions"):
@@ -1700,6 +1823,10 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
         # PROTOCOL dunders have no snake_case-nameable C++ member (surface
         # PORT_OMISSIONS impossible:, TS/PHP/perl/dotnet fleet-consistent).
         "close": {"params": [_self()], "returns": "void"},
+        # url: the reference's `self.url` — a public __init__ attribute that is
+        # ALSO a ctor param, recorded by the oracle's class-B2 rule. The C++
+        # `url()` const getter is that attribute's read.
+        "url": {"params": [_self()], "returns": "any"},
     }
 
     err = {
@@ -1709,6 +1836,12 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
                        _p("message", "string", True)],
             "returns": "void",
         },
+        # code / message: ctor params the reference stores publicly, recorded by
+        # the oracle's class-B2 rule. C++ reads them via `code()` and
+        # `server_message()` (the latter renamed to avoid colliding with
+        # std::runtime_error's message semantics).
+        "code": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
+        "message": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
     }
     # Each result DTO is @dataclass-shaped in the reference: besides ``__init__``
     # the oracle records every field as a zero-arg property getter. The C++ port
@@ -1789,6 +1922,23 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
         return
     call_mod = out_modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": {}})
     call_classes = call_mod.setdefault("classes", {})
+
+    # The BASE ``Action``: the reference declares it in ``signalwire.relay.call``
+    # with __init__/is_done/wait/result plus the two ctor params it stores
+    # publicly — ``call`` (the back-reference) and ``control_id`` — which the
+    # oracle's class-B2 rule records. The unified C++ Action carries all of
+    # them; project the reference-recorded subset onto relay.call so the base
+    # symbol lines up (the richer C++ surface stays under relay.action).
+    base_entry = call_classes.setdefault("Action", {"methods": {}})
+    for m in ("__init__", "is_done", "wait", "result", "control_id", "call"):
+        if m in action_cls:
+            base_entry["methods"].setdefault(m, action_cls[m])
+    # ``call`` is REFERENCE surface (relay.call.Action.call), now homed on the
+    # class where the reference declares it. Leaving a second copy under the
+    # port's native relay.action module would make the same member read as a
+    # port addition there. One member, one home.
+    action_cls.pop("call", None)
+
     for sub, methods in _RELAY_ACTION_CONTROL_METHODS.items():
         entry = call_classes.setdefault(sub, {"methods": {}})
         for m in methods:

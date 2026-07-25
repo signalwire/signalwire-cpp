@@ -31,6 +31,6 @@ int main() {
         std::cout << "  Call: " << result.dump(2) << "\n";
 
     } catch (const SignalWireRestError& e) {
-        std::cerr << "REST error " << e.status() << ": " << e.what() << "\n";
+        std::cerr << "REST error " << e.status_code() << ": " << e.what() << "\n";
     }
 }

@@ -19,7 +19,15 @@ namespace {
 std::string normalize_route(const std::string& route);
 }  // namespace
 
-AgentServer::AgentServer(const std::string& host, int port) : host_(host), port_(port) {
+AgentServer::AgentServer(const std::string& host, int port, const std::string& log_level)
+    : host_(host), port_(port), log_level_(log_level) {
+  // The reference stores `log_level.lower()` and does nothing else with it at
+  // construction — it is forwarded to uvicorn in `run()`. Mirror both halves:
+  // lowercase here, apply to the process logger in run() (constructing a
+  // server must not mutate global logging state).
+  std::transform(log_level_.begin(), log_level_.end(), log_level_.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
   std::string env_port = get_env("PORT", "");
   if (!env_port.empty()) {
     try {
@@ -267,6 +275,18 @@ void AgentServer::setup_routes(httplib::Server& server) {
 }
 
 void AgentServer::run() {
+  // Apply the configured log level for the server's lifetime — the reference
+  // passes `self.log_level` to uvicorn at exactly this point.
+  if (log_level_ == "debug") {
+    get_logger().set_level(LogLevel::Debug);
+  } else if (log_level_ == "info") {
+    get_logger().set_level(LogLevel::Info);
+  } else if (log_level_ == "warning" || log_level_ == "warn") {
+    get_logger().set_level(LogLevel::Warn);
+  } else if (log_level_ == "error" || log_level_ == "critical") {
+    get_logger().set_level(LogLevel::Error);
+  }
+
   // TLS termination in-process when SWML_SSL_ENABLED + cert/key paths are
   // set (mirrors Python's SecurityConfig). make_http_server returns an
   // httplib::SSLServer upcast to Server* in that case; otherwise plain HTTP.

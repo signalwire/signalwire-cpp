@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 362ab9e1d83e4c56753657f5b97e9b136b4b3dd0",
+  "generated_from": "signalwire-cpp @ da24e23f15d64ae0b61e0be2d7a1c09dcc68a9bb",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -35,9 +35,12 @@
           "get_agent",
           "get_agents",
           "get_sip_username_mapping",
+          "host",
           "list_routes",
+          "log_level",
           "lookup_sip_route",
           "map_sip_username",
+          "port",
           "register",
           "register_agent",
           "register_global_routing_callback",
@@ -80,10 +83,13 @@
           "delete",
           "end",
           "log",
-          "summarize"
+          "summarize",
+          "url"
         ],
         "AIChatError": [
-          "__init__"
+          "__init__",
+          "code",
+          "message"
         ],
         "AuthenticationError": [],
         "ChatInProgressError": [],
@@ -111,6 +117,7 @@
       "classes": {
         "PromptManager": [
           "__init__",
+          "agent",
           "define_contexts",
           "get_contexts",
           "get_post_prompt",
@@ -131,6 +138,7 @@
       "classes": {
         "ToolRegistry": [
           "__init__",
+          "agent",
           "define_tool",
           "get_all_functions",
           "get_function",
@@ -168,6 +176,7 @@
           "add_skill",
           "add_swaig_query_param",
           "add_swaig_query_params",
+          "agent_id",
           "auth_password",
           "auth_username",
           "auto_map_sip_usernames",
@@ -204,6 +213,7 @@
           "list_tools",
           "manual_set_proxy_url",
           "mcp_servers",
+          "native_functions",
           "on_debug_event",
           "on_function_call",
           "on_summary",
@@ -242,7 +252,6 @@
           "set_prompt_pom",
           "set_prompt_text",
           "set_pronunciations",
-          "set_signing_key",
           "set_use_pom",
           "set_web_hook_url",
           "set_webhook_url",
@@ -273,6 +282,7 @@
           "flask_decorator",
           "get_auth_info",
           "get_fastapi_dependency",
+          "security_config",
           "verify_api_key",
           "verify_basic_auth",
           "verify_bearer_token"
@@ -284,6 +294,7 @@
       "classes": {
         "ConfigLoader": [
           "__init__",
+          "config_paths",
           "find_config_file",
           "get",
           "get_config",
@@ -354,9 +365,15 @@
         ],
         "GatherQuestion": [
           "__init__",
+          "confirm",
+          "functions",
+          "isolated",
           "key",
+          "prompt",
+          "question",
           "to_dict",
-          "to_json"
+          "to_json",
+          "type"
         ],
         "Step": [
           "__init__",
@@ -399,6 +416,7 @@
           "expression",
           "fallback_output",
           "foreach",
+          "function_name",
           "global_error_keys",
           "output",
           "parameter",
@@ -433,10 +451,12 @@
           "join_room",
           "pay",
           "play_background_file",
+          "post_process",
           "record_call",
           "remove_global_data",
           "remove_metadata",
           "replace_in_history",
+          "response",
           "rpc_ai_message",
           "rpc_ai_unhold",
           "rpc_dial",
@@ -672,9 +692,11 @@
           "end_session",
           "generate_token",
           "get_session_metadata",
+          "secret_key",
           "set_debug_mode",
           "set_session_metadata",
           "timing_safe_compare",
+          "token_expiry_secs",
           "validate_token",
           "validate_tool_token"
         ]
@@ -729,6 +751,7 @@
       "classes": {
         "SkillBase": [
           "__init__",
+          "agent",
           "cleanup",
           "define_tool",
           "get_datamap_functions",
@@ -740,6 +763,7 @@
           "get_parameter_schema",
           "get_prompt_sections",
           "get_skill_data",
+          "params",
           "register_tools",
           "required_env_vars",
           "required_packages",
@@ -759,6 +783,7 @@
       "classes": {
         "SkillManager": [
           "__init__",
+          "agent",
           "cleanup_all",
           "get_skill",
           "has_skill",
@@ -904,6 +929,7 @@
           "hangup",
           "has_function",
           "has_tool",
+          "host",
           "join_conference",
           "join_room",
           "label",
@@ -939,10 +965,6 @@
           "serve",
           "set",
           "set_auth",
-          "set_host",
-          "set_name",
-          "set_port",
-          "set_route",
           "sip_refer",
           "sleep",
           "stop",
@@ -1331,6 +1353,7 @@
           "__init__",
           "add_pom_as_subsection",
           "add_section",
+          "debug",
           "find_section",
           "from_json",
           "from_yaml",
@@ -1346,9 +1369,14 @@
           "add_body",
           "add_bullets",
           "add_subsection",
+          "body",
+          "bullets",
+          "numbered",
+          "numberedBullets",
           "render_markdown",
           "render_xml",
           "subsections",
+          "title",
           "to_dict",
           "to_json"
         ]
@@ -1359,12 +1387,15 @@
       "classes": {
         "ConciergeAgent": [
           "__init__",
+          "amenities",
           "check_availability",
           "get_directions",
+          "hours_of_operation",
           "on_summary",
-          "set_amenities",
+          "services",
           "set_hours",
-          "set_venue_name"
+          "special_instructions",
+          "venue_name"
         ]
       },
       "functions": []
@@ -1373,11 +1404,12 @@
       "classes": {
         "FAQBotAgent": [
           "__init__",
+          "faqs",
           "on_summary",
+          "persona",
           "search_faqs",
-          "set_faqs",
           "set_no_match_message",
-          "set_suggest_related"
+          "suggest_related"
         ]
       },
       "functions": []
@@ -1413,11 +1445,16 @@
       "classes": {
         "SurveyAgent": [
           "__init__",
+          "brand_name",
+          "conclusion",
+          "introduction",
           "log_response",
+          "max_retries",
           "on_summary",
+          "questions",
           "set_completion_message",
           "set_intro_message",
-          "set_questions",
+          "survey_name",
           "validate_response"
         ]
       },
@@ -1464,6 +1501,8 @@
         ],
         "Action": [
           "__init__",
+          "call",
+          "control_id",
           "is_done",
           "result",
           "wait"
@@ -1483,12 +1522,14 @@
           "clear_digit_bindings",
           "collect",
           "connect",
+          "context",
           "denoise",
           "denoise_stop",
           "detect",
           "detect_answering_machine",
           "detect_digit",
           "detect_fax",
+          "device",
           "direction",
           "disconnect",
           "dispatch_event",
@@ -1517,6 +1558,7 @@
           "play_ringtone",
           "play_silence",
           "play_tts",
+          "project_id",
           "prompt",
           "prompt_audio",
           "prompt_tts",
@@ -1528,12 +1570,11 @@
           "refer",
           "register_action",
           "resolve_all_actions",
+          "segment_id",
           "send_digits",
           "send_fax",
           "set_client",
-          "set_direction",
           "set_from",
-          "set_tag",
           "set_to",
           "sip_refer",
           "state",
@@ -1622,15 +1663,19 @@
           "__init__",
           "config",
           "connect",
+          "contexts",
           "dial",
           "disconnect",
           "execute",
           "find_call",
           "from_env",
+          "host",
           "is_connected",
+          "jwt_token",
           "on_call",
           "on_event",
           "on_message",
+          "project",
           "receive",
           "register_call",
           "relay_protocol",
@@ -1639,6 +1684,7 @@
           "send_raw_request",
           "session_id",
           "subscribe",
+          "token",
           "unreceive",
           "unregister_call",
           "unsubscribe"
@@ -1855,19 +1901,26 @@
         "Message": [
           "__init__",
           "__repr__",
+          "body",
+          "context",
+          "direction",
+          "from_number",
           "from_params",
           "is_delivered",
           "is_done",
           "is_failed",
           "is_terminal",
+          "media",
+          "message_id",
           "message_state",
           "on",
           "on_completed",
           "reason",
           "result",
-          "set_reason",
-          "set_state",
+          "segments",
           "state",
+          "tags",
+          "to_number",
           "update_state",
           "wait"
         ]
@@ -2073,7 +2126,7 @@
           "headers",
           "method",
           "request_id",
-          "status",
+          "status_code",
           "url"
         ],
         "SignalWireRestTransportError": [
@@ -3801,6 +3854,7 @@
           "get_verb_properties",
           "get_verb_required_properties",
           "load_schema",
+          "schema_path",
           "validate_document",
           "validate_verb",
           "validate_verb_top_level_keys"
@@ -3826,8 +3880,13 @@
         "WebService": [
           "__init__",
           "add_directory",
+          "allowed_extensions",
+          "blocked_extensions",
           "directories",
+          "enable_cors",
+          "enable_directory_browsing",
           "file_allowed",
+          "max_file_size",
           "port",
           "remove_directory",
           "start",

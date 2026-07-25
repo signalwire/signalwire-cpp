@@ -10,9 +10,6 @@
 #include <vector>
 
 namespace signalwire {
-namespace agent {
-class AgentBase;  // fwd — friended below for token_expiry_secs()
-}  // namespace agent
 namespace security {
 
 using json = nlohmann::json;
@@ -27,28 +24,30 @@ using json = nlohmann::json;
 /// base64url-decodes, splits the 5 fields, recomputes the HMAC, and compares in
 /// CONSTANT time.
 class SessionManager {
-  // AgentBase forwards its ``token_expiry_secs`` constructor parameter here
-  // and reads it back for its own protected accessor.
-  friend class signalwire::agent::AgentBase;
-
  public:
-  /// Construct with a random 32-byte secret.
+  /// Construct with the reference's constructor surface:
+  /// ``SessionManager(token_expiry_secs=900, secret_key=None)``.
   ///
   /// ``token_expiry_secs`` is the lifetime applied to every token minted
   /// through ``generate_token`` / ``create_tool_token`` (and the default for
-  /// ``create_token``). Mirrors the reference's
-  /// ``SessionManager(token_expiry_secs=...)`` — this is what
-  /// ``AgentBase.__init__(token_expiry_secs=...)`` forwards.
-  explicit SessionManager(int token_expiry_secs = 900);
+  /// ``create_token``) — this is what ``AgentBase(token_expiry_secs=...)``
+  /// forwards. ``secret_key`` is the HMAC signing key; when empty a fresh
+  /// 32-byte random key is generated and hex-encoded, mirroring the
+  /// reference's ``secrets.token_hex(32)``.
+  explicit SessionManager(int token_expiry_secs = 900, const std::string& secret_key = "");
 
-  /// Construct with a specific secret (for testing)
+  /// Construct with a raw byte secret (port convenience for tests that want
+  /// deterministic key bytes). The bytes are hex-encoded into the same
+  /// ``secret_key`` string the reference-shaped constructor takes, so both
+  /// spellings sign identically.
   explicit SessionManager(const std::vector<uint8_t>& secret, int token_expiry_secs = 900);
 
-  // NOTE: the configured token lifetime is readable via the protected
-  // ``token_expiry_secs()`` below. The reference's ``self.token_expiry_secs``
-  // IS a public attribute, but the signature oracle does not enumerate
-  // ``__init__`` attributes (the class-B2 blind spot), so a public accessor
-  // here reads as a port addition against the oracle.
+  // Construction parameters the reference keeps as public instance attributes.
+  /// reference: ``self.token_expiry_secs`` — the configured token lifetime.
+  [[nodiscard]] int token_expiry_secs() const { return token_expiry_secs_; }
+  /// reference: ``self.secret_key`` — the HMAC signing key; the caller's value,
+  /// or the generated ``secrets.token_hex(32)``-shaped key when none was given.
+  [[nodiscard]] const std::string& secret_key() const { return secret_key_; }
 
   /// Create a signed token for a function call
   /// @param function_name  The SWAIG function name
@@ -138,11 +137,6 @@ class SessionManager {
   /// (``base64(function:call_id:expiry).signature``).
   [[nodiscard]] json debug_token(const std::string& token) const;
 
- protected:
-  /// Configured token lifetime in seconds (reference:
-  /// ``self.token_expiry_secs``, a public attribute there).
-  [[nodiscard]] int token_expiry_secs() const { return token_expiry_secs_; }
-
  private:
   /// Compute HMAC-SHA256 of data using the secret
   std::string hmac_sha256(const std::string& data) const;
@@ -171,7 +165,9 @@ class SessionManager {
   /// Get current Unix timestamp
   static int64_t current_timestamp();
 
-  std::vector<uint8_t> secret_;
+  /// HMAC signing key — the reference's ``self.secret_key``, a STRING whose
+  /// bytes are the HMAC key (``self.secret_key.encode()`` there).
+  std::string secret_key_;
   /// Token lifetime in seconds, used by generate_token / create_tool_token
   /// (create_token still accepts an explicit override). Set from the
   /// constructor's ``token_expiry_secs`` — the reference's

@@ -12,6 +12,11 @@
 #include "signalwire/swaig/tool_definition.hpp"
 
 namespace signalwire {
+
+namespace agent {
+class AgentBase;
+}  // namespace agent
+
 namespace skills {
 
 using json = nlohmann::json;
@@ -23,8 +28,18 @@ struct SkillPromptSection {
   std::vector<std::string> bullets;
 };
 
+class SkillManager;
+
 /// Abstract base class for all skills
 class SkillBase {
+  // The reference constructs a skill as `SkillClass(agent, params)`, so the
+  // agent + params are set BY THE LOADER, not by user code. C++ default-
+  // constructs the instance through the registry factory, so the loader injects
+  // them afterwards via `bind` — which is therefore private to SkillManager,
+  // keeping the construction contract identical (a skill cannot re-parent
+  // itself) rather than adding a public setter the reference lacks.
+  friend class SkillManager;
+
  public:
   virtual ~SkillBase() = default;
 
@@ -106,6 +121,20 @@ class SkillBase {
     return result;
   }
 
+  // Construction state the reference keeps as public instance attributes
+  // (`SkillBase.__init__(agent, params)` sets `self.agent` / `self.params`).
+  // The port binds them at load time via `bind` rather than through the ctor,
+  // because a C++ skill is default-constructed by the registry factory and
+  // then handed its agent + params — the values and their lifetime are the
+  // same, only the injection point differs.
+
+  /// The agent this skill was loaded into (reference: ``self.agent``).
+  /// ``nullptr`` before ``bind``; ``SkillManager::load_skill`` always binds.
+  [[nodiscard]] agent::AgentBase* agent() const { return agent_; }
+
+  /// The parameters this skill was loaded with (reference: ``self.params``).
+  [[nodiscard]] const json& params() const { return params_; }
+
   // ========================================================================
   // Helpers
   // ========================================================================
@@ -159,7 +188,21 @@ class SkillBase {
     return "skill:" + get_instance_key();
   }
 
-  json params_;
+  json params_ = json::object();
+  /// The loading agent — non-owning; the agent outlives its SkillManager,
+  /// which owns this instance.
+  agent::AgentBase* agent_ = nullptr;
+
+ private:
+  /// Bind the loading agent + params onto this instance. Called by
+  /// ``SkillManager::load_skill`` before ``setup``, so a skill's own
+  /// ``setup``/``register_tools`` can read ``agent()`` and ``params()``.
+  /// Private + friended to SkillManager: the reference sets both through the
+  /// constructor, so only the loader may do it here too.
+  void bind(agent::AgentBase* owner, const json& params) {
+    agent_ = owner;
+    params_ = params.is_object() ? params : json::object();
+  }
 };
 
 /// Factory function type for creating skill instances

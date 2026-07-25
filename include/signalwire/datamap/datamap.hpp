@@ -20,6 +20,12 @@ class DataMap {
  public:
   explicit DataMap(const std::string& function_name);
 
+  /// The SWAIG function name this data-map defines (reference:
+  /// ``self.function_name``) — emitted as the ``function`` key and used as the
+  /// fallback description. The caller names it at construction, so the caller
+  /// can read it back.
+  [[nodiscard]] const std::string& function_name() const { return function_name_; }
+
   /// Set the LLM-facing tool description (the "purpose"). PROMPT
   /// ENGINEERING, not developer documentation.
   ///

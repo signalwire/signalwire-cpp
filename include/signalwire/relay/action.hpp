@@ -17,6 +17,7 @@ namespace relay {
 using json = nlohmann::json;
 
 class RelayClient;
+class Call;
 
 /// Represents a controllable in-progress operation (play, record, collect, etc.)
 /// Uses shared internal state so the object can be copied/moved freely while
@@ -38,6 +39,15 @@ class Action {
   const json& result() const;
   const std::string& call_id() const { return state_->call_id; }
   const std::string& node_id() const { return state_->node_id; }
+
+  /// The Call this action runs on (reference: ``Action.__init__(call, …)``
+  /// stores ``self.call``). The port's Action carries the client + call_id
+  /// rather than a Call reference — because the client's registry OWNS the
+  /// Call and an Action outliving a raw Call& would dangle — so the
+  /// back-reference is resolved through that registry. ``nullptr`` when the
+  /// action has no client (a bare, unattached Action) or the call has already
+  /// been unregistered (ended).
+  [[nodiscard]] Call* call() const;
 
   /// Method prefix used for sub-command frames (stop/pause/resume/...).
   /// Defaults to "calling.play"; set explicitly when an Action is built

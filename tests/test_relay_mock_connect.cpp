@@ -53,6 +53,41 @@ TEST(relay_mock_connect_journal_carries_project_and_token) {
     return true;
 }
 
+// Reference `_authenticate`: a JWT credential REPLACES the project/token pair
+// on the wire — `{"jwt_token": …}` alone, because the project id is inside the
+// token. The port previously had no JWT auth at all, so a caller with only a
+// JWT could not connect.
+TEST(relay_mock_connect_jwt_token_replaces_project_and_token) {
+    auto client = mt::make_client_with_config(
+        [](RelayConfig& cfg) { cfg.jwt_token = "jwt-abc123"; });
+    auto e = mt::journal_last_recv("signalwire.connect");
+    json auth = e.frame["params"]["authentication"];
+    ASSERT_EQ(auth.value("jwt_token", ""), "jwt-abc123");
+    ASSERT_FALSE(auth.contains("project"));
+    ASSERT_FALSE(auth.contains("token"));
+    // The reference emits no top-level project/token under JWT auth either.
+    ASSERT_FALSE(e.frame["params"].contains("project"));
+    ASSERT_FALSE(e.frame["params"].contains("token"));
+    // And the caller reads the credential back (reference: self.jwt_token).
+    ASSERT_EQ(client->jwt_token(), "jwt-abc123");
+    client->disconnect();
+    return true;
+}
+
+// The flat construction-parameter accessors mirror the reference's public
+// instance attributes.
+TEST(relay_mock_connect_construction_params_readable) {
+    auto client = mt::make_client("proj-x", "tok-y", {"ctx-a", "ctx-b"});
+    ASSERT_EQ(client->project(), "proj-x");
+    ASSERT_EQ(client->token(), "tok-y");
+    ASSERT_EQ(client->jwt_token(), "");
+    ASSERT_FALSE(client->host().empty());
+    ASSERT_EQ(client->contexts().size(), static_cast<size_t>(2));
+    ASSERT_EQ(client->contexts()[0], "ctx-a");
+    client->disconnect();
+    return true;
+}
+
 TEST(relay_mock_connect_journal_carries_contexts) {
     auto client = mt::make_client();
     auto e = mt::journal_last_recv("signalwire.connect");
@@ -142,6 +177,29 @@ TEST(relay_mock_connect_with_empty_creds_fails) {
         ASSERT_TRUE(what.find("token") != std::string::npos);
         ASSERT_TRUE(what.find("SIGNALWIRE_API_TOKEN") != std::string::npos);
         ASSERT_FALSE(client.is_connected());
+    }
+
+    // JWT is the ALTERNATIVE to the pair: with a jwt_token and NEITHER
+    // project nor token, connect must proceed (reference: `if self.jwt_token:
+    // … else: <require both>`). The project id lives inside the JWT.
+    {
+        RelayConfig cfg;
+        cfg.project = "";
+        cfg.token = "";
+        cfg.jwt_token = "jwt-only";
+        cfg.host = "127.0.0.1";
+        cfg.port = mt::resolve_ws_port();
+        cfg.contexts = {"default"};
+        RelayClient client(cfg);
+        bool threw = false;
+        try {
+            (void)client.connect();
+        } catch (const std::invalid_argument&) {
+            threw = true;
+        }
+        ASSERT_FALSE(threw);
+        ASSERT_TRUE(client.is_connected());
+        client.disconnect();
     }
     return true;
 }

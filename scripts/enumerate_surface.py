@@ -1974,6 +1974,47 @@ def _project_request_options_fields(modules: dict, repo: Path) -> None:
     _emit_oracle_gated_fields(modules, "signalwire.rest._request_options", header)
 
 
+def build_native_names(include_dir: Path) -> dict:
+    """Return the port's REAL declared member names, verbatim, BEFORE any fold.
+
+    ``build_snapshot`` deliberately reshapes the emitted surface into the
+    reference's spelling so the parity diff compares equal: ``set_route`` folds
+    onto ``route`` (``_fold_setters``), and a public field is dropped unless the
+    oracle records the attribute (``_gate_field_members``). That folded snapshot
+    is the right input for the DRIFT diff and the WRONG input for the doc gates
+    — a C++ example that calls ``svc.set_route("/demo")`` is correct, compiling
+    code naming a method that genuinely exists, but the folded snapshot no
+    longer contains ``set_route``, so DOC-AUDIT reads it as a phantom.
+
+    This sidecar is the resolution the doc gates already know how to consume:
+    ``scripts/suites/_doc_audit.py`` passes ``port_surface_native.json`` to
+    ``audit_docs.py --native-names`` for ANY port that ships one, and
+    ``audit_docs.load_native_names`` unions it with the folded surface. So the
+    parity diff keeps seeing the reference's spelling while the doc gates see
+    what a caller can actually type. Emitted in the FLAT ``{"native_names":
+    [...]}`` shape (dotnet's).
+
+    Nothing here gates on the oracle: these are the port's own declarations, and
+    they are used only to RESOLVE doc references, never to claim surface."""
+    global _INCLUDE_ROOT
+    _INCLUDE_ROOT = include_dir.parent
+    names: set[str] = set()
+    patterns = ("**/*.hpp", "**/*.h")
+    header_files: list[Path] = []
+    for p in patterns:
+        header_files.extend(sorted(include_dir.glob(p)))
+    for path in header_files:
+        try:
+            findings = parse_header(path)
+        except Exception:  # pragma: no cover — build_snapshot already warns
+            continue
+        for _ns_path, class_name, methods, decl_fields in findings:
+            names.add(class_name)
+            names.update(methods)
+            names.update(decl_fields)
+    return {"native_names": sorted(names)}
+
+
 def build_snapshot(repo: Path, include_dir: Path) -> dict:
     global _INCLUDE_ROOT
     # GENERATED_PAYLOAD_NS keys begin at ``signalwire::``; the header for
@@ -2265,6 +2306,12 @@ def main(argv: list[str]) -> int:
     snapshot = build_snapshot(repo, args.include_dir)
     rendered = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
 
+    # The pre-fold native-name sidecar the doc gates resolve against (see
+    # build_native_names). Written beside --output so it tracks it.
+    native = build_native_names(args.include_dir)
+    native_rendered = json.dumps(native, indent=2, sort_keys=True) + "\n"
+    native_output = args.output.with_name("port_surface_native.json")
+
     if args.check:
         if not args.output.is_file():
             print(f"error: {args.output} does not exist", file=sys.stderr)
@@ -2284,12 +2331,25 @@ def main(argv: list[str]) -> int:
                 file=sys.stderr,
             )
             return 1
+        if not native_output.is_file():
+            print(f"error: {native_output} does not exist", file=sys.stderr)
+            return 1
+        if strip_meta(native_rendered) != strip_meta(
+                native_output.read_text(encoding="utf-8")):
+            print(
+                "DRIFT: port_surface_native.json is stale relative to headers.\n"
+                "  Regenerate:\n"
+                "    python3 scripts/enumerate_surface.py",
+                file=sys.stderr,
+            )
+            return 1
         return 0
 
     if args.stdout:
         sys.stdout.write(rendered)
     else:
         args.output.write_text(rendered, encoding="utf-8")
+        native_output.write_text(native_rendered, encoding="utf-8")
         print(f"wrote {args.output} "
               f"({len(snapshot['modules'])} modules, "
               f"{sum(len(m['classes']) for m in snapshot['modules'].values())} classes, "

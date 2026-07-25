@@ -74,7 +74,7 @@ class SignalWireRestError : public std::runtime_error {
 /// transport-level failure (connection refused, DNS failure, connection
 /// reset, TLS error), as opposed to a well-formed non-2xx HTTP response.
 ///
-/// A member of the ``SignalWireRestError`` family: ``status()`` is ``0``
+/// A member of the ``SignalWireRestError`` family: ``status_code()`` is ``0``
 /// (the sentinel this port uses for "no HTTP status" — there is no response
 /// to carry one), and the underlying transport-library error text is
 /// preserved as the exception message. Because it extends

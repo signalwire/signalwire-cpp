@@ -38,7 +38,11 @@ You need three things to connect:
 | `token`      | `SIGNALWIRE_API_TOKEN`  | Your SignalWire API token |
 | `host`       | `SIGNALWIRE_SPACE`      | Your space hostname (default `relay.signalwire.com`) |
 
-`RelayClient::from_env()` reads exactly these three variables.
+`RelayClient::from_env()` reads these three variables, plus `SIGNALWIRE_JWT_TOKEN`.
+
+A JWT is an **alternative** to the project/token pair rather than an addition to
+it: set `SIGNALWIRE_JWT_TOKEN` (or pass `jwt_token`) and the connect frame
+authenticates with the JWT alone, so `project` and `token` are not required.
 
 ## Minimal Example
 

@@ -117,8 +117,13 @@ std::string oracle_sig(const std::string& url, const std::string& body, const st
 int main() {
   json out = json::object();
 
-  std::vector<uint8_t> secret_bytes(kSecret.begin(), kSecret.end());
-  SessionManager sm(secret_bytes);
+  // Key the manager with the secret STRING, matching the reference's
+  // ``SessionManager(secret_key=SECRET)`` — the HMAC key is the bytes of that
+  // string. The byte-vector constructor is NOT equivalent here: it hex-encodes
+  // its input into ``secret_key_``, so passing kSecret's bytes would sign with
+  // hex(kSecret) while ``oracle_token`` below signs with kSecret itself, and
+  // the cross-port token_interop check would compare two different keys.
+  SessionManager sm(900, kSecret);
 
   // token_format: generate a token via the SDK, decode its wire-format fields.
   {

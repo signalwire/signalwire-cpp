@@ -533,6 +533,16 @@ run_gate "TEST" "build run_tests + run_tests ($BUILD_MODE)" test_gate
 run_gate "SURFACE" "surface parity suite (SIGNATURES/DRIFT/SURFACE-FRESH/SURFACE-DIFF/GEN-TYPE-DEGENERACY/ROUTE-COLLISION/GEN-IDIOM/SEMVER-DIFF)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/surface.py" --port cpp --repo "$PORT_ROOT"
 
+# TYPE-EROSION: a port may not erase a type the reference DECLARES. compare_param treats
+# `any` on EITHER side as matching anything, so a port emitting `any` silently satisfies
+# every reference declaration — an unlimited opt-out. ConciergeAgent.hours_of_operation is
+# declared optional<dict<string,string>> and go still shipped a bare string, with no gate
+# red. RATCHET, not a hard gate: dynamic languages cannot always express a type, so this
+# banks the current count and fails only on REGRESSION. Drive the number DOWN; never up.
+# Runs after SURFACE because it reads the port_signatures.json that enumeration writes.
+run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 122)" \
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 122
+
 # GEN (regen-from-specs family): GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS.
 # GEN-FRESH-TESTS reuses cpp's route_registry binary via the suite's cpp branch.
 run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS)" \

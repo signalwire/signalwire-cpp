@@ -136,7 +136,12 @@ class AgentServer {
   bool sip_auto_map_ = true;
   std::vector<std::pair<std::string, GlobalRoutingCallback>> routing_callbacks_;  // (path, cb)
   bool sip_routing_ = false;
-  std::unique_ptr<httplib::Server> server_;
+  /// ``shared_ptr``, not ``unique_ptr``: ``serve()`` holds its own strong
+  /// reference across the blocking ``listen()``, so a concurrent ``stop()``
+  /// that drops the member cannot destroy the server while a thread is still
+  /// executing inside it. Guarded by ``mutex_`` (write in ``serve()``, drop in
+  /// ``stop()`` — two different threads).
+  std::shared_ptr<httplib::Server> server_;
   mutable std::mutex mutex_;
 };
 

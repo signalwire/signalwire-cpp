@@ -877,7 +877,16 @@ class AgentBase : public swml::Service {
   bool trust_proxy_for_signature_ = false;
 
   // Server
-  std::unique_ptr<httplib::Server> server_;
+  /// Guards ``server_``. ``serve()`` blocks in ``listen()`` for the server's
+  /// whole lifetime, so it is normally run on its own thread while ``stop()``
+  /// is called from another — meaning the pointer is written by one thread and
+  /// read/dropped by another. Unsynchronised, that is a data race.
+  mutable std::mutex server_mutex_;
+  /// ``shared_ptr``, not ``unique_ptr``: ``serve()`` holds its own strong
+  /// reference across the blocking ``listen()``, so a concurrent ``stop()``
+  /// that drops the member cannot destroy the server while a thread is still
+  /// executing inside it.
+  std::shared_ptr<httplib::Server> server_;
   mutable std::shared_mutex state_mutex_;
 };
 

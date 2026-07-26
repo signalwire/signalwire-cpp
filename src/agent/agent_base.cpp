@@ -2221,22 +2221,33 @@ void AgentBase::serve() {
   // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
   // unique_ptr<Server>; setup_routes() is unchanged.
   auto tls = server::resolve_tls_config_from_env();
-  server_ = server::make_http_server(tls);
-  if (tls.usable() && !server_->is_valid()) {
-    get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
-                       " key=" + tls.key_path + ")");
-    return;
-  }
-  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB body limit
 
-  setup_routes(*server_);
+  // Build + configure under the lock, then listen() with our OWN strong
+  // reference and the lock released: a concurrent stop() must be able to
+  // unblock listen() without destroying the server we are still inside, and
+  // holding the mutex across the blocking call would deadlock every stop().
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+      get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
+                         " key=" + tls.key_path + ")");
+      server_.reset();
+      return;
+    }
+    server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB body limit
+
+    setup_routes(*server_);
+    srv = server_;
+  }
 
   get_logger().info("Starting agent '" + name_ + "' on " +
                     std::string(tls.usable() ? "https://" : "http://") + host_ + ":" +
                     std::to_string(port_) + route_);
   get_logger().info("Auth user: " + auth_user_);
 
-  if (!server_->listen(host_, port_)) {
+  if (!srv->listen(host_, port_)) {
     get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                        " -- is the port already in use?");
   }
@@ -2245,9 +2256,14 @@ void AgentBase::serve() {
 void AgentBase::run() { serve(); }
 
 void AgentBase::stop() {
-  if (server_) {
-    server_->stop();
-    server_.reset();
+  // Drop the member under the lock, then stop() outside it (see serve()).
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    srv = std::move(server_);
+  }
+  if (srv) {
+    srv->stop();
   }
 }
 

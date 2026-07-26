@@ -844,18 +844,33 @@ void Service::serve() {
   // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
   // unique_ptr<Server>; setup_routes() is unchanged.
   auto tls = server::resolve_tls_config_from_env();
-  server_ = server::make_http_server(tls);
-  if (tls.usable() && !server_->is_valid()) {
-    get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
-                       " key=" + tls.key_path + ")");
-    return;
+
+  // Build + configure the server under the lock: stop() may fire from another
+  // thread at any moment (the usual shape is serve() on a server thread and
+  // stop() from the owner), and it drops this same pointer. Keep our OWN strong
+  // reference for the blocking listen() below, so a concurrent stop() unblocks
+  // us without destroying the object we are still executing inside. The lock is
+  // released before listen() -- it blocks for the server's whole lifetime, so
+  // holding the mutex across it would deadlock every stop().
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+      get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
+                         " key=" + tls.key_path + ")");
+      server_.reset();
+      return;
+    }
+    server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
+    setup_routes(*server_);
+    srv = server_;
   }
-  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
-  setup_routes(*server_);
+
   get_logger().info("Starting SWML service on " +
                     std::string(tls.usable() ? "https://" : "http://") + host_ + ":" +
                     std::to_string(port_) + route_);
-  if (!server_->listen(host_, port_)) {
+  if (!srv->listen(host_, port_)) {
     get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                        " -- is the port already in use?");
   }
@@ -877,9 +892,18 @@ std::shared_ptr<httplib::Server> Service::as_router() {
 }
 
 void Service::stop() {
-  if (server_) {
-    server_->stop();
-    server_.reset();
+  // Take the pointer out under the lock, then call stop() on it OUTSIDE the
+  // lock. Doing the call while holding the mutex would block serve()'s setup
+  // path; dropping the member first means a second stop() is a no-op. serve()
+  // holds its own reference, so releasing ours here never destroys a server a
+  // thread is still inside listen() on.
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    srv = std::move(server_);
+  }
+  if (srv) {
+    srv->stop();
   }
 }
 

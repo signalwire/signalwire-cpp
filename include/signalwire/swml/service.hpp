@@ -470,7 +470,20 @@ class Service {
  private:
   void init_auth() const;
 
-  std::unique_ptr<httplib::Server> server_;
+  /// Guards ``server_``. ``serve()`` runs on the caller's thread (typically a
+  /// dedicated server thread, because it blocks in ``listen()``) while
+  /// ``stop()`` is called from another — so the pointer is written by one
+  /// thread and read/reset by another. Without this lock that is a data race:
+  /// ``stop()`` could observe a half-assigned pointer, or reset it while
+  /// ``serve()`` is still setting up routes.
+  mutable std::mutex server_mutex_;
+  /// ``shared_ptr``, not ``unique_ptr``: ``serve()`` keeps its own strong
+  /// reference for the duration of the blocking ``listen()`` call, so a
+  /// concurrent ``stop()`` that drops the member does NOT destroy the server
+  /// out from under the thread still executing inside it. ``stop()`` unblocks
+  /// ``listen()``; the object then dies when the last reference goes, which is
+  /// whichever of the two finishes second.
+  std::shared_ptr<httplib::Server> server_;
 };
 
 }  // namespace swml

@@ -291,31 +291,49 @@ void AgentServer::run() {
   // set (mirrors Python's SecurityConfig). make_http_server returns an
   // httplib::SSLServer upcast to Server* in that case; otherwise plain HTTP.
   auto tls = server::resolve_tls_config_from_env();
-  server_ = server::make_http_server(tls);
-  if (tls.usable() && !server_->is_valid()) {
-    get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
-                       " key=" + tls.key_path + ")");
-    return;
-  }
-  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
 
-  setup_routes(*server_);
+  // Build + configure under mutex_, then listen() with our OWN strong reference
+  // and the lock released: a concurrent stop() must be able to unblock listen()
+  // without destroying the server we are still inside, and holding the mutex
+  // across the blocking call would deadlock every stop().
+  std::shared_ptr<httplib::Server> srv;
+  size_t agent_count = 0;
+  {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+      get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
+                         " key=" + tls.key_path + ")");
+      server_.reset();
+      return;
+    }
+    server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
+
+    setup_routes(*server_);
+    srv = server_;
+    agent_count = agents_.size();
+  }
 
   get_logger().info("Starting AgentServer on " +
                     std::string(tls.usable() ? "https://" : "http://") + host_ + ":" +
                     std::to_string(port_));
-  get_logger().info("Registered " + std::to_string(agents_.size()) + " agent(s)");
+  get_logger().info("Registered " + std::to_string(agent_count) + " agent(s)");
 
-  if (!server_->listen(host_, port_)) {
+  if (!srv->listen(host_, port_)) {
     get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                        " -- is the port already in use?");
   }
 }
 
 void AgentServer::stop() {
-  if (server_) {
-    server_->stop();
-    server_.reset();
+  // Drop the member under the lock, then stop() outside it (see serve()).
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    srv = std::move(server_);
+  }
+  if (srv) {
+    srv->stop();
   }
 }
 

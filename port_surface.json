@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ da24e23f15d64ae0b61e0be2d7a1c09dcc68a9bb",
+  "generated_from": "signalwire-cpp @ 4875e642abb190b9dba8a9c30eadefdb605f61cd",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1010,6 +1010,10 @@
         "AIPromptText": [
           "contexts"
         ],
+        "AiSidecar": [],
+        "AiSidecarConfig": [
+          "SWAIG"
+        ],
         "AllOfProperty": [
           "allOf"
         ],
@@ -1225,6 +1229,7 @@
         "Request": [],
         "RequestConfig": [],
         "Return": [],
+        "RingbackConfig": [],
         "SIPRefer": [],
         "SMSWithBody": [],
         "SMSWithMedia": [],

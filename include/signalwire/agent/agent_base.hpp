@@ -819,9 +819,9 @@ class AgentBase : public swml::Service {
   // not.
   // ========================================================================
 
-  // NOTE: ``agent_id()`` / ``token_expiry_secs()`` are PUBLIC (above) — the
-  // reference attributes are public, and the oracle's class-B2 rule now
-  // records them.
+  // NOTE: ``agent_id()`` / ``token_expiry_secs()`` are declared PUBLIC (above),
+  // not here — they read configuration that is part of the public API, so
+  // callers may query them directly.
 
   /// reference: ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
   [[nodiscard]] bool auto_answer() const { return auto_answer_; }

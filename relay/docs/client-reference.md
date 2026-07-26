@@ -98,7 +98,7 @@ Register the inbound message handler.
 
 ```cpp
 client.on_message([](const signalwire::relay::Message& message) {
-    std::cout << "SMS from " << message.from << ": " << message.body << "\n";
+    std::cout << "SMS from " << message.from_number << ": " << message.body << "\n";
 });
 ```
 

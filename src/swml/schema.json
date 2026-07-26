@@ -76,6 +76,9 @@
                     "$ref": "#/$defs/LiveTranscribe"
                 },
                 {
+                    "$ref": "#/$defs/AiSidecar"
+                },
+                {
                     "$ref": "#/$defs/LiveTranslate"
                 },
                 {
@@ -572,7 +575,8 @@
                             "examples": [
                                 "busy"
                             ],
-                            "description": "The reason for hanging up the call."
+                            "description": "The reason for hanging up the call.",
+                            "x-sdk-widen": true
                         }
                     },
                     "unevaluatedProperties": {
@@ -727,7 +731,11 @@
                             "examples": [
                                 "female"
                             ],
-                            "description": "The gender to use for the text to speech."
+                            "description": "The gender to use for the text to speech.",
+                            "x-sdk-enum-literal": [
+                                "male",
+                                "female"
+                            ]
                         },
                         "max_digits": {
                             "anyOf": [
@@ -2582,16 +2590,24 @@
                     "description": "Time, in seconds, to set the SIP `Session-Expires` header in INVITE.\nMust be a positive, non-zero number.\nIt has no effect on calls to phone numbers.\nBased on SignalWire settings."
                 },
                 "ringback": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "examples": [
-                        [
-                            "https://example.com/ringback.mp3"
-                        ]
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "examples": [
+                                [
+                                    "https://example.com/ringback.mp3"
+                                ]
+                            ],
+                            "description": "Array of URIs to play as ringback (legacy form)."
+                        },
+                        {
+                            "$ref": "#/$defs/RingbackConfig"
+                        }
                     ],
-                    "description": "Array of URIs to play as ringback tone. If not specified, plays audio from the provider."
+                    "description": "Ringback to play while the far end rings: a legacy array of URIs, or a RingbackConfig object."
                 },
                 "result": {
                     "anyOf": [
@@ -2824,16 +2840,24 @@
                     "description": "Time, in seconds, to set the SIP `Session-Expires` header in INVITE.\nMust be a positive, non-zero number.\nIt has no effect on calls to phone numbers.\nBased on SignalWire settings."
                 },
                 "ringback": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "examples": [
-                        [
-                            "https://example.com/ringback.mp3"
-                        ]
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "examples": [
+                                [
+                                    "https://example.com/ringback.mp3"
+                                ]
+                            ],
+                            "description": "Array of URIs to play as ringback (legacy form)."
+                        },
+                        {
+                            "$ref": "#/$defs/RingbackConfig"
+                        }
                     ],
-                    "description": "Array of URIs to play as ringback tone. If not specified, plays audio from the provider."
+                    "description": "Ringback to play while the far end rings: a legacy array of URIs, or a RingbackConfig object."
                 },
                 "result": {
                     "anyOf": [
@@ -3065,16 +3089,24 @@
                     "description": "Time, in seconds, to set the SIP `Session-Expires` header in INVITE.\nMust be a positive, non-zero number.\nIt has no effect on calls to phone numbers.\nBased on SignalWire settings."
                 },
                 "ringback": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "examples": [
-                        [
-                            "https://example.com/ringback.mp3"
-                        ]
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "examples": [
+                                [
+                                    "https://example.com/ringback.mp3"
+                                ]
+                            ],
+                            "description": "Array of URIs to play as ringback (legacy form)."
+                        },
+                        {
+                            "$ref": "#/$defs/RingbackConfig"
+                        }
                     ],
-                    "description": "Array of URIs to play as ringback tone. If not specified, plays audio from the provider."
+                    "description": "Ringback to play while the far end rings: a legacy array of URIs, or a RingbackConfig object."
                 },
                 "result": {
                     "anyOf": [
@@ -3307,16 +3339,24 @@
                     "description": "Time, in seconds, to set the SIP `Session-Expires` header in INVITE.\nMust be a positive, non-zero number.\nIt has no effect on calls to phone numbers.\nBased on SignalWire settings."
                 },
                 "ringback": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "examples": [
-                        [
-                            "https://example.com/ringback.mp3"
-                        ]
+                    "oneOf": [
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "examples": [
+                                [
+                                    "https://example.com/ringback.mp3"
+                                ]
+                            ],
+                            "description": "Array of URIs to play as ringback (legacy form)."
+                        },
+                        {
+                            "$ref": "#/$defs/RingbackConfig"
+                        }
                     ],
-                    "description": "Array of URIs to play as ringback tone. If not specified, plays audio from the provider."
+                    "description": "Ringback to play while the far end rings: a legacy array of URIs, or a RingbackConfig object."
                 },
                 "result": {
                     "anyOf": [
@@ -4033,7 +4073,11 @@
                     "examples": [
                         "female"
                     ],
-                    "description": "Gender to use for the text to speech."
+                    "description": "Gender to use for the text to speech.",
+                    "x-sdk-enum-literal": [
+                        "male",
+                        "female"
+                    ]
                 },
                 "status_url": {
                     "type": "string",
@@ -4124,7 +4168,11 @@
                     "examples": [
                         "female"
                     ],
-                    "description": "Gender to use for the text to speech."
+                    "description": "Gender to use for the text to speech.",
+                    "x-sdk-enum-literal": [
+                        "male",
+                        "female"
+                    ]
                 },
                 "status_url": {
                     "type": "string",
@@ -8775,8 +8823,8 @@
                             },
                             "examples": [
                                 [
-                                    "един момент",
-                                    "нека проверя"
+                                    "\u0435\u0434\u0438\u043d \u043c\u043e\u043c\u0435\u043d\u0442",
+                                    "\u043d\u0435\u043a\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u044f"
                                 ]
                             ],
                             "description": "Bulgarian"
@@ -8823,8 +8871,8 @@
                             },
                             "examples": [
                                 [
-                                    "请稍等",
-                                    "让我查一下"
+                                    "\u8bf7\u7a0d\u7b49",
+                                    "\u8ba9\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Simplified)"
@@ -8847,8 +8895,8 @@
                             },
                             "examples": [
                                 [
-                                    "请稍等",
-                                    "让我查一下"
+                                    "\u8bf7\u7a0d\u7b49",
+                                    "\u8ba9\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Simplified, China)"
@@ -8871,8 +8919,8 @@
                             },
                             "examples": [
                                 [
-                                    "请稍等",
-                                    "让我查一下"
+                                    "\u8bf7\u7a0d\u7b49",
+                                    "\u8ba9\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Simplified Han)"
@@ -8895,8 +8943,8 @@
                             },
                             "examples": [
                                 [
-                                    "請稍等",
-                                    "讓我查一下"
+                                    "\u8acb\u7a0d\u7b49",
+                                    "\u8b93\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Traditional, Taiwan)"
@@ -8919,8 +8967,8 @@
                             },
                             "examples": [
                                 [
-                                    "請稍等",
-                                    "讓我查一下"
+                                    "\u8acb\u7a0d\u7b49",
+                                    "\u8b93\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Traditional Han)"
@@ -8943,8 +8991,8 @@
                             },
                             "examples": [
                                 [
-                                    "請稍等",
-                                    "讓我查一下"
+                                    "\u8acb\u7a0d\u7b49",
+                                    "\u8b93\u6211\u67e5\u4e00\u4e0b"
                                 ]
                             ],
                             "description": "Chinese (Traditional, Hong Kong)"
@@ -8967,8 +9015,8 @@
                             },
                             "examples": [
                                 [
-                                    "moment prosím",
-                                    "nechte mě zkontrolovat"
+                                    "moment pros\u00edm",
+                                    "nechte m\u011b zkontrolovat"
                                 ]
                             ],
                             "description": "Czech"
@@ -8991,7 +9039,7 @@
                             },
                             "examples": [
                                 [
-                                    "et øjeblik",
+                                    "et \u00f8jeblik",
                                     "lad mig tjekke"
                                 ]
                             ],
@@ -9015,7 +9063,7 @@
                             },
                             "examples": [
                                 [
-                                    "et øjeblik",
+                                    "et \u00f8jeblik",
                                     "lad mig tjekke"
                                 ]
                             ],
@@ -9207,7 +9255,7 @@
                             },
                             "examples": [
                                 [
-                                    "üks hetk",
+                                    "\u00fcks hetk",
                                     "las ma kontrollin"
                                 ]
                             ],
@@ -9280,7 +9328,7 @@
                             "examples": [
                                 [
                                     "un instant",
-                                    "laissez-moi vérifier"
+                                    "laissez-moi v\u00e9rifier"
                                 ]
                             ],
                             "description": "French"
@@ -9304,7 +9352,7 @@
                             "examples": [
                                 [
                                     "un instant",
-                                    "laissez-moi vérifier"
+                                    "laissez-moi v\u00e9rifier"
                                 ]
                             ],
                             "description": "French (Canada)"
@@ -9375,8 +9423,8 @@
                             },
                             "examples": [
                                 [
-                                    "μια στιγμή",
-                                    "επιτρέψτε μου να ελέγξω"
+                                    "\u03bc\u03b9\u03b1 \u03c3\u03c4\u03b9\u03b3\u03bc\u03ae",
+                                    "\u03b5\u03c0\u03b9\u03c4\u03c1\u03ad\u03c8\u03c4\u03b5 \u03bc\u03bf\u03c5 \u03bd\u03b1 \u03b5\u03bb\u03ad\u03b3\u03be\u03c9"
                                 ]
                             ],
                             "description": "Greek"
@@ -9399,8 +9447,8 @@
                             },
                             "examples": [
                                 [
-                                    "एक पल रुकिए",
-                                    "मुझे जांचने दीजिए"
+                                    "\u090f\u0915 \u092a\u0932 \u0930\u0941\u0915\u093f\u090f",
+                                    "\u092e\u0941\u091d\u0947 \u091c\u093e\u0902\u091a\u0928\u0947 \u0926\u0940\u091c\u093f\u090f"
                                 ]
                             ],
                             "description": "Hindi"
@@ -9424,7 +9472,7 @@
                             "examples": [
                                 [
                                     "egy pillanat",
-                                    "hadd ellenőrizzem"
+                                    "hadd ellen\u0151rizzem"
                                 ]
                             ],
                             "description": "Hungarian"
@@ -9495,8 +9543,8 @@
                             },
                             "examples": [
                                 [
-                                    "少々お待ちください",
-                                    "確認いたします"
+                                    "\u5c11\u3005\u304a\u5f85\u3061\u304f\u3060\u3055\u3044",
+                                    "\u78ba\u8a8d\u3044\u305f\u3057\u307e\u3059"
                                 ]
                             ],
                             "description": "Japanese"
@@ -9519,8 +9567,8 @@
                             },
                             "examples": [
                                 [
-                                    "잠시만요",
-                                    "확인해 보겠습니다"
+                                    "\uc7a0\uc2dc\ub9cc\uc694",
+                                    "\ud655\uc778\ud574 \ubcf4\uaca0\uc2b5\ub2c8\ub2e4"
                                 ]
                             ],
                             "description": "Korean"
@@ -9543,8 +9591,8 @@
                             },
                             "examples": [
                                 [
-                                    "잠시만요",
-                                    "확인해 보겠습니다"
+                                    "\uc7a0\uc2dc\ub9cc\uc694",
+                                    "\ud655\uc778\ud574 \ubcf4\uaca0\uc2b5\ub2c8\ub2e4"
                                 ]
                             ],
                             "description": "Korean (South Korea)"
@@ -9567,8 +9615,8 @@
                             },
                             "examples": [
                                 [
-                                    "vienu brīdi",
-                                    "ļaujiet man pārbaudīt"
+                                    "vienu br\u012bdi",
+                                    "\u013caujiet man p\u0101rbaud\u012bt"
                                 ]
                             ],
                             "description": "Latvian"
@@ -9591,7 +9639,7 @@
                             },
                             "examples": [
                                 [
-                                    "vieną akimirką",
+                                    "vien\u0105 akimirk\u0105",
                                     "leiskite patikrinti"
                                 ]
                             ],
@@ -9663,7 +9711,7 @@
                             },
                             "examples": [
                                 [
-                                    "et øyeblikk",
+                                    "et \u00f8yeblikk",
                                     "la meg sjekke"
                                 ]
                             ],
@@ -9687,8 +9735,8 @@
                             },
                             "examples": [
                                 [
-                                    "chwileczkę",
-                                    "pozwól mi sprawdzić"
+                                    "chwileczk\u0119",
+                                    "pozw\u00f3l mi sprawdzi\u0107"
                                 ]
                             ],
                             "description": "Polish"
@@ -9784,7 +9832,7 @@
                             "examples": [
                                 [
                                     "un moment",
-                                    "să verific"
+                                    "s\u0103 verific"
                                 ]
                             ],
                             "description": "Romanian"
@@ -9807,8 +9855,8 @@
                             },
                             "examples": [
                                 [
-                                    "одну минуту",
-                                    "позвольте проверить"
+                                    "\u043e\u0434\u043d\u0443 \u043c\u0438\u043d\u0443\u0442\u0443",
+                                    "\u043f\u043e\u0437\u0432\u043e\u043b\u044c\u0442\u0435 \u043f\u0440\u043e\u0432\u0435\u0440\u0438\u0442\u044c"
                                 ]
                             ],
                             "description": "Russian"
@@ -9831,8 +9879,8 @@
                             },
                             "examples": [
                                 [
-                                    "moment prosím",
-                                    "dovoľte mi skontrolovať"
+                                    "moment pros\u00edm",
+                                    "dovo\u013ete mi skontrolova\u0165"
                                 ]
                             ],
                             "description": "Slovak"
@@ -9856,7 +9904,7 @@
                             "examples": [
                                 [
                                     "un momento",
-                                    "déjame verificar"
+                                    "d\u00e9jame verificar"
                                 ]
                             ],
                             "description": "Spanish"
@@ -9880,7 +9928,7 @@
                             "examples": [
                                 [
                                     "un momento",
-                                    "déjame verificar"
+                                    "d\u00e9jame verificar"
                                 ]
                             ],
                             "description": "Spanish (Latin America)"
@@ -9903,8 +9951,8 @@
                             },
                             "examples": [
                                 [
-                                    "ett ögonblick",
-                                    "låt mig kolla"
+                                    "ett \u00f6gonblick",
+                                    "l\u00e5t mig kolla"
                                 ]
                             ],
                             "description": "Swedish"
@@ -9927,8 +9975,8 @@
                             },
                             "examples": [
                                 [
-                                    "ett ögonblick",
-                                    "låt mig kolla"
+                                    "ett \u00f6gonblick",
+                                    "l\u00e5t mig kolla"
                                 ]
                             ],
                             "description": "Swedish (Sweden)"
@@ -9951,8 +9999,8 @@
                             },
                             "examples": [
                                 [
-                                    "สักครู่",
-                                    "ให้ผมตรวจสอบ"
+                                    "\u0e2a\u0e31\u0e01\u0e04\u0e23\u0e39\u0e48",
+                                    "\u0e43\u0e2b\u0e49\u0e1c\u0e21\u0e15\u0e23\u0e27\u0e08\u0e2a\u0e2d\u0e1a"
                                 ]
                             ],
                             "description": "Thai"
@@ -9975,8 +10023,8 @@
                             },
                             "examples": [
                                 [
-                                    "สักครู่",
-                                    "ให้ผมตรวจสอบ"
+                                    "\u0e2a\u0e31\u0e01\u0e04\u0e23\u0e39\u0e48",
+                                    "\u0e43\u0e2b\u0e49\u0e1c\u0e21\u0e15\u0e23\u0e27\u0e08\u0e2a\u0e2d\u0e1a"
                                 ]
                             ],
                             "description": "Thai (Thailand)"
@@ -10023,8 +10071,8 @@
                             },
                             "examples": [
                                 [
-                                    "одну хвилину",
-                                    "дозвольте перевірити"
+                                    "\u043e\u0434\u043d\u0443 \u0445\u0432\u0438\u043b\u0438\u043d\u0443",
+                                    "\u0434\u043e\u0437\u0432\u043e\u043b\u044c\u0442\u0435 \u043f\u0435\u0440\u0435\u0432\u0456\u0440\u0438\u0442\u0438"
                                 ]
                             ],
                             "description": "Ukrainian"
@@ -10047,8 +10095,8 @@
                             },
                             "examples": [
                                 [
-                                    "xin chờ một chút",
-                                    "để tôi kiểm tra"
+                                    "xin ch\u1edd m\u1ed9t ch\u00fat",
+                                    "\u0111\u1ec3 t\u00f4i ki\u1ec3m tra"
                                 ]
                             ],
                             "description": "Vietnamese"
@@ -12245,6 +12293,159 @@
                 "not": {}
             },
             "title": "UserInputAction object"
+        },
+        "AiSidecar": {
+            "type": "object",
+            "properties": {
+                "ai_sidecar": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "not": {
+                                        "required": [
+                                            "file"
+                                        ]
+                                    },
+                                    "description": "POM object passed through to mod_openai's prompt resolver."
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "file": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "file"
+                                    ]
+                                }
+                            ],
+                            "description": "Operator prompt \u2014 POM object, plain string, or {file: path}."
+                        },
+                        "lang": {
+                            "type": "string",
+                            "description": "BCP-47 conversation language. Required."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "LLM model for sidecar tick + close-time summaries."
+                        },
+                        "direction": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "remote-caller",
+                                    "local-caller"
+                                ]
+                            },
+                            "minItems": 2,
+                            "uniqueItems": true,
+                            "description": "Both legs are required for sidecar mode."
+                        },
+                        "customer_role": {
+                            "type": "string",
+                            "enum": [
+                                "remote-caller",
+                                "local-caller"
+                            ],
+                            "description": "Which leg is the customer (turn-end trigger source)."
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "Webhook URL for transcribe events AND sidecar events."
+                        },
+                        "SWAIG": {
+                            "$ref": "#/$defs/SWAIG",
+                            "description": "SWAIG functions and MCP servers."
+                        },
+                        "permissions": {
+                            "type": "object",
+                            "description": "SWAIG permission overrides \u2014 pass-through to mod_openai.",
+                            "additionalProperties": true
+                        },
+                        "global_data": {
+                            "type": "object",
+                            "description": "Initial sidecar global_data.",
+                            "additionalProperties": true
+                        },
+                        "hints": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "Speech-recognition hints biasing ASR toward specific terms."
+                        },
+                        "params": {
+                            "type": "object",
+                            "description": "Tunable knobs (idle_timeout_ms, ai_summary, etc.) \u2014 pass-through to mod_openai which validates them strictly. New tunables only land here.",
+                            "additionalProperties": true
+                        },
+                        "action": {
+                            "description": "Reserved for future runtime sub-actions."
+                        }
+                    },
+                    "required": [
+                        "prompt",
+                        "lang"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Start ai_sidecar mode \u2014 live_transcribe with an LLM/SWAIG/MCP loop on top.",
+                    "title": "ai_sidecar"
+                }
+            },
+            "required": [
+                "ai_sidecar"
+            ],
+            "additionalProperties": false,
+            "title": "AiSidecar object"
+        },
+        "RingbackConfig": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                },
+                "urls": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "volume": {
+                    "type": "number"
+                },
+                "auto_answer": {
+                    "type": "boolean"
+                },
+                "say_voice": {
+                    "type": "string"
+                },
+                "say_language": {
+                    "type": "string"
+                },
+                "say_gender": {
+                    "type": "string",
+                    "x-sdk-enum-literal": [
+                        "male",
+                        "female"
+                    ]
+                },
+                "status_url": {
+                    "type": "string"
+                },
+                "loop": {
+                    "type": "integer"
+                }
+            },
+            "additionalProperties": false,
+            "description": "Ringback configuration (the modern object form). Declared as a named $defs entry so every generator emits a TYPED shape via $ref rather than collapsing an inline object to an untyped map; the legacy URI array remains the other oneOf branch."
         }
     }
 }

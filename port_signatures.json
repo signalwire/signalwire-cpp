@@ -10694,6 +10694,28 @@
             }
           }
         },
+        "AiSidecarConfig": {
+          "methods": {
+            "SWAIG": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            }
+          }
+        },
         "AllOfProperty": {
           "methods": {
             "__init__": {
@@ -11109,6 +11131,15 @@
               ],
               "returns": "any"
             },
+            "ringback": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "serial": {
               "params": [
                 {
@@ -11248,6 +11279,15 @@
               ],
               "returns": "any"
             },
+            "ringback": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "session_timeout": {
               "params": [
                 {
@@ -11352,6 +11392,15 @@
               "returns": "any"
             },
             "result": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "ringback": {
               "params": [
                 {
                   "name": "self",
@@ -11481,6 +11530,15 @@
               ],
               "returns": "any"
             },
+            "ringback": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "serial_parallel": {
               "params": [
                 {
@@ -11594,6 +11652,15 @@
               "returns": "any"
             },
             "result": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "ringback": {
               "params": [
                 {
                   "name": "self",

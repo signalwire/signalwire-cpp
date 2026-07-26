@@ -266,9 +266,11 @@ class Service {
   // SWAIG tool registry (lifted from AgentBase)
   // ========================================================================
 
-  /// Define a SWAIG function the AI can call.
+  /// Define a SWAIG function the AI can call. ``secure`` defaults to TRUE
+  /// (reference: ``tool_mixin.define_tool(secure=True)``) — a tool defined
+  /// without an explicit ``secure`` requires SWAIG token validation.
   Service& define_tool(const std::string& name, const std::string& description,
-                       const json& parameters, swaig::ToolHandler handler, bool secure = false);
+                       const json& parameters, swaig::ToolHandler handler, bool secure = true);
   Service& define_tool(const swaig::ToolDefinition& tool);
 
   /// Register a raw SWAIG function definition (e.g. DataMap tools).

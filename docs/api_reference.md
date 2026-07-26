@@ -481,7 +481,7 @@ signalwire::agent::AgentBase& define_tool(const std::string& name,
                        const std::string& description,
                        const json& parameters,
                        signalwire::swaig::ToolHandler handler,
-                       bool secure = false);
+                       bool secure = true);
 
 // Overload taking a fully-built ToolDefinition
 signalwire::agent::AgentBase& define_tool(const signalwire::swaig::ToolDefinition& tool);
@@ -493,7 +493,7 @@ Define a custom SWAIG function/tool. The handler is a `swaig::ToolHandler`, whic
 - `description` (`std::string`): Function description for the AI (prompt engineering — it tells the model WHEN to call the tool)
 - `parameters` (`json`): JSON-Schema object for function parameters
 - `handler` (`swaig::ToolHandler`): Callable executed when the tool is invoked
-- `secure` (`bool`): Require a valid per-call security token (default: `false`)
+- `secure` (`bool`): Require a valid per-call security token (default: `true`)
 
 **Usage:**
 ```cpp
@@ -2914,7 +2914,7 @@ struct ToolDefinition {
     std::string description;   // Function description
     json parameters;           // JSON schema for parameters
     signalwire::swaig::ToolHandler handler;// Lambda invoked when the function is called
-    bool secure = false;       // Require request signing
+    bool secure = true;        // Require a valid per-call security token (default)
 
     // Render to the SWAIG function JSON format (for inclusion in SWML)
     json to_swaig_json(const std::string& web_hook_url = "") const;

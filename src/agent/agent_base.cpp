@@ -469,10 +469,11 @@ swaig::FunctionResult AgentBase::on_function_call(const std::string& name, const
   }
   // Per-tool secure-token validation runs in the dispatcher
   // (handle_swaig_request) before this function is reached: it checks
-  // ToolDefinition.secure, reads meta_data_token + call_id from the SWAIG
-  // body, and calls session_manager_.validate_token before invoking the
-  // handler. on_function_call is the post-validation dispatch hook —
-  // overrides should keep this contract.
+  // ToolDefinition.secure, reads the ``__token`` query parameter (the value
+  // build_swaig_functions minted onto this tool's web_hook_url) plus call_id
+  // from the SWAIG body, and calls session_manager_.validate_token before
+  // invoking the handler. on_function_call is the post-validation dispatch
+  // hook — overrides should keep this contract.
   return it->second.handler(args, raw_data);
 }
 
@@ -1485,17 +1486,28 @@ std::string AgentBase::get_full_url(bool include_auth) const {
   return url;
 }
 
-json AgentBase::build_swaig_functions(const std::string& webhook_url) const {
+json AgentBase::build_swaig_functions(const std::string& webhook_url,
+                                      const std::string& call_id) const {
   json functions = json::array();
 
   for (const auto& name : tool_order_) {
     auto it = tools_.find(name);
     if (it != tools_.end()) {
-      json func = it->second.to_swaig_json(webhook_url);
-      if (it->second.secure) {
-        func["secure"] = true;
+      // A SECURE tool rendered with an active call_id carries a per-tool
+      // security token on its webhook (reference agent_base.py:1040/1096-1100:
+      // ``if func.secure and call_id: url_params["__token"] = token``). This
+      // ``__token=`` query parameter IS the wire manifestation of ``secure`` —
+      // the platform presents it on the callback and the /swaig dispatcher
+      // validates it. An INSECURE tool gets no token.
+      std::string url = webhook_url;
+      if (it->second.secure && !call_id.empty()) {
+        std::string token = session_manager_.create_tool_token(name, call_id);
+        if (!token.empty()) {
+          url += (url.find('?') == std::string::npos ? "?" : "&");
+          url += "__token=" + signalwire::url_encode(token);
+        }
       }
-      functions.push_back(func);
+      functions.push_back(it->second.to_swaig_json(url));
     }
   }
 
@@ -1507,7 +1519,7 @@ json AgentBase::build_swaig_functions(const std::string& webhook_url) const {
   return functions;
 }
 
-json AgentBase::build_ai_verb(const std::string& webhook_url) const {
+json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string& call_id) const {
   json ai;
 
   // Prompt
@@ -1581,7 +1593,7 @@ json AgentBase::build_ai_verb(const std::string& webhook_url) const {
   if (default_webhook_url_.has_value() && !default_webhook_url_->empty()) {
     swaig_section["defaults"] = json::object({{"web_hook_url", *default_webhook_url_}});
   }
-  json functions = build_swaig_functions(webhook_url);
+  json functions = build_swaig_functions(webhook_url, call_id);
   if (!functions.empty()) {
     swaig_section["functions"] = functions;
   }
@@ -1631,14 +1643,25 @@ json AgentBase::render_swml() const {
 json AgentBase::render_swml_for_request(const std::map<std::string, std::string>& query_params,
                                         const json& body_params,
                                         const std::map<std::string, std::string>& headers) const {
+  // The request's ``call_id`` query parameter drives per-tool security-token
+  // minting (reference swml_service.py:807 —
+  // ``call_id = request.query_params.get("call_id")`` → ``_render_swml(call_id)``).
+  // Absent a call_id there is no call to scope a token to, so secure tools
+  // render with the bare webhook.
+  std::string call_id;
+  auto cid = query_params.find("call_id");
+  if (cid != query_params.end()) {
+    call_id = cid->second;
+  }
+
   // If dynamic config callback is set, use cloned agent
   if (dynamic_config_callback_) {
     auto copy = clone();
     dynamic_config_callback_(query_params, body_params, headers, *copy);
-    return copy->render_swml_internal(headers);
+    return copy->render_swml_internal(headers, call_id);
   }
 
-  return render_swml_internal(headers);
+  return render_swml_internal(headers, call_id);
 }
 
 // ---------------------------------------------------------------------------
@@ -1666,6 +1689,63 @@ std::string agent_header_lookup(const std::map<std::string, std::string>& header
     }
   }
   return "";
+}
+
+/// Percent-decode one query-string component (``%XX`` escapes and ``+`` as a
+/// space). File-local: the public surface has ``url_encode`` only, and a decoder
+/// is needed solely by the query parsing below.
+std::string agent_percent_decode(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (s[i] == '+') {
+      out += ' ';
+    } else if (s[i] == '%' && i + 2 < s.size() &&
+               std::isxdigit(static_cast<unsigned char>(s[i + 1])) &&
+               std::isxdigit(static_cast<unsigned char>(s[i + 2]))) {
+      out += static_cast<char>(std::stoi(s.substr(i + 1, 2), nullptr, 16));
+      i += 2;
+    } else {
+      out += s[i];
+    }
+  }
+  return out;
+}
+
+/// Parse a URL's query string into a key->value map (percent-decoded), so the
+/// framework-free dispatch surface sees the same query parameters the served
+/// path does — notably ``call_id``, which drives per-tool security-token
+/// minting on the render path.
+std::map<std::string, std::string> agent_query_from_url(const std::string& url) {
+  std::map<std::string, std::string> out;
+  auto q = url.find('?');
+  if (q == std::string::npos) {
+    return out;
+  }
+  std::string query = url.substr(q + 1);
+  auto frag = query.find('#');
+  if (frag != std::string::npos) {
+    query = query.substr(0, frag);
+  }
+  size_t pos = 0;
+  while (pos <= query.size()) {
+    auto amp = query.find('&', pos);
+    std::string pair =
+        (amp == std::string::npos) ? query.substr(pos) : query.substr(pos, amp - pos);
+    if (!pair.empty()) {
+      auto eq = pair.find('=');
+      if (eq == std::string::npos) {
+        out[agent_percent_decode(pair)] = "";
+      } else {
+        out[agent_percent_decode(pair.substr(0, eq))] = agent_percent_decode(pair.substr(eq + 1));
+      }
+    }
+    if (amp == std::string::npos) {
+      break;
+    }
+    pos = amp + 1;
+  }
+  return out;
 }
 
 std::string agent_path_from_url(const std::string& url) {
@@ -1728,14 +1808,16 @@ std::tuple<int, std::map<std::string, std::string>, std::string> AgentBase::hand
     }
   }
 
-  // Render SWML via AgentBase's request-aware path (empty query params, the
-  // parsed body as body params, the request headers for proxy detection).
-  json swml = render_swml_for_request({}, request_body, headers);
+  // Render SWML via AgentBase's request-aware path. The URL's query string is
+  // parsed and passed through — ``call_id`` there drives per-tool
+  // security-token minting (reference swml_service.py:807).
+  json swml = render_swml_for_request(agent_query_from_url(url), request_body, headers);
   return {200, {}, swml.dump()};
 }
 
 // Private helper to actually render
-json AgentBase::render_swml_internal(const std::map<std::string, std::string>& headers) const {
+json AgentBase::render_swml_internal(const std::map<std::string, std::string>& headers,
+                                     const std::string& call_id) const {
   std::string base_url = detect_proxy_url(headers);
   std::string webhook_url = build_webhook_url(base_url);
 
@@ -1769,7 +1851,7 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
   }
 
   // Phase 4: AI verb
-  json ai_verb = build_ai_verb(webhook_url);
+  json ai_verb = build_ai_verb(webhook_url, call_id);
   doc.main().add_verb("ai", ai_verb);
 
   // Phase 5: Post-AI verbs
@@ -1927,10 +2009,20 @@ void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Respo
     args = body["argument"]["parsed"][0];
   }
 
-  // Check secure token if tool is secure
+  // Check the security token if the tool is secure. The token travels on the
+  // QUERY STRING as ``__token`` (with ``token`` accepted as the reference's
+  // fallback spelling) — reference agent_base.py:1414
+  // ``request.query_params.get("__token") or request.query_params.get("token")``.
+  // It is the same value build_swaig_functions appended to this tool's
+  // ``web_hook_url`` at render time. (``meta_data_token`` is a DIFFERENT wire
+  // field: the SWML ``UserSWAIGFunction`` meta_data SCOPING token, not a
+  // credential — reading it here validated the wrong value.)
   auto tool_it = tools_.find(func_name);
   if (tool_it != tools_.end() && tool_it->second.secure) {
-    std::string token = body.value("meta_data_token", "");
+    std::string token = req.get_param_value("__token");
+    if (token.empty()) {
+      token = req.get_param_value("token");
+    }
     std::string call_id = body.value("call_id", "");
     if (!session_manager_.validate_token(token, func_name, call_id)) {
       res.status = 403;

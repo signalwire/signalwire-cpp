@@ -183,25 +183,69 @@ TEST(tool_swaig_functions_in_swml) {
     return true;
 }
 
-TEST(tool_secure_tool_in_swml) {
+// Locate the single rendered SWAIG function entry in a rendered SWML document.
+static json swaig_only_function(const json& swml) {
+    const auto& main = swml["sections"]["main"];
+    for (const auto& verb : main) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG") &&
+            verb["ai"]["SWAIG"].contains("functions")) {
+            const auto& funcs = verb["ai"]["SWAIG"]["functions"];
+            if (funcs.size() == 1u) {
+                return funcs[0];
+            }
+        }
+    }
+    return json();
+}
+
+// A tool defined WITHOUT an explicit secure argument is SECURE (the A1 default),
+// and rendering with a call_id puts the per-tool ``__token`` on its webhook —
+// the wire manifestation of secure. ``secure`` itself is never emitted as a
+// function property (not in the SWML schema, not in the reference).
+TEST(tool_secure_tool_in_swml_carries_token) {
     AgentBase agent;
     agent.set_auth("u", "p");
     agent.define_tool("secure_tool", "Secure", json::object(),
-        [](const json&, const json&) { return FunctionResult("ok"); },
-        true /* secure */);
+        [](const json&, const json&) { return FunctionResult("ok"); });
 
-    json swml = agent.render_swml();
-    auto& main = swml["sections"]["main"];
-    for (const auto& verb : main) {
-        if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
-            auto& funcs = verb["ai"]["SWAIG"]["functions"];
-            ASSERT_EQ(funcs.size(), 1u);
-            ASSERT_TRUE(funcs[0].contains("secure"));
-            ASSERT_EQ(funcs[0]["secure"].get<bool>(), true);
-            return true;
-        }
-    }
-    ASSERT_TRUE(false);
+    const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
+    json fn = swaig_only_function(agent.render_swml_for_request(query, json::object(), {}));
+    ASSERT_FALSE(fn.is_null());
+    ASSERT_FALSE(fn.contains("secure"));
+    ASSERT_TRUE(fn.contains("web_hook_url"));
+    ASSERT_TRUE(fn["web_hook_url"].get<std::string>().find("__token=") != std::string::npos);
+    return true;
+}
+
+// The other direction: an explicitly INSECURE tool gets NO token, so a port
+// cannot blindly tokenize every function.
+TEST(tool_insecure_tool_in_swml_has_no_token) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.define_tool("open_tool", "Insecure", json::object(),
+        [](const json&, const json&) { return FunctionResult("ok"); },
+        false /* secure */);
+
+    const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
+    json fn = swaig_only_function(agent.render_swml_for_request(query, json::object(), {}));
+    ASSERT_FALSE(fn.is_null());
+    ASSERT_TRUE(fn.contains("web_hook_url"));
+    ASSERT_TRUE(fn["web_hook_url"].get<std::string>().find("__token=") == std::string::npos);
+    return true;
+}
+
+// No call_id = no call to scope a token to, so even a secure tool renders bare
+// (mirrors the reference's ``if func.secure and call_id`` guard).
+TEST(tool_secure_tool_without_call_id_has_no_token) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.define_tool("secure_tool", "Secure", json::object(),
+        [](const json&, const json&) { return FunctionResult("ok"); });
+
+    json fn = swaig_only_function(agent.render_swml());
+    ASSERT_FALSE(fn.is_null());
+    ASSERT_TRUE(fn.contains("web_hook_url"));
+    ASSERT_TRUE(fn["web_hook_url"].get<std::string>().find("__token=") == std::string::npos);
     return true;
 }
 

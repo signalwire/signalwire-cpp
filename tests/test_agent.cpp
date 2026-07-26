@@ -741,6 +741,41 @@ TEST(agent_validate_tool_token_rejects_wrong_call_id) {
     return true;
 }
 
+// The token the RENDER puts on the wire must be the token the VALIDATOR
+// accepts. Without this the two halves can drift (a minted-but-unvalidatable
+// token, or a validator reading a different wire field) and every secure tool
+// would 403 in production while the render looked correct.
+TEST(agent_rendered_token_validates_end_to_end) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.define_tool("secure_tool", "t", json::object(),
+        [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
+
+    const std::map<std::string, std::string> query = {{"call_id", "call_xyz"}};
+    json swml = agent.render_swml_for_request(query, json::object(), {});
+
+    // Pull the __token the render minted onto the webhook.
+    std::string url;
+    for (const auto& verb : swml["sections"]["main"]) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG") &&
+            verb["ai"]["SWAIG"].contains("functions")) {
+            url = verb["ai"]["SWAIG"]["functions"][0]["web_hook_url"].get<std::string>();
+        }
+    }
+    auto at = url.find("__token=");
+    ASSERT_TRUE(at != std::string::npos);
+    std::string token = url.substr(at + 8);
+    auto amp = token.find('&');
+    if (amp != std::string::npos) {
+        token = token.substr(0, amp);
+    }
+
+    // That exact value must validate for this tool + call_id, and not for another.
+    ASSERT_TRUE(agent.validate_tool_token("secure_tool", token, "call_xyz"));
+    ASSERT_FALSE(agent.validate_tool_token("secure_tool", token, "other_call"));
+    return true;
+}
+
 // ========================================================================
 // Behavior parity bundle (#190/#191/#185/#182) regression tests
 // ========================================================================

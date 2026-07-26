@@ -139,11 +139,13 @@ class SkillBase {
   // Helpers
   // ========================================================================
 
-  /// Define a tool (convenience for register_tools implementations)
+  /// Define a tool (convenience for register_tools implementations).
+  /// ``secure`` defaults to TRUE — the reference's ``SkillBase.define_tool``
+  /// delegates to ``agent.define_tool``, whose default is ``secure=True``.
   [[nodiscard]] swaig::ToolDefinition define_tool(const std::string& name,
                                                   const std::string& description,
                                                   const json& parameters,
-                                                  swaig::ToolHandler handler, bool secure = false) {
+                                                  swaig::ToolHandler handler, bool secure = true) {
     swaig::ToolDefinition td;
     td.name = name;
     td.description = description;

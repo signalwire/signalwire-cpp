@@ -224,7 +224,7 @@ A vague description is the #1 cause of "the model has the right tool but doesn't
 
 ### Defining a Tool
 
-Register a tool with `define_tool(name, description, parameters, handler, secure = false)`. The `parameters` argument is a JSON-Schema object. The handler is a `swaig::ToolHandler`, which is `std::function<swaig::FunctionResult(const json& args, const json& raw_data)>`:
+Register a tool with `define_tool(name, description, parameters, handler, secure = true)`. The `parameters` argument is a JSON-Schema object. The handler is a `swaig::ToolHandler`, which is `std::function<swaig::FunctionResult(const json& args, const json& raw_data)>`:
 
 ```cpp
 agent.define_tool("get_weather", "Get the current weather for a location",
@@ -324,7 +324,7 @@ agent.add_function_include({
 
 ### SWAIG Function Security
 
-SWAIG functions can be secured with a per-call token mechanism. Pass `secure = true` as the final argument to `define_tool(...)` for functions that should require a valid token:
+SWAIG functions are secured with a per-call token mechanism, and `secure` DEFAULTS to `true` — a tool defined without an explicit `secure` argument requires a valid token. Pass `secure = false` explicitly to opt a function OUT:
 
 ```cpp
 agent.define_tool("get_account_details", "Get customer account details",
@@ -944,7 +944,7 @@ AgentBase(const std::string& name = "agent",
 
 ### SWAIG / Tool Methods
 
-- `define_tool(name, description, parameters, handler, secure = false)`
+- `define_tool(name, description, parameters, handler, secure = true)`
 - `define_tool(const swaig::ToolDefinition&)`
 - `register_swaig_function(json)`
 - `list_tools()`

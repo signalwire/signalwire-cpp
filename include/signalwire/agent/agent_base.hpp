@@ -313,8 +313,11 @@ class AgentBase : public swml::Service {
   // reference. on_function_call is overridden to add session-token
   // validation.
   AgentBase& define_tool(const swaig::ToolDefinition& tool);
+  /// ``secure`` defaults to TRUE (reference: ``tool_mixin.define_tool(
+  /// secure=True)``) — a tool defined without an explicit ``secure`` requires
+  /// SWAIG token validation.
   AgentBase& define_tool(const std::string& name, const std::string& description,
-                         const json& parameters, swaig::ToolHandler handler, bool secure = false);
+                         const json& parameters, swaig::ToolHandler handler, bool secure = true);
   AgentBase& register_swaig_function(const json& func_def);
   [[nodiscard]] swaig::FunctionResult on_function_call(const std::string& name, const json& args,
                                                        const json& raw_data) override;
@@ -686,11 +689,21 @@ class AgentBase : public swml::Service {
   [[nodiscard]] std::string detect_proxy_url(
       const std::map<std::string, std::string>& headers) const;
 
-  // Build the AI verb JSON
-  [[nodiscard]] json build_ai_verb(const std::string& webhook_url) const;
+  // Build the AI verb JSON. ``call_id``, when non-empty, mints the per-tool
+  // security ``__token`` on each SECURE tool's webhook (see
+  // build_swaig_functions). NOT defaulted on purpose: a defaulted call_id
+  // silently renders every secure tool WITHOUT its token at any call site that
+  // forgets to thread it, which is exactly the security regression the
+  // SECURE-DEFAULT gate exists to catch. Make omission a compile error.
+  [[nodiscard]] json build_ai_verb(const std::string& webhook_url,
+                                   const std::string& call_id) const;
 
-  // Build SWAIG functions array
-  [[nodiscard]] json build_swaig_functions(const std::string& webhook_url) const;
+  // Build SWAIG functions array. A SECURE tool rendered with a non-empty
+  // ``call_id`` carries a per-tool ``__token=`` on its ``web_hook_url`` — the
+  // wire manifestation of ``secure`` (reference agent_base.py:1040/1096-1100).
+  // ``call_id`` is not defaulted; see build_ai_verb.
+  [[nodiscard]] json build_swaig_functions(const std::string& webhook_url,
+                                           const std::string& call_id) const;
 
   // Build the prompt
   [[nodiscard]] json build_prompt() const;
@@ -717,8 +730,12 @@ class AgentBase : public swml::Service {
   // Add security headers
   static void add_security_headers(httplib::Response& res);
 
-  // Internal SWML rendering (used by render_swml_for_request)
-  [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers) const;
+  // Internal SWML rendering (used by render_swml_for_request). ``call_id`` is
+  // the request's ``call_id`` query parameter (reference
+  // swml_service.py:807 → ``_render_swml(call_id)``); when non-empty every
+  // SECURE tool's rendered webhook carries its per-tool ``__token``.
+  [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers,
+                                          const std::string& call_id) const;
 
   /// Post-render transform hook. Called on the fully-rendered SWML document
   /// just before it is returned, so a subclass can rewrite it (e.g. BedrockAgent

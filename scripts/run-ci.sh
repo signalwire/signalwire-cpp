@@ -255,14 +255,15 @@ test_gate() {
             # "dump did not emit valid JSON".
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump \
-                pagination_dump relay_liveness_dump ai_chat_dump -j"$(sw_build_jobs)" || return 1
+                pagination_dump relay_liveness_dump ai_chat_dump \
+                secure_default_dump secret_scrub_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -271,7 +272,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -542,9 +543,13 @@ run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-T
 # spelling BEHAVIORAL-WIRE-RELAY. The suite drives cpp's dump binaries (built in
 # the TEST gate) + the mock-backed REST-COVERAGE/SPEC-PARITY/DOC-WIRE via cpp's
 # BUILD_MODE routing internally.
-run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY)" \
+# SECURE-DEFAULT (A1 / PSDK-4a) rides the per-PR behavioral pass: it drives
+# build/secure_default_dump and proves define_tool defaults secure=TRUE and that
+# the wire reflects it (the per-tool __token on the rendered webhook). Without it
+# a regression that silently ships every tool unauthenticated goes undetected.
+run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY/SECURE-DEFAULT)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE
+        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE,SECURE-DEFAULT
 
 # BEHAVIORAL-NIGHTLY: the timing-sensitive connection-liveness dumps.
 # WAIT-LIVENESS (Action::wait() blocks-until-event) + RELAY-LIVENESS (the broader
@@ -552,9 +557,14 @@ run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKI
 # black-hole / F3 reconnect / max-active-calls). Both spawn a real dump binary
 # (built by the TEST gate) and compare its per-fixture classification to the
 # python golden. tier=nightly (defer=1).
-run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS)" --tier=nightly \
+# SECRET-SCRUB-LIVE (PSDK-5) rides this nightly pass: it drives
+# build/secret_scrub_dump through a real RELAY connect + an inbound
+# authorization.state re-auth frame at debug level with the fixture sentinels and
+# proves none reach the log. nightly by design (it needs a live debug-level relay
+# drive) -- the static SECRET-SCRUB grep is the per-PR leg.
+run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS/SECRET-SCRUB-LIVE)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules WAIT-LIVENESS,RELAY-LIVENESS
+        --rules WAIT-LIVENESS,RELAY-LIVENESS,SECRET-SCRUB-LIVE
 
 # DOC-TRUTH (one markdown walk): DOC-AUDIT/DOC-LINKS/DOC-LANG-PURITY/DOC-ENV/
 # COUNT-CLAIM/ACCESSOR-TRUTH/STATUS-CLAIM/README-INCLUDE.

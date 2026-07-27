@@ -41,11 +41,15 @@ std::string drop_xpath_elements(const std::string& html, const std::vector<std::
     }
     // <tag ...> ... </tag>  (non-greedy body, case-insensitive), plus the
     // self-closing / unpaired form so a stray "<noscript/>" also goes.
-    const std::regex paired("<" + tag + R"((\s[^>]*)?>[\s\S]*?</)" + tag + R"(\s*>)",
-                            std::regex::icase);
-    out = std::regex_replace(out, paired, " ");
-    const std::regex selfclosing("<" + tag + R"((\s[^>]*)?/>)", std::regex::icase);
-    out = std::regex_replace(out, selfclosing, " ");
+    std::string pat;
+    pat.reserve(tag.size() * 2 + 32);
+    pat.append("<").append(tag).append(R"((\s[^>]*)?>[\s\S]*?</)").append(tag).append(R"(\s*>)");
+    out = std::regex_replace(out, std::regex(pat, std::regex::icase), " ");
+
+    std::string self_pat;
+    self_pat.reserve(tag.size() + 20);
+    self_pat.append("<").append(tag).append(R"((\s[^>]*)?/>)");
+    out = std::regex_replace(out, std::regex(self_pat, std::regex::icase), " ");
   }
   return out;
 }
@@ -118,10 +122,11 @@ class SpiderSkill : public SkillBase {
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::string prefix = get_param<std::string>(params_, "prefix", "");
     std::vector<swaig::ToolDefinition> tools;
-    // Captured BY VALUE into the tool handlers: a ToolDefinition outlives the
-    // skill instance that registered it (the agent owns the registry), so
-    // capturing ``this`` would dangle.
-    const std::vector<std::string> remove_xpaths = remove_xpaths_;
+    // shared_ptr, not a by-value vector: the capture must be nothrow-copyable
+    // (clang-tidy bugprone-exception-escape flags a handler whose CAPTURE can
+    // throw on copy), and a ToolDefinition outlives the skill instance that
+    // registered it, so capturing ``this`` would dangle.
+    const auto remove_xpaths = std::make_shared<const std::vector<std::string>>(remove_xpaths_);
 
     tools.push_back(define_tool(
         prefix + "scrape_url", "Scrape content from a URL",
@@ -155,15 +160,15 @@ class SpiderSkill : public SkillBase {
             try {
               json parsed = json::parse(resp.body);
               if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
-                text = strip_html(parsed["_raw_html"].get<std::string>(), remove_xpaths);
+                text = strip_html(parsed["_raw_html"].get<std::string>(), *remove_xpaths);
               } else {
-                text = strip_html(resp.body, remove_xpaths);
+                text = strip_html(resp.body, *remove_xpaths);
               }
             } catch (...) {
-              text = strip_html(resp.body, remove_xpaths);
+              text = strip_html(resp.body, *remove_xpaths);
             }
           } else {
-            text = strip_html(resp.body, remove_xpaths);
+            text = strip_html(resp.body, *remove_xpaths);
           }
 
           std::ostringstream out;
@@ -196,7 +201,7 @@ class SpiderSkill : public SkillBase {
           if (resp.status == 0) {
             return swaig::FunctionResult("Spider transport error: " + resp.error);
           }
-          std::string text = strip_html(resp.body, remove_xpaths);
+          std::string text = strip_html(resp.body, *remove_xpaths);
           return swaig::FunctionResult("Crawl page " + effective + ":\n" + text);
         }));
 

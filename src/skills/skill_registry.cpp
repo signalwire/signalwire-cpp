@@ -537,11 +537,15 @@ class SpiderSkillR : public SkillBase {
               std::string::npos) {
         continue;
       }
-      const std::regex paired("<" + tag + R"((\s[^>]*)?>[\s\S]*?</)" + tag + R"(\s*>)",
-                              std::regex::icase);
-      out = std::regex_replace(out, paired, " ");
-      const std::regex selfclosing("<" + tag + R"((\s[^>]*)?/>)", std::regex::icase);
-      out = std::regex_replace(out, selfclosing, " ");
+      std::string pat;
+      pat.reserve(tag.size() * 2 + 32);
+      pat.append("<").append(tag).append(R"((\s[^>]*)?>[\s\S]*?</)").append(tag).append(R"(\s*>)");
+      out = std::regex_replace(out, std::regex(pat, std::regex::icase), " ");
+
+      std::string self_pat;
+      self_pat.reserve(tag.size() + 20);
+      self_pat.append("<").append(tag).append(R"((\s[^>]*)?/>)");
+      out = std::regex_replace(out, std::regex(self_pat, std::regex::icase), " ");
     }
     return out;
   }
@@ -591,7 +595,11 @@ class SpiderSkillR : public SkillBase {
     // Captured BY VALUE: a ToolDefinition outlives the skill instance that
     // registered it (the agent owns the registry), so capturing ``this`` would
     // dangle.
-    const std::vector<std::string> xpaths = remove_xpaths_;
+    // shared_ptr, not a by-value vector: the capture must be nothrow-copyable
+    // (clang-tidy bugprone-exception-escape flags a handler whose CAPTURE can
+    // throw on copy), and a ToolDefinition outlives the skill instance that
+    // registered it, so capturing ``this`` would dangle.
+    const auto xpaths = std::make_shared<const std::vector<std::string>>(remove_xpaths_);
     return {
         define_tool(
             "scrape_url", "Scrape URL",
@@ -621,15 +629,15 @@ class SpiderSkillR : public SkillBase {
                 try {
                   json parsed = json::parse(r.body);
                   if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
-                    text = strip_html(parsed["_raw_html"].get<std::string>(), xpaths);
+                    text = strip_html(parsed["_raw_html"].get<std::string>(), *xpaths);
                   } else {
-                    text = strip_html(r.body, xpaths);
+                    text = strip_html(r.body, *xpaths);
                   }
                 } catch (...) {
-                  text = strip_html(r.body, xpaths);
+                  text = strip_html(r.body, *xpaths);
                 }
               } else {
-                text = strip_html(r.body, xpaths);
+                text = strip_html(r.body, *xpaths);
               }
               return swaig::FunctionResult("Scraped content from " + eff + ":\n" + text);
             }),

@@ -182,14 +182,22 @@ int main() {
     // The C++ SkillRegistry is a global singleton pre-populated with the
     // built-in skills, so observe the DELTA: the names this chain adds over the
     // pre-existing set (mirrors the oracle's fresh-registry ["custom_alpha",
-    // "custom_beta"]). Registration is idempotent (a duplicate name is a no-op).
+    // "custom_beta"]).
+    //
+    // NOTE: this used to re-register "custom_alpha" a second time to assert that
+    // registration was idempotent. It is NOT idempotent any more: f0b5df5 made
+    // register_skill THROW on a duplicate name, because silent overwriting is what
+    // let two different classes both claim "spider" and hid which one was live.
+    // The duplicate call therefore aborted this tool (exit 134), the differ saw
+    // empty stdout, and BEHAVIORAL-STATE went red. The delta computed below already
+    // proves the registry does not grow spuriously, so the duplicate call bought
+    // nothing the rest of this block does not.
     auto& reg = signalwire::skills::SkillRegistry::instance();
     std::set<std::string> before;
     for (const auto& n : reg.list_skills()) before.insert(n);
     auto noop_factory = []() -> std::unique_ptr<signalwire::skills::SkillBase> { return nullptr; };
     reg.register_skill("custom_alpha", noop_factory);
     reg.register_skill("custom_beta", noop_factory);
-    reg.register_skill("custom_alpha", noop_factory);  // idempotent
     std::vector<std::string> added;
     for (const auto& n : reg.list_skills()) {
       if (before.find(n) == before.end()) added.push_back(n);

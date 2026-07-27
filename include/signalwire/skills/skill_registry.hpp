@@ -28,9 +28,27 @@ class SkillRegistry {
     return registry;
   }
 
-  /// Register a skill factory
+  /// Register a skill factory.
+  ///
+  /// A second registration of a name that is already registered is ALWAYS a
+  /// bug, and it throws. Silently overwriting is what let two different
+  /// ``"spider"`` classes — one in ``src/skills/builtin/spider.cpp``, one in
+  /// ``src/skills/skill_registry.cpp`` — coexist for months: static-init order
+  /// ACROSS translation units is unspecified in C++, so which implementation a
+  /// caller actually got depended on link order, and the surface enumerator
+  /// projected the class that was NOT running. Parity can pass against dead
+  /// code that way. Failing loud makes that state unrepresentable.
+  ///
+  /// Re-registering the SAME factory is not detectable (``std::function`` has
+  /// no equality), so idempotent "register if absent" callers must ask
+  /// ``has_skill`` first — see ``ensure_builtin_skills_registered``.
   void register_skill(const std::string& name, SkillFactory factory) {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (factories_.find(name) != factories_.end()) {
+      throw std::invalid_argument("Duplicate skill registration for name: " + name +
+                                  " (a skill name may be registered exactly once; the second "
+                                  "registration would silently replace the first)");
+    }
     factories_[name] = std::move(factory);
   }
 

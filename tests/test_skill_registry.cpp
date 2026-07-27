@@ -193,3 +193,76 @@ TEST(skill_registry_add_skill_directory_dedup) {
     rmdir(dir.c_str());
     return true;
 }
+
+// ========================================================================
+// Duplicate-registration guard
+// ========================================================================
+//
+// ``register_skill`` used to overwrite silently on a name collision. That is
+// what let two different classes both claim ``"spider"`` — one in
+// ``src/skills/builtin/spider.cpp``, one in ``src/skills/skill_registry.cpp``
+// — from two different translation units. Static-init order ACROSS TUs is
+// unspecified in C++, so which implementation actually ran was decided by link
+// order, and the surface enumerator (which reads ``builtin/``) was projecting
+// the class that was NOT running. Parity can pass against dead code that way.
+//
+// A second registration of an existing skill name is always a bug, so it must
+// FAIL LOUD rather than silently replace the incumbent.
+
+TEST(skill_registry_duplicate_registration_throws) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    const std::string name = "dup_guard_probe_skill";
+    ASSERT_FALSE(reg.has_skill(name));
+
+    // First registration succeeds.
+    reg.register_skill(name, []() -> std::unique_ptr<sw_skills::SkillBase> {
+        return nullptr;
+    });
+    ASSERT_TRUE(reg.has_skill(name));
+
+    // Second registration of the SAME name must throw, not overwrite.
+    bool threw = false;
+    try {
+        reg.register_skill(name, []() -> std::unique_ptr<sw_skills::SkillBase> {
+            return nullptr;
+        });
+    } catch (const std::invalid_argument& e) {
+        threw = true;
+        std::string msg = e.what();
+        // The message must name the offending skill so the collision is
+        // diagnosable from the abort alone.
+        ASSERT_TRUE(msg.find("Duplicate skill registration") != std::string::npos);
+        ASSERT_TRUE(msg.find(name) != std::string::npos);
+    }
+    ASSERT_TRUE(threw);
+    return true;
+}
+
+// Every registered built-in name must resolve to the implementation in
+// ``src/skills/builtin/<name>.cpp`` — the same file the surface enumerator
+// reads. ``skill_description()`` is the discriminator: the deleted duplicate
+// classes in skill_registry.cpp carried DIFFERENT, abbreviated descriptions
+// ("Web scraping", "DataSphere RAG", "Gather info", "MCP bridge", …), so if a
+// second implementation ever wins the registration again, these strings change
+// and this test goes red.
+TEST(skill_registry_builtin_impl_is_the_live_one) {
+    auto& reg = sw_skills::SkillRegistry::instance();
+    const std::vector<std::pair<std::string, std::string>> expected = {
+        {"spider", "Fast web scraping and crawling capabilities"},
+        {"datasphere", "Search knowledge using SignalWire DataSphere RAG stack"},
+        {"info_gatherer", "Gather answers to a configurable list of questions"},
+        {"mcp_gateway", "Bridge MCP servers with SWAIG functions"},
+        {"swml_transfer", "Transfer calls between agents based on pattern matching"},
+        {"play_background_file", "Control background file playback"},
+        {"custom_skills", "Register user-defined custom tools"},
+        {"google_maps", "Validate addresses and compute driving routes using Google Maps"},
+        {"wikipedia_search",
+         "Search Wikipedia for information about a topic and get article summaries"},
+    };
+    for (const auto& [name, desc] : expected) {
+        auto skill = reg.create(name);
+        ASSERT_TRUE(skill != nullptr);
+        ASSERT_EQ(skill->skill_description(), desc);
+    }
+    return true;
+}

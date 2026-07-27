@@ -140,3 +140,53 @@ TEST(skill_spider_remove_xpaths_drops_script_style_and_chrome) {
     return true;
 }
 
+// The surviving (and now ONLY) spider implementation is the one in
+// ``src/skills/builtin/spider.cpp`` — the same file the surface enumerator
+// reads. Before the duplicate in ``skill_registry.cpp`` was deleted, a
+// ``remove_xpaths`` fix could land in builtin/ and have no effect at runtime,
+// because the registry's ``SpiderSkillR`` was the class actually registered.
+// Pin the identity here so a re-introduced duplicate is caught, and re-prove
+// the strip behaviour end to end against the live registration.
+TEST(skill_spider_live_impl_is_the_builtin_and_strips_script_and_nav) {
+    auto skill = sw_skills::SkillRegistry::instance().create("spider");
+    ASSERT_TRUE(skill != nullptr);
+    // The deleted duplicate said "Web scraping"; the builtin (and the Python
+    // reference's SKILL_DESCRIPTION) says this.
+    ASSERT_EQ(skill->skill_description(), "Fast web scraping and crawling capabilities");
+
+    httplib::Server srv;
+    srv.Get("/page", [&](const httplib::Request&, httplib::Response& res) {
+        res.set_content(
+            "<html><body>"
+            "<script>alert(1)</script>"
+            "<nav>NAVTEXT</nav>"
+            "<p>VISIBLE BODY</p>"
+            "</body></html>",
+            "text/html");
+    });
+
+    int port = 0;
+    std::thread th([&]{ port = srv.bind_to_any_port("127.0.0.1"); srv.listen_after_bind(); });
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (port == 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    ASSERT_TRUE(port > 0);
+
+    ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
+    skill->setup(json::object());
+    auto tools = skill->register_tools();
+    ASSERT_TRUE(tools.size() >= 1u);
+    auto result = tools[0].handler(json::object({{"url", "https://example.com/page"}}),
+                                   json::object());
+    auto resp = result.to_json()["response"].get<std::string>();
+
+    srv.stop();
+    th.join();
+    ::unsetenv("SPIDER_BASE_URL");
+
+    ASSERT_TRUE(resp.find("alert(1)") == std::string::npos);   // //script dropped
+    ASSERT_TRUE(resp.find("NAVTEXT") == std::string::npos);    // //nav dropped
+    ASSERT_TRUE(resp.find("VISIBLE BODY") != std::string::npos);
+    return true;
+}

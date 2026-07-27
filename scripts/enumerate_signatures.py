@@ -1963,20 +1963,21 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
 # fold, same fail-honest rule.
 #
 # ``oracle_key -> (candidate cpp sources, cpp class, {member: accessor})``.
-# CANDIDATES, plural, deliberately: "spider" is registered TWICE — once by
-# ``src/skills/builtin/spider.cpp`` and once by ``SpiderSkillR`` in
-# ``src/skills/skill_registry.cpp`` — and ``SkillRegistry::register_skill``
-# overwrites, so which class a caller actually gets is static-init order. Both
-# carry the accessor, so the projection is honest for either winner; requiring
-# it in ALL listed sources is what keeps it that way. (The duplicate itself is
-# a pre-existing defect, reported separately — do not paper it over here.)
+# The tuple of sources used to carry TWO entries for spider, because the skill
+# was registered twice — once by ``src/skills/builtin/spider.cpp`` and once by a
+# duplicate ``SpiderSkillR`` in ``src/skills/skill_registry.cpp`` — with
+# ``register_skill`` silently overwriting, so which class ran was decided by
+# unspecified cross-TU static-init order. That duplication is now GONE (the
+# ``*SkillR`` copies were deleted and ``register_skill`` throws on a duplicate
+# name), so each skill has exactly one defining source and the file the
+# enumerator reads is the file that runs.
 #
 # A member is projected ONLY when the named accessor is genuinely present in
 # EVERY listed source — a deleted or renamed accessor drops out rather than
 # being invented (RULES §2/§3).
 _SKILL_ACCESSOR_PROJECTIONS: dict[str, tuple[tuple[str, ...], str, dict[str, str]]] = {
     "signalwire.skills.spider.skill.SpiderSkill": (
-        ("src/skills/builtin/spider.cpp", "src/skills/skill_registry.cpp"),
+        ("src/skills/builtin/spider.cpp",),
         "SpiderSkill",
         # ``self.remove_xpaths`` — the PREFILLED xpath list the reference sets
         # in ``__init__`` and walks in ``_fast_text_extract``. C++ idiom: a

@@ -5320,7 +5320,7 @@
               "required": true
             }
           ],
-          "returns": "bool"
+          "returns": "class:signalwire.logging.logger.Logger"
         },
         "reset_logging_configuration": {
           "params": [],

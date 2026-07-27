@@ -13,14 +13,24 @@ namespace logging {
 enum class LogLevel { DEBUG, INFO, WARN, ERROR, OFF };
 
 [[nodiscard]] inline LogLevel get_log_level() {
-  std::string level = "";
+  std::string level;
   const char* env = std::getenv("SIGNALWIRE_LOG_LEVEL");
-  if (env) level = env;
+  if (env) {
+    level = env;
+  }
   const char* mode = std::getenv("SIGNALWIRE_LOG_MODE");
-  if (mode && std::string(mode) == "off") return LogLevel::OFF;
-  if (level == "debug") return LogLevel::DEBUG;
-  if (level == "warn") return LogLevel::WARN;
-  if (level == "error") return LogLevel::ERROR;
+  if (mode && std::string(mode) == "off") {
+    return LogLevel::OFF;
+  }
+  if (level == "debug") {
+    return LogLevel::DEBUG;
+  }
+  if (level == "warn") {
+    return LogLevel::WARN;
+  }
+  if (level == "error") {
+    return LogLevel::ERROR;
+  }
   return LogLevel::INFO;
 }
 
@@ -33,20 +43,24 @@ class Logger {
   // or a substring view with no allocation. (The constructor's `name`
   // stays std::string: it is retained in name_.)
   void debug(std::string_view msg) const {
-    if (get_log_level() <= LogLevel::DEBUG)
-      std::cerr << "[DEBUG][" << name_ << "] " << msg << std::endl;
+    if (get_log_level() <= LogLevel::DEBUG) {
+      std::cerr << "[DEBUG][" << name_ << "] " << msg << "\n";
+    }
   }
   void info(std::string_view msg) const {
-    if (get_log_level() <= LogLevel::INFO)
-      std::cerr << "[INFO][" << name_ << "] " << msg << std::endl;
+    if (get_log_level() <= LogLevel::INFO) {
+      std::cerr << "[INFO][" << name_ << "] " << msg << "\n";
+    }
   }
   void warn(std::string_view msg) const {
-    if (get_log_level() <= LogLevel::WARN)
-      std::cerr << "[WARN][" << name_ << "] " << msg << std::endl;
+    if (get_log_level() <= LogLevel::WARN) {
+      std::cerr << "[WARN][" << name_ << "] " << msg << "\n";
+    }
   }
   void error(std::string_view msg) const {
-    if (get_log_level() <= LogLevel::ERROR)
-      std::cerr << "[ERROR][" << name_ << "] " << msg << std::endl;
+    if (get_log_level() <= LogLevel::ERROR) {
+      std::cerr << "[ERROR][" << name_ << "] " << msg << "\n";
+    }
   }
 
  private:

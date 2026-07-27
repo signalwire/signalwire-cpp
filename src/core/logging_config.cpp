@@ -65,12 +65,15 @@ void configure_logging() {
 
 void reset_logging_configuration() { g_configured.store(false); }
 
-bool get_logger(const std::string& /*name*/) {
-  // Single entry point: ensure the process logger is configured before use.
+::signalwire::logging::Logger get_logger(const std::string& name) {
+  // Single entry point (the reference's contract): guarantee logging is
+  // configured, then hand back a NAMED logger so the caller can actually log
+  // AND `name` means something. Previously returned the configured-once bool and
+  // discarded `name`, so the canonical entry point could not produce a logger.
   if (!g_configured.load()) {
     configure_logging();
   }
-  return g_configured.load();
+  return ::signalwire::logging::get_logger(name);
 }
 
 std::string strip_control_chars(const std::string& value) {

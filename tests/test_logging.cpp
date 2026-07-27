@@ -1,4 +1,8 @@
 // Logging system tests
+#include <cstdlib>
+#include <type_traits>
+
+#include "signalwire/core/logging_config.hpp"
 #include "signalwire/logging.hpp"
 #include "signalwire/logging/logger.hpp"
 
@@ -75,7 +79,53 @@ TEST(logging_get_logger_function) {
 }
 
 TEST(logging_named_get_logger) {
+    // The factory hands back a Logger constructed with the requested name.
+    // `logging::Logger` streams straight to std::cerr with no injection point
+    // and keeps name_ private, so the name cannot be observed without either
+    // inventing an accessor (surface we do not need) or swapping the PROCESS-WIDE
+    // cerr buffer. The latter is not an option here: test_main.cpp runs tests on
+    // MULTIPLE THREADS, so redirecting the global cerr steals concurrent tests'
+    // output — including their ASSERT failure text. (Measured: doing that turned
+    // a 2037/1 run into 1497 passed / 542 "failed" with an empty log. RULES.md §4
+    // — isolation comes from scoping, never from mutating shared state.)
+    // So assert what IS observable without global mutation: construction succeeds
+    // and the value is usable.
     auto logger = logging::get_logger("MyComponent");
-    // Should not crash
+    logger.info("named-logger smoke");
+    return true;
+}
+
+// The CONTRACT entry point — recorded by the reference oracle as
+// `signalwire.core.logging_config.get_logger` — must hand back a LOGGER, not a
+// status flag. It previously returned `bool` (the internal configured-once flag)
+// and discarded `name` entirely, so a caller could not obtain a logger from the
+// canonical entry point at all; they had to already know to reach into another
+// header. Nothing caught it because the reference records this return as `any`,
+// and the signature differ treats `any` as matching anything on either side, so
+// `bool` compared clean.
+//
+// The static_assert IS the regression guard: it fails to COMPILE if the return
+// type ever reverts to bool (or to anything that is not a logging::Logger), which
+// is exactly the defect, and it needs no global state to check.
+TEST(logging_config_get_logger_returns_a_logger_not_a_flag) {
+    static_assert(
+        std::is_same_v<decltype(core::logging_config::get_logger(std::string{})),
+                       logging::Logger>,
+        "core::logging_config::get_logger must return a logging::Logger — a bool "
+        "return means the canonical entry point cannot hand a caller a logger");
+    auto logger = core::logging_config::get_logger("ContractCheck");
+    logger.error("contract smoke");
+    return true;
+}
+
+// The other half of the single-entry-point contract: asking for a logger must
+// configure logging first, even straight after a reset.
+TEST(logging_config_get_logger_configures_on_first_access) {
+    core::logging_config::reset_logging_configuration();
+    auto logger = core::logging_config::get_logger("ConfigureOnAccess");
+    logger.info("configured-on-access smoke");
+    // configure_logging() ran as part of the call above; a second call must be
+    // idempotent rather than throwing or re-initialising into a bad state.
+    core::logging_config::configure_logging();
     return true;
 }

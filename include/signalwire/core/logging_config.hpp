@@ -7,6 +7,10 @@
 
 #include <string>
 
+// `get_logger` below returns a NAMED logger by value, so the type must be
+// complete here (not merely forward-declared).
+#include "signalwire/logging/logger.hpp"
+
 namespace signalwire {
 namespace core {
 namespace logging_config {
@@ -49,16 +53,31 @@ void configure_logging();
 void reset_logging_configuration();
 
 /**
- * Return whether ``configure_logging`` has already run (the internal flag).
- * Ensures the logger is configured on first access, mirroring Python's
- * ``get_logger`` single-entry-point behavior. The C++ logger is a process
- * singleton (see ``signalwire::get_logger``); this helper guarantees it has
- * been configured before use and returns the configured state.
+ * Obtain the SDK logger, configuring it on first access. This is the single
+ * entry point every SDK module should use, mirroring Python's
+ * ``signalwire.core.logging_config.get_logger``.
  *
- * @param name Logical logger name (recorded for API compatibility; the C++
- *   Logger is a process singleton so the name is advisory).
+ * Returns a NAMED logger so a CALLER CAN ACTUALLY LOG, and so ``name`` means
+ * something. It previously returned ``bool`` (the internal configured-once flag)
+ * and discarded ``name`` entirely, which left the canonical entry point unable
+ * to hand back a logger at all — a caller had to already know to reach into a
+ * different header. Every other port returns a logger object here (ts
+ * ``Logger``, go ``*logging.Logger``, java / php / rust / dotnet ``Logger``,
+ * ruby ``Logging::Logger``), so the ``bool`` form was a functional gap, not an
+ * idiom. It went unnoticed because the reference records this function's return
+ * as ``any``, and the signature differ treats ``any`` as matching anything on
+ * either side.
+ *
+ * Delegates to ``signalwire::logging::get_logger(name)``, which already built
+ * the named-logger form — this entry point simply guarantees configuration has
+ * happened first, which is exactly the reference's single-entry-point contract.
+ * (Note ``signalwire::get_logger()``, no argument, is a THIRD overload returning
+ * the process singleton by reference; it is unrelated to this contract.)
+ *
+ * @param name Logical logger name, as in the reference's per-module
+ *   ``get_logger(__name__)``.
  */
-bool get_logger(const std::string& name);
+::signalwire::logging::Logger get_logger(const std::string& name);
 
 /**
  * Strip control characters (to prevent log injection) from ``value``.

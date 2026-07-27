@@ -101,7 +101,7 @@ TEST(rest_signalwire_client_has_all_namespaces) {
 
 TEST(rest_error_class) {
     SignalWireRestError err(404, "Not found", "{\"error\":\"not found\"}");
-    ASSERT_EQ(err.status(), 404);
+    ASSERT_EQ(err.status_code(), 404);
     ASSERT_EQ(err.body(), "{\"error\":\"not found\"}");
     ASSERT_TRUE(std::string(err.what()).find("Not found") != std::string::npos);
     return true;
@@ -115,7 +115,7 @@ TEST(rest_error_class) {
 TEST(rest_transport_error_class) {
     SignalWireRestTransportError err("Connection failed to 127.0.0.1", "/api/fabric/addresses",
                                      "GET");
-    ASSERT_EQ(err.status(), 0);
+    ASSERT_EQ(err.status_code(), 0);
     ASSERT_EQ(err.url(), "/api/fabric/addresses");
     ASSERT_EQ(err.method(), "GET");
     ASSERT_TRUE(std::string(err.what()).find("Connection failed") != std::string::npos);
@@ -123,7 +123,7 @@ TEST(rest_transport_error_class) {
     // It IS-A SignalWireRestError -- a caller catching the base family type
     // handles both the HTTP-error and the transport-error path with one catch.
     const SignalWireRestError& base = err;
-    ASSERT_EQ(base.status(), 0);
+    ASSERT_EQ(base.status_code(), 0);
     return true;
 }
 
@@ -155,7 +155,7 @@ TEST(rest_connection_refused_raises_typed_transport_error) {
         (void)client.fabric().addresses.list();
     } catch (const SignalWireRestTransportError& e) {
         threw_typed_transport = true;
-        ASSERT_EQ(e.status(), 0);
+        ASSERT_EQ(e.status_code(), 0);
     } catch (const SignalWireRestError&) {
         // A bare (non-transport-subclass) SignalWireRestError would land here --
         // fail loudly instead of silently accepting the wrong concrete type.

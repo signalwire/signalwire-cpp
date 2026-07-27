@@ -283,3 +283,38 @@ TEST(skill_manager_no_duplicate_single_instance) {
     ASSERT_FALSE(second);
     return true;
 }
+
+// Reference parity: SkillBase.__init__(agent, params) stores `self.agent` and
+// `self.params` as public instance attributes, and SkillManager.__init__(agent)
+// stores `self.agent`. The port's skills received params only through
+// `setup(params)` and never held the agent at all, so a loaded skill could not
+// reach back to the agent that owns it.
+TEST(skill_manager_binds_agent_and_params_onto_skill) {
+    signalwire::agent::AgentBase agent;
+    sw_skills::SkillManager mgr(agent);
+    ASSERT_TRUE(mgr.agent() == &agent);
+
+    json params = json::object({{"prefix", "dt"}});
+    bool loaded = mgr.load_skill("datetime", params, agent);
+    ASSERT_TRUE(loaded);
+
+    sw_skills::SkillBase* skill = mgr.get_skill("datetime");
+    ASSERT_TRUE(skill != nullptr);
+    ASSERT_TRUE(skill->agent() == &agent);
+    ASSERT_EQ(skill->params()["prefix"], "dt");
+    return true;
+}
+
+// A default-constructed manager has no bound agent; the skill still gets the
+// agent from the load_skill call.
+TEST(skill_manager_default_has_no_bound_agent) {
+    sw_skills::SkillManager mgr;
+    ASSERT_TRUE(mgr.agent() == nullptr);
+    signalwire::agent::AgentBase agent;
+    (void)mgr.load_skill("math", json::object(), agent);
+    sw_skills::SkillBase* skill = mgr.get_skill("math");
+    ASSERT_TRUE(skill != nullptr);
+    ASSERT_TRUE(skill->agent() == &agent);
+    ASSERT_TRUE(skill->params().is_object());
+    return true;
+}

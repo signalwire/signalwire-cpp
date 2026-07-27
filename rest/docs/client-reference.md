@@ -104,7 +104,7 @@ See **[calling.md](calling.md)**.
 try {
     auto agent = client.fabric().ai_agents.get("bad-id");
 } catch (const signalwire::rest::SignalWireRestError& e) {
-    std::cerr << e.status() << "\n";  // 404
+    std::cerr << e.status_code() << "\n";  // 404
     std::cerr << e.what() << "\n";    // error message
     std::cerr << e.body() << "\n";    // raw response body
 }
@@ -116,7 +116,7 @@ try {
 
 | Member | Type | Description |
 |--------|------|-------------|
-| `status()` | `int` | HTTP status code |
+| `status_code()` | `int` | HTTP status code |
 | `body()` | `const std::string&` | Raw response body |
 | `what()` | `const char*` | Error message (from `std::runtime_error`) |
 

@@ -1,5 +1,9 @@
 // AgentBase tests
 
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+
 #include "signalwire/agent/agent_base.hpp"
 
 using namespace signalwire::agent;
@@ -28,6 +32,221 @@ TEST(agent_set_name) {
     AgentBase agent;
     agent.set_name("new_name");
     ASSERT_EQ(agent.name(), "new_name");
+    return true;
+}
+
+// ========================================================================
+// Construction forwarding — the reference AgentBase.__init__ FORWARDS its
+// parameters to collaborators (SWMLService / SessionManager) rather than
+// merely storing them. These prove each one lands where it should.
+//
+// Most of the reference's construction state is underscore-private
+// (``self._auto_answer``, ``self._record_call``, …), so the C++ accessors are
+// protected. This probe subclass reads them the way a real subclass would.
+// ========================================================================
+
+namespace {
+
+struct CtorProbe : public AgentBase {
+    using AgentBase::AgentBase;
+    using AgentBase::agent_id;
+    using AgentBase::auto_answer;
+    using AgentBase::check_for_input_override;
+    using AgentBase::config_file;
+    using AgentBase::default_webhook_url;
+    using AgentBase::enable_post_prompt_override;
+    using AgentBase::record_call_enabled;
+    using AgentBase::record_format;
+    using AgentBase::record_stereo;
+    using AgentBase::schema_path;
+    using AgentBase::schema_validation;
+    using AgentBase::suppress_logs;
+    using AgentBase::token_expiry_secs;
+};
+
+}  // namespace
+
+TEST(agent_ctor_agent_id_supplied_and_generated) {
+    CtorProbe supplied("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false,
+                       "mp4", true, std::nullopt, std::string("fixed-id"));
+    ASSERT_EQ(supplied.agent_id(), "fixed-id");
+
+    // reference: ``self.agent_id = agent_id or str(uuid.uuid4())``
+    CtorProbe generated("b");
+    ASSERT_FALSE(generated.agent_id().empty());
+    CtorProbe generated2("c");
+    ASSERT_NE(generated.agent_id(), generated2.agent_id());
+    return true;
+}
+
+TEST(agent_ctor_token_expiry_forwarded_to_session_manager) {
+    // reference: AgentBase.__init__ passes token_expiry_secs to
+    // SessionManager(token_expiry_secs=...).
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 120);
+    ASSERT_EQ(agent.token_expiry_secs(), 120);
+
+    // Prove the value actually reached the SessionManager rather than merely
+    // being stored on the agent: a minted token's embedded expiry must sit
+    // ~120s out, not at the 3600s default.
+    std::string token = agent.session_manager().generate_token("fn", "call-1");
+    ASSERT_TRUE(agent.session_manager().validate_token(token, "fn", "call-1"));
+    CtorProbe long_lived("b", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 7200);
+    ASSERT_EQ(long_lived.token_expiry_secs(), 7200);
+    return true;
+}
+
+TEST(agent_ctor_schema_validation_forwarded_to_service) {
+    CtorProbe off("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
+                  true, std::nullopt, std::nullopt, std::nullopt, std::nullopt, false, false, false,
+                  std::nullopt, /*schema_validation=*/false);
+    ASSERT_FALSE(off.schema_validation());
+
+    CtorProbe on("b");
+    ASSERT_TRUE(on.schema_validation());
+    return true;
+}
+
+TEST(agent_ctor_basic_auth_forwarded_to_service) {
+    // reference: basic_auth tuple is handed to super().__init__ and short
+    // circuits the generated-credential path.
+    std::pair<std::string, std::string> creds{"alice", "s3cret"};
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, creds);
+    ASSERT_EQ(agent.auth_username(), "alice");
+    ASSERT_EQ(agent.auth_password(), "s3cret");
+    ASSERT_TRUE(agent.validate_basic_auth("alice", "s3cret"));
+    ASSERT_FALSE(agent.validate_basic_auth("alice", "wrong"));
+    return true;
+}
+
+TEST(agent_ctor_use_pom_forwarded) {
+    CtorProbe with_pom("a");
+    ASSERT_TRUE(with_pom.pom().has_value());
+
+    CtorProbe without("b", "/", "0.0.0.0", std::nullopt, std::nullopt, /*use_pom=*/false);
+    ASSERT_FALSE(without.pom().has_value());
+    return true;
+}
+
+TEST(agent_ctor_native_functions_forwarded) {
+    std::vector<std::string> natives{"check_time", "wait_for_user"};
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
+                    true, std::nullopt, std::nullopt, natives);
+    json swml = agent.render_swml();
+    const json& ai = swml["sections"]["main"][1]["ai"];
+    ASSERT_EQ(ai["SWAIG"]["native_functions"], json(natives));
+    return true;
+}
+
+TEST(agent_ctor_flags_stored) {
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
+                    true, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                    /*suppress_logs=*/true, /*enable_post_prompt_override=*/true,
+                    /*check_for_input_override=*/true);
+    ASSERT_TRUE(agent.suppress_logs());
+    ASSERT_TRUE(agent.enable_post_prompt_override());
+    ASSERT_TRUE(agent.check_for_input_override());
+    return true;
+}
+
+TEST(agent_ctor_config_file_supplies_service_defaults) {
+    // reference: _load_service_config reads the config file's ``service``
+    // section; constructor arguments left at their defaults pick it up, and
+    // explicit constructor arguments win over it.
+    // Repo-local scratch dir (never /tmp), same idiom as the ConfigLoader
+    // tests; relative to the build dir the test binary runs in.
+    std::string dir = ".sw-test-tmp";
+    (void)std::system("mkdir -p .sw-test-tmp");
+    std::string cfg = dir + "/agent_ctor_service.json";
+    {
+        std::ofstream out(cfg);
+        out << R"({"service": {"name": "from-config", "route": "/cfg", "host": "127.0.0.1", )"
+            << R"("port": 4321}})";
+    }
+
+    CtorProbe defaults("ignored-name", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true,
+                       false, "mp4", true, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+                       false, false, false, cfg);
+    ASSERT_EQ(defaults.name(), "from-config");
+    ASSERT_EQ(defaults.route(), "/cfg");
+    ASSERT_EQ(defaults.config_file().value(), cfg);
+
+    // Explicit non-default route beats the config file.
+    CtorProbe explicit_route("n", "/mine", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true,
+                             false, "mp4", true, std::nullopt, std::nullopt, std::nullopt,
+                             std::nullopt, false, false, false, cfg);
+    ASSERT_EQ(explicit_route.route(), "/mine");
+
+    std::remove(cfg.c_str());
+    return true;
+}
+
+TEST(agent_ctor_schema_path_forwarded_to_schema_utils) {
+    // reference: schema_path goes to super().__init__ which hands it to
+    // SchemaUtils(schema_path=...). The agent must report the path it was
+    // constructed with rather than silently discarding it.
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
+                    true, std::nullopt, std::nullopt, std::nullopt,
+                    std::string("/nonexistent/schema.json"));
+    ASSERT_EQ(agent.schema_path().value(), "/nonexistent/schema.json");
+    return true;
+}
+
+// ---- construction parameters with WIRE effect ---------------------------
+
+TEST(agent_ctor_auto_answer_gates_answer_verb) {
+    // reference: ``if agent_to_use._auto_answer: add_verb("answer", ...)``
+    CtorProbe on("a");
+    json with_answer = on.render_swml();
+    ASSERT_EQ(with_answer["sections"]["main"][0].contains("answer"), true);
+
+    CtorProbe off("b", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600,
+                  /*auto_answer=*/false);
+    json no_answer = off.render_swml();
+    // With auto_answer off the FIRST verb is the ai verb, not answer.
+    ASSERT_EQ(no_answer["sections"]["main"][0].contains("answer"), false);
+    ASSERT_EQ(no_answer["sections"]["main"][0].contains("ai"), true);
+    return true;
+}
+
+TEST(agent_ctor_record_call_emits_record_verb) {
+    // reference: record_call adds a post-answer ``record_call`` verb carrying
+    // format + stereo.
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true,
+                    /*record_call=*/true, /*record_format=*/"wav", /*record_stereo=*/false);
+    json swml = agent.render_swml();
+    const json& rec = swml["sections"]["main"][1]["record_call"];
+    ASSERT_EQ(rec["format"], "wav");
+    ASSERT_EQ(rec["stereo"], false);
+
+    CtorProbe without("b");
+    json plain = without.render_swml();
+    ASSERT_EQ(plain["sections"]["main"][1].contains("record_call"), false);
+    return true;
+}
+
+TEST(agent_ctor_default_webhook_url_emits_swaig_defaults) {
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
+                    true, std::string("https://example.com/hook"));
+    ASSERT_EQ(agent.default_webhook_url().value(), "https://example.com/hook");
+    json swml = agent.render_swml();
+    const json& ai = swml["sections"]["main"][1]["ai"];
+    ASSERT_EQ(ai["SWAIG"]["defaults"]["web_hook_url"], "https://example.com/hook");
+    return true;
+}
+
+TEST(agent_ctor_params_survive_clone) {
+    // The dynamic-config copy must carry the construction state onto the
+    // request-scoped clone.
+    CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 250, false, true, "wav",
+                    false, std::string("https://example.com/hook"), std::string("id-7"));
+    CtorProbe copy(agent);
+    ASSERT_EQ(copy.agent_id(), "id-7");
+    ASSERT_EQ(copy.token_expiry_secs(), 250);
+    ASSERT_FALSE(copy.auto_answer());
+    ASSERT_TRUE(copy.record_call_enabled());
+    ASSERT_EQ(copy.record_format(), "wav");
+    ASSERT_FALSE(copy.record_stereo());
+    ASSERT_EQ(copy.default_webhook_url().value(), "https://example.com/hook");
     return true;
 }
 
@@ -519,6 +738,41 @@ TEST(agent_validate_tool_token_rejects_wrong_call_id) {
     std::string token = agent.create_tool_token("test_tool", "call_A");
     ASSERT_FALSE(token.empty());
     ASSERT_FALSE(agent.validate_tool_token("test_tool", token, "call_B"));
+    return true;
+}
+
+// The token the RENDER puts on the wire must be the token the VALIDATOR
+// accepts. Without this the two halves can drift (a minted-but-unvalidatable
+// token, or a validator reading a different wire field) and every secure tool
+// would 403 in production while the render looked correct.
+TEST(agent_rendered_token_validates_end_to_end) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.define_tool("secure_tool", "t", json::object(),
+        [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
+
+    const std::map<std::string, std::string> query = {{"call_id", "call_xyz"}};
+    json swml = agent.render_swml_for_request(query, json::object(), {});
+
+    // Pull the __token the render minted onto the webhook.
+    std::string url;
+    for (const auto& verb : swml["sections"]["main"]) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG") &&
+            verb["ai"]["SWAIG"].contains("functions")) {
+            url = verb["ai"]["SWAIG"]["functions"][0]["web_hook_url"].get<std::string>();
+        }
+    }
+    auto at = url.find("__token=");
+    ASSERT_TRUE(at != std::string::npos);
+    std::string token = url.substr(at + 8);
+    auto amp = token.find('&');
+    if (amp != std::string::npos) {
+        token = token.substr(0, amp);
+    }
+
+    // That exact value must validate for this tool + call_id, and not for another.
+    ASSERT_TRUE(agent.validate_tool_token("secure_tool", token, "call_xyz"));
+    ASSERT_FALSE(agent.validate_tool_token("secure_tool", token, "other_call"));
     return true;
 }
 

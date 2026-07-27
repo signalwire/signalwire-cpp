@@ -160,7 +160,7 @@ TEST({test_name}) {{
     (void)({call});
   }} catch (const SignalWireRestError& e) {{
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }}
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

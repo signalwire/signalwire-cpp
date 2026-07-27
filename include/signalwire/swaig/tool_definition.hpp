@@ -18,7 +18,12 @@ struct ToolDefinition {
   std::string description;
   json parameters;  // JSON schema for parameters
   ToolHandler handler;
-  bool secure = false;
+  /// Whether this tool requires SWAIG token validation. Defaults to TRUE
+  /// fleet-wide (reference: ``tool_mixin.define_tool(secure=True)``) — a tool
+  /// defined without an explicit ``secure`` is SECURE, so its rendered webhook
+  /// carries the per-tool ``__token`` and its dispatch validates it. Defaulting
+  /// this to false would silently ship every tool unauthenticated.
+  bool secure = true;
 
   /// Render to the SWAIG function JSON format (for inclusion in SWML)
   /// [[nodiscard]]: the rendered JSON is the output; discarding it is a bug.
@@ -37,10 +42,11 @@ struct ToolDefinition {
       func["web_hook_url"] = web_hook_url;
     }
 
-    if (secure) {
-      func["secure"] = true;
-    }
-
+    // NOTE: ``secure`` is NOT emitted as a SWAIG function property. It is not a
+    // property of the SWML ``UserSWAIGFunction`` schema and the reference never
+    // renders it — the WIRE manifestation of ``secure`` is the per-tool
+    // ``__token`` appended to ``web_hook_url`` when the document is rendered
+    // with a call_id (see AgentBase::build_swaig_functions).
     return func;
   }
 };

@@ -678,3 +678,19 @@ TEST(relay_mock_concurrent_play_and_record_route_independently) {
     client->disconnect();
     return true;
 }
+
+// Reference parity: `Action.call` is the back-reference to the Call the action
+// runs on. Resolved through the client's call registry (which OWNS the Call),
+// so a long-lived Action cannot dangle.
+TEST(relay_mock_action_call_backreference_resolves) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call(*client, "call-backref");
+    ASSERT_TRUE(call != nullptr);
+    json media = json::array({{{"type", "silence"}, {"params", {{"duration", 1}}}}});
+    Action action = call->play(media, 0.0, "backref-ctl");
+    ASSERT_TRUE(action.call() == call);
+    ASSERT_EQ(action.call()->call_id(), "call-backref");
+    ASSERT_EQ(action.control_id(), "backref-ctl");
+    client->disconnect();
+    return true;
+}

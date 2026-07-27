@@ -24,8 +24,57 @@ namespace {
 const std::regex kSwaigFnName("^[a-zA-Z_][a-zA-Z0-9_]*$");
 }
 
-Service::Service() {
+Service::Service(const std::string& name, const std::string& route, const std::string& host,
+                 const std::optional<int>& port,
+                 const std::optional<std::pair<std::string, std::string>>& basic_auth,
+                 const std::optional<std::string>& schema_path,
+                 const std::optional<std::string>& config_file, bool schema_validation) {
   static_cast<void>(schema_.load_embedded());  // best-effort; result intentionally ignored
+
+  schema_validation_ = schema_validation;
+  schema_path_ = schema_path;
+  config_file_ = config_file;
+
+  name_ = name;
+  route_ = route;
+  // The reference does ``route.rstrip("/")``; keep a leading slash so the
+  // route stays absolute (matching AgentBase's existing normalization).
+  while (route_.size() > 1 && route_.back() == '/') {
+    route_.pop_back();
+  }
+  if (!route_.empty() && route_.front() != '/') {
+    route_ = "/" + route_;
+  }
+  host_ = host;
+
+  // Port precedence mirrors the reference: explicit param, else the PORT env
+  // var, else the 3000 default already on the member.
+  if (port.has_value()) {
+    port_ = *port;
+  } else {
+    std::string env_port = get_env("PORT", "");
+    if (!env_port.empty()) {
+      try {
+        port_ = std::stoi(env_port);
+      } catch (const std::exception&) {
+        get_logger().debug("Ignoring invalid PORT env value: " + env_port);
+      }
+    }
+  }
+
+  // ``basic_auth`` short-circuits the lazy env/generated credential
+  // resolution — the reference passes the tuple straight through.
+  if (basic_auth.has_value()) {
+    set_auth(basic_auth->first, basic_auth->second);
+  }
+
+  // ``schema_path`` + ``schema_validation`` are what the reference hands to
+  // SchemaUtils. Build it eagerly when a path was supplied so the caller's
+  // path is honored rather than SchemaUtils' own discovery.
+  if (schema_path_.has_value() && !schema_path_->empty()) {
+    schema_utils_ =
+        std::make_unique<signalwire::utils::SchemaUtils>(*schema_path_, schema_validation_);
+  }
 }
 
 signalwire::utils::SchemaUtils& Service::schema_utils() {
@@ -795,18 +844,33 @@ void Service::serve() {
   // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
   // unique_ptr<Server>; setup_routes() is unchanged.
   auto tls = server::resolve_tls_config_from_env();
-  server_ = server::make_http_server(tls);
-  if (tls.usable() && !server_->is_valid()) {
-    get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
-                       " key=" + tls.key_path + ")");
-    return;
+
+  // Build + configure the server under the lock: stop() may fire from another
+  // thread at any moment (the usual shape is serve() on a server thread and
+  // stop() from the owner), and it drops this same pointer. Keep our OWN strong
+  // reference for the blocking listen() below, so a concurrent stop() unblocks
+  // us without destroying the object we are still executing inside. The lock is
+  // released before listen() -- it blocks for the server's whole lifetime, so
+  // holding the mutex across it would deadlock every stop().
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    server_ = server::make_http_server(tls);
+    if (tls.usable() && !server_->is_valid()) {
+      get_logger().error("SSL enabled but cert/key failed to load (cert=" + tls.cert_path +
+                         " key=" + tls.key_path + ")");
+      server_.reset();
+      return;
+    }
+    server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
+    setup_routes(*server_);
+    srv = server_;
   }
-  server_->set_payload_max_length(static_cast<size_t>(1024) * 1024);  // 1MB limit
-  setup_routes(*server_);
+
   get_logger().info("Starting SWML service on " +
                     std::string(tls.usable() ? "https://" : "http://") + host_ + ":" +
                     std::to_string(port_) + route_);
-  if (!server_->listen(host_, port_)) {
+  if (!srv->listen(host_, port_)) {
     get_logger().error("Failed to start server on " + host_ + ":" + std::to_string(port_) +
                        " -- is the port already in use?");
   }
@@ -828,9 +892,18 @@ std::shared_ptr<httplib::Server> Service::as_router() {
 }
 
 void Service::stop() {
-  if (server_) {
-    server_->stop();
-    server_.reset();
+  // Take the pointer out under the lock, then call stop() on it OUTSIDE the
+  // lock. Doing the call while holding the mutex would block serve()'s setup
+  // path; dropping the member first means a second stop() is a no-op. serve()
+  // holds its own reference, so releasing ours here never destroys a server a
+  // thread is still inside listen() on.
+  std::shared_ptr<httplib::Server> srv;
+  {
+    const std::lock_guard<std::mutex> lock(server_mutex_);
+    srv = std::move(server_);
+  }
+  if (srv) {
+    srv->stop();
   }
 }
 

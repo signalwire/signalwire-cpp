@@ -37,12 +37,24 @@ struct Message {
   // Identity / outbound metadata. These are write-once-by-construction so
   // sharing across copies isn't required for these fields.
   std::string message_id;
-  std::string from;
-  std::string to;
+  /// Wire keys ``from_number`` / ``to_number`` (reference: ``self.from_number``
+  /// / ``self.to_number``). Neither is a C++ reserved word, so the field carries
+  /// the reference's spelling — the shorter ``from``/``to`` was a gratuitous
+  /// divergence from the wire key it is read from.
+  std::string from_number;
+  std::string to_number;
   std::string body;
   std::vector<std::string> media;
   std::vector<std::string> tags;
   std::string direction;
+  /// Messaging context this message belongs to (reference: ``self.context``).
+  /// Set from the ``context`` key on an inbound ``messaging.receive`` event and
+  /// from the requested context on an outbound send.
+  std::string context;
+  /// Number of SMS segments the carrier split this message into (reference:
+  /// ``self.segments``); populated from the inbound event's ``segments`` key,
+  /// 0 when the server did not report one.
+  int segments = 0;
   std::string region;
 
   // Mutable fields — accessor pattern so returned-by-value Message

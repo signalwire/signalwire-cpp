@@ -41,7 +41,7 @@ TEST(rest_mock_gen_fabric_ai_agents_delete_err) {
     (void)(client.fabric().ai_agents.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_fabric_call_flows_delete_err) {
     (void)(client.fabric().call_flows.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_delete_err) {
     (void)(client.fabric().conference_rooms.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -155,7 +155,7 @@ TEST(rest_mock_gen_fabric_cxml_applications_delete_err) {
     (void)(client.fabric().cxml_applications.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -193,7 +193,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_delete_err) {
     (void)(client.fabric().cxml_scripts.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -231,7 +231,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_delete_err) {
     (void)(client.fabric().cxml_webhooks.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -269,7 +269,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_delete_err) {
     (void)(client.fabric().freeswitch_connectors.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -307,7 +307,7 @@ TEST(rest_mock_gen_fabric_relay_applications_delete_err) {
     (void)(client.fabric().relay_applications.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -345,7 +345,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_delete_err) {
     (void)(client.fabric().sip_endpoints.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -383,7 +383,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_delete_err) {
     (void)(client.fabric().sip_gateways.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -421,7 +421,7 @@ TEST(rest_mock_gen_fabric_subscribers_delete_err) {
     (void)(client.fabric().subscribers.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -459,7 +459,7 @@ TEST(rest_mock_gen_fabric_subscribers_delete_sip_endpoint_err) {
     (void)(client.fabric().subscribers.delete_sip_endpoint("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -497,7 +497,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_delete_err) {
     (void)(client.fabric().swml_scripts.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -535,7 +535,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_delete_err) {
     (void)(client.fabric().swml_webhooks.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -573,7 +573,7 @@ TEST(rest_mock_gen_fabric_resources_delete_err) {
     (void)(client.fabric().resources.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -611,7 +611,7 @@ TEST(rest_mock_gen_fabric_addresses_list_err) {
     (void)(client.fabric().addresses.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -649,7 +649,7 @@ TEST(rest_mock_gen_fabric_addresses_get_err) {
     (void)(client.fabric().addresses.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -687,7 +687,7 @@ TEST(rest_mock_gen_fabric_resources_list_err) {
     (void)(client.fabric().resources.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -725,7 +725,7 @@ TEST(rest_mock_gen_fabric_ai_agents_list_err) {
     (void)(client.fabric().ai_agents.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -763,7 +763,7 @@ TEST(rest_mock_gen_fabric_ai_agents_get_err) {
     (void)(client.fabric().ai_agents.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -801,7 +801,7 @@ TEST(rest_mock_gen_fabric_ai_agents_list_addresses_err) {
     (void)(client.fabric().ai_agents.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -839,7 +839,7 @@ TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
     (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -877,7 +877,7 @@ TEST(rest_mock_gen_fabric_call_flows_list_versions_err) {
     (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -915,7 +915,7 @@ TEST(rest_mock_gen_fabric_call_flows_list_err) {
     (void)(client.fabric().call_flows.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -953,7 +953,7 @@ TEST(rest_mock_gen_fabric_call_flows_get_err) {
     (void)(client.fabric().call_flows.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -991,7 +991,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_err) {
     (void)(client.fabric().conference_rooms.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1029,7 +1029,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_list_err) {
     (void)(client.fabric().conference_rooms.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1067,7 +1067,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_get_err) {
     (void)(client.fabric().conference_rooms.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1105,7 +1105,7 @@ TEST(rest_mock_gen_fabric_cxml_applications_list_err) {
     (void)(client.fabric().cxml_applications.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1143,7 +1143,7 @@ TEST(rest_mock_gen_fabric_cxml_applications_get_err) {
     (void)(client.fabric().cxml_applications.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1181,7 +1181,7 @@ TEST(rest_mock_gen_fabric_cxml_applications_list_addresses_err) {
     (void)(client.fabric().cxml_applications.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1219,7 +1219,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_list_err) {
     (void)(client.fabric().cxml_scripts.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1257,7 +1257,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_get_err) {
     (void)(client.fabric().cxml_scripts.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1295,7 +1295,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_list_addresses_err) {
     (void)(client.fabric().cxml_scripts.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1333,7 +1333,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_list_err) {
     (void)(client.fabric().cxml_webhooks.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1371,7 +1371,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_get_err) {
     (void)(client.fabric().cxml_webhooks.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1409,7 +1409,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_list_addresses_err) {
     (void)(client.fabric().cxml_webhooks.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1447,7 +1447,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_list_err) {
     (void)(client.fabric().freeswitch_connectors.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1485,7 +1485,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_get_err) {
     (void)(client.fabric().freeswitch_connectors.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1523,7 +1523,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_list_addresses_err) {
     (void)(client.fabric().freeswitch_connectors.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1561,7 +1561,7 @@ TEST(rest_mock_gen_fabric_relay_applications_list_err) {
     (void)(client.fabric().relay_applications.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1599,7 +1599,7 @@ TEST(rest_mock_gen_fabric_relay_applications_get_err) {
     (void)(client.fabric().relay_applications.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1637,7 +1637,7 @@ TEST(rest_mock_gen_fabric_relay_applications_list_addresses_err) {
     (void)(client.fabric().relay_applications.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1675,7 +1675,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_list_err) {
     (void)(client.fabric().sip_endpoints.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1713,7 +1713,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_get_err) {
     (void)(client.fabric().sip_endpoints.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1751,7 +1751,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_list_addresses_err) {
     (void)(client.fabric().sip_endpoints.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1789,7 +1789,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_list_err) {
     (void)(client.fabric().sip_gateways.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1827,7 +1827,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_get_err) {
     (void)(client.fabric().sip_gateways.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1865,7 +1865,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_list_addresses_err) {
     (void)(client.fabric().sip_gateways.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1903,7 +1903,7 @@ TEST(rest_mock_gen_fabric_subscribers_list_err) {
     (void)(client.fabric().subscribers.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1941,7 +1941,7 @@ TEST(rest_mock_gen_fabric_subscribers_get_err) {
     (void)(client.fabric().subscribers.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -1979,7 +1979,7 @@ TEST(rest_mock_gen_fabric_subscribers_list_addresses_err) {
     (void)(client.fabric().subscribers.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2017,7 +2017,7 @@ TEST(rest_mock_gen_fabric_subscribers_list_sip_endpoints_err) {
     (void)(client.fabric().subscribers.list_sip_endpoints("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2055,7 +2055,7 @@ TEST(rest_mock_gen_fabric_subscribers_get_sip_endpoint_err) {
     (void)(client.fabric().subscribers.get_sip_endpoint("X", "X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2093,7 +2093,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_list_err) {
     (void)(client.fabric().swml_scripts.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2131,7 +2131,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_get_err) {
     (void)(client.fabric().swml_scripts.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2169,7 +2169,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_list_addresses_err) {
     (void)(client.fabric().swml_scripts.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2207,7 +2207,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_list_err) {
     (void)(client.fabric().swml_webhooks.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2245,7 +2245,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_get_err) {
     (void)(client.fabric().swml_webhooks.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2283,7 +2283,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_list_addresses_err) {
     (void)(client.fabric().swml_webhooks.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2321,7 +2321,7 @@ TEST(rest_mock_gen_fabric_resources_get_err) {
     (void)(client.fabric().resources.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2359,7 +2359,7 @@ TEST(rest_mock_gen_fabric_resources_list_addresses_err) {
     (void)(client.fabric().resources.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2397,7 +2397,7 @@ TEST(rest_mock_gen_fabric_ai_agents_update_err) {
     (void)(client.fabric().ai_agents.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2435,7 +2435,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_update_err) {
     (void)(client.fabric().cxml_webhooks.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2473,7 +2473,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_update_err) {
     (void)(client.fabric().sip_gateways.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2511,7 +2511,7 @@ TEST(rest_mock_gen_fabric_subscribers_update_sip_endpoint_err) {
     (void)(client.fabric().subscribers.update_sip_endpoint("X", "X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2549,7 +2549,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_update_err) {
     (void)(client.fabric().swml_webhooks.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2587,7 +2587,7 @@ TEST(rest_mock_gen_fabric_tokens_create_embed_token_err) {
     (void)(client.fabric().tokens.create_embed_token({.token = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2625,7 +2625,7 @@ TEST(rest_mock_gen_fabric_tokens_create_guest_token_err) {
     (void)(client.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2663,7 +2663,7 @@ TEST(rest_mock_gen_fabric_ai_agents_create_err) {
     (void)(client.fabric().ai_agents.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2701,7 +2701,7 @@ TEST(rest_mock_gen_fabric_call_flows_deploy_version_err) {
     (void)(client.fabric().call_flows.deploy_version("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2739,7 +2739,7 @@ TEST(rest_mock_gen_fabric_call_flows_create_err) {
     (void)(client.fabric().call_flows.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2777,7 +2777,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_create_err) {
     (void)(client.fabric().conference_rooms.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2815,7 +2815,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_create_err) {
     (void)(client.fabric().cxml_scripts.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2853,7 +2853,7 @@ TEST(rest_mock_gen_fabric_cxml_webhooks_create_err) {
     (void)(client.fabric().cxml_webhooks.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2891,7 +2891,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_create_err) {
     (void)(client.fabric().freeswitch_connectors.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2929,7 +2929,7 @@ TEST(rest_mock_gen_fabric_relay_applications_create_err) {
     (void)(client.fabric().relay_applications.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -2967,7 +2967,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_create_err) {
     (void)(client.fabric().sip_endpoints.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3005,7 +3005,7 @@ TEST(rest_mock_gen_fabric_sip_gateways_create_err) {
     (void)(client.fabric().sip_gateways.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3043,7 +3043,7 @@ TEST(rest_mock_gen_fabric_subscribers_create_err) {
     (void)(client.fabric().subscribers.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3081,7 +3081,7 @@ TEST(rest_mock_gen_fabric_subscribers_create_sip_endpoint_err) {
     (void)(client.fabric().subscribers.create_sip_endpoint("X", {.username = "X", .password = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3119,7 +3119,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_create_err) {
     (void)(client.fabric().swml_scripts.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3157,7 +3157,7 @@ TEST(rest_mock_gen_fabric_swml_webhooks_create_err) {
     (void)(client.fabric().swml_webhooks.create(json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3195,7 +3195,7 @@ TEST(rest_mock_gen_fabric_resources_assign_domain_application_err) {
     (void)(client.fabric().resources.assign_domain_application("X", {.domain_application_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3233,7 +3233,7 @@ TEST(rest_mock_gen_fabric_resources_assign_phone_route_err) {
     (void)(client.fabric().resources.assign_phone_route("X", {.phone_route_id = "X", .handler = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3271,7 +3271,7 @@ TEST(rest_mock_gen_fabric_tokens_create_invite_token_err) {
     (void)(client.fabric().tokens.create_invite_token({.address_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3309,7 +3309,7 @@ TEST(rest_mock_gen_fabric_tokens_create_subscriber_token_err) {
     (void)(client.fabric().tokens.create_subscriber_token({.reference = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3347,7 +3347,7 @@ TEST(rest_mock_gen_fabric_tokens_refresh_subscriber_token_err) {
     (void)(client.fabric().tokens.refresh_subscriber_token({.refresh_token = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3385,7 +3385,7 @@ TEST(rest_mock_gen_fabric_call_flows_update_err) {
     (void)(client.fabric().call_flows.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3423,7 +3423,7 @@ TEST(rest_mock_gen_fabric_conference_rooms_update_err) {
     (void)(client.fabric().conference_rooms.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3461,7 +3461,7 @@ TEST(rest_mock_gen_fabric_cxml_applications_update_err) {
     (void)(client.fabric().cxml_applications.update("X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3499,7 +3499,7 @@ TEST(rest_mock_gen_fabric_cxml_scripts_update_err) {
     (void)(client.fabric().cxml_scripts.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3537,7 +3537,7 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_update_err) {
     (void)(client.fabric().freeswitch_connectors.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3575,7 +3575,7 @@ TEST(rest_mock_gen_fabric_relay_applications_update_err) {
     (void)(client.fabric().relay_applications.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3613,7 +3613,7 @@ TEST(rest_mock_gen_fabric_sip_endpoints_update_err) {
     (void)(client.fabric().sip_endpoints.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3651,7 +3651,7 @@ TEST(rest_mock_gen_fabric_subscribers_update_err) {
     (void)(client.fabric().subscribers.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -3689,7 +3689,7 @@ TEST(rest_mock_gen_fabric_swml_scripts_update_err) {
     (void)(client.fabric().swml_scripts.update("X", json::object()));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

@@ -53,6 +53,19 @@ class Call {
   const std::string& from() const { return s_->from; }
   const std::string& to() const { return s_->to; }
   const std::string& tag() const { return s_->tag; }
+  /// reference: ``self.project_id`` — the SignalWire project the call belongs
+  /// to (from the inbound event's ``project_id``, else the client's project).
+  const std::string& project_id() const { return s_->project_id; }
+  /// reference: ``self.context`` — the RELAY context the call arrived on
+  /// (the connect-issued protocol, else the event's ``context``/``protocol``).
+  const std::string& context() const { return s_->context; }
+  /// reference: ``self.segment_id`` — the call segment identifier, empty when
+  /// the server did not report one.
+  const std::string& segment_id() const { return s_->segment_id; }
+  /// reference: ``self.device`` — the raw device descriptor object from the
+  /// inbound event (``{type, params:{from_number,to_number,…}}``); an empty
+  /// object when absent, matching the reference's ``device or {}``.
+  const json& device() const { return s_->device; }
 
   bool is_answered() const { return s_->state == CALL_STATE_ANSWERED; }
   bool is_ended() const { return s_->state == CALL_STATE_ENDED; }
@@ -235,6 +248,10 @@ class Call {
   void set_from(const std::string& f) { s_->from = f; }
   void set_to(const std::string& t) { s_->to = t; }
   void set_tag(const std::string& t) { s_->tag = t; }
+  void set_project_id(const std::string& p) { s_->project_id = p; }
+  void set_context(const std::string& c) { s_->context = c; }
+  void set_segment_id(const std::string& sid) { s_->segment_id = sid; }
+  void set_device(const json& d) { s_->device = d.is_object() ? d : json::object(); }
   void set_client(RelayClient* c) { s_->client = c; }
 
   void dispatch_event(const CallEvent& ev);
@@ -268,6 +285,11 @@ class Call {
     std::string from;
     std::string to;
     std::string tag;
+    // Reference Call.__init__ construction parameters (public attributes there).
+    std::string project_id;
+    std::string context;
+    std::string segment_id;
+    json device = json::object();
     RelayClient* client = nullptr;
 
     std::vector<CallEventHandler> event_handlers;

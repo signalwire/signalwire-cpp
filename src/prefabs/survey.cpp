@@ -118,12 +118,34 @@ SurveyAgent& SurveyAgent::set_questions(const std::vector<json>& questions) {
 }
 
 SurveyAgent& SurveyAgent::set_completion_message(const std::string& msg) {
+  // reference: `self.conclusion` — stored AND rendered into the prompt.
+  conclusion_ = msg;
   prompt_add_to_section("Survey Instructions", "", {"When all questions are answered: " + msg});
   return *this;
 }
 
 SurveyAgent& SurveyAgent::set_intro_message(const std::string& msg) {
+  // reference: `self.introduction` — stored AND rendered into the prompt.
+  introduction_ = msg;
   prompt_add_to_section("Personality", "\nIntroduction: " + msg);
+  return *this;
+}
+
+SurveyAgent& SurveyAgent::set_survey_name(const std::string& name) {
+  survey_name_ = name;
+  // reference: the default introduction is derived from survey_name.
+  introduction_ = "Welcome to our " + name + ". We appreciate your participation.";
+  return *this;
+}
+
+SurveyAgent& SurveyAgent::set_brand_name(const std::string& name) {
+  // reference: `brand_name or "Our Company"`.
+  brand_name_ = name.empty() ? "Our Company" : name;
+  return *this;
+}
+
+SurveyAgent& SurveyAgent::set_max_retries(int retries) {
+  max_retries_ = retries;
   return *this;
 }
 

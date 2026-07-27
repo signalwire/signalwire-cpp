@@ -1107,7 +1107,12 @@ TEST(tool_definition_to_swaig_json) {
     ASSERT_EQ(j["description"].get<std::string>(), "Get weather for a city");
     ASSERT_TRUE(j.contains("parameters"));
     ASSERT_TRUE(j.contains("web_hook_url"));
-    ASSERT_TRUE(j.contains("secure"));
+    // ``secure`` is NOT a rendered SWAIG function property: it is not in the
+    // SWML UserSWAIGFunction schema and the reference never emits it. The wire
+    // manifestation of secure is the per-tool ``__token`` AgentBase appends to
+    // web_hook_url when rendering with a call_id (see
+    // tool_secure_tool_in_swml_carries_token).
+    ASSERT_FALSE(j.contains("secure"));
     return true;
 }
 

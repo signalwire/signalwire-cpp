@@ -97,6 +97,46 @@ TEST(session_manager_same_secret_validates) {
     return true;
 }
 
+// Reference parity: `SessionManager.__init__(token_expiry_secs, secret_key)`
+// stores BOTH as public instance attributes — `self.token_expiry_secs` and
+// `self.secret_key = secret_key or secrets.token_hex(32)`. A caller hands them
+// in, so a caller reads them back. (The port previously made the expiry
+// accessor `protected` with a `friend class AgentBase`, so a C++ caller could
+// not read what every Python caller can.)
+TEST(session_manager_construction_params_readable) {
+    SessionManager sm(1800, "my-secret-key");
+    ASSERT_EQ(sm.token_expiry_secs(), 1800);
+    ASSERT_EQ(sm.secret_key(), "my-secret-key");
+    return true;
+}
+
+// Defaults mirror the reference: 900s, and an auto-generated key that is
+// `secrets.token_hex(32)`-shaped (64 lowercase hex chars) and unique per
+// instance.
+TEST(session_manager_default_secret_key_is_generated_hex) {
+    SessionManager a;
+    SessionManager b;
+    ASSERT_EQ(a.token_expiry_secs(), 900);
+    ASSERT_EQ(a.secret_key().size(), static_cast<size_t>(64));
+    for (char c : a.secret_key()) {
+        ASSERT_TRUE((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
+    }
+    ASSERT_NE(a.secret_key(), b.secret_key());
+    return true;
+}
+
+// The same explicit secret_key on two managers cross-validates; a different
+// one does not. This is the string-keyed twin of the byte-vector tests above.
+TEST(session_manager_string_secret_key_round_trip) {
+    SessionManager sm1(900, "shared-key");
+    SessionManager sm2(900, "shared-key");
+    SessionManager other(900, "different-key");
+    std::string token = sm1.create_token("func", "call-1", 3600);
+    ASSERT_TRUE(sm2.validate_token(token, "func", "call-1"));
+    ASSERT_FALSE(other.validate_token(token, "func", "call-1"));
+    return true;
+}
+
 TEST(session_manager_timing_safe_compare) {
     ASSERT_TRUE(SessionManager::timing_safe_compare("hello", "hello"));
     ASSERT_FALSE(SessionManager::timing_safe_compare("hello", "world"));
@@ -387,8 +427,13 @@ TEST(contract7_two_mints_have_different_nonces) {
 
 // (3) a token constructed in the python-oracle format validates in-port.
 TEST(contract7_python_oracle_format_interop) {
-    std::vector<uint8_t> secret(32, 0x42);
-    SessionManager sm(secret);
+    // The reference signs with `self.secret_key.encode()` — the KEY is the
+    // secret_key STRING's bytes, not a raw byte blob. Read the manager's own
+    // secret_key() (reference: `self.secret_key`) and sign with exactly that,
+    // which is what makes this a python-format interop check.
+    SessionManager sm(std::vector<uint8_t>(32, 0x42));
+    std::string key_str = sm.secret_key();
+    std::vector<uint8_t> secret(key_str.begin(), key_str.end());
 
     std::string call_id = "call-interop-1";
     std::string function_name = "lookup_order";
@@ -414,8 +459,12 @@ TEST(contract7_python_oracle_format_interop) {
 
 // (4) flip one byte of the signature field => validation fails.
 TEST(contract7_tampered_signature_rejected) {
-    std::vector<uint8_t> secret(32, 0x42);
-    SessionManager sm(secret);
+    // Sign with the manager's REAL key (reference: `self.secret_key`), so the
+    // only thing wrong with the token is the flipped signature nibble — a test
+    // signing with the wrong key would reject for the wrong reason.
+    SessionManager sm(std::vector<uint8_t>(32, 0x42));
+    std::string key_str = sm.secret_key();
+    std::vector<uint8_t> secret(key_str.begin(), key_str.end());
 
     std::string call_id = "call-9";
     std::string function_name = "fn9";

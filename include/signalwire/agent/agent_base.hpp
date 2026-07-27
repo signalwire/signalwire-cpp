@@ -148,8 +148,35 @@ class AgentBase : public swml::Service {
   friend class signalwire::server::AgentServer;
 
  public:
-  explicit AgentBase(const std::string& name = "agent", const std::string& route = "/",
-                     const std::string& host = "0.0.0.0", int port = 3000);
+  /// Construct an agent.
+  ///
+  /// Mirrors the reference ``AgentBase.__init__`` parameter-for-parameter.
+  /// Every parameter is FORWARDED to the same collaborator the reference
+  /// forwards it to, rather than merely stored:
+  ///   * ``name`` / ``route`` / ``host`` / ``port`` / ``basic_auth`` /
+  ///     ``schema_path`` / ``config_file`` / ``schema_validation``
+  ///     → the ``swml::Service`` base (the reference's ``super().__init__``),
+  ///   * ``token_expiry_secs`` → the agent's ``SessionManager``,
+  ///   * ``config_file`` additionally seeds the ``service`` section that
+  ///     supplies name/route/host/port defaults (constructor arguments win).
+  ///
+  /// ``port`` is an optional so "not supplied" stays distinguishable from an
+  /// explicit value — that is what lets the config file and the ``PORT`` env
+  /// var still apply, exactly as in the reference.
+  explicit AgentBase(
+      const std::string& name = "agent", const std::string& route = "/",
+      const std::string& host = "0.0.0.0", const std::optional<int>& port = std::nullopt,
+      const std::optional<std::pair<std::string, std::string>>& basic_auth = std::nullopt,
+      bool use_pom = true, int token_expiry_secs = 3600, bool auto_answer = true,
+      bool record_call = false, const std::string& record_format = "mp4", bool record_stereo = true,
+      const std::optional<std::string>& default_webhook_url = std::nullopt,
+      const std::optional<std::string>& agent_id = std::nullopt,
+      const std::optional<std::vector<std::string>>& native_functions = std::nullopt,
+      const std::optional<std::string>& schema_path = std::nullopt, bool suppress_logs = false,
+      bool enable_post_prompt_override = false, bool check_for_input_override = false,
+      const std::optional<std::string>& config_file = std::nullopt, bool schema_validation = true,
+      const std::optional<std::string>& signing_key = std::nullopt,
+      bool trust_proxy_for_signature = false);
   virtual ~AgentBase();
 
   // Prevent copy (use clone for dynamic config)
@@ -286,8 +313,11 @@ class AgentBase : public swml::Service {
   // reference. on_function_call is overridden to add session-token
   // validation.
   AgentBase& define_tool(const swaig::ToolDefinition& tool);
+  /// ``secure`` defaults to TRUE (reference: ``tool_mixin.define_tool(
+  /// secure=True)``) — a tool defined without an explicit ``secure`` requires
+  /// SWAIG token validation.
   AgentBase& define_tool(const std::string& name, const std::string& description,
-                         const json& parameters, swaig::ToolHandler handler, bool secure = false);
+                         const json& parameters, swaig::ToolHandler handler, bool secure = true);
   AgentBase& register_swaig_function(const json& func_def);
   [[nodiscard]] swaig::FunctionResult on_function_call(const std::string& name, const json& args,
                                                        const json& raw_data) override;
@@ -388,6 +418,16 @@ class AgentBase : public swml::Service {
   /// Returns a copy; an empty object when nothing has been set.
   [[nodiscard]] json get_global_data() const;
   AgentBase& set_native_functions(const std::vector<std::string>& funcs);
+  /// The native SWAIG functions this agent declares (reference:
+  /// ``self.native_functions``) — rendered into the SWML ``ai.SWAIG
+  /// .native_functions`` array when non-empty. A caller supplies these at
+  /// construction or via ``set_native_functions``, so a caller reads them back.
+  [[nodiscard]] const std::vector<std::string>& native_functions() const {
+    return native_functions_;
+  }
+  /// This agent's id (reference: ``self.agent_id``) — the id supplied at
+  /// construction, or a generated UUID when none was given.
+  [[nodiscard]] const std::string& agent_id() const { return agent_id_; }
   /// The complete set of internal SWAIG function names that accept
   /// fillers, matching the SWAIGInternalFiller schema definition.
   /// Any name outside this set is silently ignored by the runtime —
@@ -649,11 +689,21 @@ class AgentBase : public swml::Service {
   [[nodiscard]] std::string detect_proxy_url(
       const std::map<std::string, std::string>& headers) const;
 
-  // Build the AI verb JSON
-  [[nodiscard]] json build_ai_verb(const std::string& webhook_url) const;
+  // Build the AI verb JSON. ``call_id``, when non-empty, mints the per-tool
+  // security ``__token`` on each SECURE tool's webhook (see
+  // build_swaig_functions). NOT defaulted on purpose: a defaulted call_id
+  // silently renders every secure tool WITHOUT its token at any call site that
+  // forgets to thread it, which is exactly the security regression the
+  // SECURE-DEFAULT gate exists to catch. Make omission a compile error.
+  [[nodiscard]] json build_ai_verb(const std::string& webhook_url,
+                                   const std::string& call_id) const;
 
-  // Build SWAIG functions array
-  [[nodiscard]] json build_swaig_functions(const std::string& webhook_url) const;
+  // Build SWAIG functions array. A SECURE tool rendered with a non-empty
+  // ``call_id`` carries a per-tool ``__token=`` on its ``web_hook_url`` — the
+  // wire manifestation of ``secure`` (reference agent_base.py:1040/1096-1100).
+  // ``call_id`` is not defaulted; see build_ai_verb.
+  [[nodiscard]] json build_swaig_functions(const std::string& webhook_url,
+                                           const std::string& call_id) const;
 
   // Build the prompt
   [[nodiscard]] json build_prompt() const;
@@ -680,8 +730,12 @@ class AgentBase : public swml::Service {
   // Add security headers
   static void add_security_headers(httplib::Response& res);
 
-  // Internal SWML rendering (used by render_swml_for_request)
-  [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers) const;
+  // Internal SWML rendering (used by render_swml_for_request). ``call_id`` is
+  // the request's ``call_id`` query parameter (reference
+  // swml_service.py:807 → ``_render_swml(call_id)``); when non-empty every
+  // SECURE tool's rendered webhook carries its per-tool ``__token``.
+  [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers,
+                                          const std::string& call_id) const;
 
   /// Post-render transform hook. Called on the fully-rendered SWML document
   /// just before it is returned, so a subclass can rewrite it (e.g. BedrockAgent
@@ -758,6 +812,59 @@ class AgentBase : public swml::Service {
   SummaryCallback summary_callback_;
   DebugEventCallback debug_event_callback_;
 
+  // ========================================================================
+  // Construction-parameter accessors for the reference's UNDERSCORE-PRIVATE
+  // attributes. Protected (not public) because the reference's counterparts
+  // are private — subclasses and the render pipeline read them, callers do
+  // not.
+  // ========================================================================
+
+  // NOTE: ``agent_id()`` / ``token_expiry_secs()`` are declared PUBLIC (above),
+  // not here — they read configuration that is part of the public API, so
+  // callers may query them directly.
+
+  /// reference: ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  [[nodiscard]] bool auto_answer() const { return auto_answer_; }
+  /// reference: ``self._record_call`` / ``_record_format`` / ``_record_stereo``.
+  [[nodiscard]] bool record_call_enabled() const { return record_call_; }
+  [[nodiscard]] const std::string& record_format() const { return record_format_; }
+  [[nodiscard]] bool record_stereo() const { return record_stereo_; }
+  /// reference: ``self._default_webhook_url``.
+  [[nodiscard]] const std::optional<std::string>& default_webhook_url() const {
+    return default_webhook_url_;
+  }
+  /// reference: ``self._suppress_logs``.
+  [[nodiscard]] bool suppress_logs() const { return suppress_logs_; }
+  /// Accepted and stored by the reference constructor with no consumer.
+  [[nodiscard]] bool enable_post_prompt_override() const { return enable_post_prompt_override_; }
+  [[nodiscard]] bool check_for_input_override() const { return check_for_input_override_; }
+  /// Token lifetime forwarded to this agent's ``SessionManager``. PROTECTED,
+  /// unlike ``agent_id()``: the reference's AgentBase does NOT keep a
+  /// ``self.token_expiry_secs`` — it forwards the ctor param straight into
+  /// ``SessionManager(token_expiry_secs=…)``, where it IS public
+  /// (``SessionManager::token_expiry_secs()``). A public accessor here would be
+  /// surface the reference's AgentBase does not have.
+  [[nodiscard]] int token_expiry_secs() const { return session_manager_.token_expiry_secs(); }
+
+  // Construction parameters the reference stores on the instance.
+  /// ``self.agent_id`` — the supplied id, or a generated UUID.
+  std::string agent_id_;
+  /// ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  bool auto_answer_ = true;
+  /// ``self._record_call`` / ``_record_format`` / ``_record_stereo`` — gate
+  /// and shape the PHASE-3 ``record_call`` verb.
+  bool record_call_ = false;
+  std::string record_format_ = "mp4";
+  bool record_stereo_ = true;
+  /// ``self._default_webhook_url`` — SWAIG default ``web_hook_url``.
+  std::optional<std::string> default_webhook_url_;
+  /// ``self._suppress_logs``.
+  bool suppress_logs_ = false;
+  /// Accepted and stored by the reference constructor; no render-path
+  /// consumer in the reference either.
+  bool enable_post_prompt_override_ = false;
+  bool check_for_input_override_ = false;
+
   // Security
   security::SessionManager session_manager_;
 
@@ -770,7 +877,16 @@ class AgentBase : public swml::Service {
   bool trust_proxy_for_signature_ = false;
 
   // Server
-  std::unique_ptr<httplib::Server> server_;
+  /// Guards ``server_``. ``serve()`` blocks in ``listen()`` for the server's
+  /// whole lifetime, so it is normally run on its own thread while ``stop()``
+  /// is called from another — meaning the pointer is written by one thread and
+  /// read/dropped by another. Unsynchronised, that is a data race.
+  mutable std::mutex server_mutex_;
+  /// ``shared_ptr``, not ``unique_ptr``: ``serve()`` holds its own strong
+  /// reference across the blocking ``listen()``, so a concurrent ``stop()``
+  /// that drops the member cannot destroy the server while a thread is still
+  /// executing inside it.
+  std::shared_ptr<httplib::Server> server_;
   mutable std::shared_mutex state_mutex_;
 };
 

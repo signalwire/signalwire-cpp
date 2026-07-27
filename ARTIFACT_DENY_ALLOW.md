@@ -31,6 +31,7 @@ Format: `- path — reason (approver, date)`.
 - port_signatures.json — root porting-audit surface oracle; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
 - port_signatures.baseline.json — load-bearing SEMVER-DIFF release-floor file; mirrors port_signatures.json; must be at root, must not ship (orchestrator, 2026-07-13)
 - port_surface.json — root porting-audit surface oracle; not under src/ or include/, never packaged (orchestrator, 2026-07-06)
+- port_surface_native.json — the NATIVE-NAME SIDECAR that DOC-AUDIT reads so an accessor fold does not break cpp's own correct doc examples. Added by the class-B2 re-drift (49d6ab8), which introduced the file without the matching allow entry — ARTIFACT-DENY then correctly failed, because cpp's package set is a `git ls-files` proxy with no include/exclude discipline, so an audit artifact would have shipped in a published package. Same audit-pipeline-not-library category as the three entries above; go/java/php/dotnet each carry the equivalent entry for their own sidecar (orchestrator, 2026-07-26)
 - examples/relay_audit_harness.cpp — audit-harness example build-target, not compiled into libsignalwire.a (orchestrator, 2026-07-06)
 - examples/rest_audit_harness.cpp — audit-harness example build-target, not compiled into libsignalwire.a (orchestrator, 2026-07-06)
 - examples/skills_audit_harness.cpp — audit-harness example build-target, not compiled into libsignalwire.a (orchestrator, 2026-07-06)

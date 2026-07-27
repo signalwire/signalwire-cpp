@@ -53,10 +53,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 from pathlib import Path
+
+
+def _resolve_psdk() -> Path:
+    """Resolve the porting-sdk checkout (for the reference surface oracle).
+
+    Honours PORTING_SDK_DIR, then PORTING_SDK (the var run-ci / the surface suite
+    export), then the adjacent ``<repo>/../porting-sdk``. The env fallback makes a
+    WORKTREE run resolve the real checkout (a worktree's parent has no porting-sdk
+    sibling); real CI uses adjacency. Mirrors enumerate_signatures._resolve_psdk."""
+    for var in ("PORTING_SDK_DIR", "PORTING_SDK"):
+        val = os.environ.get(var)
+        if val and (Path(val) / "type_aliases.yaml").is_file():
+            return Path(val).resolve()
+    return (Path(__file__).resolve().parent.parent.parent / "porting-sdk").resolve()
 
 # ---------------------------------------------------------------------------
 # Class -> Python module mapping
@@ -428,6 +443,10 @@ GENERATED_PAYLOAD_NS = {
 # parse_header to force-register a zero-method struct so it surfaces).
 GENERATED_TYPE_NS_PREFIXES = (_TYPES_NS_PREFIX.rstrip(":"),) + tuple(GENERATED_PAYLOAD_NS)
 
+# Set at build_snapshot entry: the ``…/include`` root under which the generated
+# payload header namespaces resolve (``signalwire::core::foo`` -> <root>/signalwire/core/foo).
+_INCLUDE_ROOT: Path = Path(".")
+
 
 def generated_type_module(ns_path: str) -> str | None:
     """If ``ns_path`` is one of the generated wire-type / payload namespaces,
@@ -482,6 +501,17 @@ _METHOD_RENAMES: dict[str, str] = {
     # is not reserved in C++, but the trailing underscore disambiguates it from
     # the many ``register_*`` methods and matches the port's escape convention).
     "register_": "register",
+    # SWML keyword-escape verbs. ``goto``/``return``/``switch`` are C++ reserved
+    # words, so swml::Service spells the verbs ``goto_section``/``return_section``/
+    # ``switch_section``. The Python reference routes every SWML verb dynamically
+    # (no per-verb symbol); the G fold (diff-side _fold_swml_verbs) drops a
+    # SWMLService.<verb> whose leaf is a canonical schema verb name. Normalise the
+    # keyword-escaped spelling back to the canonical verb here (emission), so the
+    # fold retires them like the other ~35 typed verbs — idiom fixed at emission,
+    # not an allow-list entry.
+    "goto_section": "goto",
+    "return_section": "return",
+    "switch_section": "switch",
 }
 
 
@@ -604,6 +634,14 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     # (``agent.prompt_manager.X`` ≡ ``agent.X``). Project the same set of
     # AgentBase methods to PromptManager so the cross-language audit
     # treats both paths as covered.
+    #
+    # ``agent``: the reference's ``PromptManager(self)`` back-reference to the
+    # owning AgentBase (``self.agent``, a ctor param the oracle's class-B2 rule
+    # records). C++ does not extract a separate manager OBJECT — the prompt
+    # methods live directly on AgentBase, so the manager and its ``agent`` are
+    # the SAME object and the back-reference is ``*this``. Projecting it here is
+    # the fold of that merge: reaching the agent from the manager is exactly as
+    # available in C++ as in Python, it is simply already in hand.
     ("signalwire.core.agent.prompt.manager", "PromptManager"): [
         "__init__", "define_contexts", "get_contexts", "get_post_prompt", "get_prompt",
         "get_raw_prompt",
@@ -942,21 +980,25 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
 #                                     dotnet takes via IDisposable/using; the
 #                                     capability is real, only the idiom differs, so
 #                                     this is ZERO omissions, not an impossible:.
-#   url()  read-only getter        -> DROPPED (Python exposes ``self.url`` as an
-#                                     instance ATTRIBUTE, which the surface oracle
-#                                     does not record as a class member; the C++
-#                                     getter is that attribute's idiomatic read,
-#                                     so it folds to "no member")
-#   AIChatError code()/has_code()/server_message() getters + code_/has_code_/
-#     message_ protected fields    -> DROPPED (Python's AIChatError records only
-#                                     __init__; ``code``/``message`` are plain
-#                                     instance attributes, not surface members)
+#   url()  read-only getter        -> url            (FOLDED: Python exposes
+#                                     ``self.url`` as a public __init__ attribute
+#                                     that is ALSO a ctor param — caller-supplied
+#                                     configuration the caller reads back. The
+#                                     oracle's class-B2 rule records it, and the
+#                                     C++ getter is that attribute's read.)
+#   AIChatError code() / server_message()
+#                                  -> code / message (FOLDED, same class-B2 rule:
+#                                     both are ctor params the reference stores
+#                                     publicly. ``has_code()`` stays a port
+#                                     addition — it is the C++ spelling of
+#                                     "``code`` is None", which a C++ ``int``
+#                                     cannot express.)
 #
 # Every symbol is verified present in the header before it is emitted (abort-loud
 # on a missing one) so the projection can never invent surface the port lost.
 _AI_CHAT_CLIENT_METHODS = [
     "__aenter__", "__aexit__", "__init__", "chat", "close", "create_conversation",
-    "delete", "end", "log", "summarize",
+    "delete", "end", "log", "summarize", "url",
 ]
 # Method-less classes the oracle records in ai_chat.client: the base error
 # carries __init__; every error subclass + result struct is bare.
@@ -994,9 +1036,14 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
     for _m in ("create_conversation", "chat", "end", "log", "summarize"):
         _require(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
     _require(r"\bbool\s+del\s*\(", "AIChatClient::del (reference ``delete``)")
+    # The ctor-param reads the oracle's class-B2 rule records.
+    _require(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference ``self.url``)")
 
     # The base error + every typed subclass and result struct.
     _require(r"\bclass\s+AIChatError\b", "class AIChatError")
+    _require(r"\bint\s+code\s*\(\s*\)\s*const", "AIChatError::code")
+    _require(r"\bserver_message\s*\(\s*\)\s*const",
+             "AIChatError::server_message (reference ``message``)")
     for _c in _AI_CHAT_EMPTY_CLASSES:
         kind = r"class" if _c.endswith("Error") else r"struct"
         _require(rf"\b{kind}\s+{_c}\b", f"{kind} {_c}")
@@ -1009,9 +1056,20 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
     client_mod = modules.setdefault(
         "signalwire.ai_chat.client", {"classes": {}, "functions": []})
     client_mod["classes"]["AIChatClient"] = sorted(_AI_CHAT_CLIENT_METHODS)
-    client_mod["classes"]["AIChatError"] = ["__init__"]
+    # ``server_message()`` is the C++ spelling of the reference's ``message``
+    # attribute — ``message`` alone would collide with std::runtime_error::what()
+    # semantics, so the port disambiguates the name. Rename, never omission.
+    client_mod["classes"]["AIChatError"] = ["__init__", "code", "message"]
     for _c in _AI_CHAT_EMPTY_CLASSES:
         client_mod["classes"][_c] = []
+
+    # The result DTOs (ChatResponse/ChatLog/ConversationInfo) are @dataclass-shaped
+    # in the reference: their surface members are bare public data fields, which the
+    # C++ port carries as struct fields the method-walker skipped. Emit those fields,
+    # gated on the oracle's per-class set (drops port-internal scalars like
+    # ConversationInfo.has_initial_message that the reference does not record). The
+    # error subclasses stay method-less (they carry no oracle-recorded field).
+    _emit_oracle_gated_fields(modules, "signalwire.ai_chat.client", client_hpp)
 
 
 # ---------------------------------------------------------------------------
@@ -1163,11 +1221,22 @@ class Scope:
         self.visibility = visibility
 
 
-def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
-    """Return list of (namespace_path, class_name, public_methods).
+def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
+    """Return list of (namespace_path, class_name, public_members).
 
     namespace_path is a "::"-joined string like "signalwire::agent".
-    Methods are already sorted.
+    Members are already sorted.
+
+    "Members" is methods PLUS public data-member fields. C++ spells a piece of
+    caller-readable state either way — ``std::string body;`` on a struct and
+    ``const std::string& body() const`` on a class are the SAME read surface, and
+    the reference spells both as a plain ``self.body`` attribute. Emitting only
+    methods made every public FIELD read as missing-port drift even though the
+    member is right there (pom::Section's title/body/bullets, relay::Message's
+    message_id/body/media/tags). Field-vs-accessor SHAPE is idiom, folded at
+    emission (RULES §2). Field names are still intersected against the oracle
+    downstream (``_gate_field_members``), so a port-internal public field the
+    reference does not record never becomes invented surface.
     """
     raw = path.read_text(encoding="utf-8", errors="replace")
     text = strip_block_comments(raw)
@@ -1180,6 +1249,10 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
     # Per (namespace, class) collect methods
     # Key: (ns_path, class_name) -> ordered list of methods (dedup at end)
     collected: dict[tuple[str, str], list[str]] = {}
+    # Same keying for public DATA-MEMBER fields, kept apart from methods so the
+    # caller can oracle-gate them (a method the port declares is real surface;
+    # a public field is only surface where the reference records the attribute).
+    fields: dict[tuple[str, str], list[str]] = {}
 
     lines = text.split("\n")
     for raw_line in lines:
@@ -1281,6 +1354,18 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
                 # Map ``delete_`` (C++ keyword-avoidance) -> Python ``delete``.
                 emit_method = _METHOD_RENAMES.get(method_name, method_name)
                 collected.setdefault((ns_path, class_name), []).append(emit_method)
+            else:
+                # Not a method — try a public DATA-MEMBER field. Same read
+                # surface as an accessor (see the docstring); collected
+                # separately because fields are oracle-gated downstream.
+                field_name = extract_field_name(code_line)
+                if field_name is not None:
+                    ns_path = "::".join(
+                        s.name for s in scopes if s.kind == "namespace"
+                    )
+                    class_name = scopes[-1].name
+                    emit_field = _METHOD_RENAMES.get(field_name, field_name)
+                    fields.setdefault((ns_path, class_name), []).append(emit_field)
 
         # --- Update brace depth for any other line with braces
         # (skip string braces already via strip_strings)
@@ -1298,9 +1383,80 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str]]]:
             if m not in seen_set:
                 seen.append(m)
                 seen_set.add(m)
-        findings.append((ns, cls, sorted(seen)))
+        findings.append((ns, cls, sorted(seen), sorted(set(fields.get((ns, cls), [])))))
+
+    # A class with ONLY public fields and no methods is deliberately NOT
+    # registered here. Registering it would put the port's internal
+    # options/DTO structs (RelayConfig, ChatOptions, CreateParams, …) on the
+    # surface as invented CLASS symbols — they exist because C++ needs a named
+    # type where the reference passes kwargs. The field fold's job is to
+    # complete a class the walker already found, not to add new classes.
 
     return findings
+
+
+# A public data-member declaration at class-body depth: an optional
+# ``[[attr]]`` / ``mutable`` / ``static`` / ``constexpr`` / ``const`` prefix, a
+# type expression (possibly templated / ``::``-qualified / ref / pointer), the
+# member identifier, an optional ``= init`` or ``{init}``, then ``;``.
+# ``strip_line_comments`` has already removed any trailing comment.
+_FIELD_DECL_RE = re.compile(
+    r"^\s*(?P<quals>(?:mutable\s+|static\s+|constexpr\s+|const\s+|inline\s+)*)"
+    r"(?P<type>[A-Za-z_][\w:]*(?:\s*<.*>)?(?:\s*(?:const|\*|&))*)"
+    r"\s+(?P<name>[A-Za-z_]\w*)"
+    r"\s*(?:=[^;]*|\{[^;]*\})?;\s*$"
+)
+
+# Type-expression keywords that mean the line is a declaration of something
+# other than a data member (a nested type, an alias, a template).
+_FIELD_TYPE_REJECT = {
+    "using", "typedef", "friend", "template", "enum", "struct", "class",
+    "union", "namespace", "return", "static_assert", "public", "private",
+    "protected", "operator",
+}
+
+
+def extract_field_name(code_line: str) -> str | None:
+    """If this line declares a public DATA MEMBER, return the member name.
+
+    A field is caller-readable state exactly like a zero-arg accessor is; both
+    are the reference's plain ``self.<name>`` attribute (see ``parse_header``).
+    Rejects aliases/nested types/statics-as-constants and anything with a call
+    paren (that is a method or an initializer-with-args, handled elsewhere).
+    """
+    stripped = code_line.strip()
+    if not stripped or not stripped.endswith(";"):
+        return None
+    if stripped.startswith(("//", "#")):
+        return None
+    first = stripped.split(None, 1)[0].rstrip(":")
+    if first in _FIELD_TYPE_REJECT:
+        return None
+    m = _FIELD_DECL_RE.match(code_line)
+    if not m:
+        return None
+    # A ``(`` before the member name means a type expression like
+    # ``std::function<void()> cb_;`` (fine — the paren is inside ``<>``) or a
+    # declaration we should not treat as a field. Only reject when the paren
+    # sits OUTSIDE any angle brackets.
+    head = code_line[: m.start("name")]
+    depth = 0
+    for ch in head:
+        if ch == "<":
+            depth += 1
+        elif ch == ">":
+            depth = max(0, depth - 1)
+        elif ch == "(" and depth == 0:
+            return None
+    name = m.group("name")
+    # A trailing-underscore name is the port's PRIVATE-member convention; a
+    # public one is an implementation detail that leaked, never surface.
+    if name.endswith("_"):
+        return None
+    # An ALL-CAPS static is a constant, not instance state.
+    if "static" in m.group("quals") and name.isupper():
+        return None
+    return name
 
 
 def extract_method_name(code_line: str, class_name: str) -> str | None:
@@ -1490,7 +1646,381 @@ def _project_generated_rest_methods(modules: dict) -> None:
         mod_entry["classes"][cls] = sorted(existing)
 
 
+# Generated read-side payload structs (swml_verbs_generated, post_prompt_generated,
+# swaig_request_generated, …) are METHOD-LESS PODs: one ``std::optional<T>`` data
+# member per snake wire key. The reference SURFACE oracle records the B1 composition
+# attributes on these classes (a self-only member holding an SDK class / json /
+# optional-wrapped value) as bare members. The regex header walker only emits methods
+# (things with ``(``), so those fields never reach the surface and read as missing-port
+# DRIFT even though the field IS implemented. Project each public data-member field as
+# a surface member — but ONLY the fields the oracle records for that class (never invent
+# surface: the open ``extras`` member and scalar fields the reference does NOT expose are
+# not projected). Field-vs-attribute SHAPE idiom, reconciled via the enumerator (RULES
+# §2) — the surface analogue of the signature side's ``_project_gen_payload_getters``.
+_GEN_FIELD_RE_SURF = re.compile(
+    r"^\s+(?:\[\[[^\]]*\]\]\s*)?[A-Za-z_][\w:<>,\s]*?[>\w]\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+)?;\s*(//.*)?$"
+)
+_WIRE_KEY_RE_SURF = re.compile(r"wire key:\s*(\S+)")
+
+
+def _gen_payload_struct_fields_surf(payload_dir: Path) -> dict[str, list[str]]:
+    """``{StructName: [wire_field, …]}`` for the generated payload headers under
+    ``payload_dir``. Honours the ``// wire key: <name>`` comment on reserved-word
+    renames. Lines with ``(`` are skipped (method / initializer, not a data member).
+    Identical parse to enumerate_signatures._gen_payload_struct_fields."""
+    out: dict[str, list[str]] = {}
+    if not payload_dir.is_dir():
+        return out
+    for hdr in sorted(payload_dir.glob("*.hpp")):
+        src_txt = hdr.read_text(encoding="utf-8")
+        for sm in re.finditer(r"struct\s+(\w+)\s*\{(.*?)\n\};", src_txt, re.S):
+            cls, body = sm.group(1), sm.group(2)
+            fields: list[str] = []
+            for line in body.splitlines():
+                if "(" in line:
+                    continue
+                m = _GEN_FIELD_RE_SURF.match(line)
+                if not m:
+                    continue
+                ident, comment = m.group(1), m.group(2) or ""
+                wk = _WIRE_KEY_RE_SURF.search(comment)
+                fields.append(wk.group(1) if wk else ident)
+            if fields:
+                out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _load_reference_surface() -> dict:
+    """The reference ``python_surface.json`` (the surface oracle the diff compares
+    against). Empty dict if unresolvable — the projection then no-ops (safe)."""
+    psdk = _resolve_psdk()
+    path = psdk / "python_surface.json"
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _fold_setters(module: str, cls: str, members: list[str]) -> list[str]:
+    """Collapse a ``set_<x>`` writer onto ``<x>`` when the reference oracle
+    records ``<x>`` as a member of the SAME class.
+
+    The reference spells caller-supplied configuration as a plain public
+    attribute: ``self.venue_name = venue_name`` is BOTH the read and the write.
+    C++ splits that into an accessor + a fluent setter. Both spellings drive the
+    same capability, so the setter is IDIOM and folds at emission
+    (ALLOWLIST_DISCIPLINE §0) — it is not additional surface.
+
+    Same-class gating is what keeps this honest: a ``set_x`` whose ``x`` the
+    reference does not have on this class is left alone (it stays visible as
+    whatever it really is), so the fold can never launder genuinely port-only
+    surface, and it never performs the cross-class fold RULES §4 forbids."""
+    ref = _load_reference_surface()
+    if not ref:
+        return members
+    ref_members = ref.get("modules", {}).get(module, {}).get("classes", {}).get(cls)
+    allowed: set[str] = set()
+    if ref_members:
+        allowed = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+    if module in _FAMILY_GATE_MODULES:
+        allowed |= _agentbase_family_members(ref)
+    if not allowed:
+        return members
+    out: set[str] = set()
+    for m in members:
+        # The reference may itself expose a real ``set_<x>`` METHOD alongside
+        # the attribute (FunctionResult.set_response, AgentBase
+        # .set_native_functions). Those are surface in their own right — never
+        # fold a name the oracle records verbatim.
+        if m.startswith("set_") and m not in allowed and m[4:] in allowed:
+            out.add(m[4:])
+        else:
+            out.add(m)
+    return sorted(out)
+
+
+def _gate_field_members(module: str, cls: str, decl_fields: list[str]) -> list[str]:
+    """Filter a class's public data-member fields down to the ones the reference
+    oracle actually records for that class.
+
+    A public FIELD is caller-readable state, the same as a zero-arg accessor —
+    but unlike a declared method (which is unambiguously the port's surface), a
+    field is often incidental (a struct's working buffer, a helper's cached
+    handle). Intersecting with the oracle folds the field-vs-attribute idiom
+    exactly where the reference has the attribute and drops it everywhere else,
+    so this never invents surface (RULES §2 / ALLOWLIST_DISCIPLINE §0a).
+
+    For an ``agentbase-family`` class the diff collapses the ``module.Class``
+    prefix away entirely, so gate against the union of every family class's
+    members rather than this one class's."""
+    if not decl_fields:
+        return []
+    ref = _load_reference_surface()
+    if not ref:
+        return []
+    ref_modules = ref.get("modules", {})
+    ref_members = ref_modules.get(module, {}).get("classes", {}).get(cls)
+    allowed: set[str] = set()
+    if ref_members:
+        allowed = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+    if module in _FAMILY_GATE_MODULES:
+        allowed |= _agentbase_family_members(ref)
+    return [f for f in decl_fields if f in allowed]
+
+
+# Modules whose classes the diff folds into the `agentbase-family` token: a
+# member declared on the C++ AgentBase may be recorded by the reference on ANY
+# family class (a mixin), so the field gate must consult the whole family.
+_FAMILY_GATE_MODULES = frozenset({"signalwire.core.agent_base"})
+_FAMILY_MIXIN_PREFIX = "signalwire.core.mixins."
+
+
+def _agentbase_family_members(ref: dict) -> set[str]:
+    """Every member the reference records on an AgentBase-family class (AgentBase
+    itself plus the mixins it multiply-inherits). Mirrors the diff tool's
+    ``_fold_agentbase_family`` membership rule."""
+    out: set[str] = set()
+    for mod, entry in ref.get("modules", {}).items():
+        if mod != "signalwire.core.agent_base" and not mod.startswith(_FAMILY_MIXIN_PREFIX):
+            continue
+        for members in entry.get("classes", {}).values():
+            out |= set(members if isinstance(members, list)
+                       else members.get("members", members))
+    return out
+
+
+def _project_gen_payload_members(modules: dict) -> None:
+    """Emit each generated payload struct's public data-member fields as surface
+    members, intersected with the fields the reference oracle records for that class.
+
+    A field only surfaces if the oracle lists it as a member of the same class — so
+    the port's field-idiom folds exactly onto the reference's B1 composition attributes,
+    never inventing a member the reference lacks (the open ``extras`` member and any
+    scalar field the reference does not expose are dropped)."""
+    ref = _load_reference_surface()
+    if not ref:
+        return
+    ref_modules = ref.get("modules", {})
+    for ns, module in GENERATED_PAYLOAD_NS.items():
+        ref_classes = ref_modules.get(module, {}).get("classes", {})
+        if not ref_classes:
+            continue
+        payload_dir = _INCLUDE_ROOT / Path(*ns.split("::"))
+        struct_fields = _gen_payload_struct_fields_surf(payload_dir)
+        if not struct_fields:
+            continue
+        mod_entry = modules.setdefault(module, {"classes": {}, "functions": []})
+        for cls, fields in struct_fields.items():
+            ref_members = ref_classes.get(cls)
+            if not ref_members:
+                continue
+            ref_set = set(ref_members if isinstance(ref_members, list)
+                          else ref_members.get("members", ref_members))
+            present = [f for f in fields if f in ref_set]
+            if not present:
+                continue
+            existing = mod_entry["classes"].get(cls, [])
+            mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
+_CLIENT_TREE_MODULE = "signalwire.rest.namespaces._client_tree_generated"
+
+
+def _project_client_tree_members(modules: dict) -> None:
+    """Emit each generated namespace container's resource-accessor data members
+    (``FabricAddresses addresses;`` -> ``addresses``) as surface members, intersected
+    with the fields the oracle records for that container class.
+
+    The reference records these B1 composition attributes (a container field holding an
+    SDK resource class) as members. The C++ container declares them as ``<Type> <member>;``
+    public data members; the regex header walker only picks up ctor-init-list entries
+    (and misses the first, e.g. ``addresses``), so parse the real data members. Intersect
+    with the oracle so nothing not in the reference is invented."""
+    ref = _load_reference_surface()
+    if not ref:
+        return
+    ref_classes = ref.get("modules", {}).get(_CLIENT_TREE_MODULE, {}).get("classes", {})
+    if not ref_classes:
+        return
+    gen_dir = _INCLUDE_ROOT / "signalwire" / "rest" / "namespaces" / "generated"
+    if not gen_dir.is_dir():
+        return
+    mod_entry = modules.setdefault(_CLIENT_TREE_MODULE, {"classes": {}, "functions": []})
+    for hdr in sorted(gen_dir.glob("*Namespace.hpp")):
+        srctxt = hdr.read_text(encoding="utf-8")
+        m = re.search(r"(?:class|struct) (\w+Namespace)\s*\{(.*?)\n\};", srctxt, re.S)
+        if not m:
+            continue
+        cls, body = m.group(1), m.group(2)
+        ref_members = ref_classes.get(cls)
+        if not ref_members:
+            continue
+        ref_set = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+        # public data members: ``<TypeName> <member>;`` at 2-space indent.
+        fields = re.findall(r"^\s{2}([A-Z]\w+)\s+([a-z_]\w*);", body, re.M)
+        present = [mem for _t, mem in fields if mem in ref_set]
+        if not present:
+            continue
+        existing = mod_entry["classes"].get(cls, [])
+        mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
+# ---------------------------------------------------------------------------
+# Public data-member field projection (field-idiom fold onto the oracle)
+# ---------------------------------------------------------------------------
+# The regex header walker only registers members with a ``(`` (methods). Several
+# reference classes are @dataclass-shaped: their surface members are bare public
+# DATA FIELDS (``std::string call_state;``), which the walker never emits. The
+# reference oracle now records those fields (relay Event dataclasses, the AI-Chat
+# result DTOs, RequestOptions). Fold the C++ field-idiom onto the oracle: parse a
+# named struct/class's public data-member fields and emit exactly the ones the
+# oracle records for that class — never a port-internal helper the reference lacks
+# (the intersection is the guard). Shape idiom reconciled via the enumerator
+# (RULES §2), the surface analogue of the signature side's field projection.
+
+# ``struct/class Name[ : bases] { ... };`` — captures the body of a named struct
+# even when it inherits (``: public RelayEvent``), which the generated-payload
+# parser's ``struct Name {`` regex does not handle. Non-greedy to the matching
+# ``\n};`` at column 0.
+_NAMED_STRUCT_RE = re.compile(
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+
+
+def _struct_public_fields(header_txt: str) -> dict[str, list[str]]:
+    """``{StructName: [field, …]}`` for every named struct/class in ``header_txt``.
+
+    Only bare data-member fields are returned (lines with ``(`` — methods,
+    initializers — are skipped). Honours a ``// wire key: <name>`` comment on a
+    reserved-word rename. Visibility is not tracked; the caller intersects with
+    the oracle, so any private/helper field the reference does not record is
+    dropped anyway."""
+    out: dict[str, list[str]] = {}
+    for sm in _NAMED_STRUCT_RE.finditer(header_txt):
+        cls, body = sm.group(1), sm.group(2)
+        fields: list[str] = []
+        for line in body.splitlines():
+            # A method has ``(`` BEFORE the first ``=``/``;``; a data-member field
+            # may carry ``(`` only inside its initializer (``json x = json::object();``).
+            # Discriminating on paren-position keeps the ``json …`` payload fields
+            # (dropped by a naive ``if "(" in line``) while still skipping methods.
+            eq, sc = line.find("="), line.find(";")
+            bounds = [i for i in (eq, sc) if i != -1]
+            boundary = min(bounds) if bounds else len(line)
+            lp = line.find("(")
+            if lp != -1 and lp < boundary:
+                continue
+            m = _GEN_FIELD_RE_SURF.match(line)
+            if not m:
+                continue
+            ident, comment = m.group(1), m.group(2) or ""
+            wk = _WIRE_KEY_RE_SURF.search(comment)
+            fields.append(wk.group(1) if wk else ident)
+        if fields:
+            out.setdefault(cls, []).extend(fields)
+    return out
+
+
+def _emit_oracle_gated_fields(modules: dict, module: str, header: Path) -> None:
+    """Union each struct's public data-member fields into ``module``'s class
+    entries, intersected with the fields the reference oracle records for that
+    class. A field surfaces only if the oracle lists it for the same class, so
+    the port's field-idiom folds exactly onto the reference dataclass fields and
+    never invents surface the reference lacks."""
+    if not header.is_file():
+        return
+    ref = _load_reference_surface()
+    ref_classes = ref.get("modules", {}).get(module, {}).get("classes", {})
+    if not ref_classes:
+        return
+    struct_fields = _struct_public_fields(header.read_text(encoding="utf-8"))
+    if not struct_fields:
+        return
+    mod_entry = modules.setdefault(module, {"classes": {}, "functions": []})
+    for cls, fields in struct_fields.items():
+        ref_members = ref_classes.get(cls)
+        if not ref_members:
+            continue
+        ref_set = set(ref_members if isinstance(ref_members, list)
+                      else ref_members.get("members", ref_members))
+        present = [f for f in fields if f in ref_set]
+        if not present:
+            continue
+        existing = mod_entry["classes"].get(cls, [])
+        mod_entry["classes"][cls] = sorted(set(existing) | set(present))
+
+
+def _project_relay_event_fields(modules: dict, repo: Path) -> None:
+    """Emit the public data-member fields of the typed relay Event structs
+    (``typed_events.hpp``) as surface members, gated on the oracle's per-class
+    member set for ``signalwire.relay.event``. The structs already surface via
+    ``from_payload``; this adds the @dataclass payload fields (``call_state``,
+    ``control_id``, ``message_state``, …) the walker skipped."""
+    header = repo / "include/signalwire/relay/typed_events.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.relay.event", header)
+
+
+def _project_request_options_fields(modules: dict, repo: Path) -> None:
+    """Emit RequestOptions' public ``std::optional<…>`` data-member fields
+    (``timeout``/``retries``/``retry_on_status``/``retry_backoff``) as surface
+    members, gated on the oracle's ``signalwire.rest._request_options`` set. The
+    ``abort_signal`` pointer + ``merge`` method surface via _ensure_member / the
+    method walker; these four optional fields are what the walker skipped."""
+    header = repo / "include/signalwire/rest/request_options.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.rest._request_options", header)
+
+
+def build_native_names(include_dir: Path) -> dict:
+    """Return the port's REAL declared member names, verbatim, BEFORE any fold.
+
+    ``build_snapshot`` deliberately reshapes the emitted surface into the
+    reference's spelling so the parity diff compares equal: ``set_route`` folds
+    onto ``route`` (``_fold_setters``), and a public field is dropped unless the
+    oracle records the attribute (``_gate_field_members``). That folded snapshot
+    is the right input for the DRIFT diff and the WRONG input for the doc gates
+    — a C++ example that calls ``svc.set_route("/demo")`` is correct, compiling
+    code naming a method that genuinely exists, but the folded snapshot no
+    longer contains ``set_route``, so DOC-AUDIT reads it as a phantom.
+
+    This sidecar is the resolution the doc gates already know how to consume:
+    ``scripts/suites/_doc_audit.py`` passes ``port_surface_native.json`` to
+    ``audit_docs.py --native-names`` for ANY port that ships one, and
+    ``audit_docs.load_native_names`` unions it with the folded surface. So the
+    parity diff keeps seeing the reference's spelling while the doc gates see
+    what a caller can actually type. Emitted in the FLAT ``{"native_names":
+    [...]}`` shape (dotnet's).
+
+    Nothing here gates on the oracle: these are the port's own declarations, and
+    they are used only to RESOLVE doc references, never to claim surface."""
+    global _INCLUDE_ROOT
+    _INCLUDE_ROOT = include_dir.parent
+    names: set[str] = set()
+    patterns = ("**/*.hpp", "**/*.h")
+    header_files: list[Path] = []
+    for p in patterns:
+        header_files.extend(sorted(include_dir.glob(p)))
+    for path in header_files:
+        try:
+            findings = parse_header(path)
+        except Exception:  # pragma: no cover — build_snapshot already warns
+            continue
+        for _ns_path, class_name, methods, decl_fields in findings:
+            names.add(class_name)
+            names.update(methods)
+            names.update(decl_fields)
+    return {"native_names": sorted(names)}
+
+
 def build_snapshot(repo: Path, include_dir: Path) -> dict:
+    global _INCLUDE_ROOT
+    # GENERATED_PAYLOAD_NS keys begin at ``signalwire::``; the header for
+    # ``signalwire::core::foo`` lives at ``<include>/signalwire/core/foo``. include_dir
+    # is ``<include>/signalwire`` by default, so the base is its parent.
+    _INCLUDE_ROOT = include_dir.parent
     modules: dict[str, dict] = {}
 
     # Walk every .hpp/.h under include/
@@ -1506,7 +2036,7 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             print(f"warning: failed to parse {path}: {e}", file=sys.stderr)
             continue
 
-        for ns_path, class_name, methods in findings:
+        for ns_path, class_name, methods, decl_fields in findings:
             # Apply class rename (e.g. swml::Service -> SWMLService)
             emit_class = class_name
             emit_mod = None
@@ -1523,11 +2053,18 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             if emit_mod is None:
                 continue
             mod_entry = modules.setdefault(emit_mod, {"classes": {}, "functions": []})
+            # Public DATA-MEMBER fields are the same read surface as an
+            # accessor, but only where the reference records the attribute —
+            # gate them on the oracle's member set for this class so a
+            # port-internal public field never becomes invented surface.
+            gated_fields = _gate_field_members(emit_mod, emit_class, decl_fields)
             # If the class was already seen in another header (unlikely but
             # possible for split public/impl headers), merge the method list.
             existing = mod_entry["classes"].get(emit_class, [])
-            merged = sorted(set(existing) | set(methods))
-            mod_entry["classes"][emit_class] = merged
+            merged = sorted(set(existing) | set(methods) | set(gated_fields))
+            # Fold ``set_<x>`` onto ``<x>`` where the reference records ``<x>``
+            # on this class — writer/attribute shape idiom (see _fold_setters).
+            mod_entry["classes"][emit_class] = _fold_setters(emit_mod, emit_class, merged)
 
     # Apply mixin projections: the C++ AgentBase flattens Python's 9 mixin
     # classes. Emit the same method list under each mixin module path so
@@ -1553,6 +2090,23 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
         # Mixin class always exists (even if empty) so the class symbol
         # itself isn't flagged missing.
         mod_entry["classes"][cls] = sorted(present)
+
+    # ``PromptManager.agent`` / ``ToolRegistry.agent``: the reference constructs
+    # each helper with a back-reference to the owning agent
+    # (``PromptManager(self)`` / ``ToolRegistry(self)``, stored as ``self.agent``
+    # — a ctor param the oracle's class-B2 rule records). C++ does not extract
+    # the helpers as separate OBJECTS at all: their methods are declared
+    # directly on AgentBase / swml::Service, which is exactly what the
+    # projections above encode. When the manager and its agent are the SAME
+    # object, the back-reference is ``*this`` — reaching the agent from the
+    # manager is as available in C++ as in Python, it is simply already in hand.
+    # Emit it only where the projection actually produced the merged class, so
+    # this can never surface a member for a class the port does not have.
+    for _mod, _cls in (("signalwire.core.agent.prompt.manager", "PromptManager"),
+                       ("signalwire.core.agent.tools.registry", "ToolRegistry")):
+        _members = modules.get(_mod, {}).get("classes", {}).get(_cls)
+        if _members:
+            modules[_mod]["classes"][_cls] = sorted(set(_members) | {"agent"})
 
     # Generated REST base hierarchy projection. The generated resource bases
     # live in ``signalwire::rest::generated`` (base_resource.hpp) but the
@@ -1623,9 +2177,20 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # richer C++ surface stays under relay.action as the port addition).
     _action_own = modules.get("signalwire.relay.action", {}).get("classes", {}).get("Action", [])
     if _action_own:
-        proj = sorted({"__init__"} | {m for m in ("is_done", "wait") if m in _action_own})
+        # ``control_id`` joins the projected set: it is a ctor param the
+        # reference stores publicly (``self.control_id``), which the oracle's
+        # class-B2 rule now records, and the C++ Action has the accessor.
+        proj = sorted({"__init__"} | {m for m in ("is_done", "wait", "result", "control_id", "call")
+                                      if m in _action_own})
         modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
         modules["signalwire.relay.call"]["classes"]["Action"] = proj
+        # ``call`` is REFERENCE surface (``relay.call.Action.call``), projected
+        # above onto the class where the reference declares it. Emitting it a
+        # SECOND time under the port's native ``relay.action`` module would make
+        # the same member read as a port addition there. One member, one home.
+        modules["signalwire.relay.action"]["classes"]["Action"] = [
+            m for m in _action_own if m != "call"
+        ]
 
     # Concrete RELAY call-action subclasses (PlayAction/RecordAction/…). The C++
     # port FLATTENS every control onto the unified ``Action`` and declares each
@@ -1665,12 +2230,40 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             entry.append(member)
             modules[mod]["classes"][cls] = sorted(set(entry))
 
+    # PromptObjectModel.sections / Section.subsections are PUBLIC ``std::vector<Section>``
+    # data members in pom.hpp; the reference records them as the B1 composition attribute.
+    # Same public collection, same name — surface it (the regex walker skips data members).
+    _ensure_member("signalwire.pom.pom", "PromptObjectModel", "sections")
+    _ensure_member("signalwire.pom.pom", "Section", "subsections")
+
+    # RequestOptions exposes the cooperative-cancellation ``abort_signal`` as a public
+    # data member (``std::atomic<bool>* abort_signal``); the reference records it as the
+    # B1 cancellation attribute. Same surface, same name — the regex walker skips data
+    # members, so surface it here (idiom via the enumerator, RULES §2).
+    _ensure_member("signalwire.rest._request_options", "RequestOptions", "abort_signal")
+
     # SWAIGFunction exposes ``operator()`` + ``call`` -> Python ``__call__``.
     _ensure_member("signalwire.core.swaig_function", "SWAIGFunction", "__call__")
     # SkillRegistry is a singleton (private ctor); SkillBase has a defaulted
     # protected ctor. Both genuinely construct — surface ``__init__``.
     _ensure_member("signalwire.skills.registry", "SkillRegistry", "__init__")
     _ensure_member("signalwire.core.skill_base", "SkillBase", "__init__")
+
+    # Generated read-side payload structs: project their public data-member fields
+    # as surface members (intersected with the oracle's recorded B1 composition attrs).
+    _project_gen_payload_members(modules)
+
+    # Generated namespace containers: project their resource-accessor data members
+    # as surface members (intersected with the oracle's recorded B1 composition attrs).
+    _project_client_tree_members(modules)
+
+    # Typed relay Event structs: project their @dataclass payload fields as surface
+    # members (intersected with the oracle's signalwire.relay.event per-class set).
+    _project_relay_event_fields(modules, repo)
+
+    # RequestOptions: project its public std::optional<…> data-member fields as
+    # surface members (intersected with the oracle's _request_options set).
+    _project_request_options_fields(modules, repo)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}
@@ -1713,6 +2306,12 @@ def main(argv: list[str]) -> int:
     snapshot = build_snapshot(repo, args.include_dir)
     rendered = json.dumps(snapshot, indent=2, sort_keys=True) + "\n"
 
+    # The pre-fold native-name sidecar the doc gates resolve against (see
+    # build_native_names). Written beside --output so it tracks it.
+    native = build_native_names(args.include_dir)
+    native_rendered = json.dumps(native, indent=2, sort_keys=True) + "\n"
+    native_output = args.output.with_name("port_surface_native.json")
+
     if args.check:
         if not args.output.is_file():
             print(f"error: {args.output} does not exist", file=sys.stderr)
@@ -1732,12 +2331,25 @@ def main(argv: list[str]) -> int:
                 file=sys.stderr,
             )
             return 1
+        if not native_output.is_file():
+            print(f"error: {native_output} does not exist", file=sys.stderr)
+            return 1
+        if strip_meta(native_rendered) != strip_meta(
+                native_output.read_text(encoding="utf-8")):
+            print(
+                "DRIFT: port_surface_native.json is stale relative to headers.\n"
+                "  Regenerate:\n"
+                "    python3 scripts/enumerate_surface.py",
+                file=sys.stderr,
+            )
+            return 1
         return 0
 
     if args.stdout:
         sys.stdout.write(rendered)
     else:
         args.output.write_text(rendered, encoding="utf-8")
+        native_output.write_text(native_rendered, encoding="utf-8")
         print(f"wrote {args.output} "
               f"({len(snapshot['modules'])} modules, "
               f"{sum(len(m['classes']) for m in snapshot['modules'].values())} classes, "

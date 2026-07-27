@@ -1,5 +1,53 @@
 # PORT_SIGNATURE_OMISSIONS.md — documented signature divergences for the C++ port
 
+<!-- ══════════════════════════════════════════════════════════════════════════
+BEFORE YOU ADD AN ENTRY TO THIS FILE — READ THIS.
+
+Every entry here is a place the parity checker STOPS comparing. That is a real cost:
+a divergence you list is a divergence no gate will ever catch again. So entries must
+be RARE, and each one must earn its place. Default to skepticism: assume the entry is
+NOT needed and make the case that it is.
+
+The order of preference, always:
+  1. FIX THE PORT so it matches the reference (add the missing member; make the
+     signature match).
+  2. FIX THE EMISSION so idiom folds onto the reference shape — the enumerator/emitter
+     canonicalizes your language's spelling onto the oracle's (builder → __init__,
+     getters → attributes, Result<T,E> → the plain return, CamelCase → the reference
+     name, options-object/kwargs → the expanded param list, RAII/dispose → close).
+     MOST divergences are idiom and belong here, not in this file.
+  3. FIX THE REFERENCE if the oracle itself is wrong or stale (a Python-only symbol
+     that leaked into the contract, a param the reference added and the oracle never
+     re-enumerated). Fix Python / the oracle, then re-drift — do not paper over a
+     broken reference with a per-port entry.
+  4. Only when 1–3 genuinely cannot apply does an entry here become justified.
+
+An entry is JUSTIFIED ONLY IF it is irreducible after correct emission — i.e. the
+divergence survives because the two languages genuinely cannot express the same thing,
+not because the emitter hasn't folded the idiom yet. If emission COULD fold it, the
+entry is a bug in this file; go fix the emitter.
+
+Each entry MUST state WHY, concretely, in one of these forms:
+  • ADDITION — this symbol exists in the port but not the reference. Answer: is it
+    genuine port-only surface with NO reference twin (say what it is and why the
+    reference has no equivalent), or is it IDIOM the emitter should have folded (then
+    it does not belong here — fold it)? A convenience/alias/back-compat wrapper is NOT
+    a justification.
+  • OMISSION — this reference symbol has no port member. Answer: WHY can it not exist
+    here — what specific language feature is absent (e.g. no async-context-manager
+    protocol, no __init__ method protocol)? "impossible:" means the construct cannot
+    be expressed at all; if it merely LOOKS different, that's idiom → fold it, don't
+    omit it. Cite a precedent when one exists (e.g. RelayClient omits the same dunder).
+  • SIGNATURE — the symbol matches by name but its parameters differ. Answer: is the
+    difference a foldable idiom collapse (options-object, leading context/self,
+    builder) — then EXPAND it in the signature emitter so names+count match, don't list
+    it — or a genuine reference-only parameter with no cross-language analogue?
+
+If you cannot write a crisp, specific WHY that survives the "could emission fold this?"
+test, the entry is not ready. Prove it's needed before you add it.
+═══════════════════════════════════════════════════════════════════════════════ -->
+
+
 This file is checked by `porting-sdk/scripts/diff_port_signatures.py` on
 every PR. Every cross-language signature drift between this port and the
 Python reference for symbols that exist on both sides MUST appear below
@@ -300,13 +348,6 @@ signalwire.core.swml_service.SWMLService.get_basic_auth_credentials: cpp_overloa
 signalwire.core.swml_service.SWMLService.serve: cpp_typed_overload_subset
 signalwire.relay.client.RelayClient.send_message: cpp_typed_overload_subset
 signalwire.rest._base.HttpClient.post: cpp_post_no_params
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_ai_agent: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_call_flow: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_cxml_application: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_cxml_webhook: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_relay_application: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_relay_topic: cpp_typed_setter_no_extra_dict
-signalwire.rest.namespaces.phone_numbers.PhoneNumbersResource.set_swml_webhook: cpp_typed_setter_no_extra_dict
 signalwire.skills.registry.SkillRegistry.register_skill: cpp_register_skill_factory
 
 ### Type / kind divergences
@@ -516,3 +557,76 @@ under `swml_verbs_generated` as property-getters (or the port to expose them as
 accessors).
 signalwire.rest._request_options.RequestOptions.__init__: cpp_constructor_default_only: RequestOptions is an aggregate struct with public data fields (timeout/retries/retry_on_status/retry_backoff/abort_signal); Python's dataclass __init__ enumerates each field as a keyword. The full set is reachable via the C++ public fields (ro.retries = 1, ro.abort_signal = &flag) — same callable contract, aggregate-init idiom instead of a keyword ctor (go/ts/ruby/java value-struct match).
 signalwire.rest._request_options.RequestOptions.abort_signal: cpp_field_not_property: Python exposes abort_signal as a @property getter *method*; C++ implements it as a public data member (std::atomic<bool>* abort_signal) the libclang enumerator does not emit as a method. Reachable directly as ro.abort_signal — same callable contract, public-field idiom (the RequestOptions data fields are deliberately not surface symbols, exactly as the Python dataclass fields aren't).
+
+## A-fold / G-fold signature re-key
+# The surface allow-lists re-key these to the folded agentbase-family.<m> / canonical
+# verb tokens (SURFACE diff folds; the SIGNATURE diff matches raw keys). Same honest
+# idiom rationale as the surface entries; restores the raw-key cross-excuse the fold moved.
+
+signalwire.core.agent_base.AgentBase.add_context: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.add_context in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.add_swaig_query_param: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.add_swaig_query_param in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.create_tool_token: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.create_tool_token in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.handle_mcp_request: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.handle_mcp_request in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.render_swml_for_request: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.render_swml_for_request in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.session_manager: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.session_manager in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_auth: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_auth in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_name: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_name in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_post_prompt_url_direct: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_post_prompt_url_direct in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_signing_key: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_signing_key in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_use_pom: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_use_pom in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.set_webhook_url: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_webhook_url in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.supported_internal_filler_names: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.supported_internal_filler_names in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.agent_base.AgentBase.trust_proxy_for_signature: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.trust_proxy_for_signature in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
+signalwire.core.swml_service.SWMLService.goto: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method (goto spelled goto_section in the header — a C++ keyword-escape normalised to the canonical name at emission); Python routes verbs via __getattr__ dynamic dispatch (no per-verb symbol). Class-G fold on the surface; raw key here for the signature side.
+signalwire.core.swml_service.SWMLService.return: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method (return spelled return_section in the header — a C++ keyword-escape normalised to the canonical name at emission); Python routes verbs via __getattr__ dynamic dispatch (no per-verb symbol). Class-G fold on the surface; raw key here for the signature side.
+signalwire.core.swml_service.SWMLService.switch: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method (switch spelled switch_section in the header — a C++ keyword-escape normalised to the canonical name at emission); Python routes verbs via __getattr__ dynamic dispatch (no per-verb symbol). Class-G fold on the surface; raw key here for the signature side.
+signalwire.core.agent_base.AgentBase.skill_manager: cpp_private_composition: Python AgentBase.skill_manager is a @property exposing the SkillManager instance; C++ composes it privately and surfaces the operations as AgentBase methods (add_skill/remove_skill/list_skills/has_skill). Documented under agentbase-family.skill_manager in PORT_OMISSIONS.md.
+signalwire.core.mixins.tool_mixin.ToolMixin.tool: cpp_no_decorator: Python @tool decorator method relies on the decorator protocol; C++ has no method-decorator feature — tools register via define_tool(...). Documented under agentbase-family.tool in PORT_OMISSIONS.md (Java/TS/PHP omit likewise).
+signalwire.core.mixins.web_mixin.WebMixin.get_app: cpp_no_framework_app: returns a FastAPI/Flask app object; C++ runs httplib directly with no app object to return. Documented under agentbase-family.get_app in PORT_OMISSIONS.md (Java/TS/PHP omit likewise).
+signalwire.pom.pom.PromptObjectModel.sections: cpp_field_not_property: Python PromptObjectModel.sections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as pom.sections — public-collection idiom.
+signalwire.pom.pom.Section.subsections: cpp_field_not_property: Python Section.subsections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as section.subsections — public-collection idiom.
+
+# ---- dual-gate: dead for SURFACE-DIFF (A-fold/G-fold/folded types drop these as
+# surface symbols), but LIVE for this signature DRIFT gate — the signature gate has
+# no SWML-verb / override / base-ctor fold, so the port-only signatures need an
+# explicit signature-omission entry here. Moved from PORT_ADDITIONS during the
+# wave-3 dead-entry sweep. ----
+signalwire.core.agent_base.AgentBase.handle_request: cpp_override_recorded_on_base: Python's AgentBase overrides SWMLService.handle_request (agent_base.py) so the primitive dispatch renders SWML via AgentBase's request-aware path; the Python signature oracle records handle_request only on the base SWMLService (override dedup), so the C++ AgentBase override — genuinely present in both — surfaces here as an addition against the deduped reference. Same (method,url,headers,body)->(status,headers,body) primitive.
+signalwire.core.swml_service.SWMLService.ai: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.amazon_bedrock: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.answer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.cond: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.connect: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.denoise: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.detect_machine: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.enter_queue: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.execute: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.hangup: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.join_conference: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.join_room: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.label: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.live_transcribe: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.live_translate: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.pay: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.play: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.prompt: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.receive_fax: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.record: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.record_call: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.request: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_digits: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_fax: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.send_sms: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.set: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.sip_refer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.sleep: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_denoise: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_record_call: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.stop_tap: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.tap: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.transfer: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.unset: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.core.swml_service.SWMLService.user_event: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
+signalwire.rest._base.CrudResource.__init__: cpp_base_ctor: the C++ hand base CrudResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (HttpClient receiver + composed base path); Python's CrudResource inherits __init__ up its base chain and griffe records no own __init__ on it. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
+signalwire.rest._base.ReadResource.__init__: cpp_base_ctor: the C++ hand base ReadResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (receiver + composed base path); Python's ReadResource inherits __init__ from BaseResource and griffe records no own __init__ on ReadResource. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
+signalwire.agent_server.AgentServer.app: cpp_only: Python AgentServer.app exposes the underlying Flask/FastAPI app for advanced HTTP integration; C++ AgentServer uses httplib directly with no analogous app object to surface. End users reach HTTP customization via on_request / on_swml_request / register_route hooks instead. (Signature missing-port: the surface oracle omits `app`, so its former SURFACE omission was dead and was removed; the signature oracle records it, so it is excused here.)

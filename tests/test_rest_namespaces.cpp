@@ -140,7 +140,7 @@ TEST(rest_ns_total_count_20) {
 
 TEST(rest_error_class_details) {
     SignalWireRestError err(500, "Internal Server Error", "{\"detail\":\"crash\"}");
-    ASSERT_EQ(err.status(), 500);
+    ASSERT_EQ(err.status_code(), 500);
     ASSERT_EQ(err.body(), "{\"detail\":\"crash\"}");
     ASSERT_TRUE(std::string(err.what()).find("Internal Server Error") != std::string::npos);
     return true;

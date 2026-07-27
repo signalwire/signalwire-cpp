@@ -41,7 +41,7 @@ TEST(rest_mock_gen_project_tokens_delete_err) {
     (void)(client.project().tokens.delete_("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_project_tokens_update_err) {
     (void)(client.project().tokens.update("X", {}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_project_tokens_create_err) {
     (void)(client.project().tokens.create({.name = "X", .permissions = json::array()}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

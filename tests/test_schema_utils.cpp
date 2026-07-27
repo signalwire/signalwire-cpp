@@ -10,10 +10,11 @@ TEST(schema_utils_load_embedded_ok) {
     return true;
 }
 
-TEST(schema_utils_38_verbs) {
+TEST(schema_utils_extracts_verbs) {
     Schema schema;
     (void)schema.load_embedded();
-    ASSERT_EQ(schema.verb_names().size(), 38u);
+    // Not a frozen headcount -- see test_swml.cpp schema_load_from_file.
+    ASSERT_TRUE(schema.verb_names().size() >= 38u);
     return true;
 }
 

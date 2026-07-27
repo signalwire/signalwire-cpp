@@ -41,7 +41,7 @@ TEST(rest_mock_gen_chat_create_token_err) {
     (void)(client.chat().create_token({.ttl = 60, .channels = json::array()}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

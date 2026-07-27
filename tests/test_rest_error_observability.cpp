@@ -80,7 +80,7 @@ TEST(rest_transport_error_no_headers) {
   SignalWireRestTransportError err("Connection failed", "/z", "GET");
   ASSERT_TRUE(err.headers().empty());
   ASSERT_TRUE(err.request_id().empty());
-  ASSERT_EQ(err.status(), 0);
+  ASSERT_EQ(err.status_code(), 0);
   return true;
 }
 
@@ -131,7 +131,7 @@ TEST(rest_error_populated_from_response_headers) {
     (void)http.get("/api/does/not/exist");
   } catch (const SignalWireRestError& e) {
     threw = true;
-    ASSERT_EQ(e.status(), 404);
+    ASSERT_EQ(e.status_code(), 404);
     ASSERT_EQ(e.request_id(), std::string("req-wire-42"));
     // The raw response header map is exposed (case as sent by the server).
     bool found_custom = false;

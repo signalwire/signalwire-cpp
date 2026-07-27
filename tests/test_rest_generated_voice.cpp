@@ -41,7 +41,7 @@ TEST(rest_mock_gen_logs_voice_list_err) {
     (void)(client.logs().voice.list(std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -79,7 +79,7 @@ TEST(rest_mock_gen_logs_voice_get_err) {
     (void)(client.logs().voice.get("X"));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -117,7 +117,7 @@ TEST(rest_mock_gen_logs_voice_list_events_err) {
     (void)(client.logs().voice.list_events("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);

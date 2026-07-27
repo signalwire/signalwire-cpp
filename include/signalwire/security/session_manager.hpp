@@ -25,11 +25,29 @@ using json = nlohmann::json;
 /// CONSTANT time.
 class SessionManager {
  public:
-  /// Construct with a random 32-byte secret
-  SessionManager();
+  /// Construct with the reference's constructor surface:
+  /// ``SessionManager(token_expiry_secs=900, secret_key=None)``.
+  ///
+  /// ``token_expiry_secs`` is the lifetime applied to every token minted
+  /// through ``generate_token`` / ``create_tool_token`` (and the default for
+  /// ``create_token``) — this is what ``AgentBase(token_expiry_secs=...)``
+  /// forwards. ``secret_key`` is the HMAC signing key; when empty a fresh
+  /// 32-byte random key is generated and hex-encoded, mirroring the
+  /// reference's ``secrets.token_hex(32)``.
+  explicit SessionManager(int token_expiry_secs = 900, const std::string& secret_key = "");
 
-  /// Construct with a specific secret (for testing)
-  explicit SessionManager(const std::vector<uint8_t>& secret);
+  /// Construct with a raw byte secret (port convenience for tests that want
+  /// deterministic key bytes). The bytes are hex-encoded into the same
+  /// ``secret_key`` string the reference-shaped constructor takes, so both
+  /// spellings sign identically.
+  explicit SessionManager(const std::vector<uint8_t>& secret, int token_expiry_secs = 900);
+
+  // Construction parameters the reference keeps as public instance attributes.
+  /// reference: ``self.token_expiry_secs`` — the configured token lifetime.
+  [[nodiscard]] int token_expiry_secs() const { return token_expiry_secs_; }
+  /// reference: ``self.secret_key`` — the HMAC signing key; the caller's value,
+  /// or the generated ``secrets.token_hex(32)``-shaped key when none was given.
+  [[nodiscard]] const std::string& secret_key() const { return secret_key_; }
 
   /// Create a signed token for a function call
   /// @param function_name  The SWAIG function name
@@ -147,10 +165,14 @@ class SessionManager {
   /// Get current Unix timestamp
   static int64_t current_timestamp();
 
-  std::vector<uint8_t> secret_;
-  /// Default token lifetime in seconds, used by generate_token /
-  /// create_tool_token (create_token still accepts an explicit override).
-  int default_expiry_secs_ = 3600;
+  /// HMAC signing key — the reference's ``self.secret_key``, a STRING whose
+  /// bytes are the HMAC key (``self.secret_key.encode()`` there).
+  std::string secret_key_;
+  /// Token lifetime in seconds, used by generate_token / create_tool_token
+  /// (create_token still accepts an explicit override). Set from the
+  /// constructor's ``token_expiry_secs`` — the reference's
+  /// ``self.token_expiry_secs``.
+  int token_expiry_secs_ = 900;
 
   /// Per-session metadata store: call_id -> (key -> value). Guarded by
   /// metadata_mutex_. A real store (not the reference's stateless no-op) so

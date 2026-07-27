@@ -33,6 +33,6 @@ int main() {
         std::cout << "Detection: " << detect.dump() << "\n";
 
     } catch (const SignalWireRestError& e) {
-        std::cerr << "Error " << e.status() << ": " << e.what() << "\n";
+        std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
     }
 }

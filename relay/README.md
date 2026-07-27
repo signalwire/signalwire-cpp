@@ -62,6 +62,7 @@ int main() {
 |----------|-------------|
 | `SIGNALWIRE_PROJECT_ID` | Project ID for authentication |
 | `SIGNALWIRE_API_TOKEN` | API token for authentication |
+| `SIGNALWIRE_JWT_TOKEN` | JWT for authentication — an alternative to the project/token pair. When set, the connect frame authenticates with the JWT alone. |
 | `SIGNALWIRE_SPACE` | Space hostname (default: `relay.signalwire.com`) |
 
 ## Documentation

@@ -84,10 +84,21 @@ jobs:
           ./run_tests
 
       - name: Audit docs and examples against port surface
+        # --native-names is LOAD-BEARING, not optional. The surface enumerator folds
+        # cpp's real accessors onto the reference attribute names (set_route -> route,
+        # set_venue_name -> venue_name), so without the sidecar every correct,
+        # COMPILING doc line written in the cpp spelling becomes "unresolved" — a
+        # check bug, not a doc bug. The local suite (porting-sdk
+        # scripts/suites/_doc_audit.py) passes this flag automatically for any port
+        # shipping the file; this workflow invokes audit_docs.py directly, so it must
+        # pass it too or local and CI disagree about the same tree. (They did: on
+        # 5dfef63 the DOC-TRUTH suite was 8/8 PASS locally while this job failed on 8
+        # folded setters.)
         run: |
           python3 porting-sdk/scripts/audit_docs.py \
               --root . \
               --surface port_surface.json \
+              --native-names port_surface_native.json \
               --ignore DOC_AUDIT_IGNORE.md
 
       # On failure, print the JSON report so reviewers can see the exact
@@ -98,5 +109,6 @@ jobs:
           python3 porting-sdk/scripts/audit_docs.py \
               --root . \
               --surface port_surface.json \
+              --native-names port_surface_native.json \
               --ignore DOC_AUDIT_IGNORE.md \
               --json || true

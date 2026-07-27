@@ -79,10 +79,31 @@ class WebService {
   [[nodiscard]] bool file_allowed(const std::string& file_path) const;
 
   // ---- Accessors ----
+  // Every construction parameter the reference keeps as a public instance
+  // attribute is readable here. A caller hands these in, so a caller must be
+  // able to read them back (the reference's `self.max_file_size`,
+  // `self.enable_cors`, … are plain public attributes).
   [[nodiscard]] int port() const { return port_; }
   [[nodiscard]] const std::map<std::string, std::string>& directories() const {
     return directories_;
   }
+  /// reference: ``self.enable_directory_browsing`` — whether a directory URL
+  /// renders a listing instead of 404ing.
+  [[nodiscard]] bool enable_directory_browsing() const { return enable_directory_browsing_; }
+  /// reference: ``self.allowed_extensions`` — when set, ONLY these extensions
+  /// are servable (nullopt = no allow-list, all-but-blocked are servable).
+  [[nodiscard]] const std::optional<std::vector<std::string>>& allowed_extensions() const {
+    return allowed_extensions_;
+  }
+  /// reference: ``self.blocked_extensions`` — never servable; defaulted to the
+  /// reference's built-in list when the caller passes none.
+  [[nodiscard]] const std::vector<std::string>& blocked_extensions() const {
+    return blocked_extensions_;
+  }
+  /// reference: ``self.max_file_size`` — bytes; a larger file is refused.
+  [[nodiscard]] std::int64_t max_file_size() const { return max_file_size_; }
+  /// reference: ``self.enable_cors`` — whether CORS headers are emitted.
+  [[nodiscard]] bool enable_cors() const { return enable_cors_; }
 
  private:
   /// Normalize a route to a leading '/'.

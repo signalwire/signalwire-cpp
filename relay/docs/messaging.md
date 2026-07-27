@@ -99,12 +99,13 @@ int main() {
     auto client = RelayClient::from_env();
 
     client.on_message([&client](const Message& message) {
-        std::cout << "From: " << message.from << "\n";
-        std::cout << "To: " << message.to << "\n";
+        std::cout << "From: " << message.from_number << "\n";
+        std::cout << "To: " << message.to_number << "\n";
         std::cout << "Body: " << message.body << "\n";
 
-        // Reply back (note from/to order)
-        client.send_message(message.to, message.from, "You said: " + message.body);
+        // Reply back (note the from/to order is swapped)
+        client.send_message(message.to_number, message.from_number,
+                            "You said: " + message.body);
     });
 
     client.run();
@@ -168,12 +169,15 @@ int main() {
     client.on_call([](Call& call) {
         call.answer();
         auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello!"}}}}});
-        action.wait();
+        // wait() returns false if the action did not complete (timeout / failure).
+        if (!action.wait()) {
+            std::cout << "playback did not complete\n";
+        }
         call.hangup();
     });
 
     client.on_message([](const Message& message) {
-        std::cout << "SMS from " << message.from << ": " << message.body << "\n";
+        std::cout << "SMS from " << message.from_number << ": " << message.body << "\n";
     });
 
     client.run();

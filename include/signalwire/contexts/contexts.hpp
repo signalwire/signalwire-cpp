@@ -41,7 +41,26 @@ class GatherQuestion {
 
   [[nodiscard]] json to_json() const;
 
+  // Every construction parameter the reference keeps as a public instance
+  // attribute (`self.key`, `self.question`, …) is readable back here.
   [[nodiscard]] const std::string& key() const { return key_; }
+  /// reference: ``self.question`` — the question text put to the caller.
+  [[nodiscard]] const std::string& question() const { return question_; }
+  /// reference: ``self.type`` — answer type ("string" by default); emitted to
+  /// SWML only when it differs from the default.
+  [[nodiscard]] const std::string& type() const { return type_; }
+  /// reference: ``self.confirm`` — whether the answer is read back for
+  /// confirmation; emitted only when true.
+  [[nodiscard]] bool confirm() const { return confirm_; }
+  /// reference: ``self.prompt`` — per-question prompt override; emitted only
+  /// when non-empty.
+  [[nodiscard]] const std::string& prompt() const { return prompt_; }
+  /// reference: ``self.functions`` — SWAIG functions available while this
+  /// question is being answered; emitted only when non-empty.
+  [[nodiscard]] const std::vector<std::string>& functions() const { return functions_; }
+  /// reference: ``self.isolated`` — tri-state; ``nullopt`` inherits the
+  /// gather_info default, a set value overrides it (emitted even when false).
+  [[nodiscard]] const std::optional<bool>& isolated() const { return isolated_; }
 
  private:
   std::string key_;

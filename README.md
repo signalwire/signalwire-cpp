@@ -313,6 +313,7 @@ Guides are also available in the [`docs/`](docs/) directory:
 |----------|---------|-------------|
 | `SIGNALWIRE_PROJECT_ID` | RELAY, REST | Project identifier |
 | `SIGNALWIRE_API_TOKEN` | RELAY, REST | API token |
+| `SIGNALWIRE_JWT_TOKEN` | RELAY | JWT for RELAY auth. An **alternative** to the project/token pair, not an addition — when set (or `jwt_token` is passed), the connect frame authenticates with the JWT alone and `SIGNALWIRE_PROJECT_ID` / `SIGNALWIRE_API_TOKEN` are not required. |
 | `SIGNALWIRE_SPACE` | RELAY, REST | Space hostname (e.g. `example.signalwire.com`) |
 | `SWML_BASIC_AUTH_USER` | Agents | Basic auth username (default: auto-generated) |
 | `SWML_BASIC_AUTH_PASSWORD` | Agents | Basic auth password (default: auto-generated) |

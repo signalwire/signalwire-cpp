@@ -68,3 +68,37 @@ TEST(prefab_concierge_full_config) {
     ASSERT_TRUE(has_ai);
     return true;
 }
+
+// Reference parity: ConciergeAgent.__init__ stores venue_name / services /
+// amenities / hours_of_operation / special_instructions as public instance
+// attributes. The port carried only venue_name + amenities.
+TEST(prefab_concierge_construction_params_readable) {
+    ConciergeAgent agent;
+    // reference default: {"default": "9 AM - 5 PM"}
+    ASSERT_EQ(agent.hours_of_operation()["default"], "9 AM - 5 PM");
+    ASSERT_EQ(agent.services().size(), 0u);
+    ASSERT_EQ(agent.special_instructions().size(), 0u);
+
+    agent.set_venue_name("Grand Hotel");
+    agent.set_amenities({json::object({{"name", "pool"}, {"location", "level 3"}})});
+    agent.set_services({"valet", "room service"});
+    agent.set_hours(json::object({{"monday", "8 AM - 6 PM"}}));
+    agent.set_special_instructions({"Always greet by name."});
+
+    ASSERT_EQ(agent.venue_name(), "Grand Hotel");
+    ASSERT_EQ(agent.amenities().size(), 1u);
+    ASSERT_EQ(agent.amenities()[0]["name"], "pool");
+    ASSERT_EQ(agent.services().size(), 2u);
+    ASSERT_EQ(agent.services()[0], "valet");
+    ASSERT_EQ(agent.hours_of_operation()["monday"], "8 AM - 6 PM");
+    ASSERT_EQ(agent.special_instructions().size(), 1u);
+    return true;
+}
+
+// An empty hours object keeps the reference default (`hours_of_operation or {…}`).
+TEST(prefab_concierge_hours_empty_falls_back) {
+    ConciergeAgent agent;
+    agent.set_hours(json::object());
+    ASSERT_EQ(agent.hours_of_operation()["default"], "9 AM - 5 PM");
+    return true;
+}

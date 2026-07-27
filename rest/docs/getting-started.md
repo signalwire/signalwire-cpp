@@ -96,7 +96,7 @@ auto addresses = client.fabric().ai_agents.list_addresses("agent-uuid");
 ## Error Handling
 
 Non-2xx responses throw `SignalWireRestError`, which carries the HTTP status
-(`status()`), the response body (`body()`), and the message (`what()`):
+(`status_code()`), the response body (`body()`), and the message (`what()`):
 
 ```cpp
 #include <signalwire/rest/rest_client.hpp>
@@ -109,7 +109,7 @@ int main() {
     try {
         auto agent = client.fabric().ai_agents.get("nonexistent-id");
     } catch (const SignalWireRestError& e) {
-        std::cerr << "HTTP " << e.status() << ": " << e.what() << "\n";
+        std::cerr << "HTTP " << e.status_code() << ": " << e.what() << "\n";
         std::cerr << "Body: " << e.body() << "\n";
         // HTTP 404: ...
     }

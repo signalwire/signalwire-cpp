@@ -83,6 +83,11 @@ class AuthHandler {
   /// Initialize the auth handler with a ``SecurityConfig``.
   explicit AuthHandler(SecurityConfig& security_config);
 
+  /// The ``SecurityConfig`` this handler authenticates against (reference:
+  /// ``self.security_config``). The caller constructs the handler with it, so
+  /// the caller can read it back — e.g. to inspect which auth modes are on.
+  [[nodiscard]] const SecurityConfig& security_config() const { return security_config_; }
+
   /// Verify basic-auth credentials. Timing-safe.
   [[nodiscard]] bool verify_basic_auth(const BasicCredentials& credentials) const;
 

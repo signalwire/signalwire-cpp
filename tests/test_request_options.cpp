@@ -140,7 +140,7 @@ TEST(request_options_get_retry_exhausted) {
     (void)body;
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 503);
@@ -170,7 +170,7 @@ TEST(request_options_post_500_not_retried) {
     (void)body;
   } catch (const SignalWireRestError& e) {
     threw = true;
-    status = e.status();
+    status = e.status_code();
   }
   ASSERT_TRUE(threw);
   ASSERT_EQ(status, 500);
@@ -299,7 +299,7 @@ TEST(request_options_abort_signal_before_send) {
     (void)body;
   } catch (const SignalWireRestTransportError& e) {
     threw_transport = true;
-    status = e.status();
+    status = e.status_code();
   } catch (const SignalWireRestError&) {
     // Any other typed error means abort did not short-circuit — leave the
     // transport flag false so the assertion below fails loudly.

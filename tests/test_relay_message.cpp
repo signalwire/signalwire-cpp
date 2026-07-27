@@ -26,10 +26,38 @@ TEST(relay_msg_from_params_full) {
     auto msg = Message::from_params(p);
     ASSERT_EQ(msg.message_id, "m-1");
     ASSERT_EQ(msg.state(), "queued");
-    ASSERT_EQ(msg.from, "+15551111111");
+    ASSERT_EQ(msg.from_number, "+15551111111");
     ASSERT_EQ(msg.body, "Hello!");
     ASSERT_EQ(msg.media.size(), static_cast<size_t>(2));
     ASSERT_EQ(msg.tags.size(), static_cast<size_t>(1));
+    return true;
+}
+
+// Reference parity: `_handle_inbound_message` builds the Message with
+// `context=params["context"]` and `segments=params["segments"]`. Both are
+// caller-readable state on the reference Message; the port read neither off
+// the wire, so an inbound multi-segment message lost its context and segment
+// count.
+TEST(relay_msg_from_params_context_and_segments) {
+    json p;
+    p["message_id"] = "m-ctx";
+    p["message_state"] = "received";
+    p["direction"] = "inbound";
+    p["context"] = "support";
+    p["segments"] = 3;
+    auto msg = Message::from_params(p);
+    ASSERT_EQ(msg.context, "support");
+    ASSERT_EQ(msg.segments, 3);
+    return true;
+}
+
+// Absent on the wire, both fall back to the reference's defaults ("" / 0).
+TEST(relay_msg_from_params_context_and_segments_absent) {
+    json p;
+    p["message_id"] = "m-bare";
+    auto msg = Message::from_params(p);
+    ASSERT_EQ(msg.context, "");
+    ASSERT_EQ(msg.segments, 0);
     return true;
 }
 

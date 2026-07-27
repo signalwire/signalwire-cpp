@@ -669,8 +669,8 @@ TEST(relay_message_from_params) {
     auto msg = Message::from_params(params);
     ASSERT_EQ(msg.message_id, "msg-001");
     ASSERT_EQ(msg.state(), "queued");
-    ASSERT_EQ(msg.from, "+15551234567");
-    ASSERT_EQ(msg.to, "+15559876543");
+    ASSERT_EQ(msg.from_number, "+15551234567");
+    ASSERT_EQ(msg.to_number, "+15559876543");
     ASSERT_EQ(msg.body, "Hello!");
     ASSERT_EQ(msg.direction, "outbound");
     ASSERT_EQ(msg.media.size(), static_cast<size_t>(1));

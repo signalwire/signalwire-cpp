@@ -35,6 +35,12 @@ class ConfigLoader {
   ///   parseable file wins.
   explicit ConfigLoader(const std::optional<std::vector<std::string>>& config_paths = std::nullopt);
 
+  /// The config file paths this loader searches, in order (reference:
+  /// ``self.config_paths``) — the caller-supplied list, or the default search
+  /// paths when none was given. A caller hands these in, so a caller can read
+  /// back exactly which paths were consulted.
+  [[nodiscard]] const std::vector<std::string>& config_paths() const { return config_paths_; }
+
   /// Check if a configuration was loaded.
   [[nodiscard]] bool has_config() const;
 

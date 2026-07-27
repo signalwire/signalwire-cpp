@@ -158,7 +158,19 @@ FAQBotAgent& FAQBotAgent::set_no_match_message(const std::string& msg) {
 }
 
 FAQBotAgent& FAQBotAgent::set_suggest_related(bool suggest) {
+  // reference: `self.suggest_related` — stored AND published to global data.
+  suggest_related_ = suggest;
   update_global_data(json::object({{"suggest_related", suggest}}));
+  return *this;
+}
+
+FAQBotAgent& FAQBotAgent::set_persona(const std::string& persona) {
+  // reference: `persona or "You are a helpful FAQ bot …"` — an empty value
+  // falls back to the default rather than blanking the personality.
+  persona_ = persona.empty()
+                 ? "You are a helpful FAQ bot that provides accurate answers to common questions."
+                 : persona;
+  prompt_add_to_section("Personality", "\n" + persona_);
   return *this;
 }
 

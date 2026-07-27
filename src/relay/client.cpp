@@ -60,6 +60,12 @@ RelayClient RelayClient::from_env() {
   if (tok) {
     cfg.token = tok;
   }
+  // Reference: `jwt_token or os.environ.get("SIGNALWIRE_JWT_TOKEN", "")` — the
+  // JWT alternative to project/token.
+  const char* jwt = std::getenv("SIGNALWIRE_JWT_TOKEN");
+  if (jwt) {
+    cfg.jwt_token = jwt;
+  }
   const char* host = std::getenv("SIGNALWIRE_SPACE");
   if (host) {
     cfg.host = host;
@@ -109,15 +115,22 @@ bool RelayClient::connect() {
   // message misleads when only one is absent; and a silent connect() = false on
   // empty creds is the "silent exit-0" footgun run() then hides. Throwing (like
   // Python's ValueError) makes the missing-cred case impossible to ignore.
-  if (config_.project.empty()) {
-    throw std::invalid_argument(
-        "project is required. Pass project=... to RelayClient(...) or set the "
-        "SIGNALWIRE_PROJECT_ID env var.");
-  }
-  if (config_.token.empty()) {
-    throw std::invalid_argument(
-        "token is required. Pass token=... to RelayClient(...) or set the "
-        "SIGNALWIRE_API_TOKEN env var.");
+  // A JWT credential is the ALTERNATIVE to the project/token pair (the project
+  // id is inside the token), so neither is required when one is supplied —
+  // mirroring the reference's `if self.jwt_token: ... else: <require both>`.
+  if (config_.jwt_token.empty()) {
+    if (config_.project.empty()) {
+      throw std::invalid_argument(
+          "project is required. Pass project=... to RelayClient(...) or set the "
+          "SIGNALWIRE_PROJECT_ID env var (or use jwt_token / SIGNALWIRE_JWT_TOKEN "
+          "for JWT auth).");
+    }
+    if (config_.token.empty()) {
+      throw std::invalid_argument(
+          "token is required. Pass token=... to RelayClient(...) or set the "
+          "SIGNALWIRE_API_TOKEN env var (or use jwt_token / SIGNALWIRE_JWT_TOKEN "
+          "for JWT auth).");
+    }
   }
 
   ws_ = std::make_unique<WebSocketClient>();
@@ -210,13 +223,20 @@ bool RelayClient::authenticate() {
   params["version"] = {{"major", 2}, {"minor", 0}, {"revision", 0}};
   params["agent"] = AGENT_STRING;
   params["event_acks"] = true;
-  params["authentication"] = {{"project", config_.project}, {"token", config_.token}};
-  // Also expose project/token at top level. The SignalWire RELAY service
-  // accepts both shapes; some inspection points (audit fixture, debug
-  // logs) read the top-level keys, so emit them alongside the nested
-  // `authentication` block to match Python's behavior.
-  params["project"] = config_.project;
-  params["token"] = config_.token;
+  // Reference `_authenticate`: a JWT credential REPLACES the project/token
+  // pair — `{"jwt_token": …}` alone, because the project id is inside the
+  // token.
+  if (!config_.jwt_token.empty()) {
+    params["authentication"] = {{"jwt_token", config_.jwt_token}};
+  } else {
+    params["authentication"] = {{"project", config_.project}, {"token", config_.token}};
+    // Also expose project/token at top level. The SignalWire RELAY service
+    // accepts both shapes; some inspection points (audit fixture, debug
+    // logs) read the top-level keys, so emit them alongside the nested
+    // `authentication` block.
+    params["project"] = config_.project;
+    params["token"] = config_.token;
+  }
 
   if (!config_.contexts.empty()) {
     params["contexts"] = config_.contexts;
@@ -499,13 +519,22 @@ void RelayClient::handle_inbound_call(const RelayEvent& ev) {
 
   // Create a new Call object
   auto call = std::make_unique<Call>(call_id, node_id, this);
-  call->set_direction("inbound");
+  call->set_direction(ev.params.value("direction", "inbound"));
   call->set_from(ev.params.value("device", json::object())
                      .value("params", json::object())
                      .value("from_number", ""));
   call->set_to(ev.params.value("device", json::object())
                    .value("params", json::object())
                    .value("to_number", ""));
+  // Reference `_handle_inbound_call`: project_id falls back to the client's
+  // project; context prefers the connect-issued protocol over the event's
+  // context/protocol; device is stored raw ("device or {}").
+  call->set_project_id(ev.params.value("project_id", config_.project));
+  call->set_context(
+      !protocol_.empty() ? protocol_ : ev.params.value("context", ev.params.value("protocol", "")));
+  call->set_segment_id(ev.params.value("segment_id", ""));
+  call->set_device(ev.params.value("device", json::object()));
+  call->set_tag(ev.params.value("tag", ""));
 
   Call* call_ptr = call.get();
   register_call(call_id, call_ptr);
@@ -814,12 +843,16 @@ Message RelayClient::send_message(const std::string& from, const std::string& to
   }
 
   Message msg;
-  msg.from = from;
-  msg.to = to;
+  msg.from_number = from;
+  msg.to_number = to;
   msg.body = body;
   msg.media = media;
   msg.tags = tags;
   msg.direction = "outbound";
+  // The reference records the SENT context on the outbound Message (the
+  // explicit `context` argument, else the connect-issued protocol default it
+  // just put on the wire above).
+  msg.context = params.value("context", "");
   msg.region = region;
   msg.set_state("queued");
 

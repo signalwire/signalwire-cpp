@@ -233,11 +233,16 @@ TEST(relay_mock_inbound_message_fires_on_message_handler) {
     ASSERT_TRUE(got.load());
     ASSERT_EQ(seen.message_id, "in-msg-1");
     ASSERT_EQ(seen.direction, "inbound");
-    ASSERT_EQ(seen.from, "+15551110000");
-    ASSERT_EQ(seen.to, "+15552220000");
+    ASSERT_EQ(seen.from_number, "+15551110000");
+    ASSERT_EQ(seen.to_number, "+15552220000");
     ASSERT_EQ(seen.body, "hello back");
     ASSERT_EQ(seen.tags.size(), static_cast<size_t>(1));
     ASSERT_EQ(seen.tags[0], "incoming");
+    // The mock has always pushed `context` + `segments` on messaging.receive;
+    // the port dropped both, so an inbound handler could not tell which context
+    // the message arrived on nor how many segments the carrier used.
+    ASSERT_EQ(seen.context, "default");
+    ASSERT_EQ(seen.segments, 1);
     client->disconnect();
     return true;
 }

@@ -52,6 +52,16 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.14'
+      # Install the porting-sdk gate scripts' declared dependencies. NOT optional: the
+      # enumerator reaches the reference oracle through generate_rest.py, which needs
+      # PyYAML, and a bare `except Exception: return None` turned its absence into an EMPTY
+      # oracle — 266 oracle-gated members silently failed to emit and the diff reported
+      # "311 Python symbol(s) missing from port", blaming a port that was correct. A dev box
+      # has PyYAML, so the failure is CI-only by construction. One manifest, shared by all
+      # ten repos; check_script_deps.py fails if a script imports something it omits.
+      - name: Install porting-sdk script dependencies
+        run: python3 -m pip install --quiet -r ${{ github.workspace }}/porting-sdk/scripts/requirements.txt
+
 
       - name: Check port_surface.json is committed and up-to-date
         # `--check` regenerates in-memory and compares against the committed
@@ -59,7 +69,16 @@ jobs:
         # --exit-code` after a fresh regen could never pass because the script
         # embeds the current HEAD SHA, which by definition differs from the
         # SHA recorded when the committed file was generated.
+        #
+        # PORTING_SDK must point at the in-repo porting-sdk checkout: the surface
+        # enumerator now consults the reference oracle (python_surface.json) for the
+        # composition-attribute projection, and its adjacency fallback is
+        # `<repo>/../porting-sdk` — which does not exist in CI's in-repo `./porting-sdk`
+        # layout. Without this, the regen silently degrades (drops the projected
+        # members) and the committed-vs-fresh compare fails as a phantom "stale".
         run: python3 scripts/enumerate_surface.py --check --output port_surface.json
+        env:
+          PORTING_SDK: ${{ github.workspace }}/porting-sdk
 
       - name: Diff against Python reference
         run: |

@@ -376,6 +376,25 @@ add_executable(relay_liveness_dump tools/relay_liveness_dump.cpp tests/relay_moc
 target_link_libraries(relay_liveness_dump signalwire ixwebsocket)
 target_include_directories(relay_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 
+# secure_default_dump is the SECURE-DEFAULT (A1 / PSDK-4a) runner: it defines a
+# DEFAULT define_tool (no explicit secure argument) plus an explicit
+# secure=false tool, renders the SWML with the fixed corpus call_id, and emits
+# the per-fixture {secure_default_true, wire_reflects_secure} classification.
+# porting-sdk/scripts/diff_port_secure_default.py builds the python golden and
+# compares. Pure in-process SWML render — no mock server needed.
+add_executable(secure_default_dump tools/secure_default_dump.cpp)
+target_link_libraries(secure_default_dump signalwire)
+
+# secret_scrub_dump is the SECRET-SCRUB-LIVE (PSDK-5, nightly) runner: it drives
+# the RELAY client through a real connect + an inbound authorization.state
+# re-auth frame at debug level with the fixture sentinels, captures fd 1 + fd 2
+# for the whole drive, and emits the per-sentinel {leaked} classification.
+# porting-sdk/scripts/diff_port_secret_scrub.py builds + runs it and compares to
+# the python golden. Uses the IXWebSocket server headers directly (like
+# wire_relay_dump / relay_liveness_dump), so link ixwebsocket explicitly.
+add_executable(secret_scrub_dump tools/secret_scrub_dump.cpp)
+target_link_libraries(secret_scrub_dump signalwire ixwebsocket)
+
 # Examples: every .cpp under examples/, rest/examples/, relay/examples/ is
 # compiled against the built library. The audit_docs.py tool verifies that
 # every method referenced in docs and examples resolves to a real symbol; the

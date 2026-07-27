@@ -190,14 +190,40 @@ ConciergeAgent& ConciergeAgent::on_summary(agent::SummaryCallback cb) {
 }
 
 ConciergeAgent& ConciergeAgent::set_hours(const json& hours) {
-  update_global_data(json::object({{"venue_hours", hours}}));
+  // reference: `self.hours_of_operation = hours_of_operation or {"default": …}`
+  // — an empty/non-object value keeps the default rather than blanking it.
+  if (hours.is_object() && !hours.empty()) {
+    hours_of_operation_ = hours;
+  }
+  update_global_data(json::object({{"venue_hours", hours_of_operation_}}));
 
   std::vector<std::string> bullets;
-  for (auto& [day, time] : hours.items()) {
+  for (auto& [day, time] : hours_of_operation_.items()) {
     bullets.push_back(day + ": " + time.get<std::string>());
   }
   prompt_add_section("Venue Hours", "", bullets);
 
+  return *this;
+}
+
+ConciergeAgent& ConciergeAgent::set_services(const std::vector<std::string>& services) {
+  // reference: `self.services` — rendered into the prompt AND published to
+  // global data (the reference's _setup_concierge_agent does both).
+  services_ = services;
+  update_global_data(json::object({{"services", services_}}));
+  prompt_add_section("Services", "", services_);
+  add_hints(services_);
+  return *this;
+}
+
+ConciergeAgent& ConciergeAgent::set_special_instructions(
+    const std::vector<std::string>& instructions) {
+  // reference: `self.special_instructions or []` — extra bullets folded into
+  // the concierge's instructions.
+  special_instructions_ = instructions;
+  if (!special_instructions_.empty()) {
+    prompt_add_to_section("Instructions", "", special_instructions_);
+  }
   return *this;
 }
 

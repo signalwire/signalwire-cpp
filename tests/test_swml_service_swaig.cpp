@@ -242,3 +242,77 @@ TEST(service_as_router_registers_the_services_routes) {
     ASSERT_TRUE(swaig_ok);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// TLS / serving-domain values on the service itself.
+//
+// The reference copies these four off ``self.security`` in ``__init__``:
+//     self.ssl_enabled   = self.security.ssl_enabled
+//     self.domain        = self.security.domain
+//     self.ssl_cert_path = self.security.ssl_cert_path
+//     self.ssl_key_path  = self.security.ssl_key_path
+// and lets ``run()`` override them afterwards. They are caller-observable
+// values on the SERVICE, not only on the SecurityConfig collaborator.
+// ---------------------------------------------------------------------------
+
+namespace {
+void clear_service_tls_env() {
+    ::unsetenv("SWML_SSL_ENABLED");
+    ::unsetenv("SWML_SSL_CERT_PATH");
+    ::unsetenv("SWML_SSL_KEY_PATH");
+    ::unsetenv("SWML_DOMAIN");
+}
+}  // namespace
+
+TEST(service_tls_values_default_off) {
+    clear_service_tls_env();
+    Service svc;
+    ASSERT_FALSE(svc.ssl_enabled());
+    ASSERT_FALSE(svc.domain().has_value());
+    ASSERT_FALSE(svc.ssl_cert_path().has_value());
+    ASSERT_FALSE(svc.ssl_key_path().has_value());
+    return true;
+}
+
+// The ctor must SEED these from SecurityConfig — that is the reference's
+// wiring, and it is what makes SWML_SSL_* reach the service at all.
+TEST(service_tls_values_seeded_from_security_config) {
+    clear_service_tls_env();
+    ::setenv("SWML_SSL_ENABLED", "true", 1);
+    ::setenv("SWML_SSL_CERT_PATH", "/etc/ssl/seeded.crt", 1);
+    ::setenv("SWML_SSL_KEY_PATH", "/etc/ssl/seeded.key", 1);
+    ::setenv("SWML_DOMAIN", "seeded.example.com", 1);
+
+    Service svc;
+    bool enabled = svc.ssl_enabled();
+    std::string cert = svc.ssl_cert_path().value_or("");
+    std::string key = svc.ssl_key_path().value_or("");
+    std::string dom = svc.domain().value_or("");
+
+    clear_service_tls_env();
+
+    ASSERT_TRUE(enabled);
+    ASSERT_EQ(cert, std::string("/etc/ssl/seeded.crt"));
+    ASSERT_EQ(key, std::string("/etc/ssl/seeded.key"));
+    ASSERT_EQ(dom, std::string("seeded.example.com"));
+    return true;
+}
+
+// ...and an explicit setter overrides the seeded value, mirroring the
+// reference's ``run(ssl_enabled=…, domain=…, ssl_cert=…, ssl_key=…)``.
+TEST(service_tls_values_settable_after_construction) {
+    clear_service_tls_env();
+    Service svc;
+    ASSERT_FALSE(svc.ssl_enabled());
+
+    svc.set_ssl_enabled(true)
+        .set_ssl_cert_path("/tmp-unused/override.crt")
+        .set_ssl_key_path("/tmp-unused/override.key")
+        .set_domain("override.example.com");
+
+    ASSERT_TRUE(svc.ssl_enabled());
+    ASSERT_EQ(svc.ssl_cert_path().value_or(""), std::string("/tmp-unused/override.crt"));
+    ASSERT_EQ(svc.ssl_key_path().value_or(""), std::string("/tmp-unused/override.key"));
+    ASSERT_EQ(svc.domain().value_or(""), std::string("override.example.com"));
+    return true;
+}

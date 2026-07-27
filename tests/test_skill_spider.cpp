@@ -81,3 +81,62 @@ TEST(skill_spider_has_hints) {
     ASSERT_TRUE(hints.size() >= 1u);
     return true;
 }
+
+// ``remove_xpaths`` — the reference PREFILLS this list in __init__ and drops each
+// matched element (tag AND its body) before extracting text. Prove the observable
+// effect: script source, CSS, and nav/header/footer/aside/noscript chrome must NOT
+// reach the scraped text, while the real page body must. Before this landed the naive
+// tag-strip turned `<script>` bodies into "scraped content".
+TEST(skill_spider_remove_xpaths_drops_script_style_and_chrome) {
+    httplib::Server srv;
+    srv.Get("/page", [&](const httplib::Request&, httplib::Response& res) {
+        res.set_content(
+            "<html><head>"
+            "<style>.secret_css_token{color:red}</style>"
+            "<script>var secret_js_token = 1;</script>"
+            "</head><body>"
+            "<nav>secret_nav_token</nav>"
+            "<header>secret_header_token</header>"
+            "<aside>secret_aside_token</aside>"
+            "<noscript>secret_noscript_token</noscript>"
+            "<p>keeper body text</p>"
+            "<footer>secret_footer_token</footer>"
+            "</body></html>",
+            "text/html");
+    });
+
+    int port = 0;
+    std::thread th([&]{ port = srv.bind_to_any_port("127.0.0.1"); srv.listen_after_bind(); });
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+    while (port == 0 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    ASSERT_TRUE(port > 0);
+
+    ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
+    auto skill = sw_skills::SkillRegistry::instance().create("spider");
+    skill->setup(json::object());
+    auto tools = skill->register_tools();
+    ASSERT_TRUE(tools.size() >= 1u);
+    auto result = tools[0].handler(json::object({{"url", "https://example.com/page"}}),
+                                   json::object());
+    auto resp = result.to_json()["response"].get<std::string>();
+
+    srv.stop();
+    th.join();
+    ::unsetenv("SPIDER_BASE_URL");
+
+    // Every default remove_xpaths entry: //script //style //nav //header //footer
+    // //aside //noscript — content dropped, not merely untagged.
+    ASSERT_TRUE(resp.find("secret_js_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_css_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_nav_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_header_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_aside_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_noscript_token") == std::string::npos);
+    ASSERT_TRUE(resp.find("secret_footer_token") == std::string::npos);
+    // …and the real body survives, so the fold is not just "drop everything".
+    ASSERT_TRUE(resp.find("keeper body text") != std::string::npos);
+    return true;
+}
+

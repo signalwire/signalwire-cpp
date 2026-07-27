@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 4875e642abb190b9dba8a9c30eadefdb605f61cd",
+  "generated_from": "signalwire-cpp @ 60cd2677f0331fef5a893774b84c2278aba8bc19",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -912,6 +912,7 @@
           "denoise",
           "detect_machine",
           "document",
+          "domain",
           "enter_queue",
           "execute",
           "extract_introspect_payload",
@@ -967,6 +968,9 @@
           "set_auth",
           "sip_refer",
           "sleep",
+          "ssl_cert_path",
+          "ssl_enabled",
+          "ssl_key_path",
           "stop",
           "stop_denoise",
           "stop_record_call",
@@ -1507,6 +1511,7 @@
         "Action": [
           "__init__",
           "call",
+          "completed",
           "control_id",
           "is_done",
           "result",
@@ -3703,6 +3708,7 @@
           "get_instance_key",
           "get_parameter_schema",
           "register_tools",
+          "remove_xpaths",
           "setup"
         ]
       },

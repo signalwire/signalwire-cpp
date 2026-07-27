@@ -1076,6 +1076,12 @@ def collect(
     # cpp_unified_action idiom, tracked in PORT_SIGNATURE_OMISSIONS).
     _project_relay_action_subclasses(out_modules)
 
+    # Built-in-skill value accessors: the skill classes live in
+    # ``src/skills/builtin/*.cpp``, which the libclang HEADER walk never opens,
+    # so an implemented accessor would otherwise read as missing-port drift.
+    # Signature-side twin of enumerate_surface's ``_project_builtin_skills``.
+    _project_skill_accessors(out_modules)
+
     # AI-Chat signature fold: the Python reference records the whole AI-Chat
     # surface in ONE module (signalwire.ai_chat.client) with kwargs-exploded
     # method params; the C++ port splits it across ai_chat_client.hpp /
@@ -1924,13 +1930,15 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
     call_classes = call_mod.setdefault("classes", {})
 
     # The BASE ``Action``: the reference declares it in ``signalwire.relay.call``
-    # with __init__/is_done/wait/result plus the two ctor params it stores
-    # publicly — ``call`` (the back-reference) and ``control_id`` — which the
-    # oracle's class-B2 rule records. The unified C++ Action carries all of
-    # them; project the reference-recorded subset onto relay.call so the base
+    # with __init__/is_done/wait/result plus the ctor/derived attrs it stores
+    # publicly — ``call`` (the back-reference), ``control_id``, and
+    # ``completed`` (the bool state flag that starts False and flips True on
+    # completion) — which the oracle's class-B2 rule records. The unified C++
+    # Action carries all of them (``is_done()`` delegates to ``completed()``);
+    # project the reference-recorded subset onto relay.call so the base
     # symbol lines up (the richer C++ surface stays under relay.action).
     base_entry = call_classes.setdefault("Action", {"methods": {}})
-    for m in ("__init__", "is_done", "wait", "result", "control_id", "call"):
+    for m in ("__init__", "is_done", "wait", "result", "control_id", "call", "completed"):
         if m in action_cls:
             base_entry["methods"].setdefault(m, action_cls[m])
     # ``call`` is REFERENCE surface (relay.call.Action.call), now homed on the
@@ -1944,6 +1952,69 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
         for m in methods:
             if m in action_cls:  # only if the C++ Action truly defines it
                 entry["methods"][m] = action_cls[m]
+
+
+# Built-in-skill members the oracle records as a SIGNATURE (not merely surface
+# membership) and that the C++ port implements as a zero-arg accessor on the
+# skill class. The skill classes live in ``.cpp`` IMPLEMENTATION files the
+# header walker never opens — so libclang cannot see them and the accessor
+# would read as missing-port drift even though it is implemented. This is the
+# signature-side twin of enumerate_surface's ``_project_builtin_skills``: same
+# fold, same fail-honest rule.
+#
+# ``oracle_key -> (candidate cpp sources, cpp class, {member: accessor})``.
+# CANDIDATES, plural, deliberately: "spider" is registered TWICE — once by
+# ``src/skills/builtin/spider.cpp`` and once by ``SpiderSkillR`` in
+# ``src/skills/skill_registry.cpp`` — and ``SkillRegistry::register_skill``
+# overwrites, so which class a caller actually gets is static-init order. Both
+# carry the accessor, so the projection is honest for either winner; requiring
+# it in ALL listed sources is what keeps it that way. (The duplicate itself is
+# a pre-existing defect, reported separately — do not paper it over here.)
+#
+# A member is projected ONLY when the named accessor is genuinely present in
+# EVERY listed source — a deleted or renamed accessor drops out rather than
+# being invented (RULES §2/§3).
+_SKILL_ACCESSOR_PROJECTIONS: dict[str, tuple[tuple[str, ...], str, dict[str, str]]] = {
+    "signalwire.skills.spider.skill.SpiderSkill": (
+        ("src/skills/builtin/spider.cpp", "src/skills/skill_registry.cpp"),
+        "SpiderSkill",
+        # ``self.remove_xpaths`` — the PREFILLED xpath list the reference sets
+        # in ``__init__`` and walks in ``_fast_text_extract``. C++ idiom: a
+        # field plus a ``remove_xpaths()`` reader (+ ``set_remove_xpaths``).
+        {"remove_xpaths": "remove_xpaths"},
+    ),
+}
+
+
+def _project_skill_accessors(out_modules: dict) -> None:
+    """Project built-in-skill value accessors (see _SKILL_ACCESSOR_PROJECTIONS).
+
+    The C++ skill classes are defined in ``.cpp`` implementation files, which
+    the libclang header walk never parses. Verify the accessor really exists in
+    every candidate source and emit the oracle-shaped zero-arg signature for
+    it; skip it entirely when any source or the accessor is absent, so the
+    enumerator can never invent surface the port does not have.
+    """
+    for oracle_key, (cpp_files, _cpp_cls, members) in _SKILL_ACCESSOR_PROJECTIONS.items():
+        srcs = [PORT_ROOT / f for f in cpp_files]
+        if not all(s.is_file() for s in srcs):
+            continue  # skill not implemented in this tree — don't invent it
+        texts = [s.read_text(encoding="utf-8") for s in srcs]
+        module, cls = oracle_key.rsplit(".", 1)
+        for member, accessor in members.items():
+            # The accessor must be DEFINED (``name() const {`` / ``name() {``),
+            # not merely mentioned. A bare call site does not count.
+            pat = re.compile(
+                r"\b" + re.escape(accessor) + r"\s*\(\s*\)\s*(?:const\s*)?(?:noexcept\s*)?\{"
+            )
+            if not all(pat.search(t) for t in texts):
+                continue
+            mod_entry = out_modules.setdefault(module, {"classes": {}, "functions": {}})
+            cls_entry = mod_entry.setdefault("classes", {}).setdefault(cls, {"methods": {}})
+            cls_entry["methods"].setdefault(
+                member,
+                {"params": [{"name": "self", "kind": "self"}], "returns": "list<string>"},
+            )
 
 
 def _project_gen_payload_getters(out_modules: dict) -> None:

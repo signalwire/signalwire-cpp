@@ -8865,6 +8865,15 @@
               ],
               "returns": "class:signalwire.swml.document.Document"
             },
+            "domain": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<string>"
+            },
             "enter_queue": {
               "params": [
                 {
@@ -9605,6 +9614,33 @@
                 }
               ],
               "returns": "class:signalwire.core.swml_service.SWMLService"
+            },
+            "ssl_cert_path": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<string>"
+            },
+            "ssl_enabled": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
+            },
+            "ssl_key_path": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "optional<string>"
             },
             "stop": {
               "params": [
@@ -15879,6 +15915,15 @@
                 }
               ],
               "returns": "class:signalwire.relay.call.Call"
+            },
+            "completed": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "bool"
             },
             "control_id": {
               "params": [
@@ -29619,6 +29664,23 @@
                 }
               ],
               "returns": "void"
+            }
+          }
+        }
+      }
+    },
+    "signalwire.skills.spider.skill": {
+      "classes": {
+        "SpiderSkill": {
+          "methods": {
+            "remove_xpaths": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "list<string>"
             }
           }
         }

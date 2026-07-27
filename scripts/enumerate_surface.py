@@ -762,7 +762,8 @@ SKILL_PROJECTIONS: dict[str, tuple[str, str, list[str]]] = {
     "PlayBackgroundFileSkill": ("signalwire.skills.play_background_file.skill", "PlayBackgroundFileSkill",
         ["__init__", "get_instance_key", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
     "SpiderSkill": ("signalwire.skills.spider.skill", "SpiderSkill",
-        ["__init__", "cleanup", "get_hints", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
+        ["__init__", "cleanup", "get_hints", "get_instance_key", "get_parameter_schema",
+         "register_tools", "remove_xpaths", "setup"]),
     "SwmlTransferSkill": ("signalwire.skills.swml_transfer.skill", "SWMLTransferSkill",
         ["get_hints", "get_instance_key", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
     "WeatherApiSkill": ("signalwire.skills.weather_api.skill", "WeatherApiSkill",
@@ -2180,7 +2181,12 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
         # ``control_id`` joins the projected set: it is a ctor param the
         # reference stores publicly (``self.control_id``), which the oracle's
         # class-B2 rule now records, and the C++ Action has the accessor.
-        proj = sorted({"__init__"} | {m for m in ("is_done", "wait", "result", "control_id", "call")
+        # ``completed`` likewise: the reference sets ``self.completed = False``
+        # in ``__init__`` and flips it True on completion — a caller-observable
+        # VALUE (class-B2), and the C++ Action already exposes ``completed()``
+        # (``is_done()`` is the C++-idiom alias that delegates to it).
+        proj = sorted({"__init__"} | {m for m in ("is_done", "wait", "result", "control_id",
+                                                  "call", "completed")
                                       if m in _action_own})
         modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
         modules["signalwire.relay.call"]["classes"]["Action"] = proj

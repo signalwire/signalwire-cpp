@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include <regex>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "signalwire/common.hpp"
 #include "signalwire/skills/skill_base.hpp"
@@ -13,12 +15,48 @@ namespace skills {
 
 namespace {
 
-/// Strip HTML tags from `html` and collapse repeated whitespace. Matches the
-/// "naive HTML strip" Python's spider skill does for its scrape_url tool.
-std::string strip_html(const std::string& html) {
+/// Drop each element matched by `xpaths` — tag AND its inner content —
+/// before any tag-stripping runs. Mirrors the reference's
+/// ``_fast_text_extract``, which walks ``self.remove_xpaths`` and calls
+/// ``elem.drop_tree()`` on every hit, so a ``<script>``/``<style>`` body never
+/// reaches the extracted text. Without this the naive tag-strip below turns
+/// script source and CSS into "scraped content".
+///
+/// The reference's defaults are all plain ``//tag`` element selectors; that is
+/// the shape supported here (a full XPath engine is not vendored). An entry the
+/// resolver does not understand is skipped rather than silently mangling the
+/// document.
+std::string drop_xpath_elements(const std::string& html, const std::vector<std::string>& xpaths) {
+  std::string out = html;
+  for (const auto& xp : xpaths) {
+    // "//tag" -> element name; anything richer is not resolvable here.
+    if (xp.rfind("//", 0) != 0) {
+      continue;
+    }
+    const std::string tag = xp.substr(2);
+    if (tag.empty() ||
+        tag.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") !=
+            std::string::npos) {
+      continue;
+    }
+    // <tag ...> ... </tag>  (non-greedy body, case-insensitive), plus the
+    // self-closing / unpaired form so a stray "<noscript/>" also goes.
+    const std::regex paired("<" + tag + R"((\s[^>]*)?>[\s\S]*?</)" + tag + R"(\s*>)",
+                            std::regex::icase);
+    out = std::regex_replace(out, paired, " ");
+    const std::regex selfclosing("<" + tag + R"((\s[^>]*)?/>)", std::regex::icase);
+    out = std::regex_replace(out, selfclosing, " ");
+  }
+  return out;
+}
+
+/// Strip HTML tags from `html` and collapse repeated whitespace, after first
+/// dropping every element named by `remove_xpaths` (tag + content).
+std::string strip_html(const std::string& html, const std::vector<std::string>& remove_xpaths) {
   static const std::regex tag_re(R"(<[^>]+>)");
   static const std::regex ws_re(R"(\s+)");
-  std::string no_tags = std::regex_replace(html, tag_re, " ");
+  std::string pruned = drop_xpath_elements(html, remove_xpaths);
+  std::string no_tags = std::regex_replace(pruned, tag_re, " ");
   return std::regex_replace(no_tags, ws_re, " ");
 }
 
@@ -70,9 +108,20 @@ class SpiderSkill : public SkillBase {
     return true;
   }
 
+  /// XPath expressions for the elements stripped from a fetched page before
+  /// text extraction (reference: ``self.remove_xpaths``, set in ``__init__``
+  /// to this same PREFILLED list — not an empty default). Callers read it to
+  /// see what gets dropped; ``set_remove_xpaths`` replaces the set.
+  [[nodiscard]] const std::vector<std::string>& remove_xpaths() const { return remove_xpaths_; }
+  void set_remove_xpaths(const std::vector<std::string>& xpaths) { remove_xpaths_ = xpaths; }
+
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::string prefix = get_param<std::string>(params_, "prefix", "");
     std::vector<swaig::ToolDefinition> tools;
+    // Captured BY VALUE into the tool handlers: a ToolDefinition outlives the
+    // skill instance that registered it (the agent owns the registry), so
+    // capturing ``this`` would dangle.
+    const std::vector<std::string> remove_xpaths = remove_xpaths_;
 
     tools.push_back(define_tool(
         prefix + "scrape_url", "Scrape content from a URL",
@@ -81,7 +130,7 @@ class SpiderSkill : public SkillBase {
                        json::object({{"url", json::object({{"type", "string"},
                                                            {"description", "URL to scrape"}})}})},
                       {"required", json::array({"url"})}}),
-        [](const json& args, const json&) -> swaig::FunctionResult {
+        [remove_xpaths](const json& args, const json&) -> swaig::FunctionResult {
           std::string url = args.value("url", "");
           if (url.empty()) {
             return swaig::FunctionResult("No URL provided");
@@ -106,15 +155,15 @@ class SpiderSkill : public SkillBase {
             try {
               json parsed = json::parse(resp.body);
               if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
-                text = strip_html(parsed["_raw_html"].get<std::string>());
+                text = strip_html(parsed["_raw_html"].get<std::string>(), remove_xpaths);
               } else {
-                text = strip_html(resp.body);
+                text = strip_html(resp.body, remove_xpaths);
               }
             } catch (...) {
-              text = strip_html(resp.body);
+              text = strip_html(resp.body, remove_xpaths);
             }
           } else {
-            text = strip_html(resp.body);
+            text = strip_html(resp.body, remove_xpaths);
           }
 
           std::ostringstream out;
@@ -129,7 +178,7 @@ class SpiderSkill : public SkillBase {
                        json::object({{"start_url", json::object({{"type", "string"},
                                                                  {"description", "Start URL"}})}})},
                       {"required", json::array({"start_url"})}}),
-        [](const json& args, const json&) -> swaig::FunctionResult {
+        [remove_xpaths](const json& args, const json&) -> swaig::FunctionResult {
           // Crawl is implemented as a single-page scrape of the start
           // URL — the deeper crawl loop is a future feature; for now
           // we fetch the start page (real HTTP, real HTML strip) so
@@ -147,7 +196,7 @@ class SpiderSkill : public SkillBase {
           if (resp.status == 0) {
             return swaig::FunctionResult("Spider transport error: " + resp.error);
           }
-          std::string text = strip_html(resp.body);
+          std::string text = strip_html(resp.body, remove_xpaths);
           return swaig::FunctionResult("Crawl page " + effective + ":\n" + text);
         }));
 
@@ -179,6 +228,13 @@ class SpiderSkill : public SkillBase {
   std::vector<std::string> get_hints() const override {
     return {"scrape", "crawl", "extract", "web page", "website", "spider"};
   }
+
+ private:
+  /// The reference PREFILLS this in ``__init__`` — it is not an empty default.
+  /// Same seven selectors, same order.
+  std::vector<std::string> remove_xpaths_{
+      "//script", "//style", "//nav", "//header", "//footer", "//aside", "//noscript",
+  };
 };
 
 REGISTER_SKILL(SpiderSkill)

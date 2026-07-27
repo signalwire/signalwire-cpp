@@ -2217,10 +2217,15 @@ void AgentBase::setup_routes(httplib::Server& server) {
 void AgentBase::serve() {
   init_auth();
 
-  // TLS termination in-process when SWML_SSL_ENABLED + cert/key are set
-  // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
-  // unique_ptr<Server>; setup_routes() is unchanged.
-  auto tls = server::resolve_tls_config_from_env();
+  // TLS termination in-process, driven by the inherited swml::Service TLS
+  // values (seeded in its ctor from SecurityConfig — so SWML_SSL_ENABLED /
+  // SWML_SSL_CERT_PATH / SWML_SSL_KEY_PATH and any config file still apply —
+  // and overridable via set_ssl_*()). SSLServer upcasts into the existing
+  // shared_ptr<Server>; setup_routes() is unchanged.
+  server::TlsServerConfig tls;
+  tls.enabled = ssl_enabled();
+  tls.cert_path = ssl_cert_path().value_or("");
+  tls.key_path = ssl_key_path().value_or("");
 
   // Build + configure under the lock, then listen() with our OWN strong
   // reference and the lock released: a concurrent stop() must be able to

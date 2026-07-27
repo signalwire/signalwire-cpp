@@ -355,6 +355,38 @@ class Service {
   /// Get the effective port
   int port() const { return port_; }
 
+  // ========================================================================
+  // TLS / serving-domain configuration
+  //
+  // The reference copies these four off ``self.security`` in ``__init__``
+  // (``self.ssl_enabled = self.security.ssl_enabled``, and likewise domain /
+  // ssl_cert_path / ssl_key_path) and then lets ``run()`` override them. They
+  // are caller-observable VALUES, so they are contract surface on the service
+  // itself — not just on the SecurityConfig collaborator. C++ idiom: an
+  // accessor pair per value backed by a field.
+  // ========================================================================
+
+  /// Whether TLS is enabled for this service (reference: ``self.ssl_enabled``).
+  [[nodiscard]] bool ssl_enabled() const { return ssl_enabled_; }
+  /// Enable/disable TLS. Mirrors the reference's ``run(ssl_enabled=...)``
+  /// override of the value seeded from SecurityConfig.
+  Service& set_ssl_enabled(bool enabled);
+
+  /// The serving domain used to build public URLs (reference: ``self.domain``).
+  [[nodiscard]] const std::optional<std::string>& domain() const { return domain_; }
+  /// Set the serving domain (reference: ``run(domain=...)``).
+  Service& set_domain(const std::string& domain);
+
+  /// TLS certificate path (reference: ``self.ssl_cert_path``).
+  [[nodiscard]] const std::optional<std::string>& ssl_cert_path() const { return ssl_cert_path_; }
+  /// Set the TLS certificate path (reference: ``run(ssl_cert=...)``).
+  Service& set_ssl_cert_path(const std::string& path);
+
+  /// TLS private-key path (reference: ``self.ssl_key_path``).
+  [[nodiscard]] const std::optional<std::string>& ssl_key_path() const { return ssl_key_path_; }
+  /// Set the TLS private-key path (reference: ``run(ssl_key=...)``).
+  Service& set_ssl_key_path(const std::string& path);
+
   /// Timing-safe string comparison using CRYPTO_memcmp
   [[nodiscard]] static bool timing_safe_compare(const std::string& a, const std::string& b);
 
@@ -445,6 +477,16 @@ class Service {
   /// Config file from the constructor (or auto-discovered for this service
   /// name), forwarded to SecurityConfig.
   std::optional<std::string> config_file_;
+
+  /// The four TLS / domain values, seeded in the ctor from a
+  /// ``SecurityConfig`` built out of ``config_file_`` + the service name —
+  /// exactly what the reference's ``__init__`` copies off ``self.security``.
+  /// They stay independently settable afterwards (the reference's ``run()``
+  /// overrides them the same way).
+  bool ssl_enabled_ = false;
+  std::optional<std::string> domain_;
+  std::optional<std::string> ssl_cert_path_;
+  std::optional<std::string> ssl_key_path_;
 
   // Protected accessors for the three above — the reference's counterparts
   // are private (``self._schema_validation``) or not stored at all, so these

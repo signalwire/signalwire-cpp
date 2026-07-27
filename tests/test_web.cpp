@@ -17,7 +17,11 @@ TEST(web_manual_proxy_url) {
     agent.define_tool("test_tool", "Test", json::object(),
         [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
 
-    json swml = agent.render_swml();
+    // Render WITH a call_id: a per-tool web_hook_url is only emitted when the
+    // entry carries a token (or SWAIG query params) — reference
+    // agent_base.py:1085-1099. Without one there is no URL to inspect at all.
+    const std::map<std::string, std::string> q = {{"call_id", "call-abc"}};
+    json swml = agent.render_swml_for_request(q, json::object(), {});
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {
         if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
@@ -36,12 +40,14 @@ TEST(web_webhook_url_override) {
     agent.set_auth("u", "p");
     agent.define_tool("test_tool", "Test", json::object(), nullptr);
 
-    json swml = agent.render_swml();
+    // Render WITH a call_id — see web_manual_proxy_url.
+    const std::map<std::string, std::string> q = {{"call_id", "call-abc"}};
+    json swml = agent.render_swml_for_request(q, json::object(), {});
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {
         if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
             auto url = verb["ai"]["SWAIG"]["functions"][0]["web_hook_url"].get<std::string>();
-            ASSERT_EQ(url, "https://custom.webhook.com/swaig");
+            ASSERT_TRUE(url.rfind("https://custom.webhook.com/swaig", 0) == 0);
             return true;
         }
     }
@@ -81,7 +87,10 @@ TEST(web_clear_swaig_query_params) {
     agent.clear_swaig_query_params();
     agent.define_tool("test_tool", "Test", json::object(), nullptr);
 
-    json swml = agent.render_swml();
+    // Render WITH a call_id — with the params cleared, the token is now the only
+    // thing that earns this entry its own web_hook_url (see web_manual_proxy_url).
+    const std::map<std::string, std::string> q = {{"call_id", "call-abc"}};
+    json swml = agent.render_swml_for_request(q, json::object(), {});
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {
         if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
@@ -161,7 +170,9 @@ TEST(web_proxy_from_forwarded_headers) {
         {"x-forwarded-proto", "https"},
         {"x-forwarded-host", "myapp.example.com"}
     };
-    json swml = agent.render_swml_for_request({}, json::object(), headers);
+    // Render WITH a call_id — see web_manual_proxy_url.
+    const std::map<std::string, std::string> q = {{"call_id", "call-abc"}};
+    json swml = agent.render_swml_for_request(q, json::object(), headers);
 
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {

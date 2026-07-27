@@ -373,7 +373,7 @@ TEST(parameter_schema_define_tool_render_and_invoke) {
     json expected_params = params.to_json();
 
     AgentBase agent;
-    agent.set_auth("u", "p");  // so web_hook_url is emitted (matches test_tool.cpp)
+    agent.set_auth("u", "p");
     // Pass the builder straight in (implicit ParameterSchema -> json conversion).
     agent.define_tool("book_appointment", "Book an appointment", params,
         [](const json& args, const json&) -> FunctionResult {

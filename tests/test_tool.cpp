@@ -168,7 +168,11 @@ TEST(tool_swaig_functions_in_swml) {
         })}
     }), [](const json&, const json&) { return FunctionResult("ok"); });
 
-    json swml = agent.render_swml();
+    // Render WITH a call_id: a per-tool web_hook_url is only emitted when the
+    // entry carries a token (or SWAIG query params) — reference
+    // agent_base.py:1085-1099.
+    const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
+    json swml = agent.render_swml_for_request(query, json::object(), {});
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {
         if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
@@ -217,9 +221,33 @@ TEST(tool_secure_tool_in_swml_carries_token) {
     return true;
 }
 
-// The other direction: an explicitly INSECURE tool gets NO token, so a port
-// cannot blindly tokenize every function.
-TEST(tool_insecure_tool_in_swml_has_no_token) {
+// Locate a rendered SWAIG function entry BY NAME (the multi-tool analog of
+// swaig_only_function). Returns a null json when the name is absent.
+static json swaig_function_named(const json& swml, const std::string& name) {
+    const auto& main = swml["sections"]["main"];
+    for (const auto& verb : main) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG") &&
+            verb["ai"]["SWAIG"].contains("functions")) {
+            for (const auto& fn : verb["ai"]["SWAIG"]["functions"]) {
+                if (fn.contains("function") && fn["function"] == name) {
+                    return fn;
+                }
+            }
+        }
+    }
+    return json();
+}
+
+// The other direction, and the SECURITY half of the contract: an explicitly
+// INSECURE tool gets no token AND NO ``web_hook_url`` KEY AT ALL.
+//
+// Reference agent_base.py:1085-1099 — external URL wins; else a local URL ONLY
+// when a token or SWAIG query params exist; else the key is absent and the tool
+// falls back to the shared ``SWAIG.defaults.web_hook_url``. Emitting the local
+// URL here would publish an UNAUTHENTICATED, function-specific callback on the
+// wire, which is exactly what ``secure=false`` must not do. An empty string, a
+// null, or a tokenless URL are the same defect — the KEY must be absent.
+TEST(tool_insecure_tool_in_swml_has_no_webhook_key) {
     AgentBase agent;
     agent.set_auth("u", "p");
     agent.define_tool("open_tool", "Insecure", json::object(),
@@ -229,14 +257,95 @@ TEST(tool_insecure_tool_in_swml_has_no_token) {
     const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
     json fn = swaig_only_function(agent.render_swml_for_request(query, json::object(), {}));
     ASSERT_FALSE(fn.is_null());
-    ASSERT_TRUE(fn.contains("web_hook_url"));
-    ASSERT_TRUE(fn["web_hook_url"].get<std::string>().find("__token=") == std::string::npos);
+    ASSERT_FALSE(fn.contains("web_hook_url"));
     return true;
 }
 
-// No call_id = no call to scope a token to, so even a secure tool renders bare
-// (mirrors the reference's ``if func.secure and call_id`` guard).
-TEST(tool_secure_tool_without_call_id_has_no_token) {
+// SWAIG query params are the OTHER arm of the reference's ``elif token or
+// agent._swaig_query_params`` guard: with them set, even an insecure tool gets
+// its own (still tokenless) local webhook, because the params must reach the
+// callback. This pins that the guard is the reference's disjunction and not a
+// blanket "insecure => no webhook".
+TEST(tool_insecure_tool_with_swaig_query_params_keeps_webhook) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.add_swaig_query_param("tenant", "acme");
+    agent.define_tool("open_tool", "Insecure", json::object(),
+        [](const json&, const json&) { return FunctionResult("ok"); },
+        false /* secure */);
+
+    const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
+    json fn = swaig_only_function(agent.render_swml_for_request(query, json::object(), {}));
+    ASSERT_FALSE(fn.is_null());
+    ASSERT_TRUE(fn.contains("web_hook_url"));
+    const std::string url = fn["web_hook_url"].get<std::string>();
+    ASSERT_TRUE(url.find("tenant=acme") != std::string::npos);
+    ASSERT_TRUE(url.find("__token=") == std::string::npos);
+    return true;
+}
+
+// The SECURE-DEFAULT corpus shape, in-process: one default (secure) tool and one
+// secure=false tool on the SAME agent, rendered in ONE pass. The secure entry
+// HAS a web_hook_url carrying ``__token``; the insecure entry has NO
+// web_hook_url key at all. This is the pair the cross-port
+// diff_port_secure_default gate compares.
+TEST(tool_secure_and_insecure_tools_render_divergent_webhooks) {
+    AgentBase agent;
+    agent.set_auth("u", "p");
+    agent.define_tool("sd_default_secure", "Secure", json::object(),
+        [](const json&, const json&) { return FunctionResult("ok"); });
+    agent.define_tool("sd_explicit_insecure", "Insecure", json::object(),
+        [](const json&, const json&) { return FunctionResult("ok"); },
+        false /* secure */);
+
+    const std::map<std::string, std::string> query = {{"call_id", "call-abc"}};
+    const json swml = agent.render_swml_for_request(query, json::object(), {});
+
+    json secure_fn = swaig_function_named(swml, "sd_default_secure");
+    ASSERT_FALSE(secure_fn.is_null());
+    ASSERT_TRUE(secure_fn.contains("web_hook_url"));
+    ASSERT_TRUE(
+        secure_fn["web_hook_url"].get<std::string>().find("__token=") != std::string::npos);
+
+    json insecure_fn = swaig_function_named(swml, "sd_explicit_insecure");
+    ASSERT_FALSE(insecure_fn.is_null());
+    ASSERT_FALSE(insecure_fn.contains("web_hook_url"));
+
+    // ...and the shared fallback the insecure tool relies on MUST be present.
+    // Withholding the per-tool webhook without emitting SWAIG.defaults leaves an
+    // insecure tool with NO reachable callback at all — a worse failure than the
+    // unauthenticated per-tool callback the guard removes, and one the
+    // cross-port SECURE-DEFAULT gate cannot see (it inspects only functions[]).
+    // Reference agent_base.py:1108-1113 adds defaults whenever functions exist.
+    json swaig;
+    for (const auto& verb : swml["sections"]["main"]) {
+        if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
+            swaig = verb["ai"]["SWAIG"];
+        }
+    }
+    ASSERT_FALSE(swaig.is_null());
+    ASSERT_TRUE(swaig.contains("defaults"));
+    ASSERT_TRUE(swaig["defaults"].contains("web_hook_url"));
+    const std::string fallback = swaig["defaults"]["web_hook_url"].get<std::string>();
+    ASSERT_TRUE(fallback.find("/swaig") != std::string::npos);
+    // The shared endpoint is not per-tool, so it carries no per-tool token.
+    ASSERT_TRUE(fallback.find("__token=") == std::string::npos);
+    return true;
+}
+
+// No call_id = no call to scope a token to under C++'s ``if secure && call_id``
+// guard, so no token is minted — and with no token and no SWAIG query params the
+// reference's ``elif token or _swaig_query_params`` is false on both arms, so no
+// ``web_hook_url`` key is emitted either.
+//
+// NOTE (measured, not inferred; out of scope for this security fix): the python
+// reference GENERATES a call_id when the request supplies none
+// (agent_base.py ``generated_call_id``), so a secure tool there always mints a
+// token and always carries its own webhook. C++ renders bare instead. That is a
+// separate divergence in WHEN a call_id exists, not in this webhook-key guard,
+// and the SECURE-DEFAULT corpus always passes an explicit call_id so it does not
+// exercise it. This test pins C++'s current no-call_id behavior.
+TEST(tool_secure_tool_without_call_id_has_no_webhook_key) {
     AgentBase agent;
     agent.set_auth("u", "p");
     agent.define_tool("secure_tool", "Secure", json::object(),
@@ -244,8 +353,7 @@ TEST(tool_secure_tool_without_call_id_has_no_token) {
 
     json fn = swaig_only_function(agent.render_swml());
     ASSERT_FALSE(fn.is_null());
-    ASSERT_TRUE(fn.contains("web_hook_url"));
-    ASSERT_TRUE(fn["web_hook_url"].get<std::string>().find("__token=") == std::string::npos);
+    ASSERT_FALSE(fn.contains("web_hook_url"));
     return true;
 }
 

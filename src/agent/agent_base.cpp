@@ -1499,14 +1499,42 @@ json AgentBase::build_swaig_functions(const std::string& webhook_url,
       // ``__token=`` query parameter IS the wire manifestation of ``secure`` —
       // the platform presents it on the callback and the /swaig dispatcher
       // validates it. An INSECURE tool gets no token.
-      std::string url = webhook_url;
+      std::string token;
       if (it->second.secure && !call_id.empty()) {
-        std::string token = session_manager_.create_tool_token(name, call_id);
+        token = session_manager_.create_tool_token(name, call_id);
+      }
+
+      // WHETHER this entry gets its own ``web_hook_url`` at all — the reference
+      // guard at agent_base.py:1085-1099, verbatim:
+      //
+      //     if func.webhook_url:        -> use the external URL
+      //     elif token or _swaig_query_params:
+      //                                 -> build the local URL (+ __token)
+      //     # else: NO web_hook_url key on the entry AT ALL
+      //
+      // The else branch is load-bearing SECURITY, not a cosmetic difference: an
+      // insecure tool that is handed the local URL publishes an
+      // UNAUTHENTICATED, function-specific callback on the wire. With no key it
+      // falls back to the shared ``SWAIG.defaults.web_hook_url``, which is the
+      // whole point of ``secure=false``. Emitting an empty string / null / a
+      // tokenless URL are all the same defect — the KEY must be absent.
+      //
+      // C++ has no per-tool external webhook (``ToolDefinition`` carries no
+      // ``webhook_url``; the agent-level override lives in ``webhook_url_`` and
+      // is already folded into ``webhook_url`` by build_webhook_url), so the
+      // first reference branch has no analog here and the guard reduces to the
+      // ``elif``.
+      const bool wants_own_webhook = !token.empty() || !swaig_query_params_.empty();
+
+      std::string url;
+      if (wants_own_webhook) {
+        url = webhook_url;
         if (!token.empty()) {
           url += (url.find('?') == std::string::npos ? "?" : "&");
           url += "__token=" + signalwire::url_encode(token);
         }
       }
+      // to_swaig_json omits the key entirely for an empty url.
       functions.push_back(it->second.to_swaig_json(url));
     }
   }
@@ -1596,6 +1624,25 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
   json functions = build_swaig_functions(webhook_url, call_id);
   if (!functions.empty()) {
     swaig_section["functions"] = functions;
+    // The SHARED fallback endpoint, emitted whenever there are functions at all
+    // (reference agent_base.py:1108-1113: ``if functions: ... if "defaults" not
+    // in swaig_obj: swaig_obj["defaults"] = {"web_hook_url": ...}``).
+    //
+    // This is the OTHER half of the build_swaig_functions webhook guard and must
+    // not be separated from it. That guard correctly withholds a per-tool
+    // ``web_hook_url`` from an INSECURE tool — but an insecure tool is not
+    // meant to be unreachable, it is meant to fall back to THIS shared endpoint.
+    // Without the defaults block the insecure tool renders with no callback
+    // endpoint at all, which is a worse failure than the unauthenticated
+    // per-tool callback the guard removed. The SECURE-DEFAULT gate inspects only
+    // ``functions[]``, so it cannot see this — it is pinned by test
+    // tool_secure_and_insecure_tools_render_divergent_webhooks instead.
+    //
+    // An explicit ``default_webhook_url`` set above wins (the reference's
+    // ``if "defaults" not in swaig_obj`` guard).
+    if (!swaig_section.contains("defaults")) {
+      swaig_section["defaults"] = json::object({{"web_hook_url", webhook_url}});
+    }
   }
   if (!function_includes_.empty()) {
     swaig_section["includes"] = function_includes_;

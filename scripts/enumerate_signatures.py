@@ -573,13 +573,28 @@ def walk_translation_unit(
             # and thereby inventing an inventory class.
             if fields:
                 options_structs[f"{ns_str}::{class_name}"] = fields
-            if methods:
-                entries.append({
-                    "namespace": ns_str,
-                    "name": class_name,
-                    "methods": methods,
-                    "fields": fields,
-                })
+            # A fields-only POD is admitted to the inventory ONLY when the
+            # reference ORACLE records a class of that name in the module this
+            # class maps to — i.e. the reference genuinely has this class and
+            # spells its whole surface as attributes. That is the case for the
+            # credential carriers (``BasicCredentials``/``BearerCredentials``,
+            # two std::string fields and no methods at all): the reference
+            # records them as dataclasses whose members ARE the fields, so
+            # dropping them here made an implemented carrier read as
+            # missing-port drift. The oracle gate is what keeps this from
+            # inventing an inventory class out of an internal options struct
+            # (``RelayConfig`` has no reference counterpart and stays out).
+            if not methods and fields and \
+                    _oracle_records_class(ns_str, class_name, str(fn.name)):
+                methods = []
+            elif not methods:
+                return
+            entries.append({
+                "namespace": ns_str,
+                "name": class_name,
+                "methods": methods,
+                "fields": fields,
+            })
             return
         # Recurse into other top-level structures
         for child in cursor.get_children():
@@ -1439,7 +1454,7 @@ def collect(
                         continue
             methods_out[method_canonical] = sig
 
-        if not methods_out:
+        if not methods_out and not (entry.get("fields") or []):
             continue
         # Synthesize __init__ when libclang didn't surface an explicit
         # constructor — POD structs / classes with only the implicit
@@ -3128,6 +3143,39 @@ def _load_python_signatures() -> dict:
         return json.loads((PSDK / "python_signatures.json").read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
+
+
+def _oracle_records_class(ns_str: str, class_name: str, header_path: str) -> bool:
+    """True when the reference oracle records ``class_name`` in the Python module
+    this C++ class maps to — the gate that lets a fields-only POD into the
+    signature inventory.
+
+    Resolves the module the SAME way the emit loop does (CLASS_RENAME_MAP, then
+    CLASS_MODULE_MAP / module_for_class) so the answer cannot disagree with where
+    the class would actually land.
+
+    GENERATED DTOs ARE EXCLUDED BY PATH, and that exclusion is load-bearing rather
+    than cosmetic. ``CLASS_MODULE_MAP`` is keyed by bare class NAME, so it is
+    namespace-blind: the generated read-side DTO ``signalwire::rest::…::messages::
+    Message`` and the generated SWML verb ``…::DataMap`` resolve to the SAME
+    canonical key as the hand-written ``signalwire.relay.message.Message`` /
+    ``signalwire.core.data_map.DataMap``. Admitting a DTO therefore does not add a
+    class — it MERGES its wire fields into the hand-written class's construction
+    contract (measured: +13 bogus construction params on Message, and DataMap lost
+    its real ``function_name``). The generated DTOs already reach the audit through
+    their own generated-payload path; they must not enter here."""
+    if "/generated/" in header_path or "_generated/" in header_path:
+        return False
+    rename_key = (ns_str, class_name)
+    if rename_key in CLASS_RENAME_MAP:
+        mod, cls = CLASS_RENAME_MAP[rename_key]
+    else:
+        cls = class_name
+        mod = CLASS_MODULE_MAP.get(class_name) or module_for_class(class_name, ns_str)
+    if not mod:
+        return False
+    ref = _load_python_signatures()
+    return cls in ref.get("modules", {}).get(mod, {}).get("classes", {})
 
 
 def _load_python_free_function_targets() -> set[tuple[str, str]]:

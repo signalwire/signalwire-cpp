@@ -47,7 +47,7 @@ TEST(auth_handler_verify_bearer_disabled_by_default) {
   // false (parity with Python getattr(..., None)).
   SecurityConfig cfg = make_config("admin", "s3cret");
   AuthHandler handler(cfg);
-  ASSERT_FALSE(handler.verify_bearer_token(BearerCredentials{"anything"}));
+  ASSERT_FALSE(handler.verify_bearer_token(BearerCredentials{"Bearer", "anything"}));
   return true;
 }
 

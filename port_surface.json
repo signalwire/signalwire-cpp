@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 95641abcd377548f64a682f9bad962af8ecc7ee6",
+  "generated_from": "signalwire-cpp @ 2c6cf6dbfdd0514e8ba4ab0b91f3c07149a0c005",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -286,6 +286,14 @@
           "verify_api_key",
           "verify_basic_auth",
           "verify_bearer_token"
+        ],
+        "BasicCredentials": [
+          "password",
+          "username"
+        ],
+        "BearerCredentials": [
+          "credentials",
+          "scheme"
         ]
       },
       "functions": []

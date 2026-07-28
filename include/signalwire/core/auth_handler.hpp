@@ -42,8 +42,10 @@ struct BasicCredentials {
 };
 
 /// Bearer-token credential carrier (matches FastAPI's
-/// HTTPAuthorizationCredentials).
+/// HTTPAuthorizationCredentials, which carries BOTH halves of the
+/// ``Authorization`` header: the scheme token and the credential string).
 struct BearerCredentials {
+  std::string scheme;
   std::string credentials;
 };
 

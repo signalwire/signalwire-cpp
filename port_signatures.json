@@ -2492,7 +2492,7 @@
                 },
                 {
                   "name": "credentials",
-                  "type": "class:signalwire.core.basic_credentials.BasicCredentials",
+                  "type": "class:signalwire.core.auth_handler.BasicCredentials",
                   "required": true
                 }
               ],
@@ -2506,11 +2506,73 @@
                 },
                 {
                   "name": "credentials",
-                  "type": "class:signalwire.core.bearer_credentials.BearerCredentials",
+                  "type": "class:signalwire.core.auth_handler.BearerCredentials",
                   "required": true
                 }
               ],
               "returns": "bool"
+            }
+          }
+        },
+        "BasicCredentials": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "password": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "username": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            }
+          }
+        },
+        "BearerCredentials": {
+          "methods": {
+            "__init__": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "void"
+            },
+            "credentials": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "scheme": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
             }
           }
         }
@@ -31482,6 +31544,30 @@
         "security_config": {
           "type": "class:signalwire.core.security_config.SecurityConfig",
           "required": true
+        }
+      }
+    },
+    "signalwire.core.auth_handler.BasicCredentials": {
+      "params": {
+        "password": {
+          "type": "string",
+          "required": false
+        },
+        "username": {
+          "type": "string",
+          "required": false
+        }
+      }
+    },
+    "signalwire.core.auth_handler.BearerCredentials": {
+      "params": {
+        "credentials": {
+          "type": "string",
+          "required": false
+        },
+        "scheme": {
+          "type": "string",
+          "required": false
         }
       }
     },

@@ -118,6 +118,14 @@ CLASS_MODULE_MAP: dict[str, str] = {
 
     # -- core infra classes (auth/config/security/pom) --------------------
     "AuthHandler": "signalwire.core.auth_handler",
+    # The credential carriers live BESIDE AuthHandler in the reference module
+    # (the oracle records signalwire.core.auth_handler.BasicCredentials /
+    # .BearerCredentials since porting-sdk dcff742 resolved the FastAPI names).
+    # Without this the port-only fallback would snake_case the class name into
+    # its own module leaf (signalwire.core.basic_credentials) and the carriers
+    # would never meet their reference counterparts.
+    "BasicCredentials": "signalwire.core.auth_handler",
+    "BearerCredentials": "signalwire.core.auth_handler",
     "ConfigLoader": "signalwire.core.config_loader",
     "SecurityConfig": "signalwire.core.security_config",
     "PomBuilder": "signalwire.core.pom_builder",
@@ -1975,6 +1983,23 @@ def _project_request_options_fields(modules: dict, repo: Path) -> None:
     _emit_oracle_gated_fields(modules, "signalwire.rest._request_options", header)
 
 
+def _project_credential_carrier_fields(modules: dict, repo: Path) -> None:
+    """Emit the credential carriers' public data-member fields as surface members,
+    gated on the oracle's ``signalwire.core.auth_handler`` per-class set.
+
+    ``BasicCredentials{username,password}`` and ``BearerCredentials{scheme,
+    credentials}`` are pure data records: the reference spells them as FastAPI
+    pydantic models whose whole surface is their fields, so griffe records the
+    fields and no ``__init__``. The C++ carriers are the same shape — two
+    ``std::string`` members, zero methods — which is precisely what the regex
+    method-walker skips (it only registers a class once it sees a public method),
+    so both classes were absent from ``port_surface.json`` entirely. The oracle
+    gate is what makes this a fold rather than invented surface: a field appears
+    only if the reference records it on the same class."""
+    header = repo / "include/signalwire/core/auth_handler.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.core.auth_handler", header)
+
+
 def build_native_names(include_dir: Path) -> dict:
     """Return the port's REAL declared member names, verbatim, BEFORE any fold.
 
@@ -2270,6 +2295,10 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # RequestOptions: project its public std::optional<…> data-member fields as
     # surface members (intersected with the oracle's _request_options set).
     _project_request_options_fields(modules, repo)
+
+    # Credential carriers: project their public data-member fields as surface
+    # members (intersected with the oracle's signalwire.core.auth_handler set).
+    _project_credential_carrier_fields(modules, repo)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

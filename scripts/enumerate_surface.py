@@ -1939,7 +1939,20 @@ def _emit_oracle_gated_fields(modules: dict, module: str, header: Path) -> None:
     entries, intersected with the fields the reference oracle records for that
     class. A field surfaces only if the oracle lists it for the same class, so
     the port's field-idiom folds exactly onto the reference dataclass fields and
-    never invents surface the reference lacks."""
+    never invents surface the reference lacks.
+
+    ``__init__`` folds the same way. The reference spells these classes as
+    ``@dataclass``es (and, for the credential carriers, as structural fillers with
+    no source file at all), so their constructor is SYNTHESIZED rather than
+    written as a ``def`` — porting-sdk 8828dd2 taught the surface oracle to record
+    it, matching what the signature oracle always did. The C++ counterparts are
+    aggregates with no user-declared constructor, which is the same contract:
+    ``std::is_default_constructible`` is true for every one of them (verified for
+    BasicCredentials/BearerCredentials/RelayEvent/PlayEvent/RequestOptions), and
+    C++ aggregate-initializes them by field name. So the member is TRUE of the
+    port, not paperwork to clear a gate. It stays oracle-gated like every other
+    member here: if the reference does not record a constructor for this class,
+    the port does not claim one."""
     if not header.is_file():
         return
     ref = _load_reference_surface()
@@ -1957,6 +1970,8 @@ def _emit_oracle_gated_fields(modules: dict, module: str, header: Path) -> None:
         ref_set = set(ref_members if isinstance(ref_members, list)
                       else ref_members.get("members", ref_members))
         present = [f for f in fields if f in ref_set]
+        if "__init__" in ref_set:
+            present.append("__init__")
         if not present:
             continue
         existing = mod_entry["classes"].get(cls, [])

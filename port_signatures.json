@@ -17042,31 +17042,6 @@
               ],
               "returns": "string"
             },
-            "prompt": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "play_media",
-                  "type": "any",
-                  "required": true
-                },
-                {
-                  "name": "collect_params",
-                  "type": "any",
-                  "required": true
-                },
-                {
-                  "name": "control_id",
-                  "type": "string",
-                  "required": false,
-                  "default": ""
-                }
-              ],
-              "returns": "class:signalwire.relay.action.Action"
-            },
             "prompt_audio": {
               "params": [
                 {

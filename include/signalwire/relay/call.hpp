@@ -95,8 +95,6 @@ class Call {
   Action play_ringtone(const std::string& name, double duration = -1.0, double volume = 0.0);
   Action record(const json& params = json::object(), const std::string& control_id = "");
   Action record_call(const json& params = json::object());
-  Action prompt(const json& play_media, const json& collect_params,
-                const std::string& control_id = "");
   Action play_and_collect(const json& play_media, const json& collect_params,
                           const std::string& control_id = "");
   // Typed prompt convenience wrappers (mirror Python's prompt_tts/

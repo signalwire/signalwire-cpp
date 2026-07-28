@@ -617,7 +617,7 @@ TEST(relay_call_methods_without_client) {
     auto a18 = call.join_room("my-room");
     ASSERT_TRUE(a18.completed());
 
-    auto a19 = call.prompt(json::array(), json::object());
+    auto a19 = call.play_and_collect(json::array(), json::object());
     ASSERT_TRUE(a19.completed());
 
     auto a20 = call.collect(json::object());

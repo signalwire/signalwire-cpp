@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 977ec1f2976caa55baeb28d54f853d3e526ccff5",
+  "generated_from": "signalwire-cpp @ 8a1fd6d7c90c0ae11edc88ca1707c675e23f4686",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -1582,7 +1582,6 @@
           "play_silence",
           "play_tts",
           "project_id",
-          "prompt",
           "prompt_audio",
           "prompt_tts",
           "queue_enter",

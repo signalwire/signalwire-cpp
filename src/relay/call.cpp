@@ -400,11 +400,6 @@ Action Call::record(const json& params, const std::string& control_id) {
 
 Action Call::record_call(const json& params) { return record(params); }
 
-Action Call::prompt(const json& play_media, const json& collect_params,
-                    const std::string& control_id) {
-  return play_and_collect(play_media, collect_params, control_id);
-}
-
 Action Call::play_and_collect(const json& play_media, const json& collect_params,
                               const std::string& control_id) {
   json p;

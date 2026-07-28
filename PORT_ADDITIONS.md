@@ -213,7 +213,6 @@ signalwire.relay.call.Call.is_answered: cpp_typed_accessor: const-ref accessor o
 signalwire.relay.call.Call.is_ended: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.relay.call.Call.node_id: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.relay.call.Call.on_event: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
-signalwire.relay.call.Call.prompt: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.relay.call.Call.record_call: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.relay.call.Call.register_action: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.relay.call.Call.resolve_all_actions: cpp_typed_accessor: const-ref accessor or state predicate on C++ relay::Call; Python exposes equivalent state via attribute reads not enumerated.
@@ -434,7 +433,6 @@ signalwire.relay.message.Message.reason: cpp_accessor: failure reason populated 
 signalwire.relay.call.Call.tap: cpp_naming: alias for tap_audio (the Python signalwire.relay.call.Call exposes both `tap` as the verb name and `tap_audio` as the method); C++ now provides tap as the canonical name with tap_audio kept as a backward-compatible alias.
 signalwire.relay.call.Call.transcribe: cpp_naming: alias for live_transcribe used by the mock-backed tests; the Python SDK has TranscribeAction returning from call.transcribe.
 signalwire.relay.call.Call.stream: cpp_unified_action: calling.stream verb — Python returns StreamAction; C++ exposes via the unified Action.
-signalwire.relay.call.Call.play_and_collect: cpp_naming: alias for prompt(play_media, collect_params) — Python uses `play_and_collect` as the verb name on the wire and on the Call method (call.play_and_collect). C++ keeps prompt as the documented method; play_and_collect is the alias used by mock-backed tests.
 signalwire.relay.call.Call.pay: cpp_unified_action: calling.pay verb — Python returns PayAction; C++ via the unified Action.
 
 # C++-only additions on AgentBase / SWMLService surfaced by the signature audit.

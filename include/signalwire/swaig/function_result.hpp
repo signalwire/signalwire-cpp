@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace signalwire {
@@ -366,8 +367,8 @@ class FunctionResult {
                       const std::string& input_method = "dtmf", const std::string& status_url = "",
                       const std::string& payment_method = "credit-card", int timeout = 5,
                       int max_attempts = 1, bool security_code = true,
-                      const std::string& postal_code = "true", int min_postal_code_length = 0,
-                      const std::string& token_type = "reusable",
+                      const std::variant<bool, std::string>& postal_code = true,
+                      int min_postal_code_length = 0, const std::string& token_type = "reusable",
                       const std::string& charge_amount = "", const std::string& currency = "usd",
                       const std::string& language = "en-US", const std::string& voice = "woman",
                       const std::string& description = "",

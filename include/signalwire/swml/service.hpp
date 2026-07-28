@@ -242,7 +242,7 @@ class Service {
   /// ``callback_fn(body, headers) -> route | None``.
   using RoutingCallback = std::function<std::string(
       const json& body, const std::map<std::string, std::string>& headers)>;
-  void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+  void register_routing_callback(RoutingCallback callback, const std::string& path = "/sip");
 
   /// The registered (normalized) routing-callback paths, sorted (Python:
   /// ``sorted(SWMLService._routing_callbacks.keys())``).

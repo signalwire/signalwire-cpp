@@ -4568,9 +4568,9 @@
                 },
                 {
                   "name": "postal_code",
-                  "type": "string",
+                  "type": "union<bool,string>",
                   "required": false,
-                  "default": "true"
+                  "default": true
                 },
                 {
                   "name": "min_postal_code_length",
@@ -6279,7 +6279,7 @@
                   "name": "path",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/sip"
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -9376,7 +9376,7 @@
                   "name": "path",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/sip"
                 }
               ],
               "returns": "void"
@@ -14891,7 +14891,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/concierge"
                 },
                 {
                   "name": "host",
@@ -15043,7 +15043,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/faq"
                 },
                 {
                   "name": "host",
@@ -15158,7 +15158,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/info_gatherer"
                 },
                 {
                   "name": "host",
@@ -15317,7 +15317,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/receptionist"
                 },
                 {
                   "name": "host",
@@ -15414,7 +15414,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": "/"
+                  "default": "/survey"
                 },
                 {
                   "name": "host",

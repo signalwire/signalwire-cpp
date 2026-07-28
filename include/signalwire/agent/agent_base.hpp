@@ -337,7 +337,7 @@ class AgentBase : public swml::Service {
   /// requests to per-path handlers.
   using RoutingCallback = std::function<std::string(
       const json& body, const std::map<std::string, std::string>& headers)>;
-  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/sip");
 
   /// Install signal handlers so the agent's HTTP server drains + stops cleanly
   /// on SIGINT/SIGTERM (Python: ``WebMixin.setup_graceful_shutdown``). Real

@@ -17,8 +17,8 @@ using json = nlohmann::json;
 class InfoGathererAgent : public agent::AgentBase {
  public:
   explicit InfoGathererAgent(const std::string& name = "info_gatherer",
-                             const std::string& route = "/", const std::string& host = "0.0.0.0",
-                             int port = 3000);
+                             const std::string& route = "/info_gatherer",
+                             const std::string& host = "0.0.0.0", int port = 3000);
 
   InfoGathererAgent& set_questions(const std::vector<json>& questions);
   InfoGathererAgent& set_completion_message(const std::string& msg);
@@ -57,7 +57,7 @@ class InfoGathererAgent : public agent::AgentBase {
 /// Typed surveys with validation
 class SurveyAgent : public agent::AgentBase {
  public:
-  explicit SurveyAgent(const std::string& name = "survey", const std::string& route = "/",
+  explicit SurveyAgent(const std::string& name = "survey", const std::string& route = "/survey",
                        const std::string& host = "0.0.0.0", int port = 3000);
 
   SurveyAgent& set_questions(const std::vector<json>& questions);
@@ -117,8 +117,8 @@ class SurveyAgent : public agent::AgentBase {
 class ReceptionistAgent : public agent::AgentBase {
  public:
   explicit ReceptionistAgent(const std::string& name = "receptionist",
-                             const std::string& route = "/", const std::string& host = "0.0.0.0",
-                             int port = 3000);
+                             const std::string& route = "/receptionist",
+                             const std::string& host = "0.0.0.0", int port = 3000);
 
   ReceptionistAgent& set_departments(const json& departments);
   ReceptionistAgent& set_greeting(const std::string& greeting);
@@ -133,7 +133,7 @@ class ReceptionistAgent : public agent::AgentBase {
 /// Keyword-based FAQ matching
 class FAQBotAgent : public agent::AgentBase {
  public:
-  explicit FAQBotAgent(const std::string& name = "faq_bot", const std::string& route = "/",
+  explicit FAQBotAgent(const std::string& name = "faq_bot", const std::string& route = "/faq",
                        const std::string& host = "0.0.0.0", int port = 3000);
 
   FAQBotAgent& set_faqs(const std::vector<json>& faqs);
@@ -171,7 +171,8 @@ class FAQBotAgent : public agent::AgentBase {
 /// Venue concierge with amenity info
 class ConciergeAgent : public agent::AgentBase {
  public:
-  explicit ConciergeAgent(const std::string& name = "concierge", const std::string& route = "/",
+  explicit ConciergeAgent(const std::string& name = "concierge",
+                          const std::string& route = "/concierge",
                           const std::string& host = "0.0.0.0", int port = 3000);
 
   ConciergeAgent& set_venue_name(const std::string& name);

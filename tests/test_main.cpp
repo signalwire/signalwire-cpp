@@ -81,6 +81,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_type_inference.cpp"
 #include "test_handle_request.cpp"
 #include "test_served_routing.cpp"
+#include "test_default_fold.cpp"
 #include "test_tier2_behavioral.cpp"
 #include "test_media_enums.cpp"
 #include "test_security.cpp"

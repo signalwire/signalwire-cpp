@@ -150,10 +150,6 @@ diverge from Python's.
 - `cpp_pattern_string`: Python's `DataMap.expression(pattern)` accepts
   `Union[Pattern, str]`; C++ accepts `string` only and compiles
   internally. Same regex contract.
-- `cpp_postal_code_string`: Python's `FunctionResult.pay(postal_code:
-  Union[bool, str])` accepts a sentinel boolean to mean "ask for
-  postal code at runtime"; C++ accepts only `string` (the empty
-  string acts as the sentinel). Same wire payload.
 - `cpp_debug_level_bool`: Python's
   `AIConfigMixin.enable_debug_events(level: int)` accepts a verbosity
   level; C++ accepts a bool (on/off). The level-of-detail modes are
@@ -321,7 +317,6 @@ signalwire.core.agent.tools.registry.ToolRegistry.get_function: cpp_typed_tool_p
 signalwire.core.agent_base.AgentBase.on_debug_event: cpp_callable_typedef
 signalwire.core.contexts.Context.add_step: cpp_typed_step_positional
 signalwire.core.data_map.DataMap.expression: cpp_pattern_string
-signalwire.core.function_result.FunctionResult.pay: cpp_postal_code_string
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.enable_debug_events: cpp_debug_level_bool
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.set_languages: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.set_pronunciations: cpp_typed_overload_subset

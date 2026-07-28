@@ -49,7 +49,9 @@ DataMap& DataMap::expression(const std::string& test_value, const std::string& p
   expr["pattern"] = pattern;
   expr["output"] = output_result.to_json();
   if (nomatch_output) {
-    expr["nomatch_output"] = nomatch_output->to_json();
+    // HYPHENATED wire key per the reference (data_map.py:202). An underscore is a
+    // key the server does not recognise, so the no-match branch would never fire.
+    expr["nomatch-output"] = nomatch_output->to_json();
   }
   expressions_.push_back(expr);
   return *this;

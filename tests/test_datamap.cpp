@@ -135,7 +135,12 @@ TEST(datamap_expression_with_nomatch) {
     FunctionResult nomatch("No match found");
     dm.expression("${args.command}", "start.*", FunctionResult("Starting"), &nomatch);
     auto j = dm.to_swaig_function();
-    ASSERT_TRUE(j["data_map"]["expressions"][0].contains("nomatch_output"));
+    // HYPHENATED key per the reference (data_map.py:202). An underscored key is one
+    // the server ignores, so the no-match branch would never fire.
+    const auto& expr = j["data_map"]["expressions"][0];
+    ASSERT_TRUE(expr.contains("nomatch-output"));
+    ASSERT_FALSE(expr.contains("nomatch_output"));
+    ASSERT_EQ(expr["nomatch-output"]["response"], "No match found");
     return true;
 }
 

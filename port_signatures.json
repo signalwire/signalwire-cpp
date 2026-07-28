@@ -8379,8 +8379,38 @@
                   "kind": "self"
                 },
                 {
-                  "name": "kwargs",
-                  "type": "any",
+                  "name": "prompt_text",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "prompt_pom",
+                  "type": "optional<list<dict<string,any>>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "contexts",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "post_prompt",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "post_prompt_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "swaig",
+                  "type": "optional<dict<string,any>>",
                   "required": false,
                   "default": null
                 }
@@ -8582,8 +8612,80 @@
                   "required": true
                 },
                 {
-                  "name": "opts",
-                  "type": "class:signalwire.core.render_options.RenderOptions",
+                  "name": "post_prompt",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "post_prompt_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "swaig_functions",
+                  "type": "optional<list<dict<string,any>>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "startup_hook_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "hangup_hook_url",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "prompt_is_pom",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
+                },
+                {
+                  "name": "params",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "add_answer",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
+                },
+                {
+                  "name": "record_call",
+                  "type": "bool",
+                  "required": false,
+                  "default": false
+                },
+                {
+                  "name": "record_format",
+                  "type": "string",
+                  "required": false,
+                  "default": "mp4"
+                },
+                {
+                  "name": "record_stereo",
+                  "type": "bool",
+                  "required": false,
+                  "default": true
+                },
+                {
+                  "name": "format",
+                  "type": "string",
+                  "required": false,
+                  "default": "json"
+                },
+                {
+                  "name": "default_webhook_url",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16031,8 +16133,16 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "timeout",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "prompt",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16046,8 +16156,30 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "message_text",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "role",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "reset",
+                  "kind": "keyword",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "global_data",
+                  "kind": "keyword",
+                  "type": "optional<dict<string,any>>",
                   "required": false,
                   "default": null
                 }
@@ -16061,8 +16193,9 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "prompt",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16076,8 +16209,44 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "prompt",
+                  "kind": "keyword",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "SWAIG",
+                  "kind": "keyword",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "ai_params",
+                  "kind": "keyword",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "global_data",
+                  "kind": "keyword",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "post_prompt",
+                  "kind": "keyword",
+                  "type": "optional<dict<string,any>>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "post_prompt_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16110,8 +16279,23 @@
                   "required": true
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "bind_params",
+                  "kind": "keyword",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "realm",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "max_triggers",
+                  "kind": "keyword",
+                  "type": "optional<int>",
                   "required": false,
                   "default": null
                 }
@@ -16245,13 +16429,50 @@
                   "kind": "self"
                 },
                 {
-                  "name": "amd_params",
-                  "type": "any",
+                  "name": "initial_timeout",
+                  "kind": "keyword",
+                  "type": "optional<float>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "end_silence_timeout",
+                  "kind": "keyword",
+                  "type": "optional<float>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "machine_voice_threshold",
+                  "kind": "keyword",
+                  "type": "optional<float>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "machine_words_threshold",
+                  "kind": "keyword",
+                  "type": "optional<int>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "detect_interruptions",
+                  "kind": "keyword",
+                  "type": "optional<bool>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "detect_message_end",
+                  "kind": "keyword",
+                  "type": "optional<bool>",
                   "required": false,
                   "default": null
                 },
                 {
                   "name": "timeout",
+                  "kind": "keyword",
                   "type": "float",
                   "required": false,
                   "default": null
@@ -16349,8 +16570,16 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "timeout",
+                  "kind": "keyword",
+                  "type": "optional<float>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16856,8 +17085,16 @@
                   "required": true
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "control_id",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16876,8 +17113,23 @@
                   "required": true
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "control_id",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "queue_id",
+                  "kind": "keyword",
+                  "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "status_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -16947,8 +17199,9 @@
                   "required": true
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "status_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }
@@ -17208,14 +17461,16 @@
                   "kind": "self"
                 },
                 {
-                  "name": "params",
-                  "type": "any",
+                  "name": "control_id",
+                  "kind": "keyword",
+                  "type": "string",
                   "required": false,
                   "default": null
                 },
                 {
-                  "name": "control_id",
-                  "type": "string",
+                  "name": "status_url",
+                  "kind": "keyword",
+                  "type": "optional<string>",
                   "required": false,
                   "default": null
                 }

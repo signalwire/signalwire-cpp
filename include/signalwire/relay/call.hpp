@@ -182,8 +182,18 @@ class Call {
   /// Disable denoise on the call (calling.denoise.stop).
   Action denoise_stop();
   /// Bind a digit sequence to a method (calling.bind_digit).
+  ///
+  /// ``bind_params`` is the reference's API spelling of the WIRE key ``params``
+  /// (relay/call.py:1359 — ``params["params"] = bind_params``). Every other
+  /// knob this method offers is spelled identically on the API and the wire, so
+  /// the trailing options bag carries them verbatim; ``bind_params`` is the one
+  /// that needs its own parameter, because a caller who put it in the bag would
+  /// ship it under the wrong wire key. Bag keys still ride through (the
+  /// reference's ``**kwargs``). The bag stays in its existing 3rd position so
+  /// the current call shape keeps its meaning.
   Action bind_digit(const std::string& digits, const std::string& bind_method,
-                    const json& params = json::object());
+                    const json& params = json::object(),
+                    const std::optional<json>& bind_params = std::nullopt);
   /// Clear digit bindings, optionally scoped to a realm
   /// (calling.clear_digit_bindings).
   Action clear_digit_bindings(const std::string& realm = "");
@@ -204,7 +214,14 @@ class Call {
   /// Start Amazon Bedrock AI on the call. RULES §4: calling.ai + a Bedrock
   /// engine routes to a DEDICATED `calling.amazon_bedrock` RPC, so this
   /// emits that wire method rather than `calling.ai`.
-  Action amazon_bedrock(const json& params = json::object());
+  ///
+  /// ``ai_params`` is the reference's API spelling of the WIRE key ``params``
+  /// (relay/call.py:1502 — ``params["params"] = ai_params``); same reason as
+  /// ``bind_digit(bind_params)``. Every other knob is spelled the same on the
+  /// API and the wire and rides in the leading bag, which stays FIRST so the
+  /// existing single-argument call shape keeps its meaning.
+  Action amazon_bedrock(const json& params = json::object(),
+                        const std::optional<json>& ai_params = std::nullopt);
   /// Pass on an inbound call offer (calling.pass). Named `pass_` because
   /// `pass` is not a C++ keyword but the reserved-word rename convention is
   /// applied for cross-language consistency (wire method stays `pass`).

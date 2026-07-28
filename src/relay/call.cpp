@@ -232,10 +232,16 @@ Action Call::denoise() { return execute_simple("denoise"); }
 Action Call::denoise_stop() { return execute_simple("denoise.stop"); }
 
 Action Call::bind_digit(const std::string& digits, const std::string& bind_method,
-                        const json& params) {
+                        const json& params, const std::optional<json>& bind_params) {
   json p = params.is_object() ? params : json::object();
   p["digits"] = digits;
   p["bind_method"] = bind_method;
+  // The reference's ``bind_params`` API name lands on the WIRE key ``params``
+  // (relay/call.py:1359), and rides only when supplied — the reference's guard
+  // is ``if bind_params is not None``, so nullopt omits the key entirely.
+  if (bind_params.has_value()) {
+    p["params"] = *bind_params;
+  }
   return execute_simple("bind_digit", p);
 }
 
@@ -286,8 +292,14 @@ Action Call::ai_message(const json& params) {
   return execute_simple("ai_message", p);
 }
 
-Action Call::amazon_bedrock(const json& params) {
+Action Call::amazon_bedrock(const json& params, const std::optional<json>& ai_params) {
   json p = params.is_object() ? params : json::object();
+  // The reference's ``ai_params`` API name lands on the WIRE key ``params``
+  // (relay/call.py:1502), riding only when supplied (reference guard:
+  // ``if ai_params is not None``).
+  if (ai_params.has_value()) {
+    p["params"] = *ai_params;
+  }
   // RULES §4: a Bedrock engine routes to the dedicated calling.amazon_bedrock
   // RPC, NOT calling.ai. execute_simple prepends "calling." so we pass the
   // bare wire method name.

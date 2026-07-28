@@ -1252,6 +1252,18 @@ class GuardIndex:
                             return True
         return False
 
+    def bodies(self, cls: str, method: str) -> list[tuple[str, list[str]]]:
+        """``[(body_text, param_names)]`` for every definition of ``cls::method``.
+
+        The raw material the options-carrier unfold needs: whether a method's
+        ``const json&`` parameter is SPREAD onto the wire frame (a bag standing
+        in for the reference's keyword params) or CONSUMED as one domain value.
+        Only the body and the definition-side parameter names are exposed; the
+        file text stays private to the guard scan.
+        """
+        return [(body, names)
+                for body, _file_text, names in self._bodies.get((cls, method), [])]
+
 
 # ---------------------------------------------------------------------------
 # Building canonical inventory
@@ -1664,6 +1676,13 @@ def collect(
     # such method shows up as a kind+type mismatch even though the
     # contract is identical.
     _project_kwargs_shape(out_modules)
+
+    # METHOD-LEVEL options-carrier unfold. The construction contract already
+    # unfolds an options STRUCT param into its named fields (RelayClient(
+    # RelayConfig{...}) vs five reference kwargs); ordinary METHODS carry the
+    # same idiom and needed the same fold. Two carrier spellings, one rule —
+    # see _project_options_carrier for the evidence gates.
+    _project_options_carrier(out_modules, options_by_ref, guards)
 
     # Callable-shape projection: when the Python reference uses a fully
     # parameterized ``callable<list<...>,ret>`` annotation but the C++
@@ -2778,6 +2797,275 @@ def _project_kwargs_shape(out_modules: dict) -> None:
             ref_sig = ref_fns.get((mod, fn))
             if ref_sig:
                 project_one(sig, ref_sig)
+
+
+# ---------------------------------------------------------------------------
+# Method-level options-carrier unfold
+# ---------------------------------------------------------------------------
+#
+# THE IDIOM
+# =========
+# Python spells "these N knobs are individually optional" as N keyword-only
+# params. C++ has no keyword arguments, so the SAME contract is carried by ONE
+# object parameter — either a typed options STRUCT (``RenderOptions``) or an
+# untyped ``const json&`` bag. The construction contract already unfolds the
+# struct form (``RelayClient(RelayConfig{project, token, …})`` vs five reference
+# kwargs, see ``_construction_params_from_signature``); ordinary METHODS carry
+# exactly the same idiom, and this is the same fold applied to them.
+#
+# Folding at the emitter is the point: the diff keeps comparing every named knob
+# afterwards, so dropping or renaming one still reports. An omission would stop
+# comparing the whole method — which is what the nine ``cpp_options_object`` /
+# ``cpp_options_struct`` entries this replaces were doing.
+#
+# THE BOUNDARY — a carrier, not every dict-typed parameter
+# ========================================================
+# A single dict-typed parameter is NOT automatically a carrier. The reference has
+# genuine DOMAIN parameters whose value simply IS a dict — ``Call.execute_swml(
+# swml)``, ``Call.refer(device)``, ``DataMap.foreach(mapping)``. Unfolding one of
+# those would invent params the port never had and destroy a real one. The fold
+# therefore fires only on EVIDENCE, never on the parameter's type alone:
+#
+#   TYPED-STRUCT form — the param's emitted type resolves to a known options
+#     struct (``options_by_ref``). The struct's public FIELDS are the named set;
+#     they are declared, not guessed. Skipped when the REFERENCE also declares a
+#     param of that name (the reference passes the same object, so the carrier IS
+#     the contract — same exclusion the construction unfold makes for
+#     ``RestClient(request_options=…)``).
+#
+#   UNTYPED-BAG form — the param is the untyped ``any`` (``const json&``) AND the
+#     method body SPREADS it onto the outgoing frame rather than reading fixed
+#     keys out of it. ``Call::queue_enter`` is ``json p = params.is_object() ?
+#     params : json::object(); p["queue_name"] = queue_name; return
+#     execute_simple("queue.enter", p);`` — every key the caller puts in the bag
+#     reaches the wire verbatim, so the reference's keyword names ARE reachable
+#     through it and the two calls produce identical frames. A body that instead
+#     does ``params["mapping"]`` / ``p["swml"] = swml`` is consuming a domain
+#     value and is left alone.
+#
+# In both forms the reference must have named keyword params to unfold TO, and
+# the port must not already declare them. Anything unproven stays as it was and
+# reports drift, which is the correct outcome for a case this cannot decide.
+_BAG_SPREAD_RE = (
+    # ``json p = <param>.is_object() ? <param> : json::object();`` — the copy-the
+    # whole-bag-then-add-fixed-keys idiom every Call.* action method uses.
+    r"=\s*{n}\s*\.\s*is_object\s*\(\s*\)\s*\?\s*{n}\b",
+    # ``for (auto& [k, v] : <param>.items()) out[k] = v;`` — explicit spread.
+    r"\b{n}\s*\.\s*items\s*\(\s*\)",
+    # ``p.update(<param>)`` / ``p.merge_patch(<param>)`` / ``p.insert(…{n}…)``.
+    r"\.\s*(?:update|merge_patch)\s*\(\s*{n}\s*\)",
+)
+
+
+def _is_callable_type(t: str) -> bool:
+    """True for a canonical type whose value is a function, not JSON data.
+
+    ``callable<…>`` and ``optional<callable<…>>`` are the two spellings the
+    oracle records. A JSON bag cannot hold either.
+    """
+    t = (t or "").strip()
+    if t.startswith("optional<") and t.endswith(">"):
+        t = t[len("optional<"):-1].strip()
+    return t.startswith("callable<") or t == "callable"
+
+
+def _bag_is_spread(guards: "GuardIndex | None", cls: str, method: str,
+                   param: str, index: int) -> bool:
+    """True when SOME definition of ``cls::method`` spreads ``param`` wholesale.
+
+    Same position-then-name resolution the guard scan uses: a definition may
+    rename its parameters relative to the header, so the definition-side name at
+    this index is tried first and the header spelling is the fallback.
+    """
+    if guards is None:
+        return False
+    for body, names in guards.bodies(cls, method):
+        local = names[index] if 0 <= index < len(names) else None
+        for name in (n for n in (local, param) if n):
+            for pat in _BAG_SPREAD_RE:
+                if re.search(pat.format(n=re.escape(name)), body):
+                    return True
+    return False
+
+
+def _project_options_carrier(out_modules: dict, options_by_ref: dict,
+                             guards: "GuardIndex | None") -> None:
+    """Unfold a method's options carrier into the reference's keyword params.
+
+    See the block comment above for the idiom and the two evidence gates. The
+    unfolded params are emitted ``kind: keyword`` with the reference's own type
+    and default, because that is what the carrier genuinely offers: C++ aggregate
+    init and a JSON bag both let the caller set any subset, in any order.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    for mod, entry in out_modules.items():
+        ref_classes = ref.get("modules", {}).get(mod, {}).get("classes", {})
+        if not ref_classes:
+            continue
+        for cls, cinfo in entry.get("classes", {}).items():
+            ref_methods = ref_classes.get(cls, {}).get("methods", {})
+            if not ref_methods:
+                continue
+            for meth, sig in cinfo.get("methods", {}).items():
+                # ``__init__`` is the CONSTRUCTION contract's, not this fold's.
+                # ``build_construction`` runs its own unfold with deliberately
+                # different semantics: it emits the options struct's WHOLE field
+                # set, because a construction knob the reference lacks is still a
+                # real configurable the port offers (and the diff reports it as
+                # such). Folding here first would consume the carrier and hide
+                # those — measured: it silently dropped RelayConfig's ``port`` /
+                # ``max_connections`` / ``request_timeout_ms`` from
+                # ``RelayClient``'s construction params.
+                if meth == "__init__":
+                    continue
+                ref_sig = ref_methods.get(meth)
+                if ref_sig:
+                    _unfold_one_carrier(sig, ref_sig, options_by_ref,
+                                        guards, cls, meth)
+
+
+def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
+                        guards: "GuardIndex | None", cls: str,
+                        meth: str) -> None:
+    port_params = sig.get("params", [])
+    ref_params = ref_sig.get("params", [])
+    if not port_params or not ref_params:
+        return
+    # The reference's OPTIONAL named params are what a carrier stands in for.
+    # Two exclusions:
+    #   * ``self``/``cls`` and the trailing ``**kwargs`` — the latter is already
+    #     reconciled by ``_project_kwargs_shape``, and consuming it here would
+    #     let a carrier match a method whose only reference knob is the open
+    #     spread.
+    #   * a REQUIRED param — an options carrier is optional by construction
+    #     (both aggregate init and a JSON bag let the caller set any subset), so
+    #     it cannot stand in for something the reference demands. A required
+    #     reference param the port lacks is a genuine gap and must keep
+    #     reporting.
+    # The reference records keyword-ONLY params as ``kind: keyword`` and
+    # positional-or-keyword ones with no ``kind`` at all; both are settable BY
+    # NAME, which is the whole contract a carrier carries, so both qualify.
+    ref_kw = [p for p in ref_params
+              if p.get("name")
+              and (p.get("kind") or "positional") not in (
+                  "self", "cls", "var_keyword", "var_positional")
+              and p.get("required") is False]
+    if not ref_kw:
+        return
+    port_names = {p.get("name") for p in port_params}
+    # Nothing to unfold to if the port already declares them all.
+    target = [p for p in ref_kw if p["name"] not in port_names]
+    if not target:
+        return
+    # The C++ definition's parameter list has no ``self``, so a port param's
+    # position in the C++ signature is its index MINUS the leading self/cls.
+    self_offset = sum(
+        1 for p in port_params
+        if (p.get("kind") or "positional") in ("self", "cls"))
+    for idx, p in enumerate(port_params):
+        if (p.get("kind") or "positional") in ("self", "cls"):
+            continue
+        name = p.get("name")
+        if not name:
+            continue
+        # A carrier the REFERENCE also declares by name is the contract itself,
+        # not a stand-in — leave it typed and whole.
+        if any(rp.get("name") == name for rp in ref_params):
+            continue
+        # A REQUIRED parameter is not an optional-knob carrier. C++ overloads a
+        # long reference signature as a domain OBJECT the caller must supply
+        # (``define_tool(const ToolDefinition&)``,
+        # ``add_language(const LanguageConfig&)``) — the object carries the
+        # reference's REQUIRED params too (name/description/parameters/handler,
+        # name/code/voice), which an optional-only unfold would silently drop
+        # while still consuming the carrier. Measured: without this gate the
+        # fold turned ``define_tool(tool)`` into ``define_tool(secure)`` and
+        # ``add_language(lang)`` into five optional knobs, destroying the
+        # required surface in both. An options carrier the caller may omit
+        # entirely cannot be standing in for anything mandatory, so requiring
+        # the carrier itself to be optional is exactly the right discriminator.
+        if p.get("required") is not False:
+            continue
+        ptype = p.get("type", "")
+        fields = options_by_ref.get(ptype)
+        if fields is not None:
+            # TYPED-STRUCT form: unfold only the reference keywords the struct
+            # genuinely declares a field for. A reference keyword the struct
+            # LACKS stays missing and keeps reporting as drift — the fold must
+            # not manufacture a knob the port cannot set.
+            unfold = [rp for rp in target if rp["name"] in fields]
+        elif ptype == "any" and _bag_is_spread(
+                guards, cls, meth, name, idx - self_offset):
+            # UNTYPED-BAG form: a proven wholesale spread reaches every key, so
+            # every remaining reference knob is settable — but ONLY the ones a
+            # JSON object can actually hold. A ``const json&`` cannot carry a
+            # ``std::function``, so unfolding a reference CALLABLE out of it
+            # would claim a callback the port does not accept. (Measured: the
+            # fold otherwise invented ``on_completed`` on
+            # ``detect_answering_machine`` and ``transcribe``.) A callable knob
+            # the port genuinely lacks stays missing and keeps reporting drift,
+            # which is the honest result.
+            unfold = [rp for rp in target
+                      if not _is_callable_type(rp.get("type", ""))]
+        else:
+            continue
+        if not unfold:
+            continue
+        # Emit each unfolded knob in the reference's OWN kind/type/default. The
+        # carrier genuinely offers exactly that: settable by name, in any order,
+        # any subset, defaulting to the reference's default when unset. Copying
+        # the reference's kind (rather than forcing ``keyword``) keeps the
+        # keyword-only vs positional-or-keyword distinction the oracle draws.
+        replacement = []
+        for rp in unfold:
+            np: dict = {"name": rp["name"]}
+            if rp.get("kind"):
+                np["kind"] = rp["kind"]
+            np["type"] = rp.get("type", "any")
+            np["required"] = False
+            np["default"] = rp.get("default")
+            replacement.append(np)
+        tail = port_params[idx + 1:]
+        # A port param the reference declares KEYWORD-ONLY carries the same kind
+        # as its unfolded siblings. C++ has no keyword arguments at all — every
+        # parameter is positional — so on a method whose carrier is being
+        # unfolded, a param that is separately declared purely because its API
+        # name differs from its wire key (``bind_digit(bind_params)``,
+        # ``amazon_bedrock(ai_params)``) is reachable by name exactly the way the
+        # bag's keys are. Recording it ``positional`` next to keyword siblings
+        # the same fold just emitted would report the carrier's own idiom as
+        # drift on one param and not the others.
+        ref_kind = {rp["name"]: rp.get("kind") for rp in ref_params
+                    if rp.get("name")}
+        for i, tp in enumerate(tail):
+            if ref_kind.get(tp.get("name")) == "keyword" and not tp.get("kind"):
+                # Rebuild so ``kind`` lands in its usual slot (right after
+                # ``name``) — the artifact is committed and reviewed, so a
+                # param record's key order stays uniform across the file.
+                rebuilt = {"name": tp["name"], "kind": "keyword"}
+                rebuilt.update({k: v for k, v in tp.items() if k != "name"})
+                tail[i] = rebuilt
+        # ORDER the unfolded knobs (and any optional port params that follow the
+        # carrier) by the REFERENCE's declaration order. A carrier is unordered
+        # by nature — a JSON bag and an aggregate initializer both let the caller
+        # set any subset in any order — but the diff matches params by POSITION,
+        # so an arbitrary order manufactures param-mismatch findings against the
+        # neighbouring names. (Measured: ``bind_digit``'s explicit
+        # ``bind_params``, declared after the bag so the existing call shape
+        # keeps its meaning, otherwise collided with ``realm``/``max_triggers``
+        # and reported three bogus type mismatches.) Port params the reference
+        # does not name keep their relative order at the end — they are the
+        # genuine extras and must stay visible as such.
+        ref_order = {rp["name"]: i for i, rp in enumerate(ref_params)
+                     if rp.get("name")}
+        merged = replacement + [tp for tp in tail
+                                if tp.get("required") is False]
+        rest = [tp for tp in tail if tp.get("required") is not False]
+        merged.sort(key=lambda x: ref_order.get(x.get("name"), len(ref_order)))
+        sig["params"] = port_params[:idx] + merged + rest
+        return
 
 
 def _project_callable_shape(out_modules: dict) -> None:

@@ -530,3 +530,85 @@ TEST(relay_mock_wait_for_ringing_times_out_when_unreached) {
     client->disconnect();
     return true;
 }
+
+// ===========================================================================
+// The API-name -> WIRE-key remap: bind_digit(bind_params) and
+// amazon_bedrock(ai_params) both land on the wire key "params".
+//
+// The reference does this remap explicitly (relay/call.py:1359 and :1502) —
+// every OTHER knob these two methods offer is spelled the same on the API and
+// on the wire, so the trailing options bag carries them verbatim. These two
+// cannot ride in the bag: a caller who put the value under its API name would
+// ship "bind_params"/"ai_params" as the wire key, which the server does not
+// accept (relay_apis.c:1479 and :1982 both list "params"). These tests pin the
+// remap so the bag can never silently reabsorb them.
+// ===========================================================================
+
+TEST(relay_mock_bind_digit_remaps_bind_params_to_wire_params) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-bd-remap");
+    ASSERT_TRUE(call != nullptr);
+
+    json bind_params;
+    bind_params["url"] = "https://example.test/hook";
+    call->bind_digit("123", "notify", json{{"realm", "r-1"}}, bind_params);
+
+    json p = first_recv_params("calling.bind_digit");
+    ASSERT_EQ(p.value("digits", ""), "123");
+    ASSERT_EQ(p.value("bind_method", ""), "notify");
+    ASSERT_EQ(p.value("realm", ""), "r-1");
+    // The remap: the value rides as "params", never as "bind_params".
+    ASSERT_TRUE(p.contains("params"));
+    ASSERT_EQ(p["params"].value("url", ""), "https://example.test/hook");
+    ASSERT_FALSE(p.contains("bind_params"));
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_bind_digit_omits_params_when_bind_params_unset) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-bd-unset");
+    ASSERT_TRUE(call != nullptr);
+
+    call->bind_digit("9", "notify");
+
+    json p = first_recv_params("calling.bind_digit");
+    ASSERT_EQ(p.value("digits", ""), "9");
+    // Unset is ABSENT, not an empty object — the reference guards with
+    // `if bind_params is not None`, so it never sends "params": {}.
+    ASSERT_FALSE(p.contains("params"));
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_amazon_bedrock_remaps_ai_params_to_wire_params) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-ab-remap");
+    ASSERT_TRUE(call != nullptr);
+
+    json ai_params;
+    ai_params["temperature"] = 0.4;
+    call->amazon_bedrock(json{{"prompt", "hello"}}, ai_params);
+
+    json p = first_recv_params("calling.amazon_bedrock");
+    ASSERT_EQ(p.value("prompt", ""), "hello");
+    ASSERT_TRUE(p.contains("params"));
+    ASSERT_TRUE(p["params"]["temperature"].get<double>() == 0.4);
+    ASSERT_FALSE(p.contains("ai_params"));
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_amazon_bedrock_omits_params_when_ai_params_unset) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-ab-unset");
+    ASSERT_TRUE(call != nullptr);
+
+    call->amazon_bedrock(json{{"prompt", "hi"}});
+
+    json p = first_recv_params("calling.amazon_bedrock");
+    ASSERT_EQ(p.value("prompt", ""), "hi");
+    ASSERT_FALSE(p.contains("params"));
+    client->disconnect();
+    return true;
+}

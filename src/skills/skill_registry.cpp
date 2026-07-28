@@ -8,22 +8,19 @@
 // to give callers a symbol they can reference to guarantee the library — and with
 // it those self-registering statics — is loaded.
 //
-// It used to ALSO carry a second, parallel implementation of all 18 skills
-// (``<Name>SkillR``) and register them under the same names. Because
-// ``SkillRegistry::register_skill`` silently overwrote on collision, and because
-// static-initialization order ACROSS translation units is unspecified in C++,
-// which implementation a caller actually got was decided by link order. In
-// practice the copies here won every time, so the ``src/skills/builtin/`` files —
-// the ones the surface enumerator reads to decide what the port implements — were
-// dead code, and parity was being measured against code that never ran.
+// This TU deliberately declares NO skill of its own. It once carried a second,
+// parallel implementation of all 18 skills registered under the same names, which
+// silently shadowed the real ones: ``register_skill`` overwrote on collision, and
+// static-initialization order ACROSS translation units is unspecified in C++, so
+// which implementation a caller got was decided by link order rather than by
+// anything in the source.
 //
-// The duplicates were degraded copies: the live ``swml_transfer`` had no transfer
+// Those shadow copies were also incomplete — ``swml_transfer`` had no transfer
 // expressions, ``play_background_file`` no playback expressions, ``info_gatherer``
 // no gathering state, ``custom_skills`` no per-tool parameter schemas,
 // ``datasphere_serverless`` no auth headers, ``weather_api`` no celsius support,
-// and ``datetime`` ignored the ``timezone`` argument outright. Deleting them is
-// what makes the enumerated surface and the running code the same thing.
-// ``register_skill`` now THROWS on a duplicate name so this cannot recur.
+// and ``datetime`` ignored the ``timezone`` argument outright. They are gone, and
+// ``register_skill`` now THROWS on a duplicate name so a shadow cannot reappear.
 
 #include "signalwire/skills/skill_registry.hpp"
 

@@ -31,13 +31,11 @@ class SkillRegistry {
   /// Register a skill factory.
   ///
   /// A second registration of a name that is already registered is ALWAYS a
-  /// bug, and it throws. Silently overwriting is what let two different
-  /// ``"spider"`` classes — one in ``src/skills/builtin/spider.cpp``, one in
-  /// ``src/skills/skill_registry.cpp`` — coexist for months: static-init order
-  /// ACROSS translation units is unspecified in C++, so which implementation a
-  /// caller actually got depended on link order, and the surface enumerator
-  /// projected the class that was NOT running. Parity can pass against dead
-  /// code that way. Failing loud makes that state unrepresentable.
+  /// bug, and it throws. Silently overwriting would let two classes claim the
+  /// same skill name: static-initialization order ACROSS translation units is
+  /// unspecified in C++, so which implementation a caller actually got would
+  /// depend on link order — and could change between builds without any source
+  /// change. Failing loud makes that state unrepresentable.
   ///
   /// Re-registering the SAME factory is not detectable (``std::function`` has
   /// no equality), so idempotent "register if absent" callers must ask

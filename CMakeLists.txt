@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(signalwire VERSION 3.2.1
+project(signalwire VERSION 3.0.0
         HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
         LANGUAGES CXX)
 # C++20: the SDK's documented, idiomatic construction of the generated *Params

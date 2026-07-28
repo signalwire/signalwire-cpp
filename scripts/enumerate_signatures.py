@@ -824,8 +824,466 @@ def _has_default_value(arg) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# The null <-> zero-value sentinel fold (the C++ "no nullable scalars" idiom)
+# ---------------------------------------------------------------------------
+#
+# THE VOCABULARY RULE
+# ===================
+# Python expresses "the caller did not supply this" as ``x: T | None = None`` and
+# then guards the wire with ``if x is not None:``. C++ has no nullable scalar and
+# no keyword arguments, so the SAME contract is spelled as a ZERO-VALUE SENTINEL
+# default plus an absence guard in the body:
+#
+#     python   def user_event(self, event: str | None = None)     if event is not None: p["event"] = event
+#     cpp      Action user_event(const std::string& event = "")   if (!event.empty()) { p["event"] = event; }
+#
+# Those two are behaviourally identical: a caller who omits the argument produces
+# the identical wire frame in both languages. Recording the C++ side as
+# ``default: ""`` while the reference records ``default: null`` manufactures drift
+# out of two spellings of "absent".
+#
+# So the enumerator FOLDS the sentinel to ``null`` — at the emitter, in the
+# canonical vocabulary, so the comparison keeps running (an allow-list would stop
+# comparing and blind the gate to a real value change).
+#
+# THE FOLD IS EVIDENCE-GATED. It is NOT "empty string always means null". A port
+# that defaults ``prompt=""`` and then SENDS ``prompt: ""`` ships a different
+# request body than a reference that omits the key, and that is a REAL divergence
+# the gate must keep reporting. The fold therefore requires BOTH:
+#
+#   1. the default is the parameter type's ZERO VALUE / documented sentinel
+#      (table below), AND
+#   2. a GUARD in the method's definition body that tests that sentinel and
+#      suppresses the value's use.
+#
+# No guard -> no fold. The sentinel is then a value the port genuinely ships, and
+# the ``default-mismatch`` finding stands as a real one.
+#
+#   type              sentinel      guard that proves absence
+#   ---------------   -----------   -----------------------------------------
+#   std::string       ""            !p.empty()  /  p.empty() ? ... : p  /  p != ""
+#   vector/map/json   {}            !p.empty()  /  p.empty() ? ...
+#   integral          0, -1         p > 0  /  p >= 0  /  p != 0  /  p != -1
+#   floating          -1.0, 0.0     p >= 0.0  /  p > 0.0  /  p != -1.0
+#   optional/pointer  nullopt/null  (already recorded as null; nothing to fold)
+#
+# ONE TRANSITIVE HOP — AND NOT FOR STRINGS. Several methods store the sentinel on
+# a member and guard it at SERIALIZATION rather than at the entry point — e.g.
+# ``Step::set_gather_info`` assigns ``GatherInfo(output_key, ...)`` and
+# ``GatherInfo::to_json()`` then does ``if (!output_key_.empty())``. The guard is
+# still the proof that the sentinel never reaches the wire, so a member-name guard
+# (``<param>_`` or ``<param>``, the repo's member spelling) anywhere in the SAME
+# source file counts. Exactly one hop; the scanner never chases further, so an
+# unproven chain reports drift rather than folding on a guess.
+#
+# The transitive hop is DISALLOWED for the ``""`` sentinel, and this is the whole
+# reason the string case needs its own rule. Measured against the oracle
+# (2026-07-27): ``[]`` and ``{}`` NEVER appear as a reference default — 0 of
+# 1,505 recorded defaults — so an empty container in the reference is always
+# ``None`` and a guarded empty-container sentinel is unambiguously "absent".
+# ``""``, by contrast, is a REAL reference default 111 times, and ``0``/``0.0``
+# 35 times. An empty string is a value Python genuinely sends.
+#
+# What separates the two IS visible on the port side: the C++ code models the
+# distinction in its STORAGE type, the same way the reference models it in its
+# annotation. ``pom::Section`` declares ``std::optional<std::string> title``
+# (reference: ``str | None = None``) next to ``std::string body`` (reference:
+# ``str = ""``) — the port and the reference agree, independently. A parameter
+# stored verbatim onto a non-optional member and only guarded later at
+# serialization (``body``) is a real empty-string default; a parameter the method
+# itself tests before use (``event``, ``status_url``) models absence.
+#
+# So: strings fold ONLY on a DIRECT guard in the method's own body. Without that
+# split the fold turns the 5 POM ``body`` parameters into nulls, inventing a
+# ``"" vs null`` mismatch in the other direction — which is the same class of
+# error as not folding at all, just pointing the other way.
+#
+# WHAT THIS RULE DOES NOT PROVE, stated plainly so the next reader does not
+# mistake it for stronger than it is:
+#
+#   * NUMERICS keep the transitive hop even though ``0`` is also a real reference
+#     default (35 times). Every numeric fold this produces today is a ``timeout``
+#     / ``volume`` / ``max_duration`` parameter with a ``> 0`` guard and a
+#     reference ``None``, verified param-by-param — the hop is simply not
+#     load-bearing for any of them. If a future ``0``-defaulted numeric ever
+#     folds WRONG, tighten it to direct-guard-only the way strings already are.
+#   * A TRANSITIVELY-guarded STRING that the reference really does declare
+#     ``str | None`` (``Step::set_gather_info``'s three parameters) is NOT folded
+#     and keeps reporting drift. That is the rule choosing a false NEGATIVE over
+#     a false positive: the port stores those in plain ``std::string`` members,
+#     which is indistinguishable from the ``body`` shape. Closing them means
+#     changing the PORT to model absence (``std::optional<std::string>``, as
+#     ``pom::Section::title`` already does), not loosening this rule.
+#   * The hop is scoped to ONE source file. A parameter stored into a member
+#     declared and guarded in a different translation unit (``AgentBase::
+#     prompt_add_section``'s ``bullets``, guarded in ``pom.cpp``) does not fold.
+#     Widening to whole-tree matching would let any ``.empty()`` anywhere satisfy
+#     the guard, which is not evidence.
+
+# Sentinel default VALUES that are foldable per type, keyed by the canonical
+# (translated) type prefix. A value not in this table is a real default and is
+# never folded, however guarded the parameter is.
+_FOLDABLE_SENTINELS: dict[str, tuple] = {
+    "string": ("",),
+    "list": ([],),
+    "dict": ({},),
+    "int": (0, -1),
+    "float": (0.0, -1.0),
+}
+
+
+def _sentinel_kind(canon_type: str) -> str | None:
+    t = (canon_type or "").strip()
+    if t == "string":
+        return "string"
+    if t.startswith("list<"):
+        return "list"
+    if t.startswith("dict<") or t == "any":
+        # ``any`` is the translated form of nlohmann::json, whose ``= {}`` /
+        # empty-object default is guarded with ``.empty()`` exactly like a map.
+        return "dict"
+    if t == "int":
+        return "int"
+    if t == "float":
+        return "float"
+    return None
+
+
+def _is_foldable_sentinel(canon_type: str, value) -> bool:
+    kind = _sentinel_kind(canon_type)
+    if kind is None:
+        return False
+    if isinstance(value, bool):
+        # ``bool`` has no "absent" spelling: false is a real, sendable value.
+        return False
+    for sentinel in _FOLDABLE_SENTINELS[kind]:
+        if type(sentinel) is type(value) and sentinel == value:
+            return True
+        if kind == "float" and isinstance(value, (int, float)) and float(sentinel) == float(value):
+            return True
+    return False
+
+
+# Guard shapes, per sentinel kind, rendered against a parameter NAME placeholder.
+# Each is matched against the definition body with the name substituted in.
+_GUARD_PATTERNS: dict[str, list[str]] = {
+    # ``!p.empty()`` / ``p.empty() ?`` / ``!p.is_null()`` / ``p != ""``
+    "string": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\b{n}\s*!=\s*\"\"",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "list": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "dict": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"!\s*{n}\s*\.is_null\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\b{n}\s*\.is_object\s*\(\s*\)\s*\?",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "int": [
+        r"\b{n}\s*(?:>|>=|!=|==)\s*[-+]?\d",
+        r"\bif\s*\(\s*{n}\s*\)",
+    ],
+    "float": [
+        r"\b{n}\s*(?:>|>=|!=|==)\s*[-+]?[\d.]",
+    ],
+}
+
+
+def _member_spellings(param_name: str) -> list[str]:
+    """Names a parameter may have been stored under for the ONE transitive hop.
+
+    The repo's convention is a trailing-underscore private member
+    (``output_key`` -> ``output_key_``); a handful store under the bare name.
+    """
+    return [param_name + "_", param_name]
+
+
+def _param_names_from_list(param_list: str) -> list[str]:
+    """Parameter NAMES, in order, from a definition's parameter-list text.
+
+    ``param_list`` is everything between the ``(`` and the body's ``{``, minus the
+    leading ``(`` the caller already consumed. Split on top-level commas (so a
+    ``std::map<K, V>`` or a ``std::variant<A, B>`` argument is one parameter, not
+    two) and take the trailing identifier of each part — C++ puts the declarator
+    name last, after any ``const``/``&``/template spelling.
+    """
+    body_end = param_list.rfind(")")
+    inner = param_list[:body_end] if body_end >= 0 else param_list
+    parts: list[str] = []
+    depth, buf = 0, []
+    for ch in inner:
+        if ch in "<([{":
+            depth += 1
+        elif ch in ">)]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+            continue
+        buf.append(ch)
+    parts.append("".join(buf))
+    names: list[str] = []
+    ident = re.compile(r"([A-Za-z_]\w*)\s*(?:=[^,]*)?$")
+    for part in parts:
+        # Drop a default-argument expression and any trailing array extent, then
+        # take the last identifier.
+        head = part.split("=", 1)[0].strip().rstrip("[]").strip()
+        m = ident.search(head)
+        names.append(m.group(1) if m else "")
+    return names
+
+
+_FORWARD_RE = re.compile(
+    r"^\{\s*return\s+(?:[A-Za-z_]\w*::)*([A-Za-z_]\w*)\s*\((.*)\)\s*;\s*\}$", re.S)
+
+
+def _pure_forward_target(body: str) -> tuple[str, list[str]] | None:
+    """``(callee_name, [argument spellings])`` when ``body`` is one ``return f(...);``.
+
+    Only a body whose ENTIRE content is that single statement qualifies —
+    comments are stripped first, but any additional statement disqualifies it.
+    Arguments are split on top-level commas and kept verbatim, so the caller can
+    match a parameter by NAME and recover its position in the callee.
+    """
+    stripped = re.sub(r"//[^\n]*", "", body)
+    stripped = re.sub(r"/\*.*?\*/", "", stripped, flags=re.S)
+    stripped = " ".join(stripped.split())
+    m = _FORWARD_RE.match(stripped)
+    if not m:
+        return None
+    args, depth, buf = [], 0, []
+    for ch in m.group(2):
+        if ch in "<([{":
+            depth += 1
+        elif ch in ">)]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            args.append("".join(buf).strip())
+            buf = []
+            continue
+        buf.append(ch)
+    args.append("".join(buf).strip())
+    return m.group(1), args
+
+
+class GuardIndex:
+    """Which parameters of which C++ methods carry an absence guard.
+
+    Built by a text scan of the implementation tree (``src/**/*.cpp``) plus the
+    headers' inline bodies. libclang is not used here on purpose: the enumerator
+    parses headers with ``PARSE_SKIP_FUNCTION_BODIES`` (a 3-10x speedup on the
+    SIGNATURES gate), and re-parsing all 67 translation units to read bodies
+    would give back that entire saving to answer a question a brace-matched text
+    scan answers exactly as well.
+
+    Keyed by ``(ClassName, methodName)``; a class's method may be defined in more
+    than one file (and a method may be overloaded), so every matching body is
+    unioned — a guard in ANY definition of that name proves the port models the
+    absence.
+    """
+
+    def __init__(self, roots: list[Path]):
+        # (class, method) -> list[(body_text, file_text, [param names in order])]
+        self._bodies: dict[tuple[str, str], list[tuple[str, str, list[str]]]] = {}
+        # Free-function definitions, keyed by bare name — the forwarding-callee
+        # lookup below. Same (body, file_text, names) shape as _bodies.
+        self._free: dict[str, list[tuple[str, str, list[str]]]] = {}
+        self._defpat = re.compile(r"\b([A-Za-z_]\w*)::([A-Za-z_]\w*)\s*\(", re.M)
+        self._freepat = re.compile(
+            r"^[A-Za-z_][\w:<>,\s*&]*?\b([A-Za-z_]\w*)\s*\(", re.M)
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for path in sorted(root.rglob("*.cpp")) + sorted(root.rglob("*.hpp")):
+                try:
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                self._index_file(text)
+
+    def _index_file(self, text: str) -> None:
+        for m in self._defpat.finditer(text):
+            cls, method = m.group(1), m.group(2)
+            open_brace = text.find("{", m.end())
+            if open_brace < 0:
+                continue
+            # A ';' between the parameter list and the next '{' means this was a
+            # declaration (or a call), not a definition.
+            if ";" in text[m.end():open_brace]:
+                continue
+            depth, i = 0, open_brace
+            n = len(text)
+            while i < n:
+                ch = text[i]
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            body = text[open_brace:i + 1]
+            names = _param_names_from_list(text[m.end():open_brace])
+            self._bodies.setdefault((cls, method), []).append((body, text, names))
+
+        # Free functions, for the pure-forwarder hop only.
+        for m in self._freepat.finditer(text):
+            name = m.group(1)
+            if name in ("if", "for", "while", "switch", "return", "catch", "sizeof"):
+                continue
+            open_brace = text.find("{", m.end())
+            if open_brace < 0 or ";" in text[m.end():open_brace]:
+                continue
+            if "::" in text[m.start():m.end()]:
+                continue  # already captured as a member definition
+            depth, i = 0, open_brace
+            n = len(text)
+            while i < n:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            self._free.setdefault(name, []).append(
+                (text[open_brace:i + 1], text,
+                 _param_names_from_list(text[m.end():open_brace])))
+
+    def guards(self, cls: str, method: str, param: str, index: int, kind: str) -> bool:
+        """True when SOME definition of ``cls::method`` guards this parameter.
+
+        ``param`` is the HEADER's spelling and ``index`` its position. A C++
+        definition is free to rename its parameters (``dial(const std::string&
+        tag)`` in the header is ``dial(..., const std::string& tag_in, ...)`` in
+        the .cpp, because the body shadows it with the resolved ``tag``), so the
+        definition-side name is resolved BY POSITION and the header name is only
+        a fallback. Matching on the header name alone silently found no guard for
+        every renamed parameter — and a missing guard reads as "the port really
+        sends this", i.e. a fold refused for a bookkeeping reason.
+
+        Direct: the guard names the parameter inside the method body.
+        One transitive hop: the parameter is stored (the body mentions it) and a
+        guard on the corresponding MEMBER name appears elsewhere in the same
+        source file — the store-then-guard-at-serialization shape. NOT available
+        to the ``""`` sentinel: see the vocabulary note above (a stored-then-
+        serialization-guarded string is a real empty-string default, which is
+        exactly how both the reference and this port model ``pom::Section::body``).
+        """
+        entries = self._bodies.get((cls, method))
+        if not entries:
+            return False
+        patterns = _GUARD_PATTERNS.get(kind, [])
+        for body, file_text, names in entries:
+            local = names[index] if 0 <= index < len(names) else None
+            candidates = [n for n in (local, param) if n]
+            for name in candidates:
+                for pat in patterns:
+                    if re.search(pat.format(n=re.escape(name)), body):
+                        return True
+                # A LOCAL ALIAS still counts as a direct guard. C++ cannot
+                # reassign a ``const T&`` parameter, so the "resolve the sentinel
+                # to the real value" idiom has to copy first:
+                #     std::string id = call_id;
+                #     if (id.empty()) { id = <generated>; }
+                # That is the same absence check as ``if (!call_id.empty())``,
+                # just one named local away, and it is still INSIDE this method —
+                # unlike the member/serialization hop, which is what distinguishes
+                # a modelled absence from a real empty-string default. Only a
+                # local DECLARED FROM this parameter qualifies.
+                for alias in re.findall(
+                    r"\b(?:auto|[A-Za-z_][\w:<>,\s*&]*?)\s+([A-Za-z_]\w*)\s*=\s*"
+                    + re.escape(name) + r"\s*;",
+                    body,
+                ):
+                    for pat in patterns:
+                        if re.search(pat.format(n=re.escape(alias)), body):
+                            return True
+            # PURE FORWARDER. A method whose ENTIRE body is a single
+            # ``return <fn>(...);`` delegates its contract wholesale; the guard
+            # lives in the callee. ``AgentBase::handle_serverless_request`` is
+            # exactly this — its one statement is
+            # ``return utils::handle_serverless_request(*this, event, context, mode);``
+            # and the free function does ``mode.empty() ? get_execution_mode() : mode``.
+            # Restricted to a body with ONE statement so it can only ever mean
+            # "this method IS the callee", never "somewhere downstream something
+            # is guarded". The callee's parameter is located BY NAME in the
+            # forwarding call's argument list, so an argument the forwarder
+            # reorders or wraps does not silently match.
+            fwd = _pure_forward_target(body)
+            if fwd is not None:
+                callee, args = fwd
+                for name in candidates:
+                    if name not in args:
+                        continue
+                    arg_index = args.index(name)
+                    for cbody, cfile, cnames in self._free.get(callee, []):
+                        cname = cnames[arg_index] if 0 <= arg_index < len(cnames) else None
+                        for pat in patterns:
+                            if cname and re.search(pat.format(n=re.escape(cname)), cbody):
+                                return True
+            if kind == "string":
+                continue
+            # One transitive hop: the body must actually USE the parameter (under
+            # EITHER spelling), and the member it lands on must be guarded in this
+            # file. The member is named after the CONCEPT, so every candidate
+            # spelling is tried for the member lookup once the parameter is known
+            # to be used — the definition's local name (``Section::add_subsection``
+            # spells ``bullets`` as ``bs``) is not the member's name.
+            if not any(re.search(r"\b" + re.escape(n) + r"\b", body) for n in candidates):
+                continue
+            for name in candidates:
+                for member in _member_spellings(name):
+                    if member == name:
+                        # The bare-name hop would re-match the body itself; only
+                        # accept it OUTSIDE the body.
+                        outside = file_text.replace(body, "", 1)
+                    else:
+                        outside = file_text
+                    for pat in patterns:
+                        if re.search(pat.format(n=re.escape(member)), outside):
+                            return True
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Building canonical inventory
 # ---------------------------------------------------------------------------
+
+
+def _merge_overload_optionality(a: dict, b: dict) -> None:
+    """Union ``required``/``default`` across two equal-arity overloads, in place.
+
+    Positional match, because C++ overloads of one name share their parameter
+    ORDER (that is what makes them overloads). Only parameters whose optionality
+    DISAGREES are touched, and only in the permissive direction: if either side
+    declares a default, the caller can omit the argument, so both sides become
+    ``required: false`` carrying that default. Types and kinds are untouched —
+    those still come from whichever overload dedup selects.
+
+    Arity mismatch means the two are not the same call shape (a convenience
+    wrapper, not a typed sibling); leave them alone.
+    """
+    pa, pb = a.get("params", []), b.get("params", [])
+    if len(pa) != len(pb):
+        return
+    for x, y in zip(pa, pb):
+        if x.get("kind") == "self" or y.get("kind") == "self":
+            continue
+        x_opt = x.get("required") is False
+        y_opt = y.get("required") is False
+        if x_opt == y_opt:
+            continue
+        src, dst = (x, y) if x_opt else (y, x)
+        dst["required"] = False
+        dst["default"] = src.get("default")
 
 
 def collect(
@@ -833,6 +1291,7 @@ def collect(
     aliases: dict,
     raw_free_functions: list[dict] | None = None,
     raw_options_structs: dict[str, list[dict]] | None = None,
+    guards: "GuardIndex | None" = None,
 ) -> tuple[dict, list]:
     out_modules: dict = {}
     failures: list = []
@@ -910,12 +1369,37 @@ def collect(
                 method_canonical = _METHOD_RENAMES.get(method_canonical, method_canonical)
             ctx = f"{mod}.{name}.{method_canonical}"
             try:
-                sig = build_signature(m, aliases, ctx)
+                sig = build_signature(
+                    m, aliases, ctx,
+                    guards=guards,
+                    cpp_class=entry["name"],
+                    cpp_method=(entry["name"] if native == "<init>" else native),
+                )
             except TypeTranslationError as e:
                 failures.append(str(e))
                 continue
             if method_canonical in methods_out:
                 existing = methods_out[method_canonical]
+                # OPTIONALITY IS A PROPERTY OF THE METHOD NAME, NOT OF ONE
+                # OVERLOAD. Only one overload survives dedup, but ``required``
+                # asks a question about the CALLER: can they omit this argument?
+                # If ANY overload of the name defaults the parameter, they can.
+                #
+                # C++ forces this apart where a port ships a flat ``std::string``
+                # overload alongside a typed ``enum class`` one: the string form
+                # defaults ``record_call(control_id="", stereo=false,
+                # format="wav", direction="both")``, but the typed form CANNOT
+                # repeat those defaults — two equal-arity overloads that are both
+                # callable with fewer arguments are ambiguous, so the compiler
+                # rejects it. The typed overload therefore declares them bare,
+                # and dedup (which prefers the typed form for the closed-set
+                # contract) was reporting ``required: true`` for four parameters
+                # a caller can plainly omit.
+                #
+                # Union optionality across equal-arity overloads before choosing
+                # a winner. Types/kinds still come from the chosen overload
+                # alone; only ``required``/``default`` merge.
+                _merge_overload_optionality(existing, sig)
                 if ctx in PREFER_TYPED_OVERLOAD:
                     # Equal-arity string-vs-enum overloads: keep the one that
                     # TYPES more params (the enum-class form), so its closed-set
@@ -2428,13 +2912,17 @@ def _translate_with_canonical_fallback(spelling: str,
     return primary
 
 
-def build_signature(method: dict, aliases: dict, context: str) -> dict:
+def build_signature(
+    method: dict, aliases: dict, context: str,
+    *, guards: "GuardIndex | None" = None,
+    cpp_class: str | None = None, cpp_method: str | None = None,
+) -> dict:
     params_out: list = []
     is_static = method.get("is_static", False)
     is_ctor = method.get("is_constructor", False)
     if not is_static:
         params_out.append({"name": "self", "kind": "self"})
-    for p in method.get("parameters", []):
+    for p_index, p in enumerate(method.get("parameters", [])):
         ctx = f"{context}[{p.get('name')}]"
         canon_type = _translate_with_canonical_fallback(
             p.get("type", ""), p.get("canonical_type", ""), aliases, ctx,
@@ -2453,7 +2941,19 @@ def build_signature(method: dict, aliases: dict, context: str) -> dict:
             dv = p.get("default_value", _NO_DEFAULT)
             if dv is _EMPTY_BRACE:
                 dv = _empty_brace_default(canon_type)
-            param["default"] = None if dv is _NO_DEFAULT else dv
+            dv = None if dv is _NO_DEFAULT else dv
+            # THE NULL <-> ZERO-VALUE SENTINEL FOLD (see GuardIndex). A sentinel
+            # default whose absence the body PROVES with a guard is the C++
+            # spelling of the reference's ``= None``; record it as null so the
+            # two compare equal. An unguarded sentinel is a value the port really
+            # ships and keeps reporting as drift.
+            if dv is not None and guards is not None and cpp_class and cpp_method \
+                    and _is_foldable_sentinel(canon_type, dv):
+                kind = _sentinel_kind(canon_type)
+                if kind and guards.guards(
+                        cpp_class, cpp_method, p.get("name") or "", p_index, kind):
+                    dv = None
+            param["default"] = dv
         else:
             param["required"] = True
         params_out.append(param)
@@ -2566,8 +3066,12 @@ def main() -> int:
             raw_free_functions.extend(fn_entries)
             raw_options_structs.update(opt_structs)
 
+    # Body index for the null <-> zero-value sentinel fold. Built from the
+    # implementation tree + the headers (inline bodies); see GuardIndex.
+    guards = GuardIndex([PORT_ROOT / "src", args.include])
+
     canonical, failures = collect(raw_entries, aliases, raw_free_functions,
-                                  raw_options_structs)
+                                  raw_options_structs, guards=guards)
     if failures:
         print(f"enumerate_signatures: {len(failures)} translation failure(s)", file=sys.stderr)
         for f in failures[:30]:

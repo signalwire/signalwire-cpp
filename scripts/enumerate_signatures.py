@@ -495,20 +495,7 @@ def walk_translation_unit(
             fname = cursor.spelling
             if not fname or fname.startswith("_"):
                 return
-            params = []
-            for arg in cursor.get_arguments():
-                params.append({
-                    "name": arg.spelling,
-                    "type": arg.type.spelling,
-                    # Carry the canonical spelling alongside the
-                    # typedef-aware spelling so the translator can fall
-                    # back to it when a typedef (e.g. ``ParamsOrBody``
-                    # over ``std::variant<...>``) is opaque to its
-                    # bare-name lookup. Class methods use the same trick
-                    # via ``extract_method``.
-                    "canonical_type": arg.type.get_canonical().spelling,
-                    "has_default": _has_default_value(arg),
-                })
+            params = [_param_record(arg) for arg in cursor.get_arguments()]
             free_functions.append({
                 "namespace": "::".join(ns_path),
                 "name": fname,
@@ -631,19 +618,30 @@ def _is_copy_or_move_ctor(cursor) -> bool:
     return t.rsplit("::", 1)[-1] == cursor.semantic_parent.spelling
 
 
+def _param_record(arg) -> dict:
+    """Raw parameter record for one PARM_DECL cursor.
+
+    ``canonical_type`` carries the typedef-EXPANDED spelling alongside the
+    typedef-aware one so the translator can fall back to it when a port-internal
+    typedef (e.g. ``ParamsOrBody`` over ``std::variant<...>``) is opaque to its
+    bare-name lookup. See ``_translate_with_canonical_fallback``.
+
+    ``default_value`` is the parsed default-argument literal, or ``_NO_DEFAULT``
+    when the parameter has no default OR its default is a non-literal expression;
+    ``has_default`` distinguishes those two cases.
+    """
+    has_default, default_value = _extract_default(arg)
+    return {
+        "name": arg.spelling,
+        "type": arg.type.spelling,
+        "canonical_type": arg.type.get_canonical().spelling,
+        "has_default": has_default,
+        "default_value": default_value,
+    }
+
+
 def extract_method(cursor, is_ctor: bool) -> dict:
-    params = []
-    for arg in cursor.get_arguments():
-        params.append({
-            "name": arg.spelling,
-            "type": arg.type.spelling,
-            # Carry the canonical (typedef-expanded) spelling so the
-            # translator can fall back to it when a port-internal
-            # typedef hides a known type. See
-            # ``_translate_with_canonical_fallback``.
-            "canonical_type": arg.type.get_canonical().spelling,
-            "has_default": _has_default_value(arg),
-        })
+    params = [_param_record(arg) for arg in cursor.get_arguments()]
     return {
         "name": "<init>" if is_ctor else cursor.spelling,
         "is_constructor": is_ctor,
@@ -656,13 +654,173 @@ def extract_method(cursor, is_ctor: bool) -> dict:
     }
 
 
-def _has_default_value(arg) -> bool:
-    """Heuristic: scan tokens for '=' after the arg name."""
+# Sentinel distinguishing "this parameter has NO default" from "it has a default
+# whose value we could not reduce to a JSON literal". ``None`` cannot serve for
+# either, because ``None`` is also the value we emit for a genuine ``nullptr`` /
+# ``std::nullopt`` default.
+_NO_DEFAULT = object()
+
+
+def _default_tokens(arg) -> list[str] | None:
+    """Token spellings of a parameter's default-argument EXPRESSION, or None.
+
+    libclang's Python binding has no ``clang_getParmDeclDefaultArgument``, but the
+    PARM_DECL cursor's own token extent covers the whole ``<type> <name> = <expr>``
+    declaration, so the default expression is recoverable as the tokens after the
+    parameter's top-level ``=``.
+
+    "Top-level" is load-bearing: the ``=`` must be located at zero bracket depth so
+    a template argument list (``std::map<std::string, int> m = {}``) or a nested
+    ``<...>`` cannot be mistaken for the assignment.
+
+    Depth is counted PER CHARACTER, not per token, because libclang emits a nested
+    template close as the SINGLE token ``>>`` (and ``>>>`` for triple nesting) —
+    the C++ right-shift spelling. Decrementing once per token left the depth
+    permanently positive for every ``std::optional<std::vector<std::string>>``
+    parameter, so its ``=`` was never seen at top level and a real default was
+    silently reported as NO default (flipping ``required`` to true on 32 params).
+    Likewise ``->`` / ``<=`` / ``>=`` must not be counted as brackets at all.
+    """
     try:
-        tokens = list(arg.get_tokens())
+        tokens = [t.spelling for t in arg.get_tokens()]
     except Exception:
+        return None
+    # Multi-character operator tokens that CONTAIN an angle bracket but are not
+    # template punctuation. Checked before the per-character bracket count.
+    _NON_BRACKET_OPS = {"->", "->*", "<=", ">=", "<=>", "==", "!=", "<<", "&&"}
+    depth = 0
+    for i, tok in enumerate(tokens):
+        if tok == "=" and depth == 0:
+            rest = tokens[i + 1:]
+            return rest or None
+        if tok in _NON_BRACKET_OPS:
+            continue
+        for ch in tok:
+            if ch in "<([{":
+                depth += 1
+            elif ch in ">)]}":
+                depth -= 1
+    return None
+
+
+# C++ default expressions that mean "absent" and translate to a JSON null. These
+# are REAL defaults — a parameter carrying one is ``required: false`` with an
+# explicit null, which is NOT the same as a parameter with no default at all.
+_NULLISH_DEFAULTS = {
+    ("nullptr",),
+    ("NULL",),
+    ("std", "::", "nullopt"),
+    ("nullopt",),
+}
+
+# Empty brace-init ``= {}`` — a real default meaning "value-initialized". Its JSON
+# form depends on the parameter's type, resolved by the caller.
+_EMPTY_BRACE = ("{", "}")
+
+_INT_RE = re.compile(r"^[+-]?(?:0[xX][0-9a-fA-F]+|0[bB][01]+|\d+)[uUlL]*$")
+_FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fFlL]?$")
+
+
+def _parse_cpp_literal(tokens: list[str]):
+    """Reduce a C++ default-argument token list to a JSON-comparable value.
+
+    Returns ``_NO_DEFAULT`` when the expression is NOT a static literal — an enum
+    value, a constructor call, an arithmetic expression, a named constant. Those
+    are recorded as ``default: null`` by the caller rather than guessed at: the
+    reference records concrete values, and inventing one here would manufacture a
+    confident wrong answer, which is worse than a documented blind spot.
+    """
+    if not tokens:
+        return _NO_DEFAULT
+
+    if tuple(tokens) in _NULLISH_DEFAULTS:
+        return None
+
+    # String literals: one or more adjacent literals, concatenated as C++ does.
+    # Covers ``""`` (empty string) and ``"a" "b"``. Only plain/UTF-8 literals with
+    # no escape sequences beyond the common ones are decoded; anything exotic
+    # falls through to non-literal.
+    if all(t.startswith('"') and t.endswith('"') and len(t) >= 2 for t in tokens):
+        out = []
+        for t in tokens:
+            body = t[1:-1]
+            try:
+                out.append(json.loads('"' + body + '"'))
+            except ValueError:
+                return _NO_DEFAULT
+        return "".join(out)
+
+    if len(tokens) == 1:
+        tok = tokens[0]
+        if tok == "true":
+            return True
+        if tok == "false":
+            return False
+        if _INT_RE.match(tok):
+            digits = tok.rstrip("uUlL")
+            try:
+                return int(digits, 0)
+            except ValueError:
+                return _NO_DEFAULT
+        if _FLOAT_RE.match(tok) and (
+            "." in tok or "e" in tok.lower() or tok[-1] in "fF"
+        ):
+            try:
+                return float(tok.rstrip("fFlL"))
+            except ValueError:
+                return _NO_DEFAULT
+        # A bare char literal, an identifier (named constant / enum), etc.
+        return _NO_DEFAULT
+
+    # Unary sign applied to a numeric literal: ``= -1``, ``= +2.5``.
+    if len(tokens) == 2 and tokens[0] in ("-", "+"):
+        inner = _parse_cpp_literal([tokens[1]])
+        if isinstance(inner, (int, float)) and not isinstance(inner, bool):
+            return -inner if tokens[0] == "-" else inner
+        return _NO_DEFAULT
+
+    # Everything else (``Color::Red``, ``std::string("x")``, ``60 * 60``,
+    # ``Opt{}``, ``SomeConstant``) is a non-literal expression.
+    return _NO_DEFAULT
+
+
+# Canonical types whose ``= {}`` value-initialization has a well-defined JSON form.
+# A ``{}`` default on any other type (an SDK class, a struct) is a constructed
+# object, not a literal, and is left non-literal.
+def _empty_brace_default(canon_type: str):
+    t = (canon_type or "").strip()
+    if t.startswith("list<"):
+        return []
+    if t.startswith("dict<"):
+        return {}
+    if t == "string":
+        return ""
+    if t == "bool":
         return False
-    return any(tok.spelling == "=" for tok in tokens)
+    if t in ("int", "float"):
+        return 0 if t == "int" else 0.0
+    if t.startswith("optional<") or t == "any":
+        return None
+    return _NO_DEFAULT
+
+
+def _extract_default(arg):
+    """(has_default, value) for one PARM_DECL cursor.
+
+    ``value`` is ``_NO_DEFAULT`` when a default exists but is a non-literal
+    expression we deliberately refuse to evaluate.
+    """
+    tokens = _default_tokens(arg)
+    if tokens is None:
+        return False, _NO_DEFAULT
+    if tuple(tokens) == _EMPTY_BRACE:
+        return True, _EMPTY_BRACE
+    return True, _parse_cpp_literal(tokens)
+
+
+def _has_default_value(arg) -> bool:
+    """True when the parameter declares a default argument (value aside)."""
+    return _default_tokens(arg) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -2287,7 +2445,15 @@ def build_signature(method: dict, aliases: dict, context: str) -> dict:
         }
         if p.get("has_default"):
             param["required"] = False
-            param["default"] = None
+            # C++ declares real default arguments, so the VALUE is recoverable
+            # from the header (unlike languages whose reflection only reports
+            # that a default exists). A default we could not reduce to a literal
+            # — an enum value, a constructor call, an arithmetic expression —
+            # stays ``null``: a documented blind spot, never a guessed value.
+            dv = p.get("default_value", _NO_DEFAULT)
+            if dv is _EMPTY_BRACE:
+                dv = _empty_brace_default(canon_type)
+            param["default"] = None if dv is _NO_DEFAULT else dv
         else:
             param["required"] = True
         params_out.append(param)

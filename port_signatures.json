@@ -10,13 +10,13 @@
               "name": "args",
               "type": "list<string>",
               "required": false,
-              "default": null
+              "default": []
             },
             {
               "name": "kwargs",
               "type": "dict<string,string>",
               "required": false,
-              "default": null
+              "default": {}
             }
           ],
           "returns": "class:signalwire.rest.client.RestClient"
@@ -113,19 +113,19 @@
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 },
                 {
                   "name": "log_level",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "info"
                 }
               ],
               "returns": "void"
@@ -140,7 +140,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.agent_server.AgentServer"
@@ -261,7 +261,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.agent_server.AgentServer"
@@ -347,7 +347,7 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 }
               ],
               "returns": "class:signalwire.agent_server.AgentServer"
@@ -376,13 +376,13 @@
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/sip"
                 },
                 {
                   "name": "auto_map",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.agent_server.AgentServer"
@@ -442,43 +442,43 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "bedrock_agent"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/bedrock"
                 },
                 {
                   "name": "system_prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "voice_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "matthew"
                 },
                 {
                   "name": "temperature",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.7
                 },
                 {
                   "name": "top_p",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.9
                 },
                 {
                   "name": "max_tokens",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 1024
                 }
               ],
               "returns": "void"
@@ -502,19 +502,19 @@
                   "name": "temperature",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 },
                 {
                   "name": "top_p",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 },
                 {
                   "name": "max_tokens",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": -1
                 }
               ],
               "returns": "void"
@@ -1018,19 +1018,19 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "agent"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
@@ -1048,37 +1048,37 @@
                   "name": "use_pom",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "token_expiry_secs",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3600
                 },
                 {
                   "name": "auto_answer",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "record_call",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "record_format",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "mp4"
                 },
                 {
                   "name": "record_stereo",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "default_webhook_url",
@@ -1108,19 +1108,19 @@
                   "name": "suppress_logs",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "enable_post_prompt_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "check_for_input_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "config_file",
@@ -1132,7 +1132,7 @@
                   "name": "schema_validation",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "signing_key",
@@ -1144,7 +1144,7 @@
                   "name": "trust_proxy_for_signature",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "void"
@@ -1218,13 +1218,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
@@ -1249,13 +1249,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
@@ -1275,13 +1275,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent.prompt.manager.PromptManager"
@@ -1360,19 +1360,19 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "agent"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
@@ -1390,37 +1390,37 @@
                   "name": "use_pom",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "token_expiry_secs",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3600
                 },
                 {
                   "name": "auto_answer",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "record_call",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "record_format",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "mp4"
                 },
                 {
                   "name": "record_stereo",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "default_webhook_url",
@@ -1450,19 +1450,19 @@
                   "name": "suppress_logs",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "enable_post_prompt_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "check_for_input_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "config_file",
@@ -1474,7 +1474,7 @@
                   "name": "schema_validation",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "signing_key",
@@ -1486,7 +1486,7 @@
                   "name": "trust_proxy_for_signature",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "void"
@@ -1632,19 +1632,19 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "agent"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
@@ -1662,37 +1662,37 @@
                   "name": "use_pom",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "token_expiry_secs",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3600
                 },
                 {
                   "name": "auto_answer",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "record_call",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "record_format",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "mp4"
                 },
                 {
                   "name": "record_stereo",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "default_webhook_url",
@@ -1722,19 +1722,19 @@
                   "name": "suppress_logs",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "enable_post_prompt_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "check_for_input_override",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "config_file",
@@ -1746,7 +1746,7 @@
                   "name": "schema_validation",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "signing_key",
@@ -1758,7 +1758,7 @@
                   "name": "trust_proxy_for_signature",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "void"
@@ -1923,7 +1923,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -2002,7 +2002,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -2017,7 +2017,7 @@
                   "name": "include_auth",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "string"
@@ -2456,7 +2456,7 @@
                   "name": "optional",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "callable<list<dict<string,string>>,class:signalwire.core.auth_result.AuthResult>"
@@ -2632,7 +2632,7 @@
                   "name": "env_prefix",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "SWML_"
                 }
               ],
               "returns": "any"
@@ -2652,7 +2652,7 @@
                   "name": "max_depth",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 10
                 }
               ],
               "returns": "any"
@@ -2765,19 +2765,19 @@
                   "name": "task",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "criteria",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "functions",
@@ -2789,7 +2789,7 @@
                   "name": "valid_steps",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.contexts.Step"
@@ -3215,25 +3215,25 @@
                   "name": "output_key",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "completion_action",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "isolated",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "void"
@@ -3258,25 +3258,25 @@
                   "name": "type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "string"
                 },
                 {
                   "name": "confirm",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "functions",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "isolated",
@@ -3347,25 +3347,25 @@
                   "name": "type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "string"
                 },
                 {
                   "name": "confirm",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "functions",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "isolated",
@@ -3500,25 +3500,25 @@
                   "name": "type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "string"
                 },
                 {
                   "name": "confirm",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "functions",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "isolated",
@@ -3622,25 +3622,25 @@
                   "name": "output_key",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "completion_action",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "isolated",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.contexts.Step"
@@ -4010,13 +4010,13 @@
                   "name": "required",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "enum_values",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.data_map.DataMap"
@@ -4084,19 +4084,19 @@
                   "name": "form_param",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "input_args_as_params",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "require_args",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.data_map.DataMap"
@@ -4133,13 +4133,13 @@
                   "name": "response",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "post_process",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "void"
@@ -4215,13 +4215,13 @@
                   "name": "final",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "from_addr",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4272,13 +4272,13 @@
                   "name": "card_type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "error_type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "any"
@@ -4293,7 +4293,7 @@
                   "name": "enabled",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4308,7 +4308,7 @@
                   "name": "enabled",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4334,13 +4334,13 @@
                   "name": "call_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "node_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4360,7 +4360,7 @@
                   "name": "transfer",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4384,7 +4384,7 @@
                   "name": "timeout",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 300
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4404,25 +4404,25 @@
                   "name": "muted",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "beep",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "true"
                 },
                 {
                   "name": "start_on_enter",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "end_on_exit",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "wait_url",
@@ -4434,13 +4434,13 @@
                   "name": "max_participants",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 250
                 },
                 {
                   "name": "record",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "do-not-record"
                 },
                 {
                   "name": "region",
@@ -4452,7 +4452,7 @@
                   "name": "trim",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "trim-silence"
                 },
                 {
                   "name": "coach",
@@ -4476,7 +4476,7 @@
                   "name": "status_callback_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "POST"
                 },
                 {
                   "name": "recording_status_callback",
@@ -4488,13 +4488,13 @@
                   "name": "recording_status_callback_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "POST"
                 },
                 {
                   "name": "recording_status_callback_event",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "completed"
                 },
                 {
                   "name": "result",
@@ -4534,109 +4534,109 @@
                   "name": "input_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "dtmf"
                 },
                 {
                   "name": "status_url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "payment_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "credit-card"
                 },
                 {
                   "name": "timeout",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 5
                 },
                 {
                   "name": "max_attempts",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 1
                 },
                 {
                   "name": "security_code",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 },
                 {
                   "name": "postal_code",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "true"
                 },
                 {
                   "name": "min_postal_code_length",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 },
                 {
                   "name": "token_type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "reusable"
                 },
                 {
                   "name": "charge_amount",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "currency",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "usd"
                 },
                 {
                   "name": "language",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "en-US"
                 },
                 {
                   "name": "voice",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "woman"
                 },
                 {
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "valid_card_types",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "visa mastercard amex"
                 },
                 {
                   "name": "parameters",
                   "type": "list<any>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "prompts",
                   "type": "list<any>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "ai_response",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "The payment status is ${pay_result}, do not mention anything else about collecting payment if successful."
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4656,7 +4656,7 @@
                   "name": "wait",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4700,19 +4700,19 @@
                   "name": "terminators",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "beep",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "input_sensitivity",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 44.0
                 },
                 {
                   "name": "initial_timeout",
@@ -4736,7 +4736,7 @@
                   "name": "status_url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4812,7 +4812,7 @@
                   "name": "role",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "system"
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4856,7 +4856,7 @@
                   "name": "device_type",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "phone"
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -4895,25 +4895,25 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "media",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "tags",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "region",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5044,7 +5044,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5059,7 +5059,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5074,25 +5074,25 @@
                   "name": "system_prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "user_prompt",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "consolidate",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "full_reset",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5145,7 +5145,7 @@
                   "name": "final",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5194,13 +5194,13 @@
                   "name": "rtp_ptime",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 20
                 },
                 {
                   "name": "status_url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5224,7 +5224,7 @@
                   "name": "indent",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": -1
                 }
               ],
               "returns": "string"
@@ -5293,7 +5293,7 @@
                   "name": "answer_first",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.function_result.FunctionResult"
@@ -5432,19 +5432,19 @@
                   "name": "headers",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 },
                 {
                   "name": "resources",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "resource_vars",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5474,7 +5474,7 @@
                   "name": "ignore_case",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5499,7 +5499,7 @@
                   "name": "ignore_case",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5514,7 +5514,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5529,7 +5529,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5837,13 +5837,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5868,13 +5868,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -5894,13 +5894,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -6000,7 +6000,7 @@
                   "name": "mode",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.utils.serverless_response.ServerlessResponse"
@@ -6203,7 +6203,7 @@
                   "name": "enable",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -6279,7 +6279,7 @@
                   "name": "path",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 }
               ],
               "returns": "class:signalwire.core.agent_base.AgentBase"
@@ -6357,7 +6357,7 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
@@ -6369,13 +6369,13 @@
                   "name": "numbered",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "numbered_bullets",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "subsections",
@@ -6406,7 +6406,7 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
@@ -6730,13 +6730,13 @@
                   "name": "token_expiry_secs",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 900
                 },
                 {
                   "name": "secret_key",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "void"
@@ -6765,7 +6765,7 @@
                   "name": "call_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "string"
@@ -6790,7 +6790,7 @@
                   "name": "expiry_seconds",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3600
                 }
               ],
               "returns": "string"
@@ -7185,7 +7185,7 @@
                   "name": "is_https",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "any"
@@ -7400,7 +7400,7 @@
                   "name": "secure",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "class:signalwire.core.swaig_function.ToolDefinition"
@@ -7466,7 +7466,7 @@
                   "name": "default_val",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "string"
@@ -7798,7 +7798,7 @@
                   "name": "secure",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "fillers",
@@ -7828,13 +7828,13 @@
                   "name": "required",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "is_typed_handler",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "extra_swaig_fields",
@@ -8002,7 +8002,7 @@
                   "name": "include_auth",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "any"
@@ -8071,7 +8071,7 @@
                   "name": "web_hook_url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "any"
@@ -8553,7 +8553,7 @@
                   "name": "format",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "json"
                 }
               ],
               "returns": "string"
@@ -8597,19 +8597,19 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "service"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
@@ -8639,7 +8639,7 @@
                   "name": "schema_validation",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "void"
@@ -9376,7 +9376,7 @@
                   "name": "path",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 }
               ],
               "returns": "void"
@@ -14548,19 +14548,19 @@
                   "name": "title",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "numbered",
@@ -14572,7 +14572,7 @@
                   "name": "numbered_bullets",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.pom.pom.Section"
@@ -14730,13 +14730,13 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "bullets",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "numbered",
@@ -14748,7 +14748,7 @@
                   "name": "numbered_bullets",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 }
               ],
               "returns": "class:signalwire.pom.pom.Section"
@@ -14799,13 +14799,13 @@
                   "name": "level",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 2
                 },
                 {
                   "name": "section_number",
                   "type": "list<int>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "string"
@@ -14820,13 +14820,13 @@
                   "name": "indent",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 },
                 {
                   "name": "section_number",
                   "type": "list<int>",
                   "required": false,
-                  "default": null
+                  "default": []
                 }
               ],
               "returns": "string"
@@ -14885,25 +14885,25 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "concierge"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 }
               ],
               "returns": "void"
@@ -15037,25 +15037,25 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "faq_bot"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 }
               ],
               "returns": "void"
@@ -15152,25 +15152,25 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "info_gatherer"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 }
               ],
               "returns": "void"
@@ -15311,25 +15311,25 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "receptionist"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 }
               ],
               "returns": "void"
@@ -15408,25 +15408,25 @@
                   "name": "name",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "survey"
                 },
                 {
                   "name": "route",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "/"
                 },
                 {
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 3000
                 }
               ],
               "returns": "void"
@@ -15698,7 +15698,7 @@
                   "name": "final_state",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "finished"
                 },
                 {
                   "name": "result",
@@ -15872,7 +15872,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -15962,7 +15962,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -16004,7 +16004,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16131,7 +16131,7 @@
                   "name": "realm",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16151,7 +16151,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16218,7 +16218,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16239,7 +16239,7 @@
                   "name": "timeout",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16254,13 +16254,13 @@
                   "name": "digits",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "timeout",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16275,13 +16275,13 @@
                   "name": "tone",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "timeout",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16389,7 +16389,7 @@
                   "name": "reason",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "hangup"
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16465,7 +16465,7 @@
                   "name": "conference_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16508,7 +16508,7 @@
                   "name": "status_url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16574,7 +16574,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16594,13 +16594,13 @@
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 },
                 {
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16625,7 +16625,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16645,7 +16645,7 @@
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16665,13 +16665,13 @@
                   "name": "duration",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": -1.0
                 },
                 {
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16705,25 +16705,25 @@
                   "name": "language",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "gender",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "voice",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16757,7 +16757,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16782,7 +16782,7 @@
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16807,25 +16807,25 @@
                   "name": "language",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "gender",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "voice",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "volume",
                   "type": "float",
                   "required": false,
-                  "default": null
+                  "default": 0.0
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16880,7 +16880,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16901,7 +16901,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -16970,7 +16970,7 @@
                   "name": "final_state",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "finished"
                 }
               ],
               "returns": "void"
@@ -17013,19 +17013,19 @@
                   "name": "header",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "identity",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17124,7 +17124,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17153,7 +17153,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17173,7 +17173,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17203,7 +17203,7 @@
                   "name": "control_id",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17269,7 +17269,7 @@
                   "name": "event",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.action.Action"
@@ -17289,7 +17289,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -17304,7 +17304,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -17319,7 +17319,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -17334,7 +17334,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -17349,7 +17349,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -17694,19 +17694,19 @@
                   "name": "tag",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "dial_timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 120000
                 },
                 {
                   "name": "max_duration",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "class:signalwire.relay.call.Call"
@@ -17911,25 +17911,25 @@
                   "name": "media",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "tags",
                   "type": "list<string>",
                   "required": false,
-                  "default": null
+                  "default": []
                 },
                 {
                   "name": "region",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "context",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.relay.message.Message"
@@ -19800,7 +19800,7 @@
                   "name": "timeout_ms",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 0
                 }
               ],
               "returns": "bool"
@@ -19886,13 +19886,13 @@
                   "name": "code",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 1000
                 },
                 {
                   "name": "reason",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "void"
@@ -19912,7 +19912,7 @@
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 443
                 }
               ],
               "returns": "bool"
@@ -20061,7 +20061,7 @@
                   "name": "update_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "PATCH"
                 }
               ],
               "returns": "void"
@@ -20130,7 +20130,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "any"
@@ -20152,7 +20152,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "any"
@@ -20207,7 +20207,7 @@
                   "name": "update_method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "PATCH"
                 }
               ],
               "returns": "void"
@@ -20234,7 +20234,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "any"
@@ -20317,7 +20317,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 },
                 {
                   "name": "request_options",
@@ -20498,7 +20498,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "any"
@@ -20520,7 +20520,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "any"
@@ -20542,7 +20542,7 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "class:signalwire.rest._pagination.PaginatedIterator"
@@ -20571,25 +20571,25 @@
                   "name": "body",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "GET"
                 },
                 {
                   "name": "headers",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 }
               ],
               "returns": "void"
@@ -20667,13 +20667,13 @@
                   "name": "url",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "method",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "GET"
                 }
               ],
               "returns": "void"
@@ -20706,13 +20706,13 @@
                   "name": "params",
                   "type": "dict<string,string>",
                   "required": false,
-                  "default": null
+                  "default": {}
                 },
                 {
                   "name": "data_key",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "data"
                 },
                 {
                   "name": "request_options",
@@ -29719,7 +29719,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29739,7 +29739,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29773,7 +29773,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29793,7 +29793,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29813,7 +29813,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29838,7 +29838,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -29905,7 +29905,7 @@
                   "name": "description",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
@@ -30049,7 +30049,7 @@
                   "name": "indent",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": -1
                 }
               ],
               "returns": "string"
@@ -30241,13 +30241,13 @@
                   "name": "schema_path",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": ""
                 },
                 {
                   "name": "schema_validation",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "void"
@@ -30468,7 +30468,7 @@
               "name": "allow_private",
               "type": "bool",
               "required": false,
-              "default": null
+              "default": false
             }
           ],
           "returns": "bool"
@@ -30489,7 +30489,7 @@
                   "name": "port",
                   "type": "int",
                   "required": false,
-                  "default": null
+                  "default": 8002
                 },
                 {
                   "name": "directories",
@@ -30513,7 +30513,7 @@
                   "name": "enable_directory_browsing",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": false
                 },
                 {
                   "name": "allowed_extensions",
@@ -30537,7 +30537,7 @@
                   "name": "enable_cors",
                   "type": "bool",
                   "required": false,
-                  "default": null
+                  "default": true
                 }
               ],
               "returns": "void"
@@ -30662,7 +30662,7 @@
                   "name": "host",
                   "type": "string",
                   "required": false,
-                  "default": null
+                  "default": "0.0.0.0"
                 },
                 {
                   "name": "bind_port",

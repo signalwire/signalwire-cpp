@@ -612,3 +612,119 @@ TEST(relay_mock_amazon_bedrock_omits_params_when_ai_params_unset) {
     client->disconnect();
     return true;
 }
+
+// ===========================================================================
+// The REST of the reference's API-name -> WIRE-key remap set.
+//
+// An AST audit of every relay module (call.py / client.py / message.py /
+// event.py) for `<wire key>` <- `<differently-named API parameter>` found
+// SEVEN sites in call.py, not the two above:
+//
+//   :567  play()             media       -> "play"
+//   :844  play_and_collect() media       -> "play"
+//   :1024 pay()              input_method-> "input"
+//   :1260 join_conference()  stream_obj  -> "stream"
+//   :1359 bind_digit()       bind_params -> "params"   (pinned above)
+//   :1479 ai()               ai_params   -> "params"
+//   :1502 amazon_bedrock()   ai_params   -> "params"   (pinned above)
+//
+// The five below are NOT unreachable in C++, and the reason is structural:
+// where the reference exposes a NAMED keyword whose value it re-keys, C++
+// either (a) already names the parameter and re-keys it identically at the
+// emitter (play / play_and_collect), or (b) takes an untyped options bag that
+// is spread VERBATIM, so the caller writes the WIRE key directly and it lands
+// there unchanged (pay / join_conference / ai). Case (b) is only safe when the
+// wire key is a legal bag key — which is exactly why bind_digit/amazon_bedrock
+// above needed their own parameter: their wire key "params" collides with the
+// bag's own name and could never be expressed. These tests pin the emitted key
+// for all five so a later refactor to a named parameter cannot silently
+// reintroduce the API spelling on the wire.
+// ===========================================================================
+
+TEST(relay_mock_play_emits_wire_key_play_not_media) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-play-key");
+    ASSERT_TRUE(call != nullptr);
+
+    json media = json::array({{{"type", "audio"}, {"params", {{"url", "https://x.test/a.wav"}}}}});
+    call->play(media);
+
+    json p = first_recv_params("calling.play");
+    // Reference relay/call.py:567 — `params["play"] = media`.
+    ASSERT_TRUE(p.contains("play"));
+    ASSERT_FALSE(p.contains("media"));
+    ASSERT_EQ(p["play"][0]["params"].value("url", ""), "https://x.test/a.wav");
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_play_and_collect_emits_wire_key_play_not_media) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-pac-key");
+    ASSERT_TRUE(call != nullptr);
+
+    json media = json::array({{{"type", "audio"}, {"params", {{"url", "https://x.test/b.wav"}}}}});
+    call->play_and_collect(media, json{{"digits", {{"max", 3}}}});
+
+    json p = first_recv_params("calling.play_and_collect");
+    // Reference relay/call.py:844 — `"play": media` in the frame literal.
+    ASSERT_TRUE(p.contains("play"));
+    ASSERT_FALSE(p.contains("media"));
+    ASSERT_TRUE(p.contains("collect"));
+    ASSERT_EQ(p["play"][0]["params"].value("url", ""), "https://x.test/b.wav");
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_pay_carries_wire_key_input_not_input_method) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-pay-key");
+    ASSERT_TRUE(call != nullptr);
+
+    // Reference relay/call.py:1024 — the API keyword `input_method` lands on
+    // the WIRE key `input`. C++'s bag is spread verbatim, so the wire key is
+    // what the caller writes and it must arrive unchanged.
+    call->pay(json{{"payment_connector_url", "https://pay.test/c"}, {"input", "dtmf"}});
+
+    json p = first_recv_params("calling.pay");
+    ASSERT_EQ(p.value("input", ""), "dtmf");
+    ASSERT_FALSE(p.contains("input_method"));
+    ASSERT_EQ(p.value("payment_connector_url", ""), "https://pay.test/c");
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_join_conference_carries_wire_key_stream_not_stream_obj) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-jc-key");
+    ASSERT_TRUE(call != nullptr);
+
+    // Reference relay/call.py:1260 — API `stream_obj` -> WIRE `stream`.
+    call->join_conference("room-1", json{{"stream", {{"url", "wss://s.test/x"}}}});
+
+    json p = first_recv_params("calling.join_conference");
+    ASSERT_EQ(p.value("name", ""), "room-1");
+    ASSERT_TRUE(p.contains("stream"));
+    ASSERT_FALSE(p.contains("stream_obj"));
+    ASSERT_EQ(p["stream"].value("url", ""), "wss://s.test/x");
+    client->disconnect();
+    return true;
+}
+
+TEST(relay_mock_ai_carries_wire_key_params_not_ai_params) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_conv(*client, "conv-ai-key");
+    ASSERT_TRUE(call != nullptr);
+
+    // Reference relay/call.py:1479 — API `ai_params` -> WIRE `params`. Unlike
+    // amazon_bedrock, ai()'s bag is the FIRST positional and the caller writes
+    // the nested "params" key inside it, so the knob IS reachable.
+    call->ai(json{{"prompt", {{"text", "hello"}}}, {"params", {{"temperature", 0.7}}}});
+
+    json p = first_recv_params("calling.ai");
+    ASSERT_TRUE(p.contains("params"));
+    ASSERT_FALSE(p.contains("ai_params"));
+    ASSERT_TRUE(p["params"]["temperature"].get<double>() == 0.7);
+    client->disconnect();
+    return true;
+}

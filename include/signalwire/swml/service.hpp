@@ -279,9 +279,12 @@ class Service {
   /// Dispatch a function call to the registered handler.
   /// Returns a FunctionResult; if the function isn't registered, returns
   /// a FunctionResult with a "Function not found" response.
+  /// ``raw_data`` is OPTIONAL — reference ``ToolMixin.on_function_call``
+  /// declares ``raw_data: dict[str, Any] | None = None`` (tool_mixin.py:234).
+  /// A JSON null is the absent spelling.
   [[nodiscard]] virtual swaig::FunctionResult on_function_call(const std::string& name,
                                                                const json& args,
-                                                               const json& raw_data);
+                                                               const json& raw_data = nullptr);
 
   [[nodiscard]] bool has_tool(const std::string& name) const;
   [[nodiscard]] std::vector<std::string> list_tool_names() const;

@@ -59,38 +59,38 @@ TEST(skill_registry_create_returns_unique_instances) {
 // ========================================================================
 
 TEST(skill_manager_load_and_check) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    bool ok = mgr.load_skill("datetime", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    bool ok = mgr.load_skill("datetime");
     ASSERT_TRUE(ok);
     ASSERT_TRUE(mgr.is_loaded("datetime"));
     return true;
 }
 
 TEST(skill_manager_unload_skill) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("math", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("math");
     mgr.unload_skill("math");
     ASSERT_FALSE(mgr.is_loaded("math"));
     return true;
 }
 
 TEST(skill_manager_list_loaded_skills) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
-    (void)mgr.load_skill("math", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
+    (void)mgr.load_skill("math");
     auto loaded = mgr.list_loaded();
     ASSERT_EQ(loaded.size(), 2u);
     return true;
 }
 
 TEST(skill_manager_cleanup_all) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
-    (void)mgr.load_skill("math", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
+    (void)mgr.load_skill("math");
     mgr.cleanup_all();
     ASSERT_FALSE(mgr.is_loaded("datetime"));
     ASSERT_FALSE(mgr.is_loaded("math"));
@@ -98,17 +98,17 @@ TEST(skill_manager_cleanup_all) {
 }
 
 TEST(skill_manager_unknown_skill_returns_false) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    ASSERT_FALSE(mgr.load_skill("nonexistent_skill", json::object(), agent));
+    sw_skills::SkillManager mgr(agent);
+    ASSERT_FALSE(mgr.load_skill("nonexistent_skill"));
     return true;
 }
 
 TEST(skill_manager_duplicate_single_instance_rejected) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
-    ASSERT_FALSE(mgr.load_skill("datetime", json::object(), agent));
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
+    ASSERT_FALSE(mgr.load_skill("datetime"));
     return true;
 }
 

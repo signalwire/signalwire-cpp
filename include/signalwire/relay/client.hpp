@@ -116,14 +116,25 @@ class RelayClient {
   /// calling.call.dial(answered) for the dial's tag, or an empty Call
   /// on timeout / failure.
   ///
+  /// PARAMETER ORDER follows the reference exactly
+  /// (relay/client.py:498 — ``dial(devices, *, tag, max_duration,
+  /// dial_timeout)``). It previously read
+  /// ``(devices, tag, dial_timeout_ms, max_duration)``, so a positional third
+  /// argument meant the OPPOSITE thing in this port from what it means in the
+  /// reference. Callers passing a positional 3rd/4th argument must swap them.
+  ///
   /// `tag` lets callers pin an explicit dial tag for journal-based
   /// assertions; if blank, a UUID is generated.
-  /// `dial_timeout_ms` caps how long dial() blocks waiting for the
-  /// server's terminal dial event.
-  /// `max_duration` (seconds) is forwarded into the calling.dial frame
-  /// when non-zero.
-  Call dial(const json& devices, const std::string& tag = "", int dial_timeout_ms = 120000,
-            int max_duration = 0);
+  /// `max_duration` is the max call duration in MINUTES, forwarded into the
+  /// calling.dial frame when non-zero (reference: "Optional max call duration
+  /// in minutes").
+  /// `dial_timeout` is how long, in SECONDS, dial() blocks waiting for the
+  /// server's terminal dial event. ABSENT by default; the body substitutes
+  /// 120s, exactly as the reference does
+  /// (``timeout = dial_timeout if dial_timeout is not None else 120.0``).
+  /// Note the UNIT: this used to be `dial_timeout_ms` in milliseconds.
+  Call dial(const json& devices, const std::string& tag = "", int max_duration = 0,
+            std::optional<double> dial_timeout = std::nullopt);
 
   /// Register a generic event observer. Called for every dispatched
   /// `signalwire.event` after typed routing (on_call/on_message/action

@@ -36,7 +36,8 @@ class GatherQuestion {
  public:
   GatherQuestion(const std::string& key, const std::string& question,
                  const std::string& type = "string", bool confirm = false,
-                 const std::string& prompt = "", const std::vector<std::string>& functions = {},
+                 const std::optional<std::string>& prompt = std::nullopt,
+                 const std::vector<std::string>& functions = {},
                  const std::optional<bool>& isolated = std::nullopt);
 
   [[nodiscard]] json to_json() const;
@@ -52,9 +53,9 @@ class GatherQuestion {
   /// reference: ``self.confirm`` — whether the answer is read back for
   /// confirmation; emitted only when true.
   [[nodiscard]] bool confirm() const { return confirm_; }
-  /// reference: ``self.prompt`` — per-question prompt override; emitted only
-  /// when non-empty.
-  [[nodiscard]] const std::string& prompt() const { return prompt_; }
+  /// reference: ``self.prompt`` — per-question prompt override; ``nullopt``
+  /// when absent, and emitted only when set to a non-empty string.
+  [[nodiscard]] const std::optional<std::string>& prompt() const { return prompt_; }
   /// reference: ``self.functions`` — SWAIG functions available while this
   /// question is being answered; emitted only when non-empty.
   [[nodiscard]] const std::vector<std::string>& functions() const { return functions_; }
@@ -67,7 +68,7 @@ class GatherQuestion {
   std::string question_;
   std::string type_;
   bool confirm_;
-  std::string prompt_;
+  std::optional<std::string> prompt_;
   std::vector<std::string> functions_;
   // Tri-state: nullopt means "inherit the gather_info default".
   std::optional<bool> isolated_;
@@ -79,12 +80,13 @@ class GatherQuestion {
 
 class GatherInfo {
  public:
-  GatherInfo(const std::string& output_key = "", const std::string& completion_action = "",
-             const std::string& prompt = "", bool isolated = false);
+  GatherInfo(const std::optional<std::string>& output_key = std::nullopt,
+             const std::optional<std::string>& completion_action = std::nullopt,
+             const std::optional<std::string>& prompt = std::nullopt, bool isolated = false);
 
   GatherInfo& add_question(const std::string& key, const std::string& question,
                            const std::string& type = "string", bool confirm = false,
-                           const std::string& prompt = "",
+                           const std::optional<std::string>& prompt = std::nullopt,
                            const std::vector<std::string>& functions = {},
                            const std::optional<bool>& isolated = std::nullopt);
 
@@ -92,13 +94,15 @@ class GatherInfo {
 
   [[nodiscard]] bool has_questions() const { return !questions_.empty(); }
   [[nodiscard]] const std::vector<GatherQuestion>& questions() const { return questions_; }
-  [[nodiscard]] const std::string& completion_action() const { return completion_action_; }
+  [[nodiscard]] const std::optional<std::string>& completion_action() const {
+    return completion_action_;
+  }
 
  private:
   std::vector<GatherQuestion> questions_;
-  std::string output_key_;
-  std::string completion_action_;
-  std::string prompt_;
+  std::optional<std::string> output_key_;
+  std::optional<std::string> completion_action_;
+  std::optional<std::string> prompt_;
   bool isolated_ = false;
 };
 
@@ -206,8 +210,9 @@ class Step {
   ///   must ask rather than derive the answer from an earlier one. A
   ///   question's own isolated overrides this. The hidden turns remain in
   ///   the call log.
-  Step& set_gather_info(const std::string& output_key = "",
-                        const std::string& completion_action = "", const std::string& prompt = "",
+  Step& set_gather_info(const std::optional<std::string>& output_key = std::nullopt,
+                        const std::optional<std::string>& completion_action = std::nullopt,
+                        const std::optional<std::string>& prompt = std::nullopt,
                         bool isolated = false);
 
   /// Add a gather question (set_gather_info must be called first).
@@ -236,7 +241,7 @@ class Step {
   ///   inherits the gather's setting.
   Step& add_gather_question(const std::string& key, const std::string& question,
                             const std::string& type = "string", bool confirm = false,
-                            const std::string& prompt = "",
+                            const std::optional<std::string>& prompt = std::nullopt,
                             const std::vector<std::string>& functions = {},
                             const std::optional<bool>& isolated = std::nullopt);
 

@@ -31,13 +31,27 @@ class SkillManager {
   explicit SkillManager(agent::AgentBase& agent) : agent_(&agent) {}
 
   /// The agent this manager loads skills into (reference: ``self.agent``).
-  /// ``nullptr`` for a default-constructed manager, which takes the agent
-  /// per ``load_skill`` call instead.
+  /// ``nullptr`` for a default-constructed manager, on which ``load_skill``
+  /// fails loud — the reference's manager is always agent-bound.
   [[nodiscard]] agent::AgentBase* agent() const { return agent_; }
 
-  /// Load a skill by name with params and register it with the agent
-  [[nodiscard]] bool load_skill(const std::string& skill_name, const json& params,
-                                agent::AgentBase& agent);
+  /// Load a skill by name and register it with this manager's bound agent.
+  ///
+  /// Mirrors the reference's
+  /// ``load_skill(skill_name, skill_class=None, params=None)``
+  /// (core/skill_manager.py:26) — BOTH trailing parameters are optional.
+  ///
+  /// @param skill_class Optional explicit factory for the skill. When absent,
+  ///   the skill is looked up in ``SkillRegistry`` by name, exactly as the
+  ///   reference does (``skill_registry.get_skill_class(skill_name)``).
+  ///   ``SkillFactory`` is C++'s spelling of the reference's class object.
+  /// @param params Optional parameters handed to the skill's setup.
+  ///
+  /// Requires a manager constructed with an agent; returns false and logs when
+  /// there is none (use the explicit-agent overload in that case).
+  [[nodiscard]] bool load_skill(const std::string& skill_name,
+                                const std::optional<SkillFactory>& skill_class = std::nullopt,
+                                const std::optional<json>& params = std::nullopt);
 
   /// Unload a skill
   void unload_skill(const std::string& skill_name);

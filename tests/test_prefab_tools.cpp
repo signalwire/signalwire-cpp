@@ -170,10 +170,13 @@ TEST(prefab_tools_info_gatherer_submit_answer_completes) {
     return true;
 }
 
+// All three parameters are OPTIONAL in the reference
+// (info_gatherer.py:162) — these call it with NO arguments, so the defaults
+// are the thing under test, not values the caller supplied.
 TEST(prefab_tools_info_gatherer_on_swml_request_static_no_override) {
     InfoGathererAgent agent;
     agent.set_questions({json{{"key_name", "k"}, {"question_text", "q?"}}});
-    json override = agent.on_swml_request(json::object(), json::object(), json::object());
+    json override = agent.on_swml_request();
     // Static mode -> null (no override).
     ASSERT_TRUE(override.is_null());
     return true;
@@ -185,7 +188,7 @@ TEST(prefab_tools_info_gatherer_on_swml_request_dynamic_callback) {
         return std::vector<json>{json{{"key_name", "color"},
                                       {"question_text", "Favourite colour?"}}};
     });
-    json override = agent.on_swml_request(json::object(), json::object(), json::object());
+    json override = agent.on_swml_request();
     ASSERT_TRUE(override.contains("global_data"));
     auto& gd = override["global_data"];
     ASSERT_EQ(gd["questions"].size(), 1u);
@@ -197,9 +200,41 @@ TEST(prefab_tools_info_gatherer_on_swml_request_dynamic_callback) {
 TEST(prefab_tools_info_gatherer_on_swml_request_dynamic_fallback) {
     InfoGathererAgent agent;
     // No static questions, no callback -> fallback questions.
-    json override = agent.on_swml_request(json::object(), json::object(), json::object());
+    json override = agent.on_swml_request();
     ASSERT_TRUE(override.contains("global_data"));
     ASSERT_EQ(override["global_data"]["questions"].size(), 2u);
+    return true;
+}
+
+// The reference reads query_params/headers OFF the `request` object and passes
+// request_data through as body_params. Prove all three reach the callback, and
+// that an omitted `request` yields empty maps rather than garbage.
+TEST(prefab_tools_info_gatherer_on_swml_request_threads_request_to_callback) {
+    InfoGathererAgent agent;
+    json seen_qp, seen_bp, seen_hd;
+    agent.set_question_callback(
+        [&](const json& qp, const json& bp, const json& hd) {
+            seen_qp = qp;
+            seen_bp = bp;
+            seen_hd = hd;
+            return std::vector<json>{
+                json{{"key_name", "k"}, {"question_text", "q?"}}};
+        });
+    json request = {{"query_params", {{"src", "web"}}},
+                    {"headers", {{"x-trace", "abc"}}}};
+    (void)agent.on_swml_request(json{{"body", "v"}}, std::nullopt, request);
+    ASSERT_EQ(seen_qp["src"], "web");
+    ASSERT_EQ(seen_hd["x-trace"], "abc");
+    ASSERT_EQ(seen_bp["body"], "v");
+
+    // Omitted request -> both empty objects, body still threaded.
+    seen_qp = seen_hd = seen_bp = json();
+    (void)agent.on_swml_request(json{{"body", "v2"}});
+    ASSERT_TRUE(seen_qp.is_object());
+    ASSERT_TRUE(seen_qp.empty());
+    ASSERT_TRUE(seen_hd.is_object());
+    ASSERT_TRUE(seen_hd.empty());
+    ASSERT_EQ(seen_bp["body"], "v2");
     return true;
 }
 

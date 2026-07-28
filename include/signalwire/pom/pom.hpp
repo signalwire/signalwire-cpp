@@ -94,9 +94,15 @@ class Section {
   /// subsection so callers can chain further mutations.
   /// Throws ``std::invalid_argument`` if ``title`` is empty (Python raises
   /// ``ValueError("Subsections must have a title")``).
+  /// ``numbered`` is BINARY here, not tri-state: the reference's
+  /// ``Section.add_subsection`` declares ``numbered: bool = False`` and passes
+  /// it straight through, so a subsection built this way is never ``None``.
+  /// (``Section.__init__`` and ``PromptObjectModel.add_section`` DO take the
+  /// tri-state ``bool | None``.) The distinction is load-bearing in
+  /// ``render_markdown``: ``subsection.numbered is not False`` lets an unset
+  /// sibling inherit numbering, while an explicit ``false`` opts out.
   Section& add_subsection(const std::string& title, const std::string& body = "",
-                          const std::vector<std::string>& bullets = {},
-                          std::optional<bool> numbered = std::nullopt,
+                          const std::vector<std::string>& bullets = {}, bool numbered = false,
                           bool numbered_bullets = false);
 
   /// Convert the section (and its subtree) to a JSON object. Matches the

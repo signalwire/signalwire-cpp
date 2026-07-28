@@ -215,7 +215,10 @@ AgentBase::AgentBase(const AgentBase& other)
   global_data_ = other.global_data_;
   native_functions_ = other.native_functions_;
   internal_fillers_ = other.internal_fillers_;
-  debug_events_ = other.debug_events_;
+  // Reference copies both fields onto the ephemeral agent
+  // (agent_base.py:1587-1588).
+  debug_events_enabled_ = other.debug_events_enabled_;
+  debug_events_level_ = other.debug_events_level_;
   prompt_llm_params_ = other.prompt_llm_params_;
   post_prompt_llm_params_ = other.post_prompt_llm_params_;
   pre_answer_verbs_ = other.pre_answer_verbs_;
@@ -287,9 +290,9 @@ AgentBase& AgentBase::prompt_add_section(const std::string& title, const std::st
   return *this;
 }
 
-AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
-                                            const std::string& title, const std::string& body,
-                                            const std::vector<std::string>& bullets) {
+AgentBase& AgentBase::prompt_add_subsection(
+    const std::string& parent_title, const std::string& title, const std::string& body,
+    const std::optional<std::vector<std::string>>& bullets) {
   // #182: auto-create the parent section if it does not exist yet, matching
   // the TS reference (`addSubsection` calls `addSection(parentTitle)` when
   // missing) — previously this was a no-op for an unknown parent.
@@ -301,7 +304,8 @@ AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
       PomSection sub;
       sub.title = title;
       sub.body = body;
-      sub.bullets = bullets;
+      // Reference: ``bullets or []`` — absent becomes the empty list.
+      sub.bullets = bullets.value_or(std::vector<std::string>{});
       section.subsections.push_back(std::move(sub));
       break;
     }
@@ -753,8 +757,9 @@ AgentBase& AgentBase::add_internal_filler(const std::string& function_name,
   return *this;
 }
 
-AgentBase& AgentBase::enable_debug_events(bool enable) {
-  debug_events_ = enable;
+AgentBase& AgentBase::enable_debug_events(int level) {
+  debug_events_enabled_ = true;
+  debug_events_level_ = level;
   return *this;
 }
 
@@ -1579,9 +1584,22 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     ai["post_prompt_url"] = pp_url;
   }
 
-  // AI params
-  if (!ai_params_.is_null() && !ai_params_.empty()) {
-    ai["params"] = ai_params_;
+  // AI params. The debug-event webhook is auto-wired INTO params when enabled,
+  // exactly as the reference does (agent_base.py:1248-1261): it sets
+  // ``params.debug_webhook_url`` and ``params.debug_webhook_level``. Neither
+  // the reference nor swml/schema.json has any ``ai.debug_events`` key.
+  json params = ai_params_.is_null() ? json::object() : ai_params_;
+  if (debug_events_enabled_) {
+    std::string debug_url = webhook_url;
+    auto swaig_pos = debug_url.rfind("/swaig");
+    if (swaig_pos != std::string::npos) {
+      debug_url = debug_url.substr(0, swaig_pos) + "/debug_events";
+    }
+    params["debug_webhook_url"] = debug_url;
+    params["debug_webhook_level"] = debug_events_level_;
+  }
+  if (!params.empty()) {
+    ai["params"] = params;
   }
 
   // Hints
@@ -1667,11 +1685,6 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
   // Contexts
   if (context_builder_ && context_builder_->has_contexts()) {
     ai["contexts"] = context_builder_->to_json();
-  }
-
-  // Debug events
-  if (debug_events_) {
-    ai["debug_events"] = true;
   }
 
   // Internal fillers
@@ -2115,6 +2128,37 @@ void AgentBase::handle_post_prompt_request(const httplib::Request& req, httplib:
   res.set_content("{\"status\":\"ok\"}", "application/json");
 }
 
+void AgentBase::handle_debug_events_request(const httplib::Request& req, httplib::Response& res) {
+  // Mirrors the reference's ``_handle_debug_events_request`` (web_mixin.py:1131):
+  // auth-checked, POST-only, JSON body, structured-log the event, 200 {"status":"ok"}.
+  add_security_headers(res);
+  if (!validate_auth(req, res)) {
+    return;
+  }
+
+  json body;
+  try {
+    body = json::parse(req.body);
+  } catch (...) {
+    res.status = 400;
+    res.set_content("{\"error\":\"invalid JSON\"}", "application/json");
+    return;
+  }
+
+  // ``label`` then ``action``, defaulting to "unknown" — the reference's
+  // ``body.get("label") or body.get("action", "unknown")``.
+  std::string event_type = "unknown";
+  if (body.contains("label") && body["label"].is_string() &&
+      !body["label"].get<std::string>().empty()) {
+    event_type = body["label"].get<std::string>();
+  } else if (body.contains("action") && body["action"].is_string()) {
+    event_type = body["action"].get<std::string>();
+  }
+  get_logger().info("debug_event event_type=" + event_type);
+
+  res.set_content("{\"status\":\"ok\"}", "application/json");
+}
+
 // ============================================================================
 // Route Setup
 // ============================================================================
@@ -2207,6 +2251,16 @@ void AgentBase::setup_routes(httplib::Server& server) {
   server.Post(pp_path, wrap_post([this](const httplib::Request& req, httplib::Response& res) {
                 handle_post_prompt_request(req, res);
               }));
+
+  // Debug-event webhook endpoint. Mounted when enable_debug_events() has been
+  // called — the same condition that puts params.debug_webhook_url on the wire,
+  // so the URL we advertise always resolves.
+  if (debug_events_enabled_) {
+    std::string de_path = base + (base.back() == '/' ? "" : "/") + "debug_events";
+    server.Post(de_path, wrap_post([this](const httplib::Request& req, httplib::Response& res) {
+                  handle_debug_events_request(req, res);
+                }));
+  }
 
   // MCP server endpoint (JSON-RPC 2.0)
   if (mcp_server_enabled_) {

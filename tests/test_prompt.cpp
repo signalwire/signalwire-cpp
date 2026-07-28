@@ -113,10 +113,26 @@ TEST(prompt_add_subsection_basic) {
 TEST(prompt_add_subsection_with_bullets) {
     AgentBase agent;
     agent.prompt_add_section("Main", "");
-    agent.prompt_add_subsection("Main", "Details", "", {"Detail 1", "Detail 2"});
+    agent.prompt_add_subsection("Main", "Details", "",
+                                std::vector<std::string>{"Detail 1", "Detail 2"});
     std::string prompt = agent.get_prompt();
     ASSERT_TRUE(prompt.find("### Details") != std::string::npos);
     ASSERT_TRUE(prompt.find("- Detail 1") != std::string::npos);
+    return true;
+}
+
+// `bullets` is OPTIONAL (reference prompt_mixin.py:297 —
+// `bullets: list[str] | None = None`, applied as `bullets or []`). This omits
+// it entirely, so the DEFAULT is what is under test.
+TEST(prompt_add_subsection_bullets_omitted) {
+    AgentBase agent;
+    agent.prompt_add_section("Main", "");
+    agent.prompt_add_subsection("Main", "Details", "Just a body");
+    std::string prompt = agent.get_prompt();
+    ASSERT_TRUE(prompt.find("### Details") != std::string::npos);
+    ASSERT_TRUE(prompt.find("Just a body") != std::string::npos);
+    // Absent bullets render as no bullet list at all.
+    ASSERT_TRUE(prompt.find("- ") == std::string::npos);
     return true;
 }
 
@@ -206,7 +222,7 @@ TEST(prompt_pom_json_subsection_structure) {
     AgentBase agent;
     agent.set_use_pom(true);
     agent.prompt_add_section("Parent", "PBody");
-    agent.prompt_add_subsection("Parent", "Child", "CBody", {"CB1"});
+    agent.prompt_add_subsection("Parent", "Child", "CBody", std::vector<std::string>{"CB1"});
     json swml = agent.render_swml();
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {

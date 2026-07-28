@@ -10,16 +10,33 @@
 namespace signalwire {
 namespace skills {
 
-bool SkillManager::load_skill(const std::string& skill_name, const json& params,
-                              agent::AgentBase& agent) {
-  auto& registry = SkillRegistry::instance();
-
-  if (!registry.has_skill(skill_name)) {
-    get_logger().error("Unknown skill: " + skill_name);
+bool SkillManager::load_skill(const std::string& skill_name,
+                              const std::optional<SkillFactory>& skill_class,
+                              const std::optional<json>& params_opt) {
+  if (agent_ == nullptr) {
+    get_logger().error(
+        "SkillManager::load_skill called on a manager with no bound agent; "
+        "construct it as SkillManager(agent)");
     return false;
   }
+  agent::AgentBase& agent = *agent_;
+  // Reference: `params` defaults to None and is normalised to an empty mapping
+  // before it reaches the skill.
+  const json params = params_opt.value_or(json::object());
 
-  auto skill = registry.create(skill_name);
+  std::unique_ptr<SkillBase> skill;
+  if (skill_class.has_value() && *skill_class) {
+    // Explicit factory supplied — the reference's `skill_class` argument short-
+    // circuits the registry lookup entirely.
+    skill = (*skill_class)();
+  } else {
+    auto& registry = SkillRegistry::instance();
+    if (!registry.has_skill(skill_name)) {
+      get_logger().error("Unknown skill: " + skill_name);
+      return false;
+    }
+    skill = registry.create(skill_name);
+  }
   if (!skill) {
     get_logger().error("Failed to create skill: " + skill_name);
     return false;

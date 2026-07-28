@@ -262,10 +262,10 @@ Action Call::queue_leave(const std::string& queue_name, const json& params) {
 }
 
 Action Call::leave_conference(const std::string& conference_id) {
+  // Reference (relay/call.py:1264) declares conference_id REQUIRED and always
+  // puts it in params — there is no absence guard and no default to omit it.
   json p;
-  if (!conference_id.empty()) {
-    p["conference_id"] = conference_id;
-  }
+  p["conference_id"] = conference_id;
   return execute_simple("leave_conference", p);
 }
 

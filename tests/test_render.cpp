@@ -97,7 +97,7 @@ TEST(render_all_config_combined) {
     agent.add_pronunciation("SW", "SignalWire");
     agent.set_global_data(json::object({{"k", "v"}}));
     agent.add_language({"English", "en-US", "rachel", "", ""});
-    agent.enable_debug_events(true);
+    agent.enable_debug_events(1);
     agent.add_internal_filler("en-US", {"Hold on..."});
     agent.define_tool("test", "Test tool", json::object(),
         [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
@@ -116,7 +116,9 @@ TEST(render_all_config_combined) {
             ASSERT_TRUE(ai.contains("pronounce"));
             ASSERT_TRUE(ai.contains("global_data"));
             ASSERT_TRUE(ai.contains("languages"));
-            ASSERT_TRUE(ai.contains("debug_events"));
+            // Debug events ride in ai.params, not a top-level ai.debug_events.
+            ASSERT_FALSE(ai.contains("debug_events"));
+            ASSERT_TRUE(ai["params"].contains("debug_webhook_level"));
             ASSERT_TRUE(ai.contains("fillers"));
             ASSERT_TRUE(ai.contains("SWAIG"));
         }

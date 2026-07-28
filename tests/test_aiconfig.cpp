@@ -452,13 +452,44 @@ TEST(aiconfig_add_internal_filler) {
 // Debug events
 // ========================================================================
 
+// The reference emits NO ``ai.debug_events`` key (it is not in swml/schema.json
+// either). It wires the debug webhook into ``ai.params`` as
+// ``debug_webhook_url`` + ``debug_webhook_level`` (agent_base.py:1248-1261).
 TEST(aiconfig_enable_debug_events) {
     AgentBase agent;
-    agent.enable_debug_events(true);
+    agent.enable_debug_events(1);
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
-    ASSERT_TRUE(ai.contains("debug_events"));
-    ASSERT_EQ(ai["debug_events"].get<bool>(), true);
+    ASSERT_FALSE(ai.contains("debug_events"));
+    ASSERT_TRUE(ai.contains("params"));
+    ASSERT_TRUE(ai["params"].contains("debug_webhook_level"));
+    ASSERT_EQ(ai["params"]["debug_webhook_level"].get<int>(), 1);
+    ASSERT_TRUE(ai["params"].contains("debug_webhook_url"));
+    // The advertised URL is this agent's own /debug_events endpoint.
+    const std::string url = ai["params"]["debug_webhook_url"].get<std::string>();
+    ASSERT_TRUE(url.find("/debug_events") != std::string::npos);
+    return true;
+}
+
+// The OMITTED-argument path: enable_debug_events() with no argument must land
+// on the reference's default level of 1, not 0 and not "true".
+TEST(aiconfig_enable_debug_events_default_level_is_1) {
+    AgentBase agent;
+    agent.enable_debug_events();
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_TRUE(ai["params"].contains("debug_webhook_level"));
+    ASSERT_EQ(ai["params"]["debug_webhook_level"].get<int>(), 1);
+    return true;
+}
+
+// A LEVEL is not expressible as a bool: level 2 must reach the wire verbatim.
+TEST(aiconfig_enable_debug_events_level_2) {
+    AgentBase agent;
+    agent.enable_debug_events(2);
+    json swml = agent.render_swml();
+    auto ai = find_ai_verb(swml);
+    ASSERT_EQ(ai["params"]["debug_webhook_level"].get<int>(), 2);
     return true;
 }
 
@@ -467,6 +498,11 @@ TEST(aiconfig_debug_events_off_by_default) {
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
     ASSERT_FALSE(ai.contains("debug_events"));
+    // Neither debug key appears when the feature was never enabled.
+    if (ai.contains("params")) {
+        ASSERT_FALSE(ai["params"].contains("debug_webhook_url"));
+        ASSERT_FALSE(ai["params"].contains("debug_webhook_level"));
+    }
     return true;
 }
 

@@ -192,7 +192,9 @@ class Call {
   /// Leave a queue (calling.queue.leave).
   Action queue_leave(const std::string& queue_name, const json& params = json::object());
   /// Leave the current conference (calling.leave_conference).
-  Action leave_conference(const std::string& conference_id = "");
+  /// ``conference_id`` is REQUIRED — the reference declares it with no default
+  /// and always sends it.
+  Action leave_conference(const std::string& conference_id);
   /// Leave the current room (calling.leave_room).
   Action leave_room();
   /// AI helpers.

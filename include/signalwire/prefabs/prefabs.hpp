@@ -37,8 +37,20 @@ class InfoGathererAgent : public agent::AgentBase {
   /// Dynamic-config hook: in static mode returns null (no override); in
   /// dynamic mode invokes the question callback (or a name/message fallback)
   /// and returns a {"global_data": {questions, question_index, answers}}
-  /// override object. Mirrors Python InfoGathererAgent.on_swml_request.
-  json on_swml_request(const json& request_data, const json& query_params, const json& headers);
+  /// override object. Mirrors Python InfoGathererAgent.on_swml_request
+  /// (prefabs/info_gatherer.py:162), whose three parameters are all optional.
+  ///
+  /// @param request_data The parsed POST body — the reference's
+  ///   ``body_params = request_data or {}``.
+  /// @param callback_path Optional callback path (unused here, as in the
+  ///   reference, but part of the hook's contract).
+  /// @param request The request object the reference reads ``query_params``
+  ///   and ``headers`` off. Modelled here as a JSON object with those two
+  ///   keys; absent/!object yields empty maps for both, exactly as the
+  ///   reference's ``if request and hasattr(request, ...)`` guards do.
+  json on_swml_request(const json& request_data = nullptr,
+                       const std::optional<std::string>& callback_path = std::nullopt,
+                       const json& request = nullptr);
 
   /// SWAIG tool handler: return the first question. Reads
   /// questions/question_index from global_data (in raw_data).

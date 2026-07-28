@@ -761,8 +761,8 @@ json RelayClient::send_raw_request(const std::string& method, const json& params
   return send_request(method, params);
 }
 
-Call RelayClient::dial(const json& devices, const std::string& tag_in, int dial_timeout_ms,
-                       int max_duration) {
+Call RelayClient::dial(const json& devices, const std::string& tag_in, int max_duration,
+                       std::optional<double> dial_timeout) {
   std::string tag = tag_in.empty() ? generate_uuid() : tag_in;
 
   // Register pending dial before sending RPC
@@ -790,8 +790,11 @@ Call RelayClient::dial(const json& devices, const std::string& tag_in, int dial_
     return Call();
   }
 
-  // Wait for the dial event (with timeout)
-  auto status = future.wait_for(std::chrono::milliseconds(dial_timeout_ms));
+  // Wait for the dial event. dial_timeout is in SECONDS (reference unit), and
+  // absent means 120s — the reference's
+  // `timeout = dial_timeout if dial_timeout is not None else 120.0`.
+  const double timeout_s = dial_timeout.value_or(120.0);
+  auto status = future.wait_for(std::chrono::duration<double>(timeout_s));
   {
     std::lock_guard<std::mutex> lock(dials_mutex_);
     pending_dials_.erase(tag);

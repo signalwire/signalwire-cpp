@@ -517,7 +517,7 @@ TEST(gather_info_isolated_false_default_omits) {
 }
 
 TEST(gather_info_isolated_true_emits) {
-    GatherInfo gi("", "", "", true);
+    GatherInfo gi(std::nullopt, std::nullopt, std::nullopt, true);
     gi.add_question("k", "Q?");
     auto j = gi.to_json();
     ASSERT_TRUE(j.contains("isolated"));
@@ -525,10 +525,56 @@ TEST(gather_info_isolated_true_emits) {
     return true;
 }
 
+// set_gather_info's first three parameters are OPTIONAL in the reference
+// (`str | None = None`, core/contexts.py:407). Calling it with NONE of them
+// supplied exercises the DEFAULTS: all three absent, so none reaches the wire.
+TEST(step_set_gather_info_all_defaults_emit_nothing) {
+    Step s("gather");
+    s.set_text("x");
+    s.set_gather_info();
+    s.add_gather_question("k", "Q?");
+    auto j = s.to_json();
+    ASSERT_TRUE(j.contains("gather_info"));
+    const auto& gi = j["gather_info"];
+    ASSERT_FALSE(gi.contains("output_key"));
+    ASSERT_FALSE(gi.contains("completion_action"));
+    ASSERT_FALSE(gi.contains("prompt"));
+    // Questions still present — the defaults suppress only the three strings.
+    ASSERT_EQ(gi["questions"].size(), 1u);
+    return true;
+}
+
+// A SUPPLIED value does reach the wire — proving the absence modelling is not
+// simply dropping everything.
+TEST(step_set_gather_info_supplied_values_emit) {
+    Step s("gather");
+    s.set_text("x");
+    s.set_gather_info("ok", std::nullopt, "pre");
+    s.add_gather_question("k", "Q?");
+    auto j = s.to_json();
+    const auto& gi = j["gather_info"];
+    ASSERT_EQ(gi["output_key"], "ok");
+    ASSERT_EQ(gi["prompt"], "pre");
+    // The one left absent stays off the wire.
+    ASSERT_FALSE(gi.contains("completion_action"));
+    return true;
+}
+
+// add_gather_question's `prompt` is likewise optional. Omitted -> no key.
+TEST(step_add_gather_question_prompt_omitted) {
+    Step s("gather");
+    s.set_text("x");
+    s.set_gather_info();
+    s.add_gather_question("k", "Q?");
+    auto j = s.to_json();
+    ASSERT_FALSE(j["gather_info"]["questions"][0].contains("prompt"));
+    return true;
+}
+
 TEST(step_set_gather_info_isolated_default) {
     Step s("gather");
     s.set_text("x");
-    s.set_gather_info("", "", "", true);
+    s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
     s.add_gather_question("k", "Q?");
     auto j = s.to_json();
     ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
@@ -539,10 +585,10 @@ TEST(step_add_gather_question_isolated_override) {
     Step s("gather");
     s.set_text("x");
     // Gather-level default true; per-question overrides.
-    s.set_gather_info("", "", "", true);
+    s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
     s.add_gather_question("inherit", "Q1?");
-    s.add_gather_question("override_false", "Q2?", "string", false, "", {}, false);
-    s.add_gather_question("override_true", "Q3?", "string", false, "", {}, true);
+    s.add_gather_question("override_false", "Q2?", "string", false, std::nullopt, {}, false);
+    s.add_gather_question("override_true", "Q3?", "string", false, std::nullopt, {}, true);
     auto j = s.to_json();
     const auto& qs = j["gather_info"]["questions"];
     // Gather-level default emitted.

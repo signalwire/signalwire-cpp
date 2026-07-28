@@ -202,9 +202,11 @@ class AgentBase : public swml::Service {
   AgentBase& set_post_prompt_url(const std::string& url);
   AgentBase& prompt_add_section(const std::string& title, const std::string& body = "",
                                 const std::vector<std::string>& bullets = {});
-  AgentBase& prompt_add_subsection(const std::string& parent_title, const std::string& title,
-                                   const std::string& body = "",
-                                   const std::vector<std::string>& bullets = {});
+  /// ``bullets`` is ``nullopt`` when absent, matching the reference's
+  /// ``bullets: list[str] | None = None`` (it applies ``bullets or []``).
+  AgentBase& prompt_add_subsection(
+      const std::string& parent_title, const std::string& title, const std::string& body = "",
+      const std::optional<std::vector<std::string>>& bullets = std::nullopt);
   AgentBase& prompt_add_to_section(const std::string& title, const std::string& body = "",
                                    const std::vector<std::string>& bullets = {});
   [[nodiscard]] bool prompt_has_section(const std::string& title) const;
@@ -319,8 +321,10 @@ class AgentBase : public swml::Service {
   AgentBase& define_tool(const std::string& name, const std::string& description,
                          const json& parameters, swaig::ToolHandler handler, bool secure = true);
   AgentBase& register_swaig_function(const json& func_def);
+  /// ``raw_data`` is OPTIONAL (reference tool_mixin.py:234). Repeated on the
+  /// override so a call through AgentBase& can omit it too.
   [[nodiscard]] swaig::FunctionResult on_function_call(const std::string& name, const json& args,
-                                                       const json& raw_data) override;
+                                                       const json& raw_data = nullptr) override;
   [[nodiscard]] std::vector<std::string> list_tools() const;
 
   /// Register several SWAIG tools at once (Python: ``ToolMixin.define_tools``).
@@ -472,7 +476,19 @@ class AgentBase : public swml::Service {
   /// what fillers do. Names outside the supported set log a warning.
   AgentBase& add_internal_filler(const std::string& function_name, const std::string& language_code,
                                  const std::vector<std::string>& fillers);
-  AgentBase& enable_debug_events(bool enable = true);
+  /// Enable the debug-event webhook for this agent.
+  ///
+  /// @param level Debug event verbosity level (reference: ``level: int = 1``).
+  ///   1  = high-level events (barge, errors, session start/end, step changes)
+  ///   2+ = adds high-volume events (every LLM request/response,
+  ///        conversation_add)
+  ///
+  /// When enabled, the rendered ``ai`` verb carries
+  /// ``params.debug_webhook_url`` (this agent's ``/debug_events`` endpoint)
+  /// and ``params.debug_webhook_level`` — the two keys the SWML schema
+  /// defines. A verbosity LEVEL is not expressible as a bool, which is why
+  /// this takes an ``int``.
+  AgentBase& enable_debug_events(int level = 1);
   AgentBase& add_function_include(const json& include);
   AgentBase& set_function_includes(const std::vector<json>& includes);
   AgentBase& set_prompt_llm_params(const json& params = json::object());
@@ -723,6 +739,10 @@ class AgentBase : public swml::Service {
 
   // Handle post_prompt request
   void handle_post_prompt_request(const httplib::Request& req, httplib::Response& res);
+  /// Receives the AI module's debug-event webhook POSTs. Mounted only when
+  /// ``enable_debug_events()`` has been called, which is also what puts
+  /// ``params.debug_webhook_url`` on the wire.
+  void handle_debug_events_request(const httplib::Request& req, httplib::Response& res);
 
   // Validate basic auth
   bool validate_auth(const httplib::Request& req, httplib::Response& res) const;
@@ -774,7 +794,9 @@ class AgentBase : public swml::Service {
   json global_data_;
   std::vector<std::string> native_functions_;
   json internal_fillers_;
-  bool debug_events_ = false;
+  bool debug_events_enabled_ = false;
+  /// Reference default (``agent_base.py:319``): ``self._debug_events_level = 1``.
+  int debug_events_level_ = 1;
   json prompt_llm_params_;
   json post_prompt_llm_params_;
 

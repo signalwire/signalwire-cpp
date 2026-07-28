@@ -196,7 +196,7 @@ TEST(relay_mock_dial_state_accessor_returns_enum_for_dispatched_dial_event) {
     json devs = json::array({json::array({json{
         {"type", "phone"},
         {"params", {{"to_number", "+15551112222"}, {"from_number", "+15553334444"}}}}})});
-    Call c = client->dial(devs, "st-dial", 5000);
+    Call c = client->dial(devs, "st-dial", 0, 5.0);
     ASSERT_EQ(c.call_id(), "st-dial-winner");
 
     // The real dial frame carried dial_state:"answered" (mock server.py).

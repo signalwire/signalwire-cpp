@@ -38,12 +38,15 @@ void Section::add_bullets(const std::vector<std::string>& bs) {
 }
 
 Section& Section::add_subsection(const std::string& t, const std::string& b,
-                                 const std::vector<std::string>& bs, std::optional<bool> num,
+                                 const std::vector<std::string>& bs, bool num,
                                  bool numbered_bullets) {
   if (t.empty()) {
     throw std::invalid_argument("Subsections must have a title");
   }
-  subsections.emplace_back(std::optional<std::string>(t), b, bs, num, numbered_bullets);
+  // Reference passes ``numbered`` through verbatim, so the stored value is the
+  // explicit bool — never the tri-state ``None``.
+  subsections.emplace_back(std::optional<std::string>(t), b, bs, std::optional<bool>(num),
+                           numbered_bullets);
   return subsections.back();
 }
 

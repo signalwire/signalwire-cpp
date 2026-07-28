@@ -346,3 +346,28 @@ TEST(relay_mock_on_event_observer_fires_on_unknown_type) {
     client->disconnect();
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// leave_conference: conference_id is REQUIRED and always on the wire
+// ---------------------------------------------------------------------------
+
+// The reference (relay/call.py:1264) declares `conference_id` with NO default
+// and unconditionally puts it in params. The port used to default it to "" and
+// GUARD it out of the frame, so a caller who omitted it silently sent a
+// leave_conference with no conference at all. This asserts the wire key.
+TEST(relay_mock_leave_conference_always_sends_conference_id) {
+    auto client = mt::make_client();
+    Call* call = setup_answered_call_evt(*client, "ec-leave-conf");
+    ASSERT_TRUE(call != nullptr);
+
+    call->leave_conference("conf-42");
+
+    spin_evt([] { return !mt::journal_recv("calling.leave_conference").empty(); }, 2000);
+    auto entries = mt::journal_recv("calling.leave_conference");
+    ASSERT_FALSE(entries.empty());
+    json p = entries.back().frame["params"];
+    ASSERT_TRUE(p.contains("conference_id"));
+    ASSERT_EQ(p.value("conference_id", ""), "conf-42");
+    client->disconnect();
+    return true;
+}

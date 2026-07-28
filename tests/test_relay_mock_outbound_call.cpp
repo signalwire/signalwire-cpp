@@ -61,7 +61,7 @@ TEST(relay_mock_dial_resolves_to_call_with_winner_id) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-happy", 5000);
+    Call c = client->dial(devs, "t-happy", 0, 5.0);
     ASSERT_EQ(c.call_id(), "winner-1");
     ASSERT_EQ(c.tag(), "t-happy");
     ASSERT_EQ(c.state(), "answered");
@@ -81,7 +81,7 @@ TEST(relay_mock_dial_journal_records_calling_dial_frame) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    client->dial(devs, "t-frame", 5000);
+    client->dial(devs, "t-frame", 0, 5.0);
 
     auto entries = mt::journal_recv("calling.dial");
     ASSERT_EQ(entries.size(), static_cast<size_t>(1));
@@ -104,11 +104,39 @@ TEST(relay_mock_dial_with_max_duration_in_frame) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    client->dial(devs, "t-md", 5000, 300);
+    // PARAMETER ORDER guard. The signature is
+    // (devices, tag, max_duration, dial_timeout) — the reference's order
+    // (relay/client.py:498). It used to be (devices, tag, dial_timeout_ms,
+    // max_duration), under which this positional 300 would have been a 300ms
+    // dial timeout and NO max_duration would have reached the wire at all.
+    // Asserting the wire key is what distinguishes the two orders.
+    client->dial(devs, "t-md", 300, 5.0);
 
     auto entries = mt::journal_recv("calling.dial");
     ASSERT_EQ(entries.size(), static_cast<size_t>(1));
     ASSERT_EQ(entries[0].frame["params"]["max_duration"].get<int>(), 300);
+    client->disconnect();
+    return true;
+}
+
+// The 4th argument is dial_timeout in SECONDS. Under the old order it was the
+// 3rd and in MILLISECONDS. A 0.5 here must be half a second, not half a
+// millisecond, and must NOT be mistaken for a max_duration.
+TEST(relay_mock_dial_timeout_is_seconds_and_not_sent_as_max_duration) {
+    auto client = mt::make_client();
+    json devs = json::array({json::array({phone_device()})});
+    auto start = std::chrono::steady_clock::now();
+    Call c = client->dial(devs, "t-units", 0, 0.5);
+    auto elapsed = std::chrono::steady_clock::now() - start;
+    ASSERT_EQ(c.call_id(), "");
+    // Half a SECOND, not half a millisecond: the wait really happened.
+    ASSERT_TRUE(elapsed >= std::chrono::milliseconds(400));
+    ASSERT_TRUE(elapsed < std::chrono::seconds(30));
+
+    auto entries = mt::journal_recv("calling.dial");
+    ASSERT_EQ(entries.size(), static_cast<size_t>(1));
+    // max_duration was 0 -> guarded out; the timeout never leaks onto the wire.
+    ASSERT_FALSE(entries[0].frame["params"].contains("max_duration"));
     client->disconnect();
     return true;
 }
@@ -151,7 +179,7 @@ TEST(relay_mock_dial_auto_generates_uuid_tag_when_omitted) {
     });
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "", 5000);
+    Call c = client->dial(devs, "", 0, 5.0);
     pusher.join();
 
     ASSERT_EQ(c.call_id(), "auto-tag-winner");
@@ -194,7 +222,7 @@ TEST(relay_mock_dial_failed_returns_empty_call) {
     });
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-fail", 5000);
+    Call c = client->dial(devs, "t-fail", 0, 5.0);
     pusher.join();
     // failure → empty Call (call_id is empty)
     ASSERT_EQ(c.call_id(), "");
@@ -205,7 +233,8 @@ TEST(relay_mock_dial_failed_returns_empty_call) {
 TEST(relay_mock_dial_timeout_when_no_event) {
     auto client = mt::make_client();
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-timeout", 500);
+    // dial_timeout is in SECONDS: 0.5s.
+    Call c = client->dial(devs, "t-timeout", 0, 0.5);
     ASSERT_EQ(c.call_id(), "");
     client->disconnect();
     return true;
@@ -230,7 +259,7 @@ TEST(relay_mock_dial_winner_carries_dial_winner_true) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-winner", 5000);
+    Call c = client->dial(devs, "t-winner", 0, 5.0);
     ASSERT_EQ(c.call_id(), "WIN-ID");
 
     auto sends = mt::journal_send("calling.call.dial");
@@ -266,7 +295,7 @@ TEST(relay_mock_dial_losers_get_state_events) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    client->dial(devs, "t-losers", 5000);
+    client->dial(devs, "t-losers", 0, 5.0);
 
     auto state_events = mt::journal_send("calling.call.state");
     bool found_ended = false;
@@ -296,7 +325,7 @@ TEST(relay_mock_dial_losers_cleaned_up_from_calls) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-cleanup", 5000);
+    Call c = client->dial(devs, "t-cleanup", 0, 5.0);
     // Allow loser-state events to flow.
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     ASSERT_TRUE(client->find_call("LOSE-CL") == nullptr);
@@ -322,7 +351,7 @@ TEST(relay_mock_dial_devices_serial_two_legs_on_wire) {
     json devs = json::array({
         json::array({phone_device("+15551110001"), phone_device("+15551110002")}),
     });
-    client->dial(devs, "t-serial", 5000);
+    client->dial(devs, "t-serial", 0, 5.0);
     auto entries = mt::journal_recv("calling.dial");
     ASSERT_EQ(entries.size(), static_cast<size_t>(1));
     ASSERT_EQ(entries[0].frame["params"]["devices"].size(), static_cast<size_t>(1));
@@ -348,7 +377,7 @@ TEST(relay_mock_dial_devices_parallel_two_legs_on_wire) {
         json::array({phone_device("+15551110001")}),
         json::array({phone_device("+15551110002")}),
     });
-    client->dial(devs, "t-par", 5000);
+    client->dial(devs, "t-par", 0, 5.0);
     auto entries = mt::journal_recv("calling.dial");
     ASSERT_EQ(entries.size(), static_cast<size_t>(1));
     ASSERT_EQ(entries[0].frame["params"]["devices"].size(), static_cast<size_t>(2));
@@ -371,7 +400,7 @@ TEST(relay_mock_dial_records_call_state_progression_on_winner) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-prog", 5000);
+    Call c = client->dial(devs, "t-prog", 0, 5.0);
     auto state_events = mt::journal_send("calling.call.state");
     bool created = false, ringing = false, answered = false;
     for (auto& e : state_events) {
@@ -404,7 +433,7 @@ TEST(relay_mock_dialed_call_can_send_subsequent_command) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-after", 5000);
+    Call c = client->dial(devs, "t-after", 0, 5.0);
     c.hangup();
     auto ends = mt::journal_recv("calling.end");
     ASSERT_FALSE(ends.empty());
@@ -424,7 +453,7 @@ TEST(relay_mock_dialed_call_can_play) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "t-play", 5000);
+    Call c = client->dial(devs, "t-play", 0, 5.0);
     json media = json::array({{{"type", "tts"}, {"params", {{"text", "hi"}}}}});
     c.play(media);
     auto plays = mt::journal_recv("calling.play");
@@ -451,7 +480,7 @@ TEST(relay_mock_dial_preserves_explicit_tag) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    Call c = client->dial(devs, "my-very-explicit-tag-99", 5000);
+    Call c = client->dial(devs, "my-very-explicit-tag-99", 0, 5.0);
     ASSERT_EQ(c.tag(), "my-very-explicit-tag-99");
     client->disconnect();
     return true;
@@ -472,7 +501,7 @@ TEST(relay_mock_dial_uses_jsonrpc_2_0) {
     mt::arm_dial(arm);
 
     json devs = json::array({json::array({phone_device()})});
-    client->dial(devs, "t-rpc", 5000);
+    client->dial(devs, "t-rpc", 0, 5.0);
     auto entries = mt::journal_recv("calling.dial");
     ASSERT_EQ(entries.size(), static_cast<size_t>(1));
     ASSERT_EQ(entries[0].frame.value("jsonrpc", ""), "2.0");

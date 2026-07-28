@@ -1268,6 +1268,7 @@
     "dial",
     "dial_state",
     "dial_state_enum",
+    "dial_timeout",
     "dialogflow_agent",
     "dialogflow_reference_id",
     "dialogflow_reference_name",

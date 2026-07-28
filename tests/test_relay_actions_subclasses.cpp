@@ -120,7 +120,6 @@ TEST(relay_call_new_methods_complete_without_client) {
     ASSERT_TRUE(call.denoise().completed());
     ASSERT_TRUE(call.denoise_stop().completed());
     ASSERT_TRUE(call.leave_room().completed());
-    ASSERT_TRUE(call.leave_conference().completed());
     ASSERT_TRUE(call.leave_conference("conf-1").completed());
     ASSERT_TRUE(call.user_event("hello").completed());
     ASSERT_TRUE(call.echo().completed());

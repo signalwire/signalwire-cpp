@@ -432,7 +432,7 @@ int main() {
   // relay_dial
   client.dial(json::array({json::array(
                   {{{"type", "phone"}, {"params", {{"to_number", "+15551112222"}}}}})}),
-              "dial-1", 3000, 600);
+              "dial-1", /*max_duration=*/600, /*dial_timeout=*/3.0);
   settle();
   out["relay_dial"] = frame("calling.dial", mock->last_frame("calling.dial"));
 

@@ -266,7 +266,11 @@ class FunctionResult {
   FunctionResult& switch_context(const std::string& system_prompt = "",
                                  const std::string& user_prompt = "", bool consolidate = false,
                                  bool full_reset = false);
-  FunctionResult& replace_in_history(const json& text);
+  /// After first send, replace the tool_call+result pair in conversation
+  /// history. ``text`` is a STRING (replace the tool_call with an assistant
+  /// message carrying this text) or ``true`` (remove the pair entirely).
+  /// Reference default is ``True`` (function_result.py:672).
+  FunctionResult& replace_in_history(const json& text = true);
 
   // ========================================================================
   // Media

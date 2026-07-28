@@ -239,48 +239,80 @@ TEST(skill_info_gatherer_with_questions) {
 // SkillManager
 // ========================================================================
 
+// load_skill's trailing two parameters are OPTIONAL (reference
+// skill_manager.py:26) — these omit BOTH, so the defaults are what is
+// exercised, not arguments the caller supplied.
 TEST(skill_manager_load) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    bool loaded = mgr.load_skill("datetime", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    bool loaded = mgr.load_skill("datetime");
     ASSERT_TRUE(loaded);
     ASSERT_TRUE(mgr.is_loaded("datetime"));
     return true;
 }
 
 TEST(skill_manager_list_loaded) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
-    (void)mgr.load_skill("math", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
+    (void)mgr.load_skill("math");
     auto loaded = mgr.list_loaded();
     ASSERT_EQ(loaded.size(), 2u);
     return true;
 }
 
 TEST(skill_manager_unload) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
     mgr.unload_skill("datetime");
     ASSERT_FALSE(mgr.is_loaded("datetime"));
     return true;
 }
 
 TEST(skill_manager_unknown_skill) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    bool loaded = mgr.load_skill("nonexistent", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    bool loaded = mgr.load_skill("nonexistent");
     ASSERT_FALSE(loaded);
     return true;
 }
 
 TEST(skill_manager_no_duplicate_single_instance) {
-    sw_skills::SkillManager mgr;
     signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("datetime", json::object(), agent);
-    bool second = mgr.load_skill("datetime", json::object(), agent);
+    sw_skills::SkillManager mgr(agent);
+    (void)mgr.load_skill("datetime");
+    bool second = mgr.load_skill("datetime");
     ASSERT_FALSE(second);
+    return true;
+}
+
+// The reference's `skill_class` argument short-circuits the registry lookup.
+// C++'s spelling is a SkillFactory. Passing one must bypass the name lookup
+// entirely — proven by loading under a name the registry does NOT know.
+TEST(skill_manager_explicit_skill_class_bypasses_registry) {
+    signalwire::agent::AgentBase agent;
+    sw_skills::SkillManager mgr(agent);
+    ASSERT_FALSE(sw_skills::SkillRegistry::instance().has_skill("not_in_registry"));
+
+    sw_skills::SkillFactory factory = []() -> std::unique_ptr<sw_skills::SkillBase> {
+        return sw_skills::SkillRegistry::instance().create("math");
+    };
+    bool loaded = mgr.load_skill("not_in_registry", factory);
+    ASSERT_TRUE(loaded);
+    ASSERT_TRUE(mgr.is_loaded("not_in_registry"));
+    return true;
+}
+
+// params defaults to absent and must normalise to an empty object, not null.
+TEST(skill_manager_params_default_is_empty_object) {
+    signalwire::agent::AgentBase agent;
+    sw_skills::SkillManager mgr(agent);
+    ASSERT_TRUE(mgr.load_skill("datetime"));
+    sw_skills::SkillBase* skill = mgr.get_skill("datetime");
+    ASSERT_TRUE(skill != nullptr);
+    ASSERT_TRUE(skill->params().is_object());
+    ASSERT_TRUE(skill->params().empty());
     return true;
 }
 
@@ -295,7 +327,7 @@ TEST(skill_manager_binds_agent_and_params_onto_skill) {
     ASSERT_TRUE(mgr.agent() == &agent);
 
     json params = json::object({{"prefix", "dt"}});
-    bool loaded = mgr.load_skill("datetime", params, agent);
+    bool loaded = mgr.load_skill("datetime", std::nullopt, params);
     ASSERT_TRUE(loaded);
 
     sw_skills::SkillBase* skill = mgr.get_skill("datetime");
@@ -305,16 +337,13 @@ TEST(skill_manager_binds_agent_and_params_onto_skill) {
     return true;
 }
 
-// A default-constructed manager has no bound agent; the skill still gets the
-// agent from the load_skill call.
+// A default-constructed manager has no bound agent. The reference's manager is
+// always agent-bound (SkillManager.__init__(agent)), so load_skill must fail
+// LOUD here rather than silently loading into nothing.
 TEST(skill_manager_default_has_no_bound_agent) {
     sw_skills::SkillManager mgr;
     ASSERT_TRUE(mgr.agent() == nullptr);
-    signalwire::agent::AgentBase agent;
-    (void)mgr.load_skill("math", json::object(), agent);
-    sw_skills::SkillBase* skill = mgr.get_skill("math");
-    ASSERT_TRUE(skill != nullptr);
-    ASSERT_TRUE(skill->agent() == &agent);
-    ASSERT_TRUE(skill->params().is_object());
+    ASSERT_FALSE(mgr.load_skill("math"));
+    ASSERT_FALSE(mgr.is_loaded("math"));
     return true;
 }

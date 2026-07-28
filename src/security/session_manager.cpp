@@ -117,9 +117,13 @@ std::string SessionManager::base64url_encode(const std::string& data) {
       c = '_';
     }
   }
-  while (!out.empty() && out.back() == '=') {
-    out.pop_back();
-  }
+  // PADDING IS KEPT, deliberately. The reference mints with
+  // ``base64.urlsafe_b64encode``, which pads, and validates with
+  // ``base64.urlsafe_b64decode``, which RAISES on a stripped '='. Popping the
+  // '=' here made every minted token unusable to the reference (and to any port
+  // that decodes strictly) even though the message and HMAC were correct, while
+  // our own ``base64url_decode`` still accepted them because it re-pads — the
+  // asymmetry that makes this class of break invisible to a self round-trip.
   return out;
 }
 

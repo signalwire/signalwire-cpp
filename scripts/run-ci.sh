@@ -256,14 +256,14 @@ test_gate() {
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump \
                 pagination_dump relay_liveness_dump ai_chat_dump \
-                secure_default_dump secret_scrub_dump -j"$(sw_build_jobs)" || return 1
+                secure_default_dump secret_scrub_dump token_interop_mint -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -272,7 +272,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -575,6 +575,22 @@ run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKI
 run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS/SECRET-SCRUB-LIVE)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
         --rules WAIT-LIVENESS,RELAY-LIVENESS,SECRET-SCRUB-LIVE
+
+# TOKEN-INTEROP — property 3 of the SWAIG tool-token contract: a token this port MINTS
+# must validate under the REFERENCE's own decoder. SECURE-DEFAULT proves a token is
+# minted and the fleet keying check proves the HMAC key; NEITHER sees the base64
+# ENVELOPE, so a port can ship correct-key correct-HMAC tokens that no other
+# implementation accepts — in production every secure tool call then fails auth. This
+# port shipped exactly that: base64url_encode popped the '=' padding (while its own
+# header comment claimed it matched the reference's urlsafe_b64encode), and the
+# reference's urlsafe_b64decode RAISES on a stripped '='. Our base64url_decode tolerates
+# missing padding, so round-tripping against ourselves could never catch it. The mint
+# binary (build/token_interop_mint) is built with the other dump binaries above. One
+# mint + a pure-python validation → cheap, per-PR (a security property must not wait
+# for nightly).
+run_gate "TOKEN-INTEROP" "a token this port mints validates under the reference's decoder (padded urlsafe base64, ':'-signed / '.'-enveloped, hex HMAC keyed by the secret_key string)" \
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_token_interop.py" --port cpp \
+        --mint-cmd "$PORT_ROOT/build/token_interop_mint"
 
 # DOC-TRUTH (one markdown walk): DOC-AUDIT/DOC-LINKS/DOC-LANG-PURITY/DOC-ENV/
 # COUNT-CLAIM/ACCESSOR-TRUTH/STATUS-CLAIM/README-INCLUDE.

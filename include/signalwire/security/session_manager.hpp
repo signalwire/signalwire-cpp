@@ -147,8 +147,14 @@ class SessionManager {
   /// Base64 decode
   static std::string base64_decode(const std::string& encoded);
 
-  /// Base64url encode (URL-safe alphabet, no padding) — matches Python's
-  /// ``base64.urlsafe_b64encode(...).decode()`` used to wrap the whole token.
+  /// Base64url encode (URL-safe alphabet, PADDING INTACT) — matches Python's
+  /// ``base64.urlsafe_b64encode(...).decode()`` used to wrap the whole token,
+  /// which KEEPS the ``=`` padding. This used to strip the padding while
+  /// claiming to match the reference; the reference's ``urlsafe_b64decode``
+  /// RAISES on a stripped ``=``, so every token minted here was unusable to the
+  /// reference and to any port that decodes strictly, even with a correct key
+  /// and a correct HMAC. Our own ``base64url_decode`` tolerates missing padding,
+  /// which is exactly why round-tripping against ourselves never caught it.
   static std::string base64url_encode(const std::string& data);
 
   /// Base64url decode (URL-safe alphabet, tolerates missing padding) —

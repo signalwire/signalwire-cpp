@@ -385,6 +385,15 @@ target_include_directories(relay_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests
 add_executable(secure_default_dump tools/secure_default_dump.cpp)
 target_link_libraries(secure_default_dump signalwire)
 
+# token_interop_mint is the TOKEN-INTEROP fixture: it mints ONE SWAIG tool token
+# with the FIXED inputs the checker supplies in the environment and prints just
+# that token, so porting-sdk/scripts/diff_port_token_interop.py can validate it
+# under the REFERENCE's own decoder. That is property 3 of the token contract —
+# a correct key and a correct HMAC still leave the base64 ENVELOPE able to be
+# wrong, and an unpadded token is unusable to every other implementation.
+add_executable(token_interop_mint tools/token_interop_mint.cpp)
+target_link_libraries(token_interop_mint signalwire)
+
 # secret_scrub_dump is the SECRET-SCRUB-LIVE (PSDK-5, nightly) runner: it drives
 # the RELAY client through a real connect + an inbound authorization.state
 # re-auth frame at debug level with the fixture sentinels, captures fd 1 + fd 2

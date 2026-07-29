@@ -116,8 +116,14 @@ std::string SwmlRenderer::render_function_response_swml(
   // Reset the document to start fresh.
   service.document() = swml::Document();
 
+  // Text is played via the `say:` URL scheme — the SWML `play` verb has no
+  // `text` key (schema.json: oneOf[PlayWithURL, PlayWithURLS] with
+  // `unevaluatedProperties: {"not": {}}`), so `{"text": ...}` produces a
+  // document the schema rejects. The canonical form, which SWMLBuilder::play /
+  // ::say next door already use, is `url: "say:<text>"`. Matches the reference
+  // (swml_renderer.py: `service.add_verb("play", {"url": f"say:{response_text}"})`).
   if (!response_text.empty()) {
-    service.document().add_verb("play", json::object({{"text", response_text}}));
+    service.document().add_verb("play", json::object({{"url", "say:" + response_text}}));
   }
 
   if (actions.has_value()) {

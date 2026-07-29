@@ -58,7 +58,9 @@ class SwmlRenderer {
                                                const RenderOptions& opts = {});
 
   /// Generate a SWML document for a function response — a `play` of the
-  /// response text followed by any provided actions.
+  /// response text followed by any provided actions. The response text is
+  /// emitted as `play: {url: "say:<text>"}`: the SWML `play` verb has no
+  /// `text` key, so the `say:` URL scheme is how spoken text reaches the wire.
   [[nodiscard]] static std::string render_function_response_swml(
       const std::string& response_text, swml::Service& service,
       const std::optional<std::vector<json>>& actions = std::nullopt,

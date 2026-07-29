@@ -61,6 +61,41 @@ TEST(skill_ds_serverless_datamap_has_webhook) {
     return true;
 }
 
+// The engine reads ONLY "params" and "headers" off a webhook (mod_openai/actions.c:735-739 --
+// there is no read of "body" anywhere), and expands ${formatted_results} from the "foreach" block.
+// This asserts on the EMITTED PAYLOAD; the construction assertions above all passed while the
+// payload was being sent on a key the server ignores.
+TEST(skill_ds_serverless_webhook_carries_params_and_foreach) {
+    auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
+    skill->setup(json::object({
+        {"space_name", "test.signalwire.com"},
+        {"project_id", "proj-123"},
+        {"token", "tok-456"},
+        {"document_id", "doc-789"},
+        {"count", 4},
+        {"distance", 2.5}
+    }));
+    auto dm = skill->get_datamap_functions();
+    auto webhook = dm[0]["data_map"]["webhooks"][0];
+
+    // The search payload must ride on "params" -- a "body" key is silently dropped by the engine.
+    ASSERT_TRUE(!webhook.contains("body"));
+    ASSERT_TRUE(webhook.contains("params"));
+    ASSERT_EQ(webhook["params"]["query_string"].get<std::string>(), std::string("${args.query}"));
+    ASSERT_EQ(webhook["params"]["document_id"].get<std::string>(), std::string("doc-789"));
+    ASSERT_EQ(webhook["params"]["count"].get<int>(), 4);
+    ASSERT_EQ(webhook["params"]["distance"].get<double>(), 2.5);
+
+    // ${formatted_results} in the output is only populated by a foreach block.
+    ASSERT_TRUE(webhook.contains("foreach"));
+    ASSERT_EQ(webhook["foreach"]["input_key"].get<std::string>(), std::string("chunks"));
+    ASSERT_EQ(webhook["foreach"]["output_key"].get<std::string>(), std::string("formatted_results"));
+    ASSERT_EQ(webhook["foreach"]["max"].get<int>(), 4);
+    ASSERT_TRUE(webhook["foreach"]["append"].get<std::string>().find("${this.text}")
+                != std::string::npos);
+    return true;
+}
+
 TEST(skill_ds_serverless_global_data) {
     auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
     skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}}));

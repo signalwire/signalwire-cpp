@@ -76,7 +76,7 @@ void reset_logging_configuration() { g_configured.store(false); }
   return ::signalwire::logging::get_logger(name);
 }
 
-std::string strip_control_chars(const std::string& value) {
+std::string strip_control_chars_str(const std::string& value) {
   std::string out;
   out.reserve(value.size());
   for (char c : value) {
@@ -87,6 +87,22 @@ std::string strip_control_chars(const std::string& value) {
       continue;
     }
     out.push_back(c);
+  }
+  return out;
+}
+
+nlohmann::json strip_control_chars(const nlohmann::json& event_dict) {
+  // Not an object (or empty): nothing to walk — return it unchanged, matching
+  // the reference's behaviour of only touching string VALUES of the event map.
+  if (!event_dict.is_object()) {
+    return event_dict;
+  }
+  nlohmann::json out = event_dict;
+  for (auto& [key, value] : out.items()) {
+    (void)key;
+    if (value.is_string()) {
+      value = strip_control_chars_str(value.get<std::string>());
+    }
   }
   return out;
 }

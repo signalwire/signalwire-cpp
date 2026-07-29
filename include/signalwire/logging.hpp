@@ -7,6 +7,11 @@
 #include <string>
 #include <string_view>
 
+// For the control-char scrub applied on the emission path below. logging_config
+// includes signalwire/logging/logger.hpp (a DIFFERENT header from this one), so
+// this does not close an include cycle.
+#include "signalwire/core/logging_config.hpp"
+
 namespace signalwire {
 
 enum class LogLevel { Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4 };
@@ -64,10 +69,18 @@ class Logger {
         break;
     }
 
+    // Scrub control characters BEFORE emitting — log-injection defence, and the
+    // reason the reference registers strip_control_chars in both of its structlog
+    // processor chains. A port that merely EXPOSES the scrub without putting it on
+    // the emission path offers no protection at all: a caller-supplied `\x00` or a
+    // `\x1b[` escape reaches the terminal verbatim and can forge log lines.
+    const std::string safe =
+        ::signalwire::core::logging_config::strip_control_chars_str(std::string(message));
+
     if (level >= LogLevel::Warn) {
-      std::cerr << prefix << message << "\n";
+      std::cerr << prefix << safe << "\n";
     } else {
-      std::cout << prefix << message << "\n";
+      std::cout << prefix << safe << "\n";
     }
   }
 

@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <string>
 
 // `get_logger` below returns a NAMED logger by value, so the type must be
@@ -80,12 +81,29 @@ void reset_logging_configuration();
 ::signalwire::logging::Logger get_logger(const std::string& name);
 
 /**
- * Strip control characters (to prevent log injection) from ``value``.
- * Mirrors Python's ``strip_control_chars`` structlog processor, reduced to
- * the value-sanitizing core: removes ASCII control chars except ``\t``,
- * ``\n`` and ``\r``.
+ * Strip control characters from a single string.
+ *
+ * Removes ASCII control chars except ``\t``, ``\n`` and ``\r``.
+ *
+ * INTERNAL: the reference's public contract is the event-map form
+ * (``strip_control_chars`` below); this is the per-value scrub that form is
+ * built out of, and the unit the emitter needs. Not port surface.
  */
-std::string strip_control_chars(const std::string& value);
+std::string strip_control_chars_str(const std::string& value);
+
+/**
+ * Strip control characters from log event values to prevent log injection.
+ *
+ * Mirrors ``signalwire.core.logging_config.strip_control_chars``: takes the log
+ * event map, scrubs every STRING value, and returns the map. Non-string values
+ * pass through untouched, exactly as the reference's ``isinstance(value, str)``
+ * guard does.
+ *
+ * The reference registers this in BOTH of its structlog processor chains, so the
+ * scrub sits on the real emission path rather than merely being available; this
+ * port does the same from ``signalwire::logging::Logger::log``.
+ */
+nlohmann::json strip_control_chars(const nlohmann::json& event_dict);
 
 }  // namespace logging_config
 }  // namespace core

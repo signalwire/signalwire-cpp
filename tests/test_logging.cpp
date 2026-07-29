@@ -129,3 +129,63 @@ TEST(logging_config_get_logger_configures_on_first_access) {
     core::logging_config::configure_logging();
     return true;
 }
+
+// --- control-char scrub: contract + WIRING ---------------------------------
+
+TEST(strip_control_chars_scrubs_string_values_in_the_event_dict) {
+    // The PUBLIC contract, matching the reference: an event map in, the same map
+    // out with every STRING value scrubbed.
+    nlohmann::json ev = {
+        {"event", std::string("hello\x01world")},
+        {"field", std::string("a\x07" "b\x1f" "c")},
+        {"n", 42},
+    };
+    auto out = core::logging_config::strip_control_chars(ev);
+    ASSERT_EQ(out["event"].get<std::string>(), std::string("helloworld"));
+    ASSERT_EQ(out["field"].get<std::string>(), std::string("abc"));
+    // Non-string values pass through untouched (the reference's
+    // `isinstance(value, str)` guard).
+    ASSERT_EQ(out["n"].get<int>(), 42);
+    return true;
+}
+
+// The scrub must be ON THE EMISSION PATH, not merely available. This captures
+// what Logger::log ACTUALLY writes; deleting the scrub from the emitter turns it
+// RED. A test that called strip_control_chars_str directly would pass even with
+// the wiring removed — which is exactly how this shipped unprotected: the
+// function was public, correct, and called by nothing.
+TEST(log_output_has_control_chars_stripped) {
+    auto& logger = Logger::instance();
+    // test_main.cpp suppresses the singleton for the whole run; unsuppress for
+    // this test's scope only, then restore, so no sibling sees the change.
+    const bool was_suppressed = logger.is_suppressed();
+    logger.unsuppress();
+    std::ostringstream capture;
+    std::streambuf* saved = std::cout.rdbuf(capture.rdbuf());
+    logger.info("user\x01said\x1b[31mRED\x07");
+    std::cout.rdbuf(saved);
+    if (was_suppressed) logger.suppress();
+
+    const std::string line = capture.str();
+    for (char bad : {'\x01', '\x1b', '\x07'}) {
+        ASSERT_TRUE(line.find(bad) == std::string::npos);
+    }
+    ASSERT_TRUE(line.find("usersaid[31mRED") != std::string::npos);
+    return true;
+}
+
+// Tab/newline/CR are LEGAL in a log line and must survive — a scrub that ate
+// them would mangle multi-line messages while still passing the test above.
+TEST(log_output_keeps_legal_whitespace) {
+    auto& logger = Logger::instance();
+    const bool was_suppressed = logger.is_suppressed();
+    logger.unsuppress();
+    std::ostringstream capture;
+    std::streambuf* saved = std::cout.rdbuf(capture.rdbuf());
+    logger.info("line1\tcol\nline2\r end");
+    std::cout.rdbuf(saved);
+    if (was_suppressed) logger.suppress();
+
+    ASSERT_TRUE(capture.str().find("line1\tcol\nline2\r end") != std::string::npos);
+    return true;
+}

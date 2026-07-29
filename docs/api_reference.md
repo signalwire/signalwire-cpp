@@ -241,10 +241,9 @@ agent.prompt_add_to_section("Process", "", {"Follow up", "Close ticket"});
 ##### `prompt_add_subsection`
 
 ```cpp
-signalwire::agent::AgentBase& prompt_add_subsection(const std::string& parent_title,
-                                 const std::string& title,
-                                 const std::string& body = "",
-                                 const std::vector<std::string>& bullets = {});
+signalwire::agent::AgentBase& prompt_add_subsection(
+    const std::string& parent_title, const std::string& title, const std::string& body = "",
+    const std::optional<std::vector<std::string>>& bullets = std::nullopt);
 ```
 Add a subsection to an existing prompt section.
 
@@ -252,13 +251,14 @@ Add a subsection to an existing prompt section.
 - `parent_title` (`std::string`): Title of the parent section
 - `title` (`std::string`): Subsection title
 - `body` (`std::string`): Subsection content (default: `""`)
-- `bullets` (`std::vector<std::string>`): Subsection bullet points (default: empty)
+- `bullets` (`std::optional<std::vector<std::string>>`): Subsection bullet points
+  (default: `std::nullopt`, matching the reference's `bullets: list[str] | None = None`)
 
 **Usage:**
 ```cpp
 agent.prompt_add_subsection("Guidelines", "Escalation Rules",
     "Escalate when:",
-    {"Customer is angry", "Technical issue beyond scope"});
+    std::vector<std::string>{"Customer is angry", "Technical issue beyond scope"});
 ```
 
 ### Voice and Language Configuration

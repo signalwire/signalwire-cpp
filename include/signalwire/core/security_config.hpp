@@ -93,10 +93,12 @@ class SecurityConfig {
   [[nodiscard]] SslValidationResult validate_ssl_config() const;
 
   /// SSL options for binding an HTTPS server. Empty when SSL is disabled or
-  /// validation fails; otherwise a language-neutral option object with keys
-  /// ``ssl_enabled``, ``cert_path``, ``key_path`` (Python returns uvicorn
-  /// ``ssl_certfile``/``ssl_keyfile`` kwargs; the C++/Java idiom is a neutral
-  /// map the web service consumes).
+  /// validation fails; otherwise EXACTLY the reference's two keys and nothing
+  /// else — ``ssl_certfile`` (the cert path) and ``ssl_keyfile`` (the key
+  /// path). This is byte-identical to Python's ``get_ssl_context_kwargs``;
+  /// C++ does NOT substitute a "neutral" ``{ssl_enabled, cert_path,
+  /// key_path}`` map. Pinned by
+  /// ``security_config_ssl_context_kwargs_matches_python_when_enabled``.
   [[nodiscard]] json get_ssl_context_kwargs() const;
 
   /// Get basic auth credentials, generating a random URL-safe password when

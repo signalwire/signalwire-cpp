@@ -276,6 +276,16 @@ class RelayClient {
   std::unique_ptr<WebSocketClient> ws_;
 
   // Correlation mechanism 1: JSON-RPC id -> promise
+  /// One in-flight JSON-RPC request awaiting its response frame.
+  ///
+  /// The sending thread parks on this promise's future while the WebSocket
+  /// reader thread matches an inbound frame's `id` back to this entry and
+  /// fulfils the promise with the result. Held by `shared_ptr` in
+  /// `pending_requests_` so the entry stays alive even if the map is cleared
+  /// while a waiter still holds it. On disconnect, `reject_all_pending` fulfils
+  /// every outstanding promise with a `{code:"503", message:"Connection lost"}`
+  /// result rather than leaving it unsatisfied — an abandoned promise would
+  /// block its waiter forever.
   struct PendingRequest {
     std::promise<json> promise;
   };
@@ -289,6 +299,15 @@ class RelayClient {
   // Correlation mechanism 3: control_id -> Action (tracked per Call)
 
   // Correlation mechanism 4: tag -> promise<Call*> for dials
+  /// One in-flight outbound dial awaiting the call it creates.
+  ///
+  /// A dial cannot be correlated by JSON-RPC id: the `Call` does not exist
+  /// until the server reports it, so the dial is keyed by the caller-generated
+  /// `tag` and the promise is fulfilled with the owned `Call*` when an event
+  /// bearing that tag arrives. Held by `shared_ptr` in `pending_dials_` for the
+  /// same lifetime reason as `PendingRequest`. On disconnect,
+  /// `reject_all_pending` fulfils it with `nullptr`, so a waiting caller gets a
+  /// null Call rather than hanging.
   struct PendingDial {
     std::promise<Call*> promise;
   };

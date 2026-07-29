@@ -294,6 +294,30 @@ class Call {
   // collect-only resolution. Backs prompt_tts/prompt_audio.
   Action prompt_with_media(const json& media, const json& collect, double volume);
 
+  /// The state a `Call` and all of its copies share.
+  ///
+  /// Like `Action`, `Call` is a copyable value whose copies must observe the
+  /// same leg, so the real state sits behind a `shared_ptr`.
+  ///
+  /// It holds the leg's wire identity and metadata (`call_id`/`node_id`,
+  /// `state`, `direction`, `from`/`to`, `tag`, plus the `project_id`,
+  /// `context`, `segment_id`, and `device` the reference `Call.__init__`
+  /// exposes as public attributes), a NON-OWNING `client` back-pointer for
+  /// sending frames, and three pieces of concurrency machinery:
+  ///
+  ///   * `event_handlers` + `handlers_mutex` — `on_event()` mutates the vector
+  ///     from the user thread while `dispatch_event()` iterates it from the
+  ///     WebSocket reader thread, so the mutex is load-bearing, not defensive.
+  ///   * `actions` + `actions_mutex` — the in-flight action registry, keyed by
+  ///     `control_id`. It stores `Action` BY VALUE: an `Action` keeps its state
+  ///     in a `shared_ptr`, so the stored copy shares state with the caller's
+  ///     copy and resolving one resolves both. Storing a raw `Action*` dangled
+  ///     as soon as the caller's stack-local went out of scope.
+  ///   * `ended_mutex` + `ended_cv` + `state_cv` — the wait rendezvous.
+  ///     `state_cv` is notified on EVERY state transition, not only on `ended`,
+  ///     which is what lets `wait_for_answered`/`ringing`/`ending` wake on
+  ///     intermediate states; both condition variables are guarded by
+  ///     `ended_mutex`, which already serialises `state`.
   struct SharedState {
     std::string call_id;
     std::string node_id;

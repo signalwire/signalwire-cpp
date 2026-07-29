@@ -32,6 +32,19 @@ constexpr int MAX_STEPS_PER_CONTEXT = 100;
 // GatherQuestion
 // ============================================================================
 
+/// One question in a step's ``gather_info`` questionnaire.
+///
+/// Each question names the ``key`` its answer is stored under, the
+/// ``question`` text put to the caller, and the answer ``type``. Optional
+/// per-question overrides narrow the behaviour for this question only:
+/// ``confirm`` reads the answer back for confirmation, ``prompt`` replaces the
+/// gather-level prompt, ``functions`` limits which SWAIG tools are callable
+/// while it is being answered, and ``isolated`` is tri-state — unset inherits
+/// the ``GatherInfo`` default, a set value overrides it.
+///
+/// Immutable after construction; ``to_json`` emits only the fields that differ
+/// from their default, so a bare (key, question) pair renders as a minimal
+/// object.
 class GatherQuestion {
  public:
   GatherQuestion(const std::string& key, const std::string& question,
@@ -78,6 +91,18 @@ class GatherQuestion {
 // GatherInfo
 // ============================================================================
 
+/// A step's structured data-collection block — the ``gather_info`` object.
+///
+/// Attaching one to a ``Step`` turns that step into a questionnaire: the
+/// runtime injects the reserved ``gather_submit`` tool (see
+/// ``reserved_native_tool_names``) and walks the caller through each
+/// ``GatherQuestion`` in order, writing the collected answers under
+/// ``output_key``. ``completion_action`` says what happens once every question
+/// is answered, ``prompt`` supplies the gather-wide prompt each question may
+/// override, and ``isolated`` is the default the questions inherit when they
+/// do not set their own.
+///
+/// ``add_question`` appends and returns ``*this`` for fluent chaining.
 class GatherInfo {
  public:
   GatherInfo(const std::optional<std::string>& output_key = std::nullopt,
@@ -110,6 +135,26 @@ class GatherInfo {
 // Step
 // ============================================================================
 
+/// One stage of a context's guided flow — the unit the runtime advances
+/// through.
+///
+/// A step carries its own prompt (raw text via ``set_text``, or POM sections
+/// via ``add_section``/``add_bullets``) and the rules for leaving it:
+/// ``set_step_criteria`` states when it is complete, ``set_valid_steps`` /
+/// ``set_valid_contexts`` declare where the model may navigate next (which is
+/// what causes the reserved ``next_step`` / ``change_context`` tools to be
+/// injected), and ``set_end`` marks it terminal for the flow.
+///
+/// Three behaviours are easy to get wrong and are documented on their setters:
+///   * ``set_functions`` — the active tool set is INHERITED from the previous
+///     step unless a step declares its own;
+///   * ``set_end(true)`` — exits step mode, it does NOT end the call;
+///   * ``set_gather_info`` — while a gather is running, every other tool
+///     except ``gather_submit`` and the question's own ``functions`` is
+///     deactivated, including the navigation tools.
+///
+/// All mutators return ``*this`` for fluent chaining; ``to_json`` emits the
+/// step object embedded in the SWML contexts structure.
 class Step {
  public:
   Step() = default;
@@ -299,6 +344,28 @@ class Step {
 // Context
 // ============================================================================
 
+/// A named, ordered collection of ``Step``s — one mode of an agent's workflow.
+///
+/// A ``ContextBuilder`` owns one or more contexts and exactly one is active at
+/// a time; ``set_valid_contexts`` declares which others the model may switch
+/// to via the reserved ``change_context`` tool. Entering a context begins at
+/// its first step unless ``set_initial_step`` names another — useful when
+/// re-entry should skip a preamble.
+///
+/// Beyond its steps, a context carries prompt material applied for as long as
+/// it is active: ``set_prompt``/``add_section``/``add_bullets`` for the
+/// context prompt, ``set_system_prompt``/``add_system_section``/
+/// ``add_system_bullets`` for the system prompt, ``set_post_prompt`` to
+/// override the agent's summary prompt, and enter/exit fillers spoken across
+/// the switch. Conversation visibility is controlled by ``set_history`` (the
+/// default each step's own ``set_history`` overrides) and by
+/// ``set_isolated`` — noting that a reset configuration
+/// (``set_consolidate`` / ``set_full_reset``) takes precedence over the
+/// isolated wipe.
+///
+/// Steps are keyed by name and kept in insertion order; ``add_step`` returns a
+/// reference to the step for chaining, and ``move_step``/``remove_step``
+/// rearrange that order. All context mutators return ``*this``.
 class Context {
  public:
   Context() = default;

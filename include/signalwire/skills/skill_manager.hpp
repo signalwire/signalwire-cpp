@@ -80,6 +80,14 @@ class SkillManager {
   void cleanup_all();
 
  private:
+  /// One skill the manager has loaded, and everything needed to unload it.
+  ///
+  /// `name` is the registry key `load_skill`/`unload_skill`/`is_loaded` match
+  /// on. `instance` OWNS the constructed skill — the manager's `unique_ptr` is
+  /// what keeps it alive, so `get_skill` hands back a non-owning `SkillBase*`
+  /// that is valid only until that skill is unloaded or `cleanup_all` runs.
+  /// `params` retains the configuration the skill was loaded with. Entries are
+  /// kept in a vector, so `list_loaded` reports load order.
   struct LoadedSkill {
     std::string name;
     std::unique_ptr<SkillBase> instance;

@@ -144,6 +144,50 @@ struct SwaigQueryParam {
 // AgentBase
 // ============================================================================
 
+/// The AI-agent host: an HTTP endpoint that renders SWML and services SWAIG
+/// function calls for a single agent.
+///
+/// AgentBase extends ``swml::Service`` (the framework-free SWML endpoint) with
+/// everything an AI agent adds on top of a plain SWML document: a prompt (raw
+/// text or a POM section tree), SWAIG tool definitions, contexts/steps,
+/// languages/hints/pronunciations, skills, and a post-prompt summary hook. A
+/// GET/POST on the agent's ``route`` renders the ``ai`` verb via
+/// ``render_swml_for_request``; POSTs to ``/swaig`` dispatch to the registered
+/// tool handlers through ``on_function_call``; ``/post_prompt`` receives the
+/// conversation summary; ``/debug_events`` receives the AI module's debug
+/// webhook when ``enable_debug_routes`` is on. The same object can also run
+/// without a server via ``handle_request`` (raw method/url/headers/body) or
+/// ``handle_serverless_request`` (Lambda / GCF / Azure / CGI).
+///
+/// ## Security — three independent mechanisms, all off-by-default-safe
+///
+/// 1. **HTTP basic auth.** ``basic_auth`` (ctor) or ``set_auth`` gates every
+///    mounted route; ``handle_request`` returns 401 for a bad or missing
+///    credential. When no credentials are supplied the ``swml::Service`` base
+///    generates a random pair rather than leaving the endpoint open.
+/// 2. **Webhook signature validation.** When a signing key is resolved —
+///    ``set_signing_key`` first, then the ``SIGNALWIRE_SIGNING_KEY`` env var —
+///    the agent server auto-mounts the signature validator on POST ``/``,
+///    ``/swaig``, and ``/post_prompt``: an unsigned or wrongly-signed request
+///    gets a 403 and never reaches a handler. With no key resolved the agent
+///    logs a startup warning and accepts unsigned POSTs. The URL the signature
+///    is computed over honors ``X-Forwarded-Proto``/``X-Forwarded-Host`` only
+///    when ``trust_proxy_for_signature(true)`` is set, because those headers
+///    are caller-spoofable.
+/// 3. **Per-call SWAIG tool tokens.** ``define_tool`` defaults ``secure`` to
+///    TRUE, matching the reference. A secure tool's rendered ``web_hook_url``
+///    carries a ``__token=`` minted by this agent's ``SessionManager`` for the
+///    (tool, call_id) pair (``create_tool_token``). The ``/swaig`` dispatcher
+///    validates that token against the SWAIG body's ``call_id`` BEFORE
+///    ``on_function_call`` is reached, so a replayed or cross-call token is
+///    rejected and ``on_function_call`` is a post-validation hook — an override
+///    must preserve that contract. This is why the protected
+///    ``build_ai_verb``/``build_swaig_functions`` take ``call_id`` with NO
+///    default — an omitted call_id would silently render every secure tool
+///    without its token.
+///
+/// Copy construction is supported (and used by ``clone()`` for the
+/// per-request dynamic-config path); copy ASSIGNMENT is deleted.
 class AgentBase : public swml::Service {
   friend class signalwire::server::AgentServer;
 

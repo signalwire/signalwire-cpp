@@ -29,6 +29,37 @@ struct SslValidationResult {
   std::optional<std::string> error;
 };
 
+/// Centralized security settings for a SignalWire service — SSL, allowed
+/// hosts, CORS, response security headers, request limits, and basic-auth
+/// credentials.
+///
+/// The web/agent services read their security posture from one of these so the
+/// behaviour is consistent across them. Settings are resolved in three layers,
+/// each overriding the last: **built-in defaults**, then the ``SWML_*``
+/// **environment variables** named by the class constants below, then a
+/// **config file**'s ``security`` section (highest priority) — located either
+/// from an explicit path or from the service name.
+///
+/// Security-relevant behaviours worth knowing before you deploy:
+///   * ``get_basic_auth`` never returns an empty password. When none is
+///     configured it GENERATES a random one and warns once — that password
+///     lives only in this process, so external callers who do not know it get
+///     HTTP 401. Configure ``SWML_BASIC_AUTH_USER``/``_PASSWORD`` for anything
+///     a client must reach.
+///   * ``validate_ssl_config`` is always valid when SSL is disabled; with SSL
+///     enabled it requires cert and key paths that are set AND exist on disk,
+///     and ``get_ssl_context_kwargs`` returns an EMPTY object when SSL is off
+///     OR that validation fails (logging the reason) — so a caller that binds
+///     TLS only on a non-empty result will not silently serve plaintext.
+///   * ``should_allow_host`` treats ``*`` in the allowed list as allow-all.
+///   * ``get_security_headers`` adds ``Strict-Transport-Security`` only when
+///     the caller says the connection is HTTPS and HSTS is enabled — sending
+///     HSTS over plaintext is meaningless and can lock out a host.
+///   * ``log_config`` never logs a secret.
+///
+/// Defaults: SSL off, verify mode ``CERT_REQUIRED``, 10 MiB max request, 60
+/// requests/min rate limit, 30 s request timeout, HSTS on with a one-year
+/// max-age.
 class SecurityConfig {
  public:
   // Security environment variable names (mirror the Python class constants).

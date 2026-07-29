@@ -10,25 +10,23 @@ namespace relay {
 
 using json = nlohmann::json;
 
-// ===========================================================================
-// Device — the {type, params} object passed as a raw json map across the RELAY
-// calling methods that target an endpoint: connect / refer / dial / tap.
-//
-// Grounded in the RELAY calling protocol schema for dial/connect/refer: each
-// device is an object
-// with a REQUIRED string `type` discriminant (e.g. "phone", "sip", "webrtc")
-// and an open `params` object whose keys depend on `type`. The schema is
-// `additionalProperties:true` and does NOT enumerate the `type` values, so we
-// type the SHAPE only: `type` stays a `std::string` (open discriminant), and
-// `params` stays a free `json` map. `to_json()` yields the IDENTICAL wire shape
-// the hand-written `{{"type",...},{"params",...}}` map produces.
-//
-// Additive idiom (PORT_ADDITIONS.md): the raw-`json` connect/dial/refer/tap
-// overloads stay canonical (matches Python's nested dict/list). `Device`
-// is a typed convenience for assembling that map with a named field instead of
-// stringly keys — `Device{"phone", {{"to_number", to}}}` reads better than the
-// brace-soup and can't typo the two top-level keys.
-// ===========================================================================
+/// The `{type, params}` endpoint object the RELAY calling methods that target
+/// an endpoint take: connect / refer / dial / tap.
+///
+/// Grounded in the RELAY calling protocol schema for dial/connect/refer: each
+/// device is an object with a REQUIRED string `type` discriminant (e.g.
+/// "phone", "sip", "webrtc") and an open `params` object whose keys depend on
+/// `type`. The schema is `additionalProperties:true` and does NOT enumerate the
+/// `type` values, so this types the SHAPE only: `type` stays a `std::string`
+/// (open discriminant), and `params` stays a free `json` map. `to_json()`
+/// yields the IDENTICAL wire shape the hand-written
+/// `{{"type",...},{"params",...}}` map produces.
+///
+/// Additive idiom (PORT_ADDITIONS.md): the raw-`json` connect/dial/refer/tap
+/// overloads stay canonical (matching Python's nested dict/list). `Device` is a
+/// typed convenience for assembling that map with a named field instead of
+/// stringly keys — `Device{"phone", {{"to_number", to}}}` reads better than the
+/// brace-soup and can't typo the two top-level keys.
 struct Device {
   /// REQUIRED endpoint-type discriminant. Open set (not schema-enumerated) →
   /// kept a std::string. Common values: "phone", "sip", "webrtc".

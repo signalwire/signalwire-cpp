@@ -74,6 +74,39 @@ class AuthException : public std::runtime_error {
   AuthResponse response_;
 };
 
+/// Unified authentication over a request header map — HTTP Basic, Bearer
+/// token, and API key.
+///
+/// The handler is constructed from a ``SecurityConfig`` and authenticates a
+/// request by trying the ENABLED methods in order — Bearer, then API key, then
+/// Basic — reporting which one succeeded. Which methods are enabled follows
+/// the reference exactly: **Basic is always on** (seeded from
+/// ``SecurityConfig::get_basic_auth``, which generates a random password when
+/// none is configured, so the endpoint is never credential-free), while Bearer
+/// and API key are **off** because the reference ``SecurityConfig`` carries no
+/// such fields. Their verifiers are real and correct — a subclass that
+/// supplies a token or key gets working enforcement — but out of the box a
+/// Bearer or ``X-API-Key`` header authenticates nothing.
+///
+/// **Every credential comparison is timing-safe** (constant-time over the full
+/// operand), so a caller cannot recover a secret byte-by-byte from response
+/// latency. Header lookup is case-insensitive, matching HTTP; the API-key
+/// header name defaults to ``X-API-Key`` and comes from the config. A failed
+/// attempt is logged without the submitted credential, and ``get_auth_info``
+/// reports which methods are enabled but never a secret. The API-key header
+/// name is ``X-API-Key``.
+///
+/// Two entry points wrap that core for the two shapes the Python reference
+/// exposes as framework bindings. C++ ships no web framework, so both are
+/// framework-neutral over ``Headers`` (same idiom as the Java port), and both
+/// are real enforcement, not stubs: ``get_fastapi_dependency`` returns a
+/// callable yielding an ``AuthResult`` — throwing ``AuthException`` when
+/// ``optional`` is false and auth fails — and ``flask_decorator`` wraps a
+/// downstream ``RequestHandler`` so unauthenticated requests get an HTTP 401
+/// with a ``WWW-Authenticate`` challenge and never reach it.
+///
+/// Holds a REFERENCE to the ``SecurityConfig``: the config must outlive the
+/// handler.
 class AuthHandler {
  public:
   /// Framework-neutral request handler: header map in, ``AuthResponse`` out.

@@ -112,6 +112,20 @@ struct Message {
   }
 
  private:
+  /// The delivery state a `Message` and all of its copies share.
+  ///
+  /// `Message` is copied and returned by value, but a copy must observe the
+  /// same delivery outcome as the instance the client registry tracks — so the
+  /// mutable half lives here behind a `shared_ptr` while the write-once
+  /// identity fields (`message_id`, `from_number`, …) stay on the Message
+  /// itself.
+  ///
+  /// `mutex` guards all four members. `state` and `reason` are overwritten by
+  /// `update_state` as `messaging.state` events arrive from the WebSocket
+  /// reader thread; `completed` latches once a terminal state is reached, at
+  /// which point `cv` wakes every thread blocked in `wait()` and `callback`
+  /// (set via `on_completed`/`on`) is invoked. Registering a callback on an
+  /// already-terminal message fires it immediately.
   struct SyncState {
     std::mutex mutex;
     std::condition_variable cv;

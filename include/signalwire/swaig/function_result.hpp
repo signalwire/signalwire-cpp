@@ -174,11 +174,21 @@ enum class Codec { Pcmu, Pcma };
 /// Templated on the enum type plus its `*_value()` mapper so one definition
 /// covers all four sets.
 template <typename E, std::string (*Map)(E)>
+/// @tparam E   the closed-set enum this field accepts.
+/// @tparam Map the enum's `*_value()` mapper — the single point where an
+///   enumerator becomes its wire string, so the typed and the string path can
+///   never disagree.
 struct EnumOrString {
+  /// The resolved wire string. Normalized at construction: an enum operand is
+  /// mapped through `Map`, a string operand is stored verbatim.
   std::string value;
-  EnumOrString(E e) : value(Map(e)) {}              // NOLINT(google-explicit-constructor)
+  /// Implicit from the enum — mapped to its wire string.
+  EnumOrString(E e) : value(Map(e)) {}  // NOLINT(google-explicit-constructor)
+  /// Implicit from a string — stored as-is, matching Python's bare `str`.
   EnumOrString(const std::string& s) : value(s) {}  // NOLINT
-  EnumOrString(const char* s) : value(s) {}         // NOLINT
+  /// Implicit from a string literal, so `= "onEnter"` needs no cast.
+  EnumOrString(const char* s) : value(s) {}  // NOLINT
+  /// The wire string this field serializes to.
   [[nodiscard]] const std::string& str() const { return value; }
 };
 

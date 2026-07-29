@@ -131,6 +131,26 @@ class Action {
   void send_control_command(const std::string& operation,
                             const json& extra_params = json::object());
 
+  /// The state an `Action` and all of its copies share.
+  ///
+  /// `Action` is a value type callers pass around and store by copy, but every
+  /// copy must observe the SAME completion — so the real state lives here
+  /// behind a `shared_ptr` and copying an `Action` shares it rather than
+  /// duplicating it. Resolving the copy the Call registry holds therefore
+  /// resolves the copy on the caller's stack.
+  ///
+  /// The first group identifies the action on the wire: `control_id` correlates
+  /// server events back to it, `call_id`/`node_id` address the leg, and
+  /// `method_prefix` (default `calling.play`) determines which RPC the control
+  /// commands send — a `record()` action carries `calling.record` so `stop()`
+  /// emits `calling.record.stop`. `event_type_filter`, `resolve_on_detect`, and
+  /// `resolve_on_result` encode the verb-specific completion semantics that the
+  /// reference splits across per-verb Action subclasses. `client` is a
+  /// NON-OWNING back-pointer used to send those frames.
+  ///
+  /// The second group is the completion rendezvous: `mutex` guards
+  /// `current_state`, `is_completed`, `result_data`, and `completed_callback`,
+  /// and `cv` wakes threads blocked waiting for the action to finish.
   struct SharedState {
     std::string control_id;
     std::string call_id;

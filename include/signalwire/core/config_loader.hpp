@@ -27,6 +27,33 @@ namespace core {
 
 using json = nlohmann::json;
 
+/// Loads a JSON configuration file and resolves ``${VAR|default}``
+/// environment-variable references inside it.
+///
+/// Construction walks the supplied search paths (or the built-in defaults) and
+/// keeps the FIRST file that exists and parses; ``has_config`` and
+/// ``get_config_file`` report whether and which. The stored config is the RAW
+/// document — substitution happens on read, so ``get``/``get_section``/
+/// ``merge_with_env`` see current environment values, while ``get_config``
+/// hands back the unsubstituted original.
+///
+/// Substitution is recursive over objects and arrays. ``${VAR}`` expands to
+/// the environment value, ``${VAR|default}`` falls back to ``default`` when
+/// the variable is unset. Nesting deeper than ``max_depth`` (10 by default)
+/// throws ``std::invalid_argument`` rather than looping. After substitution, a
+/// string that looks like a boolean, integer, or float is COERCED to that
+/// native JSON type, so ``"${PORT|8080}"`` reads back as a number.
+///
+/// ``get`` addresses values by dot-notation path (``"security.ssl_enabled"``)
+/// and returns ``default_value`` for a missing path — no exception.
+/// ``merge_with_env`` folds ``SWML_``-prefixed environment variables into the
+/// config (prefix stripped, lowercased, split on underscore boundaries) but
+/// only where the config does not already define the key: **the config file
+/// wins over the environment**, the opposite precedence from ``SecurityConfig``.
+///
+/// C++-port note: JSON only. The vendored ``nlohmann::json`` is a JSON library
+/// and the port carries no YAML dependency, so ``.yaml``/``.yml`` files are not
+/// supported (every default search path is a ``*.json``).
 class ConfigLoader {
  public:
   /// Initialize the config loader.

@@ -540,8 +540,8 @@ run_gate "SURFACE" "surface parity suite (SIGNATURES/DRIFT/SURFACE-FRESH/SURFACE
 # red. RATCHET, not a hard gate: dynamic languages cannot always express a type, so this
 # banks the current count and fails only on REGRESSION. Drive the number DOWN; never up.
 # Runs after SURFACE because it reads the port_signatures.json that enumeration writes.
-run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 122)" \
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 122
+run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 85)" \
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 85
 
 # GEN (regen-from-specs family): GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS.
 # GEN-FRESH-TESTS reuses cpp's route_registry binary via the suite's cpp branch.

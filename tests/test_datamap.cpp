@@ -61,6 +61,24 @@ TEST(datamap_webhook) {
     return true;
 }
 
+// The reference emits the method upper-cased on the wire
+// (core/data_map.py:230, `"method": method.upper()`), so a caller writing a
+// lower-case method must still produce byte-identical SWML across languages.
+TEST(datamap_webhook_upper_cases_method_on_the_wire) {
+    DataMap dm("case_fn");
+    dm.webhook("get", "https://api.example.com");
+    dm.webhook("post", "https://api2.example.com");
+    auto j = dm.to_swaig_function();
+    ASSERT_EQ(j["data_map"]["webhooks"][0]["method"].get<std::string>(), "GET");
+    ASSERT_EQ(j["data_map"]["webhooks"][1]["method"].get<std::string>(), "POST");
+    // An already-upper-case method is unchanged.
+    DataMap dm2("case_fn2");
+    dm2.webhook("DELETE", "https://api3.example.com");
+    auto j2 = dm2.to_swaig_function();
+    ASSERT_EQ(j2["data_map"]["webhooks"][0]["method"].get<std::string>(), "DELETE");
+    return true;
+}
+
 TEST(datamap_webhook_with_headers) {
     DataMap dm("test");
     dm.webhook("POST", "https://api.example.com/data",

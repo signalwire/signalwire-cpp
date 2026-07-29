@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/datamap/datamap.hpp"
 
+#include <algorithm>
+#include <cctype>
+
 namespace signalwire {
 namespace datamap {
 
@@ -61,7 +64,13 @@ DataMap& DataMap::webhook(const std::string& method, const std::string& url, con
                           const std::string& form_param, bool input_args_as_params,
                           const std::vector<std::string>& require_args) {
   json wh;
-  wh["method"] = method;
+  // The reference upper-cases the method on the wire (core/data_map.py:230,
+  // `"method": method.upper()`), so the same program emits byte-identical SWML in
+  // both languages. The engine itself compares case-insensitively.
+  std::string upper_method = method;
+  std::transform(upper_method.begin(), upper_method.end(), upper_method.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+  wh["method"] = upper_method;
   wh["url"] = url;
   if (!headers.empty()) {
     wh["headers"] = headers;

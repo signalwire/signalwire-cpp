@@ -45,32 +45,40 @@ Each agent is a self-contained microservice that generates [SWML](docs/swml_serv
 
 <!-- include: examples/quickstart_agent.cpp#agent -->
 ```cpp
-#include <signalwire/agent/agent_base.hpp>
 #include <ctime>
+#include <iostream>
+#include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 class MyAgent : public agent::AgentBase {
-public:
-    MyAgent() : AgentBase("my-agent", "/agent") {
-        add_language({"English", "en-US", "inworld.Mark"});
-        prompt_add_section("Role", "You are a helpful assistant.");
+ public:
+  MyAgent() : AgentBase("my-agent", "/agent") {
+    add_language({"English", "en-US", "inworld.Mark"});
+    prompt_add_section("Role", "You are a helpful assistant.");
 
-        define_tool("get_time", "Get the current time",
-            {{"type", "object"}, {"properties", json::object()}},
-            [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
-                auto now = std::time(nullptr);
-                char buf[32];
-                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
-                return swaig::FunctionResult(std::string("The time is ") + buf);
-            });
-    }
+    define_tool("get_time", "Get the current time",
+                {{"type", "object"}, {"properties", json::object()}},
+                [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
+                  auto now = std::time(nullptr);
+                  char buf[32];
+                  std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
+                  return swaig::FunctionResult(std::string("The time is ") + buf);
+                });
+  }
 };
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     MyAgent agent;
     agent.run();  // Serves on http://0.0.0.0:3000/agent
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 ```
 
@@ -124,27 +132,24 @@ Real-time call control and messaging over WebSocket. The RELAY client connects t
 
 <!-- include: examples/quickstart_relay.cpp#relay -->
 ```cpp
-#include <signalwire/relay/client.hpp>
-
 #include <iostream>
+#include <signalwire/relay/client.hpp>
 
 using namespace signalwire::relay;
 
 int main() {
-    auto client = RelayClient::from_env();
+  auto client = RelayClient::from_env();
 
-    client.on_call([](Call& call) {
-        call.answer();
-        auto action = call.play({
-            {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
-        });
-        if (!action.wait()) {  // false = call ended before playback finished
-            std::cerr << "playback interrupted\n";
-        }
-        call.hangup();
-    });
+  client.on_call([](Call& call) {
+    call.answer();
+    auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}});
+    if (!action.wait()) {  // false = call ended before playback finished
+      std::cerr << "playback interrupted\n";
+    }
+    call.hangup();
+  });
 
-    client.run();
+  client.run();
 }
 ```
 
@@ -163,23 +168,32 @@ Synchronous REST client for managing SignalWire resources and controlling calls 
 
 <!-- include: examples/quickstart_rest.cpp#rest -->
 ```cpp
+#include <iostream>
 #include <signalwire/rest/rest_client.hpp>
 
 using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     auto client = RestClient::from_env();
 
     auto agents = client.fabric().ai_agents.list();
-    auto call   = client.calling().dial({
-        .from = "+15559876543", .to = "+15551234567",
+    auto call = client.calling().dial({
+        .from = "+15559876543",
+        .to = "+15551234567",
         .url = "https://example.com/handler",
     });
     auto numbers = client.phone_numbers().search({{"areacode", "512"}});
     auto results = client.datasphere().documents.search({
         .query_string = "billing policy",
     });
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 ```
 

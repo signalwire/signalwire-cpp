@@ -31,11 +31,9 @@ using json = nlohmann::json;
 struct ServerlessTokenAccess;
 
 /**
- * Cross-language SDK contract: `signalwire.utils.is_serverless_mode`
- * returns `true` whenever the SDK is running inside any short-lived /
- * event-driven invocation environment (anything other than `"server"`).
- *
- * Mirrors `signalwire.utils.is_serverless_mode` in the Python reference.
+ * Whether the SDK is running inside a short-lived / event-driven invocation
+ * environment, as opposed to a long-lived server process. Determined from
+ * `core::logging_config::get_execution_mode()`.
  *
  * @return `true` unless the detected mode is `"server"`.
  */
@@ -44,7 +42,7 @@ struct ServerlessTokenAccess;
 /**
  * A platform-neutral serverless response: the `(status, headers, body)` shape
  * every dispatch handler produces. Lambda/Azure return this as a struct; GCF /
- * CGI additionally emit it to stdout when serving live (mirrors php's Adapter).
+ * CGI additionally emit it to stdout when serving live.
  */
 struct ServerlessResponse {
   int status = 200;
@@ -59,7 +57,6 @@ struct ServerlessResponse {
  * (HTTP API v2 `rawPath` / `requestContext.http.method`, REST API v1
  * `httpMethod` / `path`, base64-decoding `isBase64Encoded` bodies), calls
  * `agent.handle_request(...)`, and returns the API-Gateway-shaped response.
- * Mirrors php `Adapter::handleLambda`.
  */
 [[nodiscard]] ServerlessResponse handle_lambda(agent::AgentBase& agent, const json& event,
                                                const json& context = json::object());
@@ -67,8 +64,7 @@ struct ServerlessResponse {
 /**
  * Dispatch a Google Cloud Function invocation from an explicit request tuple
  * (the live GCF path reads these from the runtime; the tuple form is what the
- * dispatcher and tests feed in). Calls `agent.handle_request(...)`. Mirrors
- * php `Adapter::handleGcf`.
+ * dispatcher and tests feed in). Calls `agent.handle_request(...)`.
  */
 [[nodiscard]] ServerlessResponse handle_gcf(agent::AgentBase& agent, const std::string& method,
                                             const std::string& path,
@@ -77,7 +73,7 @@ struct ServerlessResponse {
 
 /**
  * Dispatch an Azure Functions invocation from a request object (method / url /
- * headers / body). Mirrors php `Adapter::handleAzure`.
+ * headers / body).
  */
 [[nodiscard]] ServerlessResponse handle_azure(agent::AgentBase& agent, const json& request);
 
@@ -85,7 +81,7 @@ struct ServerlessResponse {
  * Dispatch a CGI / FastCGI invocation. Reads REQUEST_METHOD / PATH_INFO /
  * CONTENT_TYPE / HTTP_* from `env` (defaulting to the process environment when
  * `env` is empty) and takes the request body explicitly (the live path reads
- * it from stdin via CONTENT_LENGTH). Mirrors php `Adapter::handleCgi`.
+ * it from stdin via CONTENT_LENGTH).
  */
 [[nodiscard]] ServerlessResponse handle_cgi(agent::AgentBase& agent,
                                             const std::map<std::string, std::string>& env,
@@ -94,8 +90,7 @@ struct ServerlessResponse {
 /**
  * Auto-detect (or force) the serverless platform and dispatch the request to
  * the matching handler, returning the `(status, headers, body)` response.
- * Mirrors Python `ServerlessMixin.handle_serverless_request(event, context,
- * mode)`: `mode` (empty = auto-detect via get_execution_mode) selects
+ * `mode` (empty = auto-detect via `get_execution_mode`) selects
  * lambda / google_cloud_function / azure_function / cgi. An unknown/`"server"`
  * mode renders SWML via a plain GET `handle_request` so a dispatch always
  * produces a real response (never a fall-through to serve()).

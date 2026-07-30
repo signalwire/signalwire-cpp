@@ -15,14 +15,11 @@ namespace skills {
 /// `document_id` travels in the JSON body alongside `query_string`, `count`
 /// and `distance`, with Basic auth derived from `project_id:token`.
 ///
-/// Wire shape verified against the reference
-/// (`signalwire/skills/datasphere/skill.py`): `self.api_url` is
-/// `.../api/datasphere/documents/search` (no per-document path segment), the
-/// payload carries `document_id`, and the response array is **`chunks`**, not
-/// `results` — the reference comments that explicitly ("DataSphere API returns
-/// 'chunks', not 'results'"). Rendering mirrors `_format_search_results`:
-/// an "I found N result(s) for 'q'" header, then `=== RESULT n ===` blocks
-/// reading `text` → `content` → `chunk` → raw JSON.
+/// Wire shape: the URL is `.../api/datasphere/documents/search` with NO
+/// per-document path segment, the payload carries `document_id`, and the
+/// response array is **`chunks`** — NOT `results`, which is the easy mistake
+/// here. Rendering emits an "I found N result(s) for 'q'" header, then
+/// `=== RESULT n ===` blocks reading `text` → `content` → `chunk` → raw JSON.
 ///
 /// `DATASPHERE_BASE_URL` env var overrides the upstream URL (used by
 /// `audit_skills_dispatch.py`); when unset, the real upstream is built

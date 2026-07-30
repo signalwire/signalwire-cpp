@@ -28,7 +28,7 @@ namespace relay {
 
 using json = nlohmann::json;
 
-/// Error returned by the RELAY server (Python: ``relay.client.RelayError``).
+/// Error returned by the RELAY server.
 /// Carries the server-supplied JSON-RPC error ``code`` + ``message``.
 class RelayError : public std::runtime_error {
  public:
@@ -63,8 +63,8 @@ struct RelayConfig {
   std::string token;
   /// JWT bearer credential — the alternative to project/token. When set, the
   /// connect frame authenticates with ``{"jwt_token": …}`` and project/token
-  /// are not required (the project id is inside the token). Mirrors the
-  /// reference's ``RelayClient(jwt_token=…)`` / ``SIGNALWIRE_JWT_TOKEN``.
+  /// are not required (the project id is inside the token). Also settable via
+  /// the ``SIGNALWIRE_JWT_TOKEN`` environment variable.
   std::string jwt_token;
   std::string host = DEFAULT_HOST;
   int port = DEFAULT_PORT;
@@ -111,28 +111,22 @@ class RelayClient {
   void on_call(InboundCallHandler handler);
 
   /// Dial outbound. The `devices` argument is the nested
-  /// "device-of-leg-of-leg" array used by the Python SDK
-  /// (`[[{type:phone,...}]]`). Returns a Call once the server emits
-  /// calling.call.dial(answered) for the dial's tag, or an empty Call
-  /// on timeout / failure.
+  /// "device-of-leg-of-leg" array (`[[{type:phone,...}]]`). Returns a Call once
+  /// the server emits calling.call.dial(answered) for the dial's tag, or an
+  /// empty Call on timeout / failure.
   ///
-  /// PARAMETER ORDER follows the reference exactly
-  /// (relay/client.py:498 — ``dial(devices, *, tag, max_duration,
-  /// dial_timeout)``). It previously read
+  /// PARAMETER ORDER CHANGED: this previously read
   /// ``(devices, tag, dial_timeout_ms, max_duration)``, so a positional third
-  /// argument meant the OPPOSITE thing in this port from what it means in the
-  /// reference. Callers passing a positional 3rd/4th argument must swap them.
+  /// argument now means something different. Callers passing a positional
+  /// 3rd/4th argument must swap them.
   ///
   /// `tag` lets callers pin an explicit dial tag for journal-based
   /// assertions; if blank, a UUID is generated.
   /// `max_duration` is the max call duration in MINUTES, forwarded into the
-  /// calling.dial frame when non-zero (reference: "Optional max call duration
-  /// in minutes").
+  /// calling.dial frame when non-zero.
   /// `dial_timeout` is how long, in SECONDS, dial() blocks waiting for the
   /// server's terminal dial event. ABSENT by default; the body substitutes
-  /// 120s, exactly as the reference does
-  /// (``timeout = dial_timeout if dial_timeout is not None else 120.0``).
-  /// Note the UNIT: this used to be `dial_timeout_ms` in milliseconds.
+  /// 120s. Note the UNIT: this used to be `dial_timeout_ms` in milliseconds.
   Call dial(const json& devices, const std::string& tag = "", int max_duration = 0,
             std::optional<double> dial_timeout = std::nullopt);
 
@@ -163,17 +157,15 @@ class RelayClient {
   void subscribe(const std::vector<std::string>& contexts);
   void unsubscribe(const std::vector<std::string>& contexts);
 
-  /// Subscribe to additional contexts for inbound events (Python:
-  /// ``RelayClient.receive``). Sends ``signalwire.receive`` on the assigned
-  /// protocol so inbound calls on ``contexts`` start being delivered; can be
-  /// called after ``connect()`` to add contexts without reconnecting. Thin
-  /// Python-named alias of ``subscribe``.
+  /// Subscribe to additional contexts for inbound events. Sends
+  /// ``signalwire.receive`` on the assigned protocol so inbound calls on
+  /// ``contexts`` start being delivered; can be called after ``connect()`` to
+  /// add contexts without reconnecting. Thin alias of ``subscribe``.
   void receive(const std::vector<std::string>& contexts) { subscribe(contexts); }
 
-  /// Unsubscribe from contexts for inbound events (Python:
-  /// ``RelayClient.unreceive``). Sends ``signalwire.unreceive`` to stop
-  /// receiving inbound calls on ``contexts``. Thin Python-named alias of
-  /// ``unsubscribe``.
+  /// Unsubscribe from contexts for inbound events. Sends
+  /// ``signalwire.unreceive`` to stop receiving inbound calls on ``contexts``.
+  /// Thin alias of ``unsubscribe``.
   void unreceive(const std::vector<std::string>& contexts) { unsubscribe(contexts); }
 
   // Accessors
@@ -184,26 +176,25 @@ class RelayClient {
   // (`self.project` / `self.token` / `self.jwt_token` / `self.host` /
   // `self.contexts`). The port stores them in `config_`; these read them back
   // under the reference's flat names.
-  /// reference: ``self.project`` — the SignalWire project id (empty under JWT auth).
+  /// The SignalWire project id (empty under JWT auth).
   const std::string& project() const { return config_.project; }
-  /// reference: ``self.token`` — the API token (unused under JWT auth).
+  /// The API token (unused under JWT auth).
   const std::string& token() const { return config_.token; }
-  /// reference: ``self.jwt_token`` — the JWT credential; when non-empty the
-  /// connect frame authenticates with it instead of project/token.
+  /// The JWT credential; when non-empty the connect frame authenticates with
+  /// it instead of project/token.
   const std::string& jwt_token() const { return config_.jwt_token; }
-  /// reference: ``self.host`` — the RELAY host (a bare hostname, not a URL).
+  /// The RELAY host (a bare hostname, not a URL).
   const std::string& host() const { return config_.host; }
-  /// reference: ``self.contexts`` — the contexts subscribed at connect.
+  /// The contexts subscribed at connect.
   const std::vector<std::string>& contexts() const { return config_.contexts; }
 
   /// Server-assigned session id captured from the `signalwire.connect`
   /// handshake result (`result.sessionid`). Empty until a successful
   /// connect. Production code never needs this — it exists so the test
   /// harness can scope the mock's journal/scenarios/pushes to this client's
-  /// session and run safely under parallel execution. Python's RelayClient
-  /// keeps the equivalent internal too; exposing a read-only accessor here
-  /// (rather than a bare public field) keeps it off the mutable surface.
-  /// Documented in PORT_ADDITIONS.md as cpp_relay_session_id_accessor.
+  /// session and run safely under parallel execution. Exposed as a read-only
+  /// accessor rather than a bare public field to keep it off the mutable
+  /// surface.
   const std::string& session_id() const { return session_id_; }
 
   // JSON-RPC execution (used by Call and Action objects)

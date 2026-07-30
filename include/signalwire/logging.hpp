@@ -32,10 +32,9 @@ enum class LogLevel { Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4 };
 /// suppressed.
 ///
 /// Every message is scrubbed of control characters ON THE EMISSION PATH before
-/// it is written. This is log-injection defence, and matches the reference
-/// registering ``strip_control_chars`` in both of its structlog processor
-/// chains: without it a caller-supplied ``\x00`` or ``\x1b[`` escape reaches
-/// the terminal verbatim and can forge log lines.
+/// it is written. This is log-injection defence: without it a caller-supplied
+/// ``\x00`` or ``\x1b[`` escape reaches the terminal verbatim and can forge log
+/// lines.
 ///
 /// Distinct from ``signalwire::logging::Logger`` (``signalwire/logging/
 /// logger.hpp``), which is a per-component NAMED logger created by value.
@@ -92,11 +91,10 @@ class Logger {
         break;
     }
 
-    // Scrub control characters BEFORE emitting — log-injection defence, and the
-    // reason the reference registers strip_control_chars in both of its structlog
-    // processor chains. A port that merely EXPOSES the scrub without putting it on
-    // the emission path offers no protection at all: a caller-supplied `\x00` or a
-    // `\x1b[` escape reaches the terminal verbatim and can forge log lines.
+    // Scrub control characters BEFORE emitting — log-injection defence. Merely
+    // EXPOSING the scrub without putting it on the emission path offers no
+    // protection at all: a caller-supplied `\x00` or a `\x1b[` escape reaches
+    // the terminal verbatim and can forge log lines.
     const std::string safe =
         ::signalwire::core::logging_config::strip_control_chars_str(std::string(message));
 

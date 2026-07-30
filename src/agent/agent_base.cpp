@@ -30,10 +30,9 @@ namespace agent {
 
 namespace {
 
-/// Load the ``service`` section of the agent's config file, mirroring the
-/// reference's ``AgentBase._load_service_config(config_file, name)``: use the
-/// explicit path when given, else discover one for this service name; return
-/// an empty object when nothing loads.
+/// Load the ``service`` section of the agent's config file: use the explicit
+/// path when given, else discover one for this service name; return an empty
+/// object when nothing loads.
 json load_service_config(const std::optional<std::string>& config_file,
                          const std::string& service_name) {
   std::optional<std::string> path = config_file;

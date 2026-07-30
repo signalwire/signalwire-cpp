@@ -17,10 +17,9 @@ namespace core {
 namespace logging_config {
 
 /**
- * Cross-language SDK contract for serverless / deployment-mode detection.
+ * Detect the serverless / deployment mode from the environment.
  *
- * Mirrors `signalwire.core.logging_config.get_execution_mode` in the
- * Python reference. Order of precedence (FIRST match wins):
+ * Order of precedence (FIRST match wins):
  *
  *   1. GATEWAY_INTERFACE                                       -> "cgi"
  *   2. AWS_LAMBDA_FUNCTION_NAME or LAMBDA_TASK_ROOT            -> "lambda"
@@ -37,8 +36,7 @@ std::string get_execution_mode();
 
 /**
  * Configure the SDK logging system once, globally, from environment
- * variables (idempotent). Mirrors Python's
- * ``signalwire.core.logging_config.configure_logging``. Reads
+ * variables (idempotent). Reads
  * ``SIGNALWIRE_LOG_MODE`` (off/stderr/default/auto) and
  * ``SIGNALWIRE_LOG_LEVEL`` and applies them to the process logger. Safe to
  * call repeatedly; only the first call takes effect until
@@ -48,35 +46,25 @@ void configure_logging();
 
 /**
  * Reset the one-shot logging-configured flag so a subsequent
- * ``configure_logging`` call re-reads the environment. Mirrors Python's
- * ``reset_logging_configuration`` (useful when env vars change at runtime).
+ * ``configure_logging`` call re-reads the environment. Useful when env vars
+ * change at runtime.
  */
 void reset_logging_configuration();
 
 /**
  * Obtain the SDK logger, configuring it on first access. This is the single
- * entry point every SDK module should use, mirroring Python's
- * ``signalwire.core.logging_config.get_logger``.
+ * entry point every SDK module should use.
  *
- * Returns a NAMED logger so a CALLER CAN ACTUALLY LOG, and so ``name`` means
- * something. It previously returned ``bool`` (the internal configured-once flag)
- * and discarded ``name`` entirely, which left the canonical entry point unable
- * to hand back a logger at all — a caller had to already know to reach into a
- * different header. Every other port returns a logger object here (ts
- * ``Logger``, go ``*logging.Logger``, java / php / rust / dotnet ``Logger``,
- * ruby ``Logging::Logger``), so the ``bool`` form was a functional gap, not an
- * idiom. It went unnoticed because the reference records this function's return
- * as ``any``, and the signature differ treats ``any`` as matching anything on
- * either side.
+ * Returns a NAMED logger BY VALUE, so the caller can log directly and ``name``
+ * is honoured. Delegates to ``signalwire::logging::get_logger(name)``; the only
+ * thing this entry point adds is the guarantee that ``configure_logging`` has
+ * run first.
  *
- * Delegates to ``signalwire::logging::get_logger(name)``, which already built
- * the named-logger form — this entry point simply guarantees configuration has
- * happened first, which is exactly the reference's single-entry-point contract.
- * (Note ``signalwire::get_logger()``, no argument, is a THIRD overload returning
- * the process singleton by reference; it is unrelated to this contract.)
+ * (Note ``signalwire::get_logger()``, taking no argument, is a DIFFERENT
+ * overload returning the process singleton by reference; it is unrelated to
+ * this contract.)
  *
- * @param name Logical logger name, as in the reference's per-module
- *   ``get_logger(__name__)``.
+ * @param name Logical logger name, conventionally the calling module's name.
  */
 ::signalwire::logging::Logger get_logger(const std::string& name);
 
@@ -85,23 +73,20 @@ void reset_logging_configuration();
  *
  * Removes ASCII control chars except ``\t``, ``\n`` and ``\r``.
  *
- * INTERNAL: the reference's public contract is the event-map form
+ * INTERNAL helper: the public entry point is the event-map form
  * (``strip_control_chars`` below); this is the per-value scrub that form is
- * built out of, and the unit the emitter needs. Not port surface.
+ * built out of.
  */
 std::string strip_control_chars_str(const std::string& value);
 
 /**
  * Strip control characters from log event values to prevent log injection.
  *
- * Mirrors ``signalwire.core.logging_config.strip_control_chars``: takes the log
- * event map, scrubs every STRING value, and returns the map. Non-string values
- * pass through untouched, exactly as the reference's ``isinstance(value, str)``
- * guard does.
+ * Takes the log event map, scrubs every STRING value, and returns the map.
+ * Non-string values pass through untouched.
  *
- * The reference registers this in BOTH of its structlog processor chains, so the
- * scrub sits on the real emission path rather than merely being available; this
- * port does the same from ``signalwire::logging::Logger::log``.
+ * This is called from ``signalwire::logging::Logger::log``, so the scrub sits
+ * on the real emission path rather than merely being available to callers.
  */
 nlohmann::json strip_control_chars(const nlohmann::json& event_dict);
 

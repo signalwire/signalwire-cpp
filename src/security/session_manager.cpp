@@ -16,12 +16,11 @@ namespace signalwire {
 namespace security {
 
 namespace {
-/// Truncate to 8 chars + "..." when longer (matches the authoritative
-/// reference's debug_token component redaction).
+/// Truncate to 8 chars + "..." when longer — the redaction ``debug_token``
+/// applies to each token component.
 std::string truncate8(const std::string& s) { return s.size() > 8 ? s.substr(0, 8) + "..." : s; }
 
-/// Format a Unix timestamp as an ISO-8601 UTC string (matches Python's
-/// datetime.fromtimestamp(...).isoformat() closely enough for the debug view).
+/// Format a Unix timestamp as an ISO-8601 UTC string, for the debug view.
 std::string iso8601_utc(int64_t ts) {
   std::time_t t = static_cast<std::time_t>(ts);
   std::tm tm_buf{};

@@ -229,9 +229,7 @@ std::string build_url(const ParsedUrl& p, const std::string& port_override) {
   return out;
 }
 
-/// Return the URL variants to try for Scheme B port normalization.
-///
-/// Mirrors ``_candidate_urls`` in the Python reference:
+/// Return the URL variants to try for Scheme B port normalization:
 ///   - non-standard explicit port  -> just the input URL
 ///   - https + no port             -> input + url with :443
 ///   - http  + no port             -> input + url with :80

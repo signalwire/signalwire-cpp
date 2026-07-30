@@ -34,14 +34,13 @@ class Action {
   const std::string& control_id() const { return state_->control_id; }
   const std::string& state() const;
   [[nodiscard]] bool completed() const;
-  /// Corresponds to ``Action.is_done`` — whether the action has finished.
+  /// Whether the action has finished. Alias of ``completed()``.
   [[nodiscard]] bool is_done() const { return completed(); }
   const json& result() const;
   const std::string& call_id() const { return state_->call_id; }
   const std::string& node_id() const { return state_->node_id; }
 
-  /// The Call this action runs on (reference: ``Action.__init__(call, …)``
-  /// stores ``self.call``). The port's Action carries the client + call_id
+  /// The Call this action runs on. `Action` carries the client + call_id
   /// rather than a Call reference — because the client's registry OWNS the
   /// Call and an Action outliving a raw Call& would dangle — so the
   /// back-reference is resolved through that registry. ``nullptr`` when the
@@ -78,15 +77,14 @@ class Action {
   }
 
   /// Detect actions resolve on the first event carrying a `detect`
-  /// payload, not on a state(finished) — see Python's DetectAction.
-  /// When this flag is set the action's update_state path resolves
-  /// only when `params.detect` is present.
+  /// payload, not on a state(finished). When this flag is set the action's
+  /// update_state path resolves only when `params.detect` is present.
   void set_resolve_on_detect(bool flag) { state_->resolve_on_detect = flag; }
   bool resolve_on_detect() const { return state_->resolve_on_detect; }
 
   /// Collect actions resolve when an event carries a `result` payload.
   /// A play(finished) earlier in the timeline does NOT resolve a
-  /// CollectAction — see Python's CollectAction terminal-event logic.
+  /// CollectAction.
   void set_resolve_on_result(bool flag) { state_->resolve_on_result = flag; }
   bool resolve_on_result() const { return state_->resolve_on_result; }
 
@@ -103,8 +101,7 @@ class Action {
 
   /// Request the server to pause this action. The optional `behavior`
   /// (e.g. "continuous" for record-side pause) is sent as the `behavior`
-  /// frame field only when provided — matching Python's
-  /// `pause(behavior: str | None = None)`.
+  /// frame field only when provided; otherwise the field is omitted.
   void pause(const std::optional<std::string>& behavior = std::nullopt);
 
   /// Request the server to resume this action.
@@ -114,8 +111,7 @@ class Action {
   /// supplied amount in dB; positive boosts, negative attenuates.
   void volume(double amount);
 
-  /// Start the inter-digit / final-digit timers on a collect. The
-  /// matching Python method is StandaloneCollectAction.start_input_timers.
+  /// Start the inter-digit / final-digit timers on a collect.
   void start_input_timers();
 
   /// Set a callback to fire when the action completes.
@@ -144,8 +140,8 @@ class Action {
   /// `method_prefix` (default `calling.play`) determines which RPC the control
   /// commands send — a `record()` action carries `calling.record` so `stop()`
   /// emits `calling.record.stop`. `event_type_filter`, `resolve_on_detect`, and
-  /// `resolve_on_result` encode the verb-specific completion semantics that the
-  /// reference splits across per-verb Action subclasses. `client` is a
+  /// `resolve_on_result` encode the verb-specific completion semantics on the
+  /// unified base rather than in per-verb subclasses. `client` is a
   /// NON-OWNING back-pointer used to send those frames.
   ///
   /// The second group is the completion rendezvous: `mutex` guards

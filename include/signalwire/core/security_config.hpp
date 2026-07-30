@@ -3,12 +3,9 @@
 //
 // Unified security configuration for SignalWire services.
 //
-// C++ port of the Python reference
-// ``signalwire.core.security_config.SecurityConfig`` (cross-checked against the
-// Java ``com.signalwire.sdk.core.SecurityConfig``). Provides centralized
-// security settings (SSL, allowed hosts, CORS, security headers, basic auth)
-// consumed by the web/agent services so behavior stays consistent. Defaults are
-// applied first, then environment variables (backward compatibility), then a
+// Provides centralized security settings (SSL, allowed hosts, CORS, security
+// headers, basic auth) consumed by the web/agent services so behavior stays
+// consistent. Defaults are applied first, then environment variables, then a
 // config file if available (highest priority).
 #pragma once
 
@@ -23,7 +20,7 @@ namespace core {
 using json = nlohmann::json;
 
 /// Result of ``SecurityConfig::validate_ssl_config``: a validity flag plus an
-/// optional error message (Python returns ``(bool, str | None)``).
+/// error message that is set only when ``valid`` is false.
 struct SslValidationResult {
   bool valid = false;
   std::optional<std::string> error;
@@ -62,7 +59,7 @@ struct SslValidationResult {
 /// max-age.
 class SecurityConfig {
  public:
-  // Security environment variable names (mirror the Python class constants).
+  // Security environment variable names.
   static constexpr const char* SSL_ENABLED = "SWML_SSL_ENABLED";
   static constexpr const char* SSL_CERT_PATH = "SWML_SSL_CERT_PATH";
   static constexpr const char* SSL_KEY_PATH = "SWML_SSL_KEY_PATH";
@@ -84,8 +81,8 @@ class SecurityConfig {
   explicit SecurityConfig(const std::optional<std::string>& config_file = std::nullopt,
                           const std::optional<std::string>& service_name = std::nullopt);
 
-  /// Load configuration from environment variables (public; part of the
-  /// Python surface — called by the ctor and re-callable).
+  /// Load configuration from environment variables. Called by the constructor,
+  /// and safe to call again to re-read the environment.
   void load_from_env();
 
   /// Validate SSL configuration. When SSL is disabled the result is always
@@ -93,12 +90,10 @@ class SecurityConfig {
   [[nodiscard]] SslValidationResult validate_ssl_config() const;
 
   /// SSL options for binding an HTTPS server. Empty when SSL is disabled or
-  /// validation fails; otherwise EXACTLY the reference's two keys and nothing
-  /// else — ``ssl_certfile`` (the cert path) and ``ssl_keyfile`` (the key
-  /// path). This is byte-identical to Python's ``get_ssl_context_kwargs``;
-  /// C++ does NOT substitute a "neutral" ``{ssl_enabled, cert_path,
-  /// key_path}`` map. Pinned by
-  /// ``security_config_ssl_context_kwargs_matches_python_when_enabled``.
+  /// validation fails; otherwise EXACTLY two keys and nothing else —
+  /// ``ssl_certfile`` (the cert path) and ``ssl_keyfile`` (the key path). It is
+  /// deliberately NOT a ``{ssl_enabled, cert_path, key_path}`` map; the key
+  /// spelling is part of the contract and is pinned by a test.
   [[nodiscard]] json get_ssl_context_kwargs() const;
 
   /// Get basic auth credentials, generating a random URL-safe password when
@@ -121,7 +116,7 @@ class SecurityConfig {
   /// Log the current security configuration (never logs secrets).
   void log_config(const std::string& service_name) const;
 
-  // Accessors (matches the Python public attributes).
+  // Accessors.
   [[nodiscard]] bool ssl_enabled() const { return ssl_enabled_; }
   [[nodiscard]] const std::optional<std::string>& ssl_cert_path() const { return ssl_cert_path_; }
   [[nodiscard]] const std::optional<std::string>& ssl_key_path() const { return ssl_key_path_; }

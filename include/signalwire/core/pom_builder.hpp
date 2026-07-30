@@ -3,20 +3,16 @@
 //
 // PomBuilder — standalone builder for structured POM prompts.
 //
-// C++ port of the Python reference
-// ``signalwire.core.pom_builder.PomBuilder`` (cross-checked against the Java
-// ``com.signalwire.sdk.core.PomBuilder``). A flexible wrapper around the
-// existing ``signalwire::pom::PromptObjectModel`` (see
-// ``include/signalwire/pom/pom.hpp``) that allows dynamic creation of sections
+// A flexible wrapper around the existing ``signalwire::pom::PromptObjectModel``
+// (see ``include/signalwire/pom/pom.hpp``) that allows dynamic creation of sections
 // on demand, adding content to existing sections, nesting subsections, and
 // rendering to Markdown or XML. There are no predefined section types. All
 // mutator methods return ``*this`` for fluent chaining.
 //
 // Section lookup: rather than caching ``Section*`` (which vector growth would
 // invalidate), sections are resolved by title through
-// ``PromptObjectModel::find_section`` on each access — that recursive search
-// resolves top-level sections, matching the Python ``_sections`` map for the
-// operations this builder performs (all keyed by top-level section title).
+// ``PromptObjectModel::find_section`` on each access. Every operation this
+// builder performs is keyed by top-level section title.
 #pragma once
 
 #include <nlohmann/json.hpp>

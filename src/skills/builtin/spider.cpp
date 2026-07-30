@@ -16,14 +16,12 @@ namespace skills {
 namespace {
 
 /// Drop each element matched by `xpaths` — tag AND its inner content —
-/// before any tag-stripping runs. Mirrors the reference's
-/// ``_fast_text_extract``, which walks ``self.remove_xpaths`` and calls
-/// ``elem.drop_tree()`` on every hit, so a ``<script>``/``<style>`` body never
+/// before any tag-stripping runs, so a ``<script>``/``<style>`` body never
 /// reaches the extracted text. Without this the naive tag-strip below turns
 /// script source and CSS into "scraped content".
 ///
-/// The reference's defaults are all plain ``//tag`` element selectors; that is
-/// the shape supported here (a full XPath engine is not vendored). An entry the
+/// Only plain ``//tag`` element selectors are supported (a full XPath engine is
+/// not vendored), which is the shape the default selector set uses. An entry the
 /// resolver does not understand is skipped rather than silently mangling the
 /// document.
 std::string drop_xpath_elements(const std::string& html, const std::vector<std::string>& xpaths) {
@@ -66,9 +64,9 @@ std::string strip_html(const std::string& html, const std::vector<std::string>& 
 
 /// Apply the SPIDER_BASE_URL override (used by audit fixtures) by replacing
 /// the host portion of `url` with `base`. If `base` is empty or `url` has
-/// no parseable host, returns `url` untouched. This is how Python's port
-/// reroutes scrape requests to a loopback fixture for the audit while
-/// keeping the per-call URL the LLM passed in.
+/// no parseable host, returns `url` untouched. This reroutes scrape requests
+/// to a loopback fixture for the audit while keeping the per-call URL the LLM
+/// passed in.
 std::string apply_base_override(const std::string& url, const std::string& base) {
   if (base.empty()) {
     return url;
@@ -94,7 +92,6 @@ std::string apply_base_override(const std::string& url, const std::string& base)
 
 /// Spider scrape skill — issues a real GET against the URL the LLM passes
 /// in. Strips HTML tags from the response and returns the text payload.
-/// Matches Python `SpiderSkill`'s scrape_url behavior.
 ///
 /// `SPIDER_BASE_URL` env var overrides the host portion of the URL the
 /// caller passes in (used by `audit_skills_dispatch.py` to redirect
@@ -113,9 +110,9 @@ class SpiderSkill : public SkillBase {
   }
 
   /// XPath expressions for the elements stripped from a fetched page before
-  /// text extraction (reference: ``self.remove_xpaths``, set in ``__init__``
-  /// to this same PREFILLED list — not an empty default). Callers read it to
-  /// see what gets dropped; ``set_remove_xpaths`` replaces the set.
+  /// text extraction. PREFILLED at construction — deliberately not an empty
+  /// default. Callers read it to see what gets dropped;
+  /// ``set_remove_xpaths`` replaces the set.
   [[nodiscard]] const std::vector<std::string>& remove_xpaths() const { return remove_xpaths_; }
   void set_remove_xpaths(const std::vector<std::string>& xpaths) { remove_xpaths_ = xpaths; }
 
@@ -235,8 +232,9 @@ class SpiderSkill : public SkillBase {
   }
 
  private:
-  /// The reference PREFILLS this in ``__init__`` — it is not an empty default.
-  /// Same seven selectors, same order.
+  /// PREFILLED at construction — deliberately NOT an empty default. These
+  /// seven selectors, in this order, are what a scrape strips before extracting
+  /// text.
   std::vector<std::string> remove_xpaths_{
       "//script", "//style", "//nav", "//header", "//footer", "//aside", "//noscript",
   };

@@ -145,11 +145,10 @@ struct CollectEvent : public RelayEvent {
   std::string control_id;
   std::string state;
   /// The collect result is a structured object (e.g.
-  /// ``{"type":"digit","params":{"digits":"1234"}}``), not a scalar — the
-  /// reference records ``result: dict``. Reading it as a string drops the payload.
+  /// ``{"type":"digit","params":{"digits":"1234"}}``), not a scalar.
+  /// Reading it as a string drops the payload.
   json result = json::object();
-  /// Tri-state: absent (nullopt), true, or false — matches Python
-  /// ``final: bool | None``.
+  /// Tri-state: absent (nullopt), true, or false.
   std::optional<bool> final;
   [[nodiscard]] static CollectEvent from_payload(const json& payload) {
     RelayEvent base = RelayEvent::from_payload(payload);

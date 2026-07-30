@@ -19,8 +19,6 @@ using json = nlohmann::json;
 /// transformed into ``amazon_bedrock`` and voice/inference params are folded
 /// into the prompt object (Bedrock carries voice + inference inside ``prompt``,
 /// not as sibling fields).
-///
-/// Corresponds to ``signalwire.agents.bedrock.BedrockAgent``.
 class BedrockAgent : public agent::AgentBase {
  public:
   explicit BedrockAgent(const std::string& name = "bedrock_agent",
@@ -32,8 +30,8 @@ class BedrockAgent : public agent::AgentBase {
   /// Set the Bedrock voice ID (e.g. "matthew", "joanna").
   void set_voice(const std::string& voice_id);
 
-  /// Update Bedrock inference params. A negative value leaves that param
-  /// unchanged (mirrors Python's ``None`` = "don't update").
+  /// Update Bedrock inference params. A negative value means "don't update" and
+  /// leaves that param unchanged.
   void set_inference_params(double temperature = -1.0, double top_p = -1.0, int max_tokens = -1);
 
   /// Not applicable for Bedrock (fixed voice-to-voice model) — logs a warning.
@@ -49,7 +47,7 @@ class BedrockAgent : public agent::AgentBase {
   /// Not applicable for Bedrock — use set_inference_params() instead; logs a warning.
   void set_prompt_llm_params(const json& params = json::object());
 
-  /// String representation (Python: ``__repr__``).
+  /// String representation of this agent, for debugging and logging.
   [[nodiscard]] std::string repr() const;
 
  protected:

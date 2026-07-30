@@ -22,8 +22,7 @@ using json = nlohmann::json;
 /// yields the IDENTICAL wire shape the hand-written
 /// `{{"type",...},{"params",...}}` map produces.
 ///
-/// Additive idiom (PORT_ADDITIONS.md): the raw-`json` connect/dial/refer/tap
-/// overloads stay canonical (matching Python's nested dict/list). `Device` is a
+/// The raw-`json` connect/dial/refer/tap overloads stay canonical. `Device` is a
 /// typed convenience for assembling that map with a named field instead of
 /// stringly keys — `Device{"phone", {{"to_number", to}}}` reads better than the
 /// brace-soup and can't typo the two top-level keys.

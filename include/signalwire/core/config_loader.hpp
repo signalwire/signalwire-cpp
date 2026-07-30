@@ -3,18 +3,14 @@
 //
 // Configuration loader with environment-variable substitution.
 //
-// C++ port of the Python reference
-// ``signalwire.core.config_loader.ConfigLoader`` (cross-checked against the
-// Java ``com.signalwire.sdk.core.ConfigLoader``). Supports ``${VAR|default}``
-// syntax for referencing environment variables within configuration files. The
-// first existing, parseable file in the search paths wins.
+// Supports ``${VAR|default}`` syntax for referencing environment variables
+// within configuration files. The first existing, parseable file in the search
+// paths wins.
 //
-// Idiom mapping: the C++ port parses JSON only — the vendored ``nlohmann::json``
-// is a JSON library and the port carries no YAML dependency, so ``.yaml``/
-// ``.yml`` files are NOT supported here (the Python/Java ports also default to
-// JSON config files; the default search paths are all ``*.json``). After
-// substitution, string values that look like booleans/integers/floats are
-// coerced to those native JSON types.
+// JSON only: the vendored ``nlohmann::json`` is a JSON library and there is no
+// YAML dependency, so ``.yaml``/``.yml`` files are NOT supported (the default
+// search paths are all ``*.json``). After substitution, string values that look
+// like booleans/integers/floats are coerced to those native JSON types.
 #pragma once
 
 #include <nlohmann/json.hpp>
@@ -51,9 +47,9 @@ using json = nlohmann::json;
 /// only where the config does not already define the key: **the config file
 /// wins over the environment**, the opposite precedence from ``SecurityConfig``.
 ///
-/// C++-port note: JSON only. The vendored ``nlohmann::json`` is a JSON library
-/// and the port carries no YAML dependency, so ``.yaml``/``.yml`` files are not
-/// supported (every default search path is a ``*.json``).
+/// JSON only. The vendored ``nlohmann::json`` is a JSON library and there is no
+/// YAML dependency, so ``.yaml``/``.yml`` files are not supported (every
+/// default search path is a ``*.json``).
 class ConfigLoader {
  public:
   /// Initialize the config loader.
@@ -62,10 +58,10 @@ class ConfigLoader {
   ///   parseable file wins.
   explicit ConfigLoader(const std::optional<std::vector<std::string>>& config_paths = std::nullopt);
 
-  /// The config file paths this loader searches, in order (reference:
-  /// ``self.config_paths``) — the caller-supplied list, or the default search
-  /// paths when none was given. A caller hands these in, so a caller can read
-  /// back exactly which paths were consulted.
+  /// The config file paths this loader searches, in order — the
+  /// caller-supplied list, or the default search paths when none was given. A
+  /// caller hands these in, so a caller can read back exactly which paths were
+  /// consulted.
   [[nodiscard]] const std::vector<std::string>& config_paths() const { return config_paths_; }
 
   /// Check if a configuration was loaded.

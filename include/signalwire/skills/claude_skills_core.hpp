@@ -4,13 +4,13 @@
 
 // Shared core for the claude_skills skill's SKILL.md discovery + tool building.
 //
-// Ports Python signalwire/skills/claude_skills/skill.py: each immediate
-// subdirectory of skills_path that contains a SKILL.md is discovered, its YAML
-// frontmatter (name/description) parsed, and one SWAIG tool declared per skill
-// (name = {tool_prefix}{sanitized-name}, description from the frontmatter,
-// handler returns the SKILL.md body). NATIVE EXECUTION of skill scripts is
-// impossible in this AOT port, so the port discovers + declares the tools and
-// serves their instructions; it does not run embedded code.
+// Each immediate subdirectory of skills_path that contains a SKILL.md is
+// discovered, its YAML frontmatter (name/description) parsed, and one SWAIG
+// tool declared per skill (name = {tool_prefix}{sanitized-name}, description
+// from the frontmatter, handler returns the SKILL.md body). Executing a
+// skill's scripts is not possible from an ahead-of-time-compiled binary, so
+// this discovers + declares the tools and serves their instructions; it does
+// not run embedded code.
 //
 // This header is included by BOTH claude_skills implementations in the tree —
 // the registered `ClaudeSkillsSkillR` in skill_registry.cpp and the
@@ -127,7 +127,7 @@ inline bool parse_skill_md(const fs::path& path, DiscoveredSkill& out) {
 }
 
 /// Sanitize a skill name into a SWAIG-safe tool suffix (lowercase, non
-/// [a-z0-9_] -> '_'), mirroring the reference's ``_sanitize_tool_name``.
+/// [a-z0-9_] -> '_').
 inline std::string sanitize_tool_name(const std::string& name) {
   std::string out;
   out.reserve(name.size());

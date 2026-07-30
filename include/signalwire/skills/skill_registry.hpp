@@ -79,12 +79,10 @@ class SkillRegistry {
 
   /// Add a directory to search for skills.
   ///
-  /// Mirrors Python's
-  /// ``signalwire.skills.registry.SkillRegistry.add_skill_directory``:
-  /// validate that the path exists and is a directory, then append it
-  /// (de-duplicated) to ``external_paths_``. Throws
-  /// ``std::invalid_argument`` (the C++ analog of Python's ``ValueError``)
-  /// for invalid input — the path doesn't exist or isn't a directory.
+  /// Validates that the path exists and is a directory, then appends it
+  /// (de-duplicated) to the external search paths. Throws
+  /// ``std::invalid_argument`` when the path doesn't exist or isn't a
+  /// directory.
   void add_skill_directory(const std::string& path) {
     std::lock_guard<std::mutex> lock(mutex_);
     struct stat st;
@@ -102,16 +100,14 @@ class SkillRegistry {
     external_paths_.push_back(path);
   }
 
-  /// Look up a skill factory by name (Python:
-  /// ``SkillRegistry.get_skill_class`` — returns the skill *type*). C++ has no
-  /// first-class ``type`` object, so this returns whether the skill is known
-  /// (the factory exists); use ``create`` to instantiate. Mirrors the
-  /// discovery-by-name contract.
+  /// Look up a skill factory by name. C++ has no first-class ``type`` object,
+  /// so this returns whether the skill is known (its factory exists); use
+  /// ``create`` to instantiate one.
   [[nodiscard]] bool get_skill_class(const std::string& name) const { return has_skill(name); }
 
-  /// Discover all registered skills as ``{name, ...}`` records (Python:
-  /// ``SkillRegistry.discover_skills`` -> list of dicts). Each record carries
-  /// the skill name and its instance-level schema where available.
+  /// Discover all registered skills as an ARRAY of ``{name, ...}`` records.
+  /// Each record carries the skill name and its instance-level schema where
+  /// available.
   [[nodiscard]] nlohmann::json discover_skills() const {
     std::lock_guard<std::mutex> lock(mutex_);
     nlohmann::json out = nlohmann::json::array();
@@ -123,8 +119,8 @@ class SkillRegistry {
     return out;
   }
 
-  /// Return every registered skill's parameter schema keyed by skill name
-  /// (Python: ``SkillRegistry.get_all_skills_schema`` -> dict[name -> schema]).
+  /// Return every registered skill's parameter schema as a JSON OBJECT keyed by
+  /// skill name (name -> schema).
   [[nodiscard]] nlohmann::json get_all_skills_schema() const {
     std::lock_guard<std::mutex> lock(mutex_);
     nlohmann::json out = nlohmann::json::object();
@@ -136,9 +132,9 @@ class SkillRegistry {
   }
 
   /// Return the source (built-in vs external directory) each skill was loaded
-  /// from (Python: ``SkillRegistry.list_all_skill_sources`` -> dict[source ->
-  /// list of names]). Built-in factories are grouped under ``"builtin"``; the
-  /// registered external directories are listed under ``"external"``.
+  /// from, as a JSON OBJECT of source -> list of names. Built-in factories are
+  /// grouped under ``"builtin"``; the registered external directories are
+  /// listed under ``"external"``.
   [[nodiscard]] nlohmann::json list_all_skill_sources() const {
     std::lock_guard<std::mutex> lock(mutex_);
     nlohmann::json out = nlohmann::json::object();
@@ -168,10 +164,9 @@ class SkillRegistry {
   /// Returns the effective external skill directories: the ones registered via
   /// ``add_skill_directory`` PLUS any supplied through the
   /// ``SIGNALWIRE_SKILL_PATHS`` environment variable (colon-separated, deduped,
-  /// registered paths first). Mirrors Python's ``SkillRegistry`` search order,
-  /// which appends ``os.environ["SIGNALWIRE_SKILL_PATHS"]`` (split on
-  /// ``os.pathsep``) to the registered ``_external_paths`` when resolving a
-  /// skill by name.
+  /// registered paths first). This is the search order used when resolving a
+  /// skill by name: registered directories are consulted before the
+  /// environment-supplied ones.
   [[nodiscard]] std::vector<std::string> external_paths() const {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::string> paths = external_paths_;
@@ -193,7 +188,7 @@ class SkillRegistry {
  private:
   /// Parse the ``SIGNALWIRE_SKILL_PATHS`` env var into a list of directories
   /// (colon-separated, empty entries dropped). Read on every call so a var set
-  /// after construction still takes effect, matching Python's search-time read.
+  /// after construction still takes effect.
   [[nodiscard]] static std::vector<std::string> env_skill_paths_locked() {
     std::vector<std::string> out;
     const char* raw = std::getenv("SIGNALWIRE_SKILL_PATHS");

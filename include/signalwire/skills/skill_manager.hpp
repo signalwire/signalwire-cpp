@@ -26,25 +26,21 @@ class SkillManager {
  public:
   SkillManager() = default;
 
-  /// Construct bound to the agent this manager loads skills into. Mirrors the
-  /// reference's ``SkillManager(agent)``.
+  /// Construct bound to the agent this manager loads skills into.
   explicit SkillManager(agent::AgentBase& agent) : agent_(&agent) {}
 
-  /// The agent this manager loads skills into (reference: ``self.agent``).
-  /// ``nullptr`` for a default-constructed manager, on which ``load_skill``
-  /// fails loud — the reference's manager is always agent-bound.
+  /// The agent this manager loads skills into. ``nullptr`` for a
+  /// default-constructed manager, on which ``load_skill`` fails loud — a
+  /// manager is normally agent-bound.
   [[nodiscard]] agent::AgentBase* agent() const { return agent_; }
 
   /// Load a skill by name and register it with this manager's bound agent.
   ///
-  /// Mirrors the reference's
-  /// ``load_skill(skill_name, skill_class=None, params=None)``
-  /// (core/skill_manager.py:26) — BOTH trailing parameters are optional.
+  /// BOTH trailing parameters are optional.
   ///
   /// @param skill_class Optional explicit factory for the skill. When absent,
-  ///   the skill is looked up in ``SkillRegistry`` by name, exactly as the
-  ///   reference does (``skill_registry.get_skill_class(skill_name)``).
-  ///   ``SkillFactory`` is C++'s spelling of the reference's class object.
+  ///   the skill is looked up in ``SkillRegistry`` by name via
+  ///   ``SkillRegistry::get_skill_class(skill_name)``.
   /// @param params Optional parameters handed to the skill's setup.
   ///
   /// Requires a manager constructed with an agent; returns false and logs when
@@ -62,18 +58,17 @@ class SkillManager {
   /// List loaded skills
   [[nodiscard]] std::vector<std::string> list_loaded() const;
 
-  // ---- Public surface (signalwire.core.skill_manager.SkillManager) --
+  // ---- Public surface ------------------------------------------------
 
-  /// Whether a skill is loaded (Python: ``has_skill``). Alias of is_loaded.
+  /// Whether a skill is loaded. Alias of ``is_loaded``.
   [[nodiscard]] bool has_skill(const std::string& skill_name) const {
     return is_loaded(skill_name);
   }
 
-  /// List loaded skill names (Python: ``list_loaded_skills``). Alias of list_loaded.
+  /// List loaded skill names. Alias of ``list_loaded``.
   [[nodiscard]] std::vector<std::string> list_loaded_skills() const { return list_loaded(); }
 
-  /// Get a loaded skill instance by name, or nullptr if not loaded
-  /// (Python: ``get_skill``).
+  /// Get a loaded skill instance by name, or nullptr if not loaded.
   [[nodiscard]] SkillBase* get_skill(const std::string& skill_name) const;
 
   /// Cleanup all skills

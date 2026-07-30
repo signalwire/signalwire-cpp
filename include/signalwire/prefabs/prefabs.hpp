@@ -24,8 +24,8 @@ class InfoGathererAgent : public agent::AgentBase {
   InfoGathererAgent& set_completion_message(const std::string& msg);
   InfoGathererAgent& set_prefix(const std::string& prefix);
 
-  /// Per-request question producer (dynamic mode). Mirrors the Python
-  /// callback signature (query_params, body_params, headers) -> questions.
+  /// Per-request question producer (dynamic mode):
+  /// (query_params, body_params, headers) -> questions.
   using QuestionCallback = std::function<std::vector<json>(
       const json& query_params, const json& body_params, const json& headers)>;
 
@@ -37,17 +37,15 @@ class InfoGathererAgent : public agent::AgentBase {
   /// Dynamic-config hook: in static mode returns null (no override); in
   /// dynamic mode invokes the question callback (or a name/message fallback)
   /// and returns a {"global_data": {questions, question_index, answers}}
-  /// override object. Mirrors Python InfoGathererAgent.on_swml_request
-  /// (prefabs/info_gatherer.py:162), whose three parameters are all optional.
+  /// override object. All three parameters are optional.
   ///
-  /// @param request_data The parsed POST body — the reference's
-  ///   ``body_params = request_data or {}``.
-  /// @param callback_path Optional callback path (unused here, as in the
-  ///   reference, but part of the hook's contract).
-  /// @param request The request object the reference reads ``query_params``
-  ///   and ``headers`` off. Modelled here as a JSON object with those two
-  ///   keys; absent/!object yields empty maps for both, exactly as the
-  ///   reference's ``if request and hasattr(request, ...)`` guards do.
+  /// @param request_data The parsed POST body; treated as an empty object when
+  ///   absent.
+  /// @param callback_path Optional callback path — unused here, but part of
+  ///   the hook's contract.
+  /// @param request The request object ``query_params`` and ``headers`` are
+  ///   read off. Modelled as a JSON object with those two keys; when it is
+  ///   absent or not an object, both are treated as empty maps.
   json on_swml_request(const json& request_data = nullptr,
                        const std::optional<std::string>& callback_path = std::nullopt,
                        const json& request = nullptr);
@@ -75,34 +73,31 @@ class SurveyAgent : public agent::AgentBase {
   SurveyAgent& set_questions(const std::vector<json>& questions);
   SurveyAgent& set_completion_message(const std::string& msg);
   SurveyAgent& set_intro_message(const std::string& msg);
-  /// The survey's display name (reference: ``self.survey_name``), used in the
-  /// default introduction.
+  /// The survey's display name, used in the default introduction.
   SurveyAgent& set_survey_name(const std::string& name);
-  /// The brand/company name (reference: ``self.brand_name``, default
-  /// "Our Company").
+  /// The brand/company name. Defaults to "Our Company".
   SurveyAgent& set_brand_name(const std::string& name);
-  /// Maximum retries for an invalid answer (reference: ``self.max_retries``,
-  /// default 2).
+  /// Maximum retries for an invalid answer. Defaults to 2.
   SurveyAgent& set_max_retries(int retries);
 
-  // Configuration the reference keeps as public instance attributes; a caller
-  // supplies each of these, so a caller reads each back.
-  /// reference: ``self.survey_name``
+  // Configuration accessors: a caller supplies each of these, so a caller
+  // reads each back.
+  /// The survey's display name.
   [[nodiscard]] const std::string& survey_name() const { return survey_name_; }
-  /// reference: ``self.questions`` — the question objects driving the survey.
+  /// The question objects driving the survey.
   [[nodiscard]] const std::vector<json>& questions() const { return survey_questions_; }
-  /// reference: ``self.brand_name``
+  /// The brand/company name.
   [[nodiscard]] const std::string& brand_name() const { return brand_name_; }
-  /// reference: ``self.introduction`` — the opening line; defaults to
+  /// The opening line; defaults to
   /// "Welcome to our <survey_name>. We appreciate your participation."
   [[nodiscard]] const std::string& introduction() const { return introduction_; }
-  /// reference: ``self.conclusion`` — the closing line; defaults to
+  /// The closing line; defaults to
   /// "Thank you for completing our survey. Your feedback is valuable to us."
   [[nodiscard]] const std::string& conclusion() const { return conclusion_; }
-  /// reference: ``self.max_retries``
+  /// Maximum retries for an invalid answer.
   [[nodiscard]] int max_retries() const { return max_retries_; }
 
-  /// Register a post-prompt summary callback (Python SurveyAgent.on_summary).
+  /// Register a post-prompt summary callback.
   /// Wires through to AgentBase::on_summary.
   SurveyAgent& on_summary(agent::SummaryCallback cb);
 
@@ -136,8 +131,7 @@ class ReceptionistAgent : public agent::AgentBase {
   ReceptionistAgent& set_greeting(const std::string& greeting);
   ReceptionistAgent& set_transfer_message(const std::string& msg);
 
-  /// Register a post-prompt summary callback (Python
-  /// ReceptionistAgent.on_summary override point). Wires through to
+  /// Register a post-prompt summary callback. Wires through to
   /// AgentBase::on_summary.
   ReceptionistAgent& on_summary(agent::SummaryCallback cb);
 };
@@ -151,20 +145,20 @@ class FAQBotAgent : public agent::AgentBase {
   FAQBotAgent& set_faqs(const std::vector<json>& faqs);
   FAQBotAgent& set_no_match_message(const std::string& msg);
   FAQBotAgent& set_suggest_related(bool suggest);
-  /// The bot's personality description (reference: ``self.persona``).
+  /// The bot's personality description.
   FAQBotAgent& set_persona(const std::string& persona);
 
-  // Configuration the reference keeps as public instance attributes.
-  /// reference: ``self.faqs`` — the FAQ items ({question, answer, categories}).
+  // Configuration accessors.
+  /// The FAQ items ({question, answer, categories}).
   [[nodiscard]] const std::vector<json>& faqs() const { return faqs_; }
-  /// reference: ``self.suggest_related`` — whether related questions are
-  /// suggested alongside an answer (default true).
+  /// Whether related questions are suggested alongside an answer
+  /// (default true).
   [[nodiscard]] bool suggest_related() const { return suggest_related_; }
-  /// reference: ``self.persona`` — defaults to "You are a helpful FAQ bot that
-  /// provides accurate answers to common questions."
+  /// The bot's personality description; defaults to "You are a helpful FAQ bot
+  /// that provides accurate answers to common questions."
   [[nodiscard]] const std::string& persona() const { return persona_; }
 
-  /// Register a post-prompt summary callback (Python FAQBotAgent.on_summary).
+  /// Register a post-prompt summary callback.
   /// Wires through to AgentBase::on_summary.
   FAQBotAgent& on_summary(agent::SummaryCallback cb);
 
@@ -190,24 +184,21 @@ class ConciergeAgent : public agent::AgentBase {
   ConciergeAgent& set_venue_name(const std::string& name);
   ConciergeAgent& set_amenities(const std::vector<json>& amenities);
   ConciergeAgent& set_hours(const json& hours);
-  /// The services the venue offers (reference: ``self.services``).
+  /// The services the venue offers.
   ConciergeAgent& set_services(const std::vector<std::string>& services);
-  /// Extra guidance folded into the prompt (reference:
-  /// ``self.special_instructions``).
+  /// Extra guidance folded into the prompt.
   ConciergeAgent& set_special_instructions(const std::vector<std::string>& instructions);
 
-  // Configuration the reference keeps as public instance attributes.
-  /// reference: ``self.venue_name``
+  // Configuration accessors.
+  /// The venue's display name.
   [[nodiscard]] const std::string& venue_name() const { return venue_name_; }
-  /// reference: ``self.amenities`` — the amenity objects ({name, description,
-  /// location, …}).
+  /// The amenity objects ({name, description, location, …}).
   [[nodiscard]] const std::vector<json>& amenities() const { return amenities_; }
-  /// reference: ``self.services``
+  /// The services the venue offers.
   [[nodiscard]] const std::vector<std::string>& services() const { return services_; }
-  /// reference: ``self.hours_of_operation`` — day -> hours; defaults to
-  /// ``{"default": "9 AM - 5 PM"}``.
+  /// Day -> hours; defaults to ``{"default": "9 AM - 5 PM"}``.
   [[nodiscard]] const json& hours_of_operation() const { return hours_of_operation_; }
-  /// reference: ``self.special_instructions``
+  /// Extra guidance folded into the prompt.
   [[nodiscard]] const std::vector<std::string>& special_instructions() const {
     return special_instructions_;
   }
@@ -222,7 +213,7 @@ class ConciergeAgent : public agent::AgentBase {
   /// otherwise points the guest at the front desk.
   swaig::FunctionResult get_directions(const json& args, const json& raw_data);
 
-  /// Register a post-prompt summary callback (Python ConciergeAgent.on_summary).
+  /// Register a post-prompt summary callback.
   /// Wires through to AgentBase::on_summary.
   ConciergeAgent& on_summary(agent::SummaryCallback cb);
 

@@ -37,23 +37,21 @@ struct Message {
   // Identity / outbound metadata. These are write-once-by-construction so
   // sharing across copies isn't required for these fields.
   std::string message_id;
-  /// Wire keys ``from_number`` / ``to_number`` (reference: ``self.from_number``
-  /// / ``self.to_number``). Neither is a C++ reserved word, so the field carries
-  /// the reference's spelling — the shorter ``from``/``to`` was a gratuitous
-  /// divergence from the wire key it is read from.
+  /// Named for the wire keys ``from_number`` / ``to_number`` they are read
+  /// from. The shorter ``from``/``to`` would be a gratuitous divergence from
+  /// those keys (and neither name is a C++ reserved word, so nothing forces it).
   std::string from_number;
   std::string to_number;
   std::string body;
   std::vector<std::string> media;
   std::vector<std::string> tags;
   std::string direction;
-  /// Messaging context this message belongs to (reference: ``self.context``).
-  /// Set from the ``context`` key on an inbound ``messaging.receive`` event and
-  /// from the requested context on an outbound send.
+  /// Messaging context this message belongs to. Set from the ``context`` key on
+  /// an inbound ``messaging.receive`` event and from the requested context on
+  /// an outbound send.
   std::string context;
-  /// Number of SMS segments the carrier split this message into (reference:
-  /// ``self.segments``); populated from the inbound event's ``segments`` key,
-  /// 0 when the server did not report one.
+  /// Number of SMS segments the carrier split this message into; populated from
+  /// the inbound event's ``segments`` key, 0 when the server did not report one.
   int segments = 0;
   std::string region;
 
@@ -94,19 +92,19 @@ struct Message {
 
   // ---- Public surface (signalwire.relay.message.Message) ----------
 
-  /// Whether the message has reached a terminal state (Python: ``is_done``).
+  /// Whether the message has reached a terminal state. Alias of is_terminal.
   [[nodiscard]] bool is_done() const { return is_terminal(); }
 
-  /// Register a terminal-state callback (Python: ``on``). Alias of on_completed.
+  /// Register a terminal-state callback. Alias of on_completed.
   void on(CompletedCallback cb) { on_completed(std::move(cb)); }
 
-  /// Terminal outcome as a JSON object (Python: ``result``): the final state,
-  /// reason, and message id.
+  /// Terminal outcome as a JSON object: the final state, reason, and
+  /// message id.
   [[nodiscard]] json result() const {
     return json::object({{"message_id", message_id}, {"state", state()}, {"reason", reason()}});
   }
 
-  /// String representation (Python: ``__repr__``).
+  /// Compact debug string `Message(id='...', state='...')`.
   [[nodiscard]] std::string repr() const {
     return "Message(id='" + message_id + "', state='" + state() + "')";
   }

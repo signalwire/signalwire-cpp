@@ -2436,6 +2436,89 @@
                     },
                     "description": "An array of JSON objects defining supported languages in the conversation."
                 },
+                "multilingual": {
+                    "type": "object",
+                    "title": "Multilingual",
+                    "description": "ASR-driven multilingual mode. The recognizer runs in code-switching mode and reports the language of each utterance; the agent answers in that language and swaps to the matching voice. Mutually exclusive with `languages` - when both are present the server uses `multilingual`.",
+                    "properties": {
+                        "languages": {
+                            "type": "array",
+                            "description": "Voice entries keyed by BCP-47 base code. Needs a `default` (or first) entry with a voice.",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "language": {
+                                        "type": "string"
+                                    },
+                                    "voice": {
+                                        "type": "string"
+                                    },
+                                    "engine": {
+                                        "type": "string"
+                                    },
+                                    "model": {
+                                        "type": "string"
+                                    },
+                                    "params": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        },
+                        "engine": {
+                            "type": "string",
+                            "description": "ASR engine. Runs in `multi`. Default deepgram."
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "ASR model. Default nova-3."
+                        },
+                        "provider": {
+                            "type": "string",
+                            "description": "ASR provider (deepgram / gladia / grok)."
+                        },
+                        "start_language": {
+                            "type": "string",
+                            "description": "BCP-47 base code the agent opens in. Default `en`."
+                        },
+                        "allowed": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description": "BCP-47 base codes the agent may switch into."
+                        },
+                        "min_switch_words": {
+                            "type": "integer",
+                            "description": "Minimum words in an utterance before a detected-language switch is trusted. Default 2."
+                        },
+                        "fillers": {
+                            "description": "Global speech fillers. Flat array = auto-translate; object = language-keyed map.",
+                            "anyOf": [
+                                {
+                                    "type": "array"
+                                },
+                                {
+                                    "type": "object"
+                                }
+                            ]
+                        },
+                        "function_fillers": {
+                            "description": "Global function-call fillers. Same shape as `fillers`.",
+                            "anyOf": [
+                                {
+                                    "type": "array"
+                                },
+                                {
+                                    "type": "object"
+                                }
+                            ]
+                        }
+                    },
+                    "required": [
+                        "languages"
+                    ]
+                },
                 "params": {
                     "$ref": "#/$defs/AIParams",
                     "description": "A JSON object containing parameters as key-value pairs."

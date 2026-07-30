@@ -37,6 +37,7 @@ import importlib.util as _ilu
 import os as _os
 import sysconfig as _sc
 
+
 def _macos_llvm_prefixes() -> list[str]:
     """Candidate Homebrew LLVM install prefixes on macOS, newest-pinned first.
 
@@ -47,10 +48,9 @@ def _macos_llvm_prefixes() -> list[str]:
     prefixes: list[str] = []
     # `brew --prefix llvm` / versioned kegs, without requiring brew on PATH:
     # probe the standard Apple-silicon and Intel Cellar/opt layouts.
-    import glob as _glob
     for base in ("/opt/homebrew/opt", "/usr/local/opt"):
         # Prefer an explicitly versioned keg (llvm@18, llvm@19, …) then plain llvm.
-        prefixes += sorted(_glob.glob(f"{base}/llvm@*"), reverse=True)
+        prefixes += sorted((str(q) for q in Path(base).glob("llvm@*")), reverse=True)
         prefixes.append(f"{base}/llvm")
     return prefixes
 
@@ -67,7 +67,6 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
     Derived from the same LLVM prefix that provided libclang.dylib so the dylib
     and headers are one self-consistent toolchain.
     """
-    import glob as _glob
     args: list[str] = []
     try:
         sdk = subprocess.run(
@@ -76,7 +75,10 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
         if sdk and Path(sdk).is_dir():
             args += ["-isysroot", sdk]
     except (OSError, subprocess.CalledProcessError) as e:
-        print(f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr)
+        print(
+            f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr
+        )
+
     # Find a libc++ + builtin (resource) header pair. Prefer the prefix that
     # provided libclang.dylib (a self-consistent toolchain); but the pip
     # `libclang` package's dylib lives in clang/native/ with NO headers — in
@@ -84,11 +86,16 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
     # doesn't silently degrade types to `int`.
     def _libcxx_and_builtins(prefix: Path):
         libcxx = prefix / "include" / "c++" / "v1"
-        builtins = sorted(_glob.glob(str(prefix / "lib" / "clang" / "*" / "include")), reverse=True)
+        builtins = sorted(
+            (str(q) for q in (prefix / "lib" / "clang").glob("*/include")), reverse=True
+        )
         return (str(libcxx), builtins[0]) if libcxx.is_dir() and builtins else None
+
     found = None
     if libclang_path:
-        found = _libcxx_and_builtins(Path(libclang_path).parent.parent)  # <prefix>/lib/libclang.dylib
+        found = _libcxx_and_builtins(
+            Path(libclang_path).parent.parent
+        )  # <prefix>/lib/libclang.dylib
     if not found:
         for prefix in _macos_llvm_prefixes():
             found = _libcxx_and_builtins(Path(prefix))
@@ -98,9 +105,11 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
         libcxx, builtins = found
         args += ["-nostdinc++", "-isystem", libcxx, "-isystem", builtins]
     else:
-        print("enumerate_signatures: no matched libc++/builtin headers found on "
-              "macOS (install a Homebrew `llvm` keg); C++ types may degrade to int",
-              file=sys.stderr)
+        print(
+            "enumerate_signatures: no matched libc++/builtin headers found on "
+            "macOS (install a Homebrew `llvm` keg); C++ types may degrade to int",
+            file=sys.stderr,
+        )
     return args
 
 
@@ -155,11 +164,14 @@ def _find_libclang() -> str | None:
         "/usr/lib/x86_64-linux-gnu/libclang-15.so.1",
         # Local-dev fallback: the clang python bindings' bundled native lib,
         # derived from $HOME so it is machine-agnostic.
-        str(Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"),
+        str(
+            Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"
+        ),
     ):
         if Path(cand).is_file():
             return cand
     return None
+
 
 _LIBCLANG = _find_libclang()
 if _LIBCLANG:
@@ -190,9 +202,14 @@ PSDK = _resolve_psdk()
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
     CALLBACK_TYPEDEFS_AS_CALLABLE,
-    CLASS_MODULE_MAP, CLASS_RENAME_MAP, FREE_FUNCTION_RENAMES,
-    MIXIN_PROJECTIONS, _METHOD_RENAMES,
-    camel_to_snake, module_for_class, native_ns_to_module,
+    CLASS_MODULE_MAP,
+    CLASS_RENAME_MAP,
+    FREE_FUNCTION_RENAMES,
+    MIXIN_PROJECTIONS,
+    _METHOD_RENAMES,
+    camel_to_snake,
+    module_for_class,
+    native_ns_to_module,
 )
 
 # Methods whose canonical name should resolve to the OVERLOAD WITH THE MOST
@@ -297,10 +314,10 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
         new_t = t
         for prefix in ("const ", "volatile ", "constexpr "):
             if new_t.startswith(prefix):
-                new_t = new_t[len(prefix):].strip()
+                new_t = new_t[len(prefix) :].strip()
         for suffix in ("&&", "&", "*"):
             if new_t.endswith(suffix):
-                new_t = new_t[:-len(suffix)].strip()
+                new_t = new_t[: -len(suffix)].strip()
         if new_t == t:
             break
         t = new_t
@@ -331,8 +348,7 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
         if head in ("std::optional", "boost::optional"):
             return f"optional<{canon_args[0]}>" if canon_args else "optional<any>"
         if head in ("std::shared_ptr", "std::unique_ptr", "std::weak_ptr"):
-            inner_canon = canon_args[0] if canon_args else "any"
-            return inner_canon
+            return canon_args[0] if canon_args else "any"
         if head in ("std::function",):
             # std::function<R(A,B,...)>
             if canon_args:
@@ -343,7 +359,10 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
                     args_part = args_part[:-1]
                     ret = translate_cpp_type(ret_part, aliases, context)
                     if args_part.strip():
-                        canon_a = [translate_cpp_type(a, aliases, context) for a in split_top_commas(args_part)]
+                        canon_a = [
+                            translate_cpp_type(a, aliases, context)
+                            for a in split_top_commas(args_part)
+                        ]
                     else:
                         canon_a = []
                     return f"callable<list<{','.join(canon_a)}>,{ret}>"
@@ -388,7 +407,7 @@ def _build_rename_by_name() -> dict[str, tuple[str, str]]:
     multiple namespaces in the map, prefer the first registration.
     """
     by_name: dict[str, tuple[str, str]] = {}
-    for (ns, cls_name), (mod, py_cls) in CLASS_RENAME_MAP.items():
+    for (_ns, cls_name), (mod, py_cls) in CLASS_RENAME_MAP.items():
         by_name.setdefault(cls_name, (mod, py_cls))
     return by_name
 
@@ -437,8 +456,7 @@ def _translate_sdk_class_ref(t: str) -> str:
     # table keys on ``(signalwire::rest, AddressesNamespace)``.
     ns_candidates = [ns_path] if ns_path else []
     parts = ns_path.split("::") if ns_path else []
-    for i in range(len(parts) - 1, 0, -1):
-        ns_candidates.append("::".join(parts[:i]))
+    ns_candidates.extend("::".join(parts[:i]) for i in range(len(parts) - 1, 0, -1))
     for ns in ns_candidates:
         if (ns, name) in CLASS_RENAME_MAP:
             target_mod, target_cls = CLASS_RENAME_MAP[(ns, name)]
@@ -454,7 +472,11 @@ def _translate_sdk_class_ref(t: str) -> str:
     mod = module_for_class(name, ns_path)
     if mod:
         return f"class:{mod}.{name}"
-    return f"class:signalwire.{native_ns_to_module(ns_path)}.{name}" if ns_path else f"class:{name}"
+    return (
+        f"class:signalwire.{native_ns_to_module(ns_path)}.{name}"
+        if ns_path
+        else f"class:{name}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -463,7 +485,8 @@ def _translate_sdk_class_ref(t: str) -> str:
 
 
 def walk_translation_unit(
-    tu: TranslationUnit, file_filter: Path,
+    tu: TranslationUnit,
+    file_filter: Path,
 ) -> tuple[list[dict], list[dict], dict[str, list[dict]]]:
     """Walk a clang TU and emit (class entries, free-function entries).
 
@@ -477,7 +500,7 @@ def walk_translation_unit(
 
     def visit(cursor, ns_path: list[str]):
         if cursor.kind in (CursorKind.NAMESPACE,):
-            new_ns = ns_path + [cursor.spelling]
+            new_ns = [*ns_path, cursor.spelling]
             for child in cursor.get_children():
                 visit(child, new_ns)
             return
@@ -496,13 +519,15 @@ def walk_translation_unit(
             if not fname or fname.startswith("_"):
                 return
             params = [_param_record(arg) for arg in cursor.get_arguments()]
-            free_functions.append({
-                "namespace": "::".join(ns_path),
-                "name": fname,
-                "parameters": params,
-                "return_type": cursor.result_type.spelling,
-                "canonical_return_type": cursor.result_type.get_canonical().spelling,
-            })
+            free_functions.append(
+                {
+                    "namespace": "::".join(ns_path),
+                    "name": fname,
+                    "parameters": params,
+                    "return_type": cursor.result_type.spelling,
+                    "canonical_return_type": cursor.result_type.get_canonical().spelling,
+                }
+            )
             return
         if cursor.kind in (CursorKind.CLASS_DECL, CursorKind.STRUCT_DECL):
             if not cursor.is_definition():
@@ -532,11 +557,13 @@ def walk_translation_unit(
                 fname = child.spelling
                 if not fname or fname.startswith("_") or fname.endswith("_"):
                     continue
-                fields.append({
-                    "name": fname,
-                    "type": child.type.spelling,
-                    "canonical_type": child.type.get_canonical().spelling,
-                })
+                fields.append(
+                    {
+                        "name": fname,
+                        "type": child.type.spelling,
+                        "canonical_type": child.type.get_canonical().spelling,
+                    }
+                )
             for child in cursor.get_children():
                 if child.kind == CursorKind.CXX_METHOD:
                     if child.access_specifier.name != "PUBLIC":
@@ -584,17 +611,22 @@ def walk_translation_unit(
             # missing-port drift. The oracle gate is what keeps this from
             # inventing an inventory class out of an internal options struct
             # (``RelayConfig`` has no reference counterpart and stays out).
-            if not methods and fields and \
-                    _oracle_records_class(ns_str, class_name, str(fn.name)):
+            if (
+                not methods
+                and fields
+                and _oracle_records_class(ns_str, class_name, str(fn.name))
+            ):
                 methods = []
             elif not methods:
                 return
-            entries.append({
-                "namespace": ns_str,
-                "name": class_name,
-                "methods": methods,
-                "fields": fields,
-            })
+            entries.append(
+                {
+                    "namespace": ns_str,
+                    "name": class_name,
+                    "methods": methods,
+                    "fields": fields,
+                }
+            )
             return
         # Recurse into other top-level structures
         for child in cursor.get_children():
@@ -617,19 +649,30 @@ def _is_copy_or_move_ctor(cursor) -> bool:
             try:
                 if fn():
                     return True
-            except Exception:
-                pass
+            except (AttributeError, TypeError, ValueError) as e:
+                # The binding exposes the name but cannot evaluate it (older
+                # libclang builds raise instead of returning False). That is
+                # precisely what the structural fallback below exists for, so
+                # carry on -- but SAY which predicate was unusable: a silent
+                # pass here is indistinguishable from "the predicate said no",
+                # and the two have very different consequences for the
+                # ctor/dunder classification this function drives.
+                print(
+                    f"enumerate_signatures: libclang {pred}() unusable ({e}); "
+                    "falling back to the structural copy/move test",
+                    file=sys.stderr,
+                )
     args = list(cursor.get_arguments())
     if len(args) != 1:
         return False
     t = args[0].type.get_canonical().spelling
     for prefix in ("const ", "volatile "):
         while t.startswith(prefix):
-            t = t[len(prefix):]
+            t = t[len(prefix) :]
     t = t.rstrip("&").strip()
     for prefix in ("const ", "volatile "):
         while t.startswith(prefix):
-            t = t[len(prefix):]
+            t = t[len(prefix) :]
     return t.rsplit("::", 1)[-1] == cursor.semantic_parent.spelling
 
 
@@ -706,7 +749,7 @@ def _default_tokens(arg) -> list[str] | None:
     depth = 0
     for i, tok in enumerate(tokens):
         if tok == "=" and depth == 0:
-            rest = tokens[i + 1:]
+            rest = tokens[i + 1 :]
             return rest or None
         if tok in _NON_BRACKET_OPS:
             continue
@@ -974,7 +1017,11 @@ def _is_foldable_sentinel(canon_type: str, value) -> bool:
     for sentinel in _FOLDABLE_SENTINELS[kind]:
         if type(sentinel) is type(value) and sentinel == value:
             return True
-        if kind == "float" and isinstance(value, (int, float)) and float(sentinel) == float(value):
+        if (
+            kind == "float"
+            and isinstance(value, (int, float))
+            and float(sentinel) == float(value)
+        ):
             return True
     return False
 
@@ -1056,7 +1103,8 @@ def _param_names_from_list(param_list: str) -> list[str]:
 
 
 _FORWARD_RE = re.compile(
-    r"^\{\s*return\s+(?:[A-Za-z_]\w*::)*([A-Za-z_]\w*)\s*\((.*)\)\s*;\s*\}$", re.S)
+    r"^\{\s*return\s+(?:[A-Za-z_]\w*::)*([A-Za-z_]\w*)\s*\((.*)\)\s*;\s*\}$", re.S
+)
 
 
 def _pure_forward_target(body: str) -> tuple[str, list[str]] | None:
@@ -1112,7 +1160,8 @@ class GuardIndex:
         self._free: dict[str, list[tuple[str, str, list[str]]]] = {}
         self._defpat = re.compile(r"\b([A-Za-z_]\w*)::([A-Za-z_]\w*)\s*\(", re.M)
         self._freepat = re.compile(
-            r"^[A-Za-z_][\w:<>,\s*&]*?\b([A-Za-z_]\w*)\s*\(", re.M)
+            r"^[A-Za-z_][\w:<>,\s*&]*?\b([A-Za-z_]\w*)\s*\(", re.M
+        )
         for root in roots:
             if not root.is_dir():
                 continue
@@ -1131,7 +1180,7 @@ class GuardIndex:
                 continue
             # A ';' between the parameter list and the next '{' means this was a
             # declaration (or a call), not a definition.
-            if ";" in text[m.end():open_brace]:
+            if ";" in text[m.end() : open_brace]:
                 continue
             depth, i = 0, open_brace
             n = len(text)
@@ -1144,8 +1193,8 @@ class GuardIndex:
                     if depth == 0:
                         break
                 i += 1
-            body = text[open_brace:i + 1]
-            names = _param_names_from_list(text[m.end():open_brace])
+            body = text[open_brace : i + 1]
+            names = _param_names_from_list(text[m.end() : open_brace])
             self._bodies.setdefault((cls, method), []).append((body, text, names))
 
         # Free functions, for the pure-forwarder hop only.
@@ -1154,9 +1203,9 @@ class GuardIndex:
             if name in ("if", "for", "while", "switch", "return", "catch", "sizeof"):
                 continue
             open_brace = text.find("{", m.end())
-            if open_brace < 0 or ";" in text[m.end():open_brace]:
+            if open_brace < 0 or ";" in text[m.end() : open_brace]:
                 continue
-            if "::" in text[m.start():m.end()]:
+            if "::" in text[m.start() : m.end()]:
                 continue  # already captured as a member definition
             depth, i = 0, open_brace
             n = len(text)
@@ -1169,8 +1218,12 @@ class GuardIndex:
                         break
                 i += 1
             self._free.setdefault(name, []).append(
-                (text[open_brace:i + 1], text,
-                 _param_names_from_list(text[m.end():open_brace])))
+                (
+                    text[open_brace : i + 1],
+                    text,
+                    _param_names_from_list(text[m.end() : open_brace]),
+                )
+            )
 
     def guards(self, cls: str, method: str, param: str, index: int, kind: str) -> bool:
         """True when SOME definition of ``cls::method`` guards this parameter.
@@ -1215,7 +1268,8 @@ class GuardIndex:
                 # local DECLARED FROM this parameter qualifies.
                 for alias in re.findall(
                     r"\b(?:auto|[A-Za-z_][\w:<>,\s*&]*?)\s+([A-Za-z_]\w*)\s*=\s*"
-                    + re.escape(name) + r"\s*;",
+                    + re.escape(name)
+                    + r"\s*;",
                     body,
                 ):
                     for pat in patterns:
@@ -1239,10 +1293,14 @@ class GuardIndex:
                     if name not in args:
                         continue
                     arg_index = args.index(name)
-                    for cbody, cfile, cnames in self._free.get(callee, []):
-                        cname = cnames[arg_index] if 0 <= arg_index < len(cnames) else None
+                    for cbody, _cfile, cnames in self._free.get(callee, []):
+                        cname = (
+                            cnames[arg_index] if 0 <= arg_index < len(cnames) else None
+                        )
                         for pat in patterns:
-                            if cname and re.search(pat.format(n=re.escape(cname)), cbody):
+                            if cname and re.search(
+                                pat.format(n=re.escape(cname)), cbody
+                            ):
                                 return True
             if kind == "string":
                 continue
@@ -1252,7 +1310,9 @@ class GuardIndex:
             # spelling is tried for the member lookup once the parameter is known
             # to be used — the definition's local name (``Section::add_subsection``
             # spells ``bullets`` as ``bs``) is not the member's name.
-            if not any(re.search(r"\b" + re.escape(n) + r"\b", body) for n in candidates):
+            if not any(
+                re.search(r"\b" + re.escape(n) + r"\b", body) for n in candidates
+            ):
                 continue
             for name in candidates:
                 for member in _member_spellings(name):
@@ -1276,8 +1336,10 @@ class GuardIndex:
         Only the body and the definition-side parameter names are exposed; the
         file text stays private to the guard scan.
         """
-        return [(body, names)
-                for body, _file_text, names in self._bodies.get((cls, method), [])]
+        return [
+            (body, names)
+            for body, _file_text, names in self._bodies.get((cls, method), [])
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -1301,7 +1363,7 @@ def _merge_overload_optionality(a: dict, b: dict) -> None:
     pa, pb = a.get("params", []), b.get("params", [])
     if len(pa) != len(pb):
         return
-    for x, y in zip(pa, pb):
+    for x, y in zip(pa, pb, strict=False):
         if x.get("kind") == "self" or y.get("kind") == "self":
             continue
         x_opt = x.get("required") is False
@@ -1318,7 +1380,7 @@ def collect(
     aliases: dict,
     raw_free_functions: list[dict] | None = None,
     raw_options_structs: dict[str, list[dict]] | None = None,
-    guards: "GuardIndex | None" = None,
+    guards: GuardIndex | None = None,
 ) -> tuple[dict, list]:
     out_modules: dict = {}
     failures: list = []
@@ -1343,7 +1405,8 @@ def collect(
             fctx = f"construction.{ref}.{f['name']}"
             try:
                 ftype = _translate_with_canonical_fallback(
-                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx)
+                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx
+                )
             except TypeTranslationError:
                 ftype = "any"
             typed[f["name"]] = ftype or "any"
@@ -1360,9 +1423,12 @@ def collect(
             by_class[key]["methods"].extend(entry["methods"])
             by_class[key]["fields"].extend(entry.get("fields") or [])
         else:
-            by_class[key] = {"namespace": ns, "name": name,
-                             "methods": list(entry["methods"]),
-                             "fields": list(entry.get("fields") or [])}
+            by_class[key] = {
+                "namespace": ns,
+                "name": name,
+                "methods": list(entry["methods"]),
+                "fields": list(entry.get("fields") or []),
+            }
 
     for (ns, name), entry in by_class.items():
         # Check CLASS_RENAME_MAP first: (cpp_namespace, cpp_class) →
@@ -1393,11 +1459,15 @@ def collect(
                 # Map C++ keyword-avoidance trailing underscore methods
                 # (delete_, etc.) back to Python's unsuffixed names so the
                 # diff lines up.
-                method_canonical = _METHOD_RENAMES.get(method_canonical, method_canonical)
+                method_canonical = _METHOD_RENAMES.get(
+                    method_canonical, method_canonical
+                )
             ctx = f"{mod}.{name}.{method_canonical}"
             try:
                 sig = build_signature(
-                    m, aliases, ctx,
+                    m,
+                    aliases,
+                    ctx,
                     guards=guards,
                     cpp_class=entry["name"],
                     cpp_method=(entry["name"] if native == "<init>" else native),
@@ -1439,8 +1509,9 @@ def collect(
                     old_typed = _typed_param_count(existing)
                     if new_typed < old_typed:
                         continue
-                    if new_typed == old_typed and \
-                            len(sig["params"]) >= len(existing["params"]):
+                    if new_typed == old_typed and len(sig["params"]) >= len(
+                        existing["params"]
+                    ):
                         continue
                 elif ctx in PREFER_FULL_OVERLOAD:
                     # Keep the LARGER-arity overload (the flat form that
@@ -1476,11 +1547,13 @@ def collect(
             fctx = f"construction.{mod}.{name}.{f['name']}"
             try:
                 ftype = _translate_with_canonical_fallback(
-                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx)
+                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx
+                )
             except TypeTranslationError:
                 ftype = "any"
             struct_fields.setdefault(f"{mod}.{name}", {}).setdefault(
-                f["name"], ftype or "any")
+                f["name"], ftype or "any"
+            )
 
         out_modules.setdefault(mod, {"classes": {}})
         out_modules[mod]["classes"].setdefault(name, {"methods": {}})
@@ -1491,7 +1564,8 @@ def collect(
         # ctor param, so register it under its canonical class-ref too.
         if struct_fields.get(f"{mod}.{name}"):
             options_by_ref.setdefault(
-                f"class:{mod}.{name}", struct_fields[f"{mod}.{name}"])
+                f"class:{mod}.{name}", struct_fields[f"{mod}.{name}"]
+            )
 
     # Mixin projection — methods may live on AgentBase OR SWMLService
     # (Service is the parent class; many tool/auth/state helpers are
@@ -1508,8 +1582,16 @@ def collect(
     # methods are all defined on AgentBase and return ``AgentBase``; the
     # mixin class is just an interface marker. Don't retarget for those —
     # leaving the C++ AgentBase return matches Python's AgentBase return.
-    ab_entry = out_modules.get("signalwire.core.agent_base", {}).get("classes", {}).get("AgentBase")
-    svc_entry = out_modules.get("signalwire.core.swml_service", {}).get("classes", {}).get("SWMLService")
+    ab_entry = (
+        out_modules.get("signalwire.core.agent_base", {})
+        .get("classes", {})
+        .get("AgentBase")
+    )
+    svc_entry = (
+        out_modules.get("signalwire.core.swml_service", {})
+        .get("classes", {})
+        .get("SWMLService")
+    )
     if ab_entry or svc_entry:
         ab_methods = ab_entry["methods"] if ab_entry else {}
         svc_methods = svc_entry["methods"] if svc_entry else {}
@@ -1552,8 +1634,9 @@ def collect(
             # really produced the merged class.
             if retarget_returns:
                 out_modules[target_mod]["classes"][target_cls]["methods"].setdefault(
-                    "agent", {"params": [{"name": "self", "kind": "self"}],
-                              "returns": "any"})
+                    "agent",
+                    {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
+                )
             projected.update(present)
         for n in projected:
             # ``__init__`` is COPIED to the synthetic projection targets
@@ -1657,7 +1740,10 @@ def collect(
     # ``HttpClient`` records request_options POSITIONAL on every transport verb, so
     # it is deliberately excluded.
     _RO_KEYWORD_BASE_CLASSES = {
-        "ReadResource", "CrudResource", "CrudWithAddresses", "FabricResource",
+        "ReadResource",
+        "CrudResource",
+        "CrudWithAddresses",
+        "FabricResource",
     }
     _bm = out_modules.get("signalwire.rest._base", {})
     for _bcls_name, _bcls in _bm.get("classes", {}).items():
@@ -1665,8 +1751,14 @@ def collect(
             continue
         for _bsig in _bcls.get("methods", {}).values():
             _bparams = _bsig.get("params", [])
-            _ro_idx = next((i for i, p in enumerate(_bparams)
-                            if p.get("name") == "request_options"), None)
+            _ro_idx = next(
+                (
+                    i
+                    for i, p in enumerate(_bparams)
+                    if p.get("name") == "request_options"
+                ),
+                None,
+            )
             if _ro_idx is None:
                 continue
             _bparams[_ro_idx]["kind"] = "keyword"
@@ -1674,10 +1766,15 @@ def collect(
             # by libclang as a positional ``dict<string,string>`` / var_keyword map),
             # so request_options lands at the reference's position and ``params`` is
             # the ignored trailing extra.
-            if _ro_idx == len(_bparams) - 1 and len(_bparams) >= 2 \
-                    and _bparams[_ro_idx - 1].get("name") == "params":
-                _bparams[_ro_idx - 1], _bparams[_ro_idx] = \
-                    _bparams[_ro_idx], _bparams[_ro_idx - 1]
+            if (
+                _ro_idx == len(_bparams) - 1
+                and len(_bparams) >= 2
+                and _bparams[_ro_idx - 1].get("name") == "params"
+            ):
+                _bparams[_ro_idx - 1], _bparams[_ro_idx] = (
+                    _bparams[_ro_idx],
+                    _bparams[_ro_idx - 1],
+                )
 
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a
@@ -1792,16 +1889,20 @@ def collect(
     # (the structs inherit from RelayEvent, so the generated-payload parser can't
     # reach them — this handles the inheriting form). Field-vs-getter idiom, RULES §2.
     _project_named_struct_getters(
-        out_modules, "signalwire.relay.event",
-        PORT_ROOT / "include" / "signalwire" / "relay" / "typed_events.hpp")
+        out_modules,
+        "signalwire.relay.event",
+        PORT_ROOT / "include" / "signalwire" / "relay" / "typed_events.hpp",
+    )
 
     # RequestOptions optional-field getters (timeout/retries/retry_on_status/
     # retry_backoff), gated on the oracle's _request_options getter set. abort_signal
     # is a pointer field (documented cpp_field_not_property omission) and merge is a
     # real method libclang already emits — neither is touched here.
     _project_named_struct_getters(
-        out_modules, "signalwire.rest._request_options",
-        PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp")
+        out_modules,
+        "signalwire.rest._request_options",
+        PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp",
+    )
 
     sorted_modules = {}
     for k in sorted(out_modules):
@@ -1823,7 +1924,8 @@ def collect(
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
         "construction": build_construction(
-            sorted_modules, struct_fields, options_by_ref),
+            sorted_modules, struct_fields, options_by_ref
+        ),
     }, failures
 
 
@@ -1832,10 +1934,22 @@ def collect(
 # ---------------------------------------------------------------------------
 
 # Members that are construction MECHANISM, never a construction parameter.
-_CONSTRUCTION_NON_PARAMS = frozenset({
-    "__init__", "__repr__", "__eq__", "from_payload", "from_params", "from_env",
-    "from_json", "to_json", "merge", "build", "builder", "clone",
-})
+_CONSTRUCTION_NON_PARAMS = frozenset(
+    {
+        "__init__",
+        "__repr__",
+        "__eq__",
+        "from_payload",
+        "from_params",
+        "from_env",
+        "from_json",
+        "to_json",
+        "merge",
+        "build",
+        "builder",
+        "clone",
+    }
+)
 
 # C++ ctor / accessor parameter spellings that name the SAME configurable as the
 # reference, under a different word. A RENAME (ALLOWLIST_DISCIPLINE §7 / RULES §2
@@ -1860,8 +1974,9 @@ _CONSTRUCTION_PARAM_RENAMES: dict[str, str] = {
 _TRANSPORT_PARAM_RENAME = ("client", "http")
 
 
-def _construction_params_from_signature(sig: dict, options_by_ref: dict,
-                                        ref_param_names: set) -> dict:
+def _construction_params_from_signature(
+    sig: dict, options_by_ref: dict, ref_param_names: set
+) -> dict:
     """Name-keyed construction params from an emitted ``__init__`` signature.
 
     A parameter whose TYPE is a known options struct is UNFOLDED into that
@@ -1901,8 +2016,9 @@ def _construction_params_from_signature(sig: dict, options_by_ref: dict,
     return params
 
 
-def build_construction(modules: dict, struct_fields: dict,
-                       options_by_ref: dict | None = None) -> dict:
+def build_construction(
+    modules: dict, struct_fields: dict, options_by_ref: dict | None = None
+) -> dict:
     """Return ``{"module.Class": {"params": {name: {type, required}}}}``.
 
     A NAME-KEYED, unordered SET of configurable parameters — order, arity and
@@ -1949,10 +2065,10 @@ def build_construction(modules: dict, struct_fields: dict,
             init = cinfo.get("methods", {}).get("__init__")
             if not isinstance(init, dict):
                 continue
-            ref_names = set(
-                ref_construction.get(f"{mod}.{cls}", {}).get("params", {}))
+            ref_names = set(ref_construction.get(f"{mod}.{cls}", {}).get("params", {}))
             params = _construction_params_from_signature(
-                init, options_by_ref, ref_names)
+                init, options_by_ref, ref_names
+            )
             if params:
                 out[f"{mod}.{cls}"] = {"params": params}
 
@@ -2005,8 +2121,11 @@ def build_construction(modules: dict, struct_fields: dict,
                     continue
                 if not isinstance(msig, dict):
                     continue
-                args = [p for p in msig.get("params", [])
-                        if (p.get("kind") or "positional") not in ("self", "cls")]
+                args = [
+                    p
+                    for p in msig.get("params", [])
+                    if (p.get("kind") or "positional") not in ("self", "cls")
+                ]
                 if len(args) != 1:
                     continue
                 pname = mname[4:]
@@ -2029,8 +2148,11 @@ def build_construction(modules: dict, struct_fields: dict,
         ref_names = set(ref_construction.get(key, {}).get("params", {}))
         params: dict = {}
         for pname, spec in entry["params"].items():
-            if (pname == cpp_transport and ref_transport in ref_names
-                    and cpp_transport not in ref_names):
+            if (
+                pname == cpp_transport
+                and ref_transport in ref_names
+                and cpp_transport not in ref_names
+            ):
                 pname = ref_transport
             pname = _CONSTRUCTION_PARAM_RENAMES.get(f"{key}.{pname}", pname)
             # A rename may collide with an already-canonical name; the ctor
@@ -2043,8 +2165,15 @@ def build_construction(modules: dict, struct_fields: dict,
 
 def _load_rest_sidecar() -> dict:
     """Load the generator's rest_signatures.json (Class::method -> [records])."""
-    sc = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-          / "generated" / "rest_signatures.json")
+    sc = (
+        PORT_ROOT
+        / "include"
+        / "signalwire"
+        / "rest"
+        / "namespaces"
+        / "generated"
+        / "rest_signatures.json"
+    )
     if not sc.is_file():
         return {}
     return json.loads(sc.read_text()).get("methods", {})
@@ -2053,8 +2182,15 @@ def _load_rest_sidecar() -> dict:
 def _generated_class_modules() -> dict[str, str]:
     """Map each generated resource/container CLASS -> its python module, from
     generated_surface_map.json (the same source enumerate_surface projects)."""
-    smap = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-            / "generated" / "generated_surface_map.json")
+    smap = (
+        PORT_ROOT
+        / "include"
+        / "signalwire"
+        / "rest"
+        / "namespaces"
+        / "generated"
+        / "generated_surface_map.json"
+    )
     if not smap.is_file():
         return {}
     return json.loads(smap.read_text())
@@ -2064,10 +2200,10 @@ def _generated_container_members() -> dict[str, list[str]]:
     """Parse the generated namespace-container headers for their public resource
     member fields (FabricNamespace { AiAgents ai_agents; ... }) so the client
     tree's accessor surface can be projected onto the oracle shape."""
-    gen_dir = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-               / "generated")
+    gen_dir = PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces" / "generated"
     out: dict[str, list[str]] = {}
     import re as _re
+
     for hdr in gen_dir.glob("*Namespace.hpp"):
         src = hdr.read_text()
         m = _re.search(r"class (\w+Namespace)\s*\{(.*?)\n\};", src, _re.S)
@@ -2115,19 +2251,24 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
             # map; a miss means the map is stale — fail loud rather than drift.
             raise SystemExit(
                 f"enumerate_signatures: sidecar class {cls!r} not in "
-                f"generated_surface_map.json (regenerate the REST layer)")
+                f"generated_surface_map.json (regenerate the REST layer)"
+            )
         out_modules.setdefault(mod, {"classes": {}})
         cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
         for canon, records in methods.items():
             cls_entry["methods"][canon] = {
-                "params": [{"name": "self", "kind": "self"}] + [dict(r) for r in records],
+                "params": [{"name": "self", "kind": "self"}]
+                + [dict(r) for r in records],
                 "returns": "any",
             }
         # Ensure a constructor is present (POD resource: implicit default ctor).
-        cls_entry["methods"].setdefault("__init__", {
-            "params": [{"name": "self", "kind": "self"}],
-            "returns": "void",
-        })
+        cls_entry["methods"].setdefault(
+            "__init__",
+            {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "void",
+            },
+        )
 
     # Client-tree container accessors: the Python oracle records each namespace
     # container's resource members (FabricNamespace.ai_agents, ...) as zero-arg
@@ -2140,19 +2281,28 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
         if mod is None:
             raise SystemExit(
                 f"enumerate_signatures: container {cls!r} not in "
-                f"generated_surface_map.json (regenerate the REST layer)")
+                f"generated_surface_map.json (regenerate the REST layer)"
+            )
         out_modules.setdefault(mod, {"classes": {}})
         cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
         for member in members:
-            cls_entry["methods"].setdefault(member, {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "any",
-            })
-        cls_entry["methods"].setdefault("__init__", {
-            "params": [{"name": "self", "kind": "self"},
-                       {"name": "http", "type": "any", "required": True}],
-            "returns": "void",
-        })
+            cls_entry["methods"].setdefault(
+                member,
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                },
+            )
+        cls_entry["methods"].setdefault(
+            "__init__",
+            {
+                "params": [
+                    {"name": "self", "kind": "self"},
+                    {"name": "http", "type": "any", "required": True},
+                ],
+                "returns": "void",
+            },
+        )
 
 
 # A public data-member declaration inside one of the generated payload structs,
@@ -2175,6 +2325,7 @@ def _gen_payload_ns_to_module() -> dict[str, str]:
     ``include/``. Import (don't hardcode) so a new payload namespace registered
     for the surface side is automatically covered here too."""
     from enumerate_surface import GENERATED_PAYLOAD_NS  # type: ignore
+
     return dict(GENERATED_PAYLOAD_NS)
 
 
@@ -2216,7 +2367,8 @@ def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
 # it inherits (``: public RelayEvent``), which the generated-payload ``struct Name {``
 # regex above does not. Used for the relay Event dataclasses + RequestOptions.
 _NAMED_STRUCT_RE_SIG = re.compile(
-    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S
+)
 
 
 def _named_struct_public_fields(header: Path) -> dict[str, list[str]]:
@@ -2265,8 +2417,9 @@ def _oracle_class_members(module: str, cls: str) -> set[str]:
     out: set[str] = set(ref_cls.get("methods", {})) if ref_cls else set()
     if module == "signalwire.core.agent_base":
         for mod, entry in ref_modules.items():
-            if mod != "signalwire.core.agent_base" and \
-                    not mod.startswith("signalwire.core.mixins."):
+            if mod != "signalwire.core.agent_base" and not mod.startswith(
+                "signalwire.core.mixins."
+            ):
                 continue
             for cls_entry in entry.get("classes", {}).values():
                 out |= set(cls_entry.get("methods", {}))
@@ -2295,10 +2448,13 @@ def _project_public_fields_as_getters(out_modules: dict, struct_fields: dict) ->
             continue
         for field in fields:
             if field in allowed:
-                cls_entry["methods"].setdefault(field, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+                cls_entry["methods"].setdefault(
+                    field,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
 
 
 def _fold_setter_signatures(out_modules: dict) -> None:
@@ -2330,10 +2486,13 @@ def _fold_setter_signatures(out_modules: dict) -> None:
                 # shape — carrying the setter's ``(self, value) -> Self``
                 # signature over would be a spurious arity/return mismatch
                 # against an attribute.
-                methods.setdefault(target, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+                methods.setdefault(
+                    target,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
 
 
 def _project_named_struct_getters(out_modules: dict, module: str, header: Path) -> None:
@@ -2360,18 +2519,19 @@ def _project_named_struct_getters(out_modules: dict, module: str, header: Path) 
         ref_cls = ref_classes.get(cls)
         if not ref_cls:
             continue
-        oracle_getters = {
-            m for m in ref_cls.get("methods", {}) if m != "__init__"
-        }
+        oracle_getters = {m for m in ref_cls.get("methods", {}) if m != "__init__"}
         present = [f for f in fields if f in oracle_getters]
         if not present:
             continue
         cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
         for field in present:
-            cls_entry["methods"].setdefault(field, {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "any",
-            })
+            cls_entry["methods"].setdefault(
+                field,
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                },
+            )
 
 
 # Oracle-recorded control methods per concrete RELAY call-action (mirrors
@@ -2401,6 +2561,7 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     symbols (abort-loud on a missing one) so nothing is invented. Drops the
     mis-routed native ai_chat modules."""
     import re as _re
+
     client_hpp = PORT_ROOT / "include" / "signalwire" / "ai_chat" / "ai_chat_client.hpp"
     if not client_hpp.is_file():
         return  # port doesn't ship AI-Chat
@@ -2411,7 +2572,8 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
             raise SystemExit(
                 f"enumerate_signatures: AI-Chat projection expected {what} in "
                 f"{client_hpp.name} but it is gone -- fix the projection, do not "
-                f"emit a member the port no longer has")
+                f"emit a member the port no longer has"
+            )
 
     # Client + RAII/verbs the projection reconciles must genuinely exist.
     _need(r"\bclass\s+AIChatClient\b", "class AIChatClient")
@@ -2424,11 +2586,18 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     # The class-B2 ctor-param reads the projection emits below.
     _need(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference self.url)")
     _need(r"\bint\s+code\s*\(\s*\)\s*const", "AIChatError::code")
-    _need(r"\bserver_message\s*\(\s*\)\s*const",
-          "AIChatError::server_message (reference message)")
+    _need(
+        r"\bserver_message\s*\(\s*\)\s*const",
+        "AIChatError::server_message (reference message)",
+    )
     # Options structs whose fields the unfold below relies on.
-    for _s in ("AIChatClientOptions", "CreateConversationOptions", "ChatOptions",
-               "SummarizeOptions", "ConversationTurnOptions"):
+    for _s in (
+        "AIChatClientOptions",
+        "CreateConversationOptions",
+        "ChatOptions",
+        "SummarizeOptions",
+        "ConversationTurnOptions",
+    ):
         _need(rf"\bstruct\s+{_s}\b", f"struct {_s}")
     # Error family + result structs.
     _need(r"\bclass\s+AIChatError\b", "class AIChatError")
@@ -2455,32 +2624,38 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     # idiom divergence (cpp-stateless-transport), NOT invented here.
     aic = {
         "__init__": {
-            "params": [_self(),
-                       _p("project", "optional<string>", False),
-                       _p("token", "optional<string>", False),
-                       _p("space", "optional<string>", False),
-                       _p("url", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("project", "optional<string>", False),
+                _p("token", "optional<string>", False),
+                _p("space", "optional<string>", False),
+                _p("url", "optional<string>", False),
+            ],
             "returns": "void",
         },
         "chat": {
-            "params": [_self(),
-                       _p("conversation_id", "string", True),
-                       _p("message", "string", True),
-                       _p("role", "string", False, "user"),
-                       _p("config_url", "optional<string>", False),
-                       _p("user_metadata", "optional<dict<string,any>>", False),
-                       _p("timeout", "optional<int>", False),
-                       _p("reinit", "bool", False, False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("message", "string", True),
+                _p("role", "string", False, "user"),
+                _p("config_url", "optional<string>", False),
+                _p("user_metadata", "optional<dict<string,any>>", False),
+                _p("timeout", "optional<int>", False),
+                _p("reinit", "bool", False, False),
+            ],
             "returns": "class:signalwire.ai_chat.client.ChatResponse",
         },
         "create_conversation": {
-            "params": [_self(),
-                       _p("conversation_id", "string", True),
-                       _p("config_url", "string", True),
-                       _p("user_message", "optional<string>", False),
-                       _p("timeout", "optional<int>", False),
-                       _p("user_metadata", "optional<dict<string,any>>", False),
-                       _p("reinit", "bool", False, False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("config_url", "string", True),
+                _p("user_message", "optional<string>", False),
+                _p("timeout", "optional<int>", False),
+                _p("user_metadata", "optional<dict<string,any>>", False),
+                _p("reinit", "bool", False, False),
+            ],
             "returns": "class:signalwire.ai_chat.client.ConversationInfo",
         },
         "end": {
@@ -2496,8 +2671,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
             "returns": "class:signalwire.ai_chat.client.ChatLog",
         },
         "summarize": {
-            "params": [_self(), _p("conversation_id", "string", True),
-                       _p("summary_prompt", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("summary_prompt", "optional<string>", False),
+            ],
             "returns": "string",
         },
         # close() is a genuine C++ method (RAII no-op) folded onto the reference
@@ -2513,9 +2691,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
 
     err = {
         "__init__": {
-            "params": [_self(),
-                       _p("code", "optional<int>", True),
-                       _p("message", "string", True)],
+            "params": [
+                _self(),
+                _p("code", "optional<int>", True),
+                _p("message", "string", True),
+            ],
             "returns": "void",
         },
         # code / message: ctor params the reference stores publicly, recorded by
@@ -2525,6 +2705,7 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
         "code": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
         "message": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
     }
+
     # Each result DTO is @dataclass-shaped in the reference: besides ``__init__``
     # the oracle records every field as a zero-arg property getter. The C++ port
     # carries them as public struct fields; emit the oracle's getter shape (self-
@@ -2535,10 +2716,12 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
 
     conv_info = {
         "__init__": {
-            "params": [_self(),
-                       _p("id", "string", True),
-                       _p("status", "string", True),
-                       _p("initial_message", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("id", "string", True),
+                _p("status", "string", True),
+                _p("initial_message", "optional<string>", False),
+            ],
             "returns": "void",
         },
         "id": _getter(),
@@ -2547,10 +2730,12 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
     chat_resp = {
         "__init__": {
-            "params": [_self(),
-                       _p("text", "string", True),
-                       _p("conversation_id", "string", True),
-                       _p("user_event", "optional<dict<string,any>>", False)],
+            "params": [
+                _self(),
+                _p("text", "string", True),
+                _p("conversation_id", "string", True),
+                _p("user_event", "optional<dict<string,any>>", False),
+            ],
             "returns": "void",
         },
         "text": _getter(),
@@ -2559,9 +2744,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
     chat_log = {
         "__init__": {
-            "params": [_self(),
-                       _p("messages", "list<dict<string,any>>", False, "list()"),
-                       _p("call_timeline", "list<dict<string,any>>", False, "list()")],
+            "params": [
+                _self(),
+                _p("messages", "list<dict<string,any>>", False, "list()"),
+                _p("call_timeline", "list<dict<string,any>>", False, "list()"),
+            ],
             "returns": "void",
         },
         "messages": _getter(),
@@ -2569,8 +2756,10 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
 
     # Drop the mis-routed native modules, emit the single canonical one.
-    for _native in ("signalwire.ai_chat.ai_chat_client",
-                    "signalwire.ai_chat.ai_chat_error"):
+    for _native in (
+        "signalwire.ai_chat.ai_chat_client",
+        "signalwire.ai_chat.ai_chat_error",
+    ):
         out_modules.pop(_native, None)
 
     mod = out_modules.setdefault("signalwire.ai_chat.client", {"classes": {}})
@@ -2602,7 +2791,9 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
     )
     if not action_cls:
         return
-    call_mod = out_modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": {}})
+    call_mod = out_modules.setdefault(
+        "signalwire.relay.call", {"classes": {}, "functions": {}}
+    )
     call_classes = call_mod.setdefault("classes", {})
 
     # The BASE ``Action``: the reference declares it in ``signalwire.relay.call``
@@ -2614,7 +2805,15 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
     # project the reference-recorded subset onto relay.call so the base
     # symbol lines up (the richer C++ surface stays under relay.action).
     base_entry = call_classes.setdefault("Action", {"methods": {}})
-    for m in ("__init__", "is_done", "wait", "result", "control_id", "call", "completed"):
+    for m in (
+        "__init__",
+        "is_done",
+        "wait",
+        "result",
+        "control_id",
+        "call",
+        "completed",
+    ):
         if m in action_cls:
             base_entry["methods"].setdefault(m, action_cls[m])
     # ``call`` is REFERENCE surface (relay.call.Action.call), now homed on the
@@ -2672,7 +2871,11 @@ def _project_skill_accessors(out_modules: dict) -> None:
     it; skip it entirely when any source or the accessor is absent, so the
     enumerator can never invent surface the port does not have.
     """
-    for oracle_key, (cpp_files, _cpp_cls, members) in _SKILL_ACCESSOR_PROJECTIONS.items():
+    for oracle_key, (
+        cpp_files,
+        _cpp_cls,
+        members,
+    ) in _SKILL_ACCESSOR_PROJECTIONS.items():
         srcs = [PORT_ROOT / f for f in cpp_files]
         if not all(s.is_file() for s in srcs):
             continue  # skill not implemented in this tree — don't invent it
@@ -2682,15 +2885,22 @@ def _project_skill_accessors(out_modules: dict) -> None:
             # The accessor must be DEFINED (``name() const {`` / ``name() {``),
             # not merely mentioned. A bare call site does not count.
             pat = re.compile(
-                r"\b" + re.escape(accessor) + r"\s*\(\s*\)\s*(?:const\s*)?(?:noexcept\s*)?\{"
+                r"\b"
+                + re.escape(accessor)
+                + r"\s*\(\s*\)\s*(?:const\s*)?(?:noexcept\s*)?\{"
             )
             if not all(pat.search(t) for t in texts):
                 continue
             mod_entry = out_modules.setdefault(module, {"classes": {}, "functions": {}})
-            cls_entry = mod_entry.setdefault("classes", {}).setdefault(cls, {"methods": {}})
+            cls_entry = mod_entry.setdefault("classes", {}).setdefault(
+                cls, {"methods": {}}
+            )
             cls_entry["methods"].setdefault(
                 member,
-                {"params": [{"name": "self", "kind": "self"}], "returns": "list<string>"},
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "list<string>",
+                },
             )
 
 
@@ -2737,23 +2947,27 @@ def _project_gen_payload_getters(out_modules: dict) -> None:
             ref_cls = ref_classes.get(cls)
             if not ref_cls:
                 continue
-            oracle_getters = {
-                m for m in ref_cls.get("methods", {}) if m != "__init__"
-            }
+            oracle_getters = {m for m in ref_cls.get("methods", {}) if m != "__init__"}
             present = [f for f in fields if f in oracle_getters]
             if not present:
                 continue
             cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
             for field in present:
-                cls_entry["methods"].setdefault(field, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+                cls_entry["methods"].setdefault(
+                    field,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
             # Method-less POD: implicit default constructor is available.
-            cls_entry["methods"].setdefault("__init__", {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "void",
-            })
+            cls_entry["methods"].setdefault(
+                "__init__",
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "void",
+                },
+            )
 
 
 def _project_kwargs_shape(out_modules: dict) -> None:
@@ -2880,12 +3094,13 @@ def _is_callable_type(t: str) -> bool:
     """
     t = (t or "").strip()
     if t.startswith("optional<") and t.endswith(">"):
-        t = t[len("optional<"):-1].strip()
+        t = t[len("optional<") : -1].strip()
     return t.startswith("callable<") or t == "callable"
 
 
-def _bag_is_spread(guards: "GuardIndex | None", cls: str, method: str,
-                   param: str, index: int) -> bool:
+def _bag_is_spread(
+    guards: GuardIndex | None, cls: str, method: str, param: str, index: int
+) -> bool:
     """True when SOME definition of ``cls::method`` spreads ``param`` wholesale.
 
     Same position-then-name resolution the guard scan uses: a definition may
@@ -2903,8 +3118,9 @@ def _bag_is_spread(guards: "GuardIndex | None", cls: str, method: str,
     return False
 
 
-def _project_options_carrier(out_modules: dict, options_by_ref: dict,
-                             guards: "GuardIndex | None") -> None:
+def _project_options_carrier(
+    out_modules: dict, options_by_ref: dict, guards: GuardIndex | None
+) -> None:
     """Unfold a method's options carrier into the reference's keyword params.
 
     See the block comment above for the idiom and the two evidence gates. The
@@ -2937,13 +3153,17 @@ def _project_options_carrier(out_modules: dict, options_by_ref: dict,
                     continue
                 ref_sig = ref_methods.get(meth)
                 if ref_sig:
-                    _unfold_one_carrier(sig, ref_sig, options_by_ref,
-                                        guards, cls, meth)
+                    _unfold_one_carrier(sig, ref_sig, options_by_ref, guards, cls, meth)
 
 
-def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
-                        guards: "GuardIndex | None", cls: str,
-                        meth: str) -> None:
+def _unfold_one_carrier(
+    sig: dict,
+    ref_sig: dict,
+    options_by_ref: dict,
+    guards: GuardIndex | None,
+    cls: str,
+    meth: str,
+) -> None:
     port_params = sig.get("params", [])
     ref_params = ref_sig.get("params", [])
     if not port_params or not ref_params:
@@ -2962,11 +3182,14 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
     # The reference records keyword-ONLY params as ``kind: keyword`` and
     # positional-or-keyword ones with no ``kind`` at all; both are settable BY
     # NAME, which is the whole contract a carrier carries, so both qualify.
-    ref_kw = [p for p in ref_params
-              if p.get("name")
-              and (p.get("kind") or "positional") not in (
-                  "self", "cls", "var_keyword", "var_positional")
-              and p.get("required") is False]
+    ref_kw = [
+        p
+        for p in ref_params
+        if p.get("name")
+        and (p.get("kind") or "positional")
+        not in ("self", "cls", "var_keyword", "var_positional")
+        and p.get("required") is False
+    ]
     if not ref_kw:
         return
     port_names = {p.get("name") for p in port_params}
@@ -2977,8 +3200,8 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
     # The C++ definition's parameter list has no ``self``, so a port param's
     # position in the C++ signature is its index MINUS the leading self/cls.
     self_offset = sum(
-        1 for p in port_params
-        if (p.get("kind") or "positional") in ("self", "cls"))
+        1 for p in port_params if (p.get("kind") or "positional") in ("self", "cls")
+    )
     for idx, p in enumerate(port_params):
         if (p.get("kind") or "positional") in ("self", "cls"):
             continue
@@ -3012,7 +3235,8 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
             # not manufacture a knob the port cannot set.
             unfold = [rp for rp in target if rp["name"] in fields]
         elif ptype == "any" and _bag_is_spread(
-                guards, cls, meth, name, idx - self_offset):
+            guards, cls, meth, name, idx - self_offset
+        ):
             # UNTYPED-BAG form: a proven wholesale spread reaches every key, so
             # every remaining reference knob is settable — but ONLY the ones a
             # JSON object can actually hold. A ``const json&`` cannot carry a
@@ -3022,8 +3246,7 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
             # ``detect_answering_machine`` and ``transcribe``.) A callable knob
             # the port genuinely lacks stays missing and keeps reporting drift,
             # which is the honest result.
-            unfold = [rp for rp in target
-                      if not _is_callable_type(rp.get("type", ""))]
+            unfold = [rp for rp in target if not _is_callable_type(rp.get("type", ""))]
         else:
             continue
         if not unfold:
@@ -3042,7 +3265,7 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
             np["required"] = False
             np["default"] = rp.get("default")
             replacement.append(np)
-        tail = port_params[idx + 1:]
+        tail = port_params[idx + 1 :]
         # A port param the reference declares KEYWORD-ONLY carries the same kind
         # as its unfolded siblings. C++ has no keyword arguments at all — every
         # parameter is positional — so on a method whose carrier is being
@@ -3052,8 +3275,7 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
         # bag's keys are. Recording it ``positional`` next to keyword siblings
         # the same fold just emitted would report the carrier's own idiom as
         # drift on one param and not the others.
-        ref_kind = {rp["name"]: rp.get("kind") for rp in ref_params
-                    if rp.get("name")}
+        ref_kind = {rp["name"]: rp.get("kind") for rp in ref_params if rp.get("name")}
         for i, tp in enumerate(tail):
             if ref_kind.get(tp.get("name")) == "keyword" and not tp.get("kind"):
                 # Rebuild so ``kind`` lands in its usual slot (right after
@@ -3073,10 +3295,8 @@ def _unfold_one_carrier(sig: dict, ref_sig: dict, options_by_ref: dict,
         # and reported three bogus type mismatches.) Port params the reference
         # does not name keep their relative order at the end — they are the
         # genuine extras and must stay visible as such.
-        ref_order = {rp["name"]: i for i, rp in enumerate(ref_params)
-                     if rp.get("name")}
-        merged = replacement + [tp for tp in tail
-                                if tp.get("required") is False]
+        ref_order = {rp["name"]: i for i, rp in enumerate(ref_params) if rp.get("name")}
+        merged = replacement + [tp for tp in tail if tp.get("required") is False]
         rest = [tp for tp in tail if tp.get("required") is not False]
         merged.sort(key=lambda x: ref_order.get(x.get("name"), len(ref_order)))
         sig["params"] = port_params[:idx] + merged + rest
@@ -3189,15 +3409,14 @@ def _load_python_free_function_targets() -> set[tuple[str, str]]:
     except FileNotFoundError:
         return targets
     for mod, entry in ref.get("modules", {}).items():
-        for fn in (entry.get("functions") or {}).keys():
+        for fn in entry.get("functions") or {}:
             targets.add((mod, fn))
     return targets
 
 
-def _translate_with_canonical_fallback(spelling: str,
-                                        canonical_spelling: str,
-                                        aliases: dict,
-                                        ctx: str) -> str:
+def _translate_with_canonical_fallback(
+    spelling: str, canonical_spelling: str, aliases: dict, ctx: str
+) -> str:
     """Translate a C++ type spelling, with awareness of typedef expansion.
 
     libclang reports the typedef name in ``arg.type.spelling``
@@ -3230,16 +3449,22 @@ def _translate_with_canonical_fallback(spelling: str,
     # ``class:<module>.<TypedefName>`` invented from the typedef's
     # bare name, but the typedef actually wraps a stdlib type the
     # canonical spelling can decompose.
-    if canonical_spelling and canonical_spelling != spelling and \
-            primary.startswith("class:") and "." in primary:
+    if (
+        canonical_spelling
+        and canonical_spelling != spelling
+        and primary.startswith("class:")
+        and "." in primary
+    ):
         # Look up the typedef name in CLASS_MODULE_MAP / CLASS_RENAME_MAP
         # to see if there's an intentional class-rename target. If so,
         # keep the primary translation; otherwise prefer canonical.
         tail = primary.split(":", 1)[1]
         cls_name = tail.rsplit(".", 1)[-1]
-        if cls_name not in CLASS_MODULE_MAP and \
-                not any(v[1] == cls_name for v in CLASS_RENAME_MAP.values()) and \
-                cls_name not in CALLBACK_TYPEDEFS_AS_CALLABLE:
+        if (
+            cls_name not in CLASS_MODULE_MAP
+            and not any(v[1] == cls_name for v in CLASS_RENAME_MAP.values())
+            and cls_name not in CALLBACK_TYPEDEFS_AS_CALLABLE
+        ):
             try:
                 return translate_cpp_type(canonical_spelling, aliases, ctx)
             except TypeTranslationError:
@@ -3249,9 +3474,13 @@ def _translate_with_canonical_fallback(spelling: str,
 
 
 def build_signature(
-    method: dict, aliases: dict, context: str,
-    *, guards: "GuardIndex | None" = None,
-    cpp_class: str | None = None, cpp_method: str | None = None,
+    method: dict,
+    aliases: dict,
+    context: str,
+    *,
+    guards: GuardIndex | None = None,
+    cpp_class: str | None = None,
+    cpp_method: str | None = None,
 ) -> dict:
     params_out: list = []
     is_static = method.get("is_static", False)
@@ -3261,7 +3490,10 @@ def build_signature(
     for p_index, p in enumerate(method.get("parameters", [])):
         ctx = f"{context}[{p.get('name')}]"
         canon_type = _translate_with_canonical_fallback(
-            p.get("type", ""), p.get("canonical_type", ""), aliases, ctx,
+            p.get("type", ""),
+            p.get("canonical_type", ""),
+            aliases,
+            ctx,
         )
         param: dict = {
             "name": p.get("name", "_") or "_",
@@ -3283,21 +3515,31 @@ def build_signature(
             # spelling of the reference's ``= None``; record it as null so the
             # two compare equal. An unguarded sentinel is a value the port really
             # ships and keeps reporting as drift.
-            if dv is not None and guards is not None and cpp_class and cpp_method \
-                    and _is_foldable_sentinel(canon_type, dv):
+            if (
+                dv is not None
+                and guards is not None
+                and cpp_class
+                and cpp_method
+                and _is_foldable_sentinel(canon_type, dv)
+            ):
                 kind = _sentinel_kind(canon_type)
                 if kind and guards.guards(
-                        cpp_class, cpp_method, p.get("name") or "", p_index, kind):
+                    cpp_class, cpp_method, p.get("name") or "", p_index, kind
+                ):
                     dv = None
             param["default"] = dv
         else:
             param["required"] = True
         params_out.append(param)
-    return_canon = "void" if is_ctor else _translate_with_canonical_fallback(
-        method.get("return_type", "void"),
-        method.get("canonical_return_type", ""),
-        aliases,
-        context + "[->]",
+    return_canon = (
+        "void"
+        if is_ctor
+        else _translate_with_canonical_fallback(
+            method.get("return_type", "void"),
+            method.get("canonical_return_type", ""),
+            aliases,
+            context + "[->]",
+        )
     )
     return {"params": params_out, "returns": return_canon}
 
@@ -3384,8 +3626,11 @@ def main() -> int:
             raw_options_structs.update(opt_structs)
             single_tu_ok = True
     except Exception as e:
-        print(f"enumerate_signatures: single-TU parse failed ({e}); "
-              f"falling back to per-header", file=sys.stderr)
+        print(
+            f"enumerate_signatures: single-TU parse failed ({e}); "
+            f"falling back to per-header",
+            file=sys.stderr,
+        )
 
     if not single_tu_ok:
         raw_entries.clear()
@@ -3397,7 +3642,9 @@ def main() -> int:
             except Exception as e:
                 print(f"skip {header}: {e}", file=sys.stderr)
                 continue
-            cls_entries, fn_entries, opt_structs = walk_translation_unit(tu, args.include)
+            cls_entries, fn_entries, opt_structs = walk_translation_unit(
+                tu, args.include
+            )
             raw_entries.extend(cls_entries)
             raw_free_functions.extend(fn_entries)
             raw_options_structs.update(opt_structs)
@@ -3406,10 +3653,14 @@ def main() -> int:
     # implementation tree + the headers (inline bodies); see GuardIndex.
     guards = GuardIndex([PORT_ROOT / "src", args.include])
 
-    canonical, failures = collect(raw_entries, aliases, raw_free_functions,
-                                  raw_options_structs, guards=guards)
+    canonical, failures = collect(
+        raw_entries, aliases, raw_free_functions, raw_options_structs, guards=guards
+    )
     if failures:
-        print(f"enumerate_signatures: {len(failures)} translation failure(s)", file=sys.stderr)
+        print(
+            f"enumerate_signatures: {len(failures)} translation failure(s)",
+            file=sys.stderr,
+        )
         for f in failures[:30]:
             print(f"  - {f}", file=sys.stderr)
         if len(failures) > 30:
@@ -3417,10 +3668,17 @@ def main() -> int:
         if args.strict:
             return 1
 
-    args.out.write_text(json.dumps(canonical, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    args.out.write_text(
+        json.dumps(canonical, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+    )
     n_mods = len(canonical["modules"])
-    n_methods = sum(sum(len(c["methods"]) for c in m.get("classes", {}).values()) for m in canonical["modules"].values())
-    print(f"enumerate_signatures: wrote {args.out} ({n_mods} modules, {n_methods} methods)")
+    n_methods = sum(
+        sum(len(c["methods"]) for c in m.get("classes", {}).values())
+        for m in canonical["modules"].values()
+    )
+    print(
+        f"enumerate_signatures: wrote {args.out} ({n_mods} modules, {n_methods} methods)"
+    )
     return 0
 
 

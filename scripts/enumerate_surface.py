@@ -73,6 +73,7 @@ def _resolve_psdk() -> Path:
             return Path(val).resolve()
     return (Path(__file__).resolve().parent.parent.parent / "porting-sdk").resolve()
 
+
 # ---------------------------------------------------------------------------
 # Class -> Python module mapping
 # ---------------------------------------------------------------------------
@@ -86,28 +87,23 @@ def _resolve_psdk() -> Path:
 CLASS_MODULE_MAP: dict[str, str] = {
     # -- agent ------------------------------------------------------------
     "AgentBase": "signalwire.core.agent_base",
-
     # -- pom --------------------------------------------------------------
     # PromptObjectModel has no name conflict; Section does (swml::Section).
     # PromptObjectModel can use the simple class-name map; Section is
     # disambiguated via CLASS_RENAME_MAP keyed on (signalwire::pom, Section).
     "PromptObjectModel": "signalwire.pom.pom",
-
     # -- contexts ---------------------------------------------------------
     "Context": "signalwire.core.contexts",
     "ContextBuilder": "signalwire.core.contexts",
     "GatherInfo": "signalwire.core.contexts",
     "GatherQuestion": "signalwire.core.contexts",
     "Step": "signalwire.core.contexts",
-
     # -- datamap ----------------------------------------------------------
     "DataMap": "signalwire.core.data_map",
-
     # -- swaig ------------------------------------------------------------
     "FunctionResult": "signalwire.core.function_result",
     "ToolDefinition": "signalwire.core.swaig_function",
     "SWAIGFunction": "signalwire.core.swaig_function",
-
     # -- swml verb-handler registry (core/swml_handler.hpp) ---------------
     "SWMLVerbHandler": "signalwire.core.swml_handler",
     "AIVerbHandler": "signalwire.core.swml_handler",
@@ -115,7 +111,6 @@ CLASS_MODULE_MAP: dict[str, str] = {
     # -- swml builder / renderer -----------------------------------------
     "SWMLBuilder": "signalwire.core.swml_builder",
     "SwmlRenderer": "signalwire.core.swml_renderer",
-
     # -- core infra classes (auth/config/security/pom) --------------------
     "AuthHandler": "signalwire.core.auth_handler",
     # The credential carriers live BESIDE AuthHandler in the reference module
@@ -129,33 +124,26 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "ConfigLoader": "signalwire.core.config_loader",
     "SecurityConfig": "signalwire.core.security_config",
     "PomBuilder": "signalwire.core.pom_builder",
-
     # -- skills -----------------------------------------------------------
     "SkillBase": "signalwire.core.skill_base",
     "SkillManager": "signalwire.core.skill_manager",
     "SkillRegistry": "signalwire.skills.registry",
-
     # -- prefab agents ----------------------------------------------------
     "BedrockAgent": "signalwire.agents.bedrock",
-
     # -- server -----------------------------------------------------------
     "AgentServer": "signalwire.agent_server",
-
     # -- security ---------------------------------------------------------
     "SessionManager": "signalwire.core.security.session_manager",
-
     # -- swml -------------------------------------------------------------
     # Document/Schema have no exact Python analog, so treat as port-only
     # via the native translation.
     # ``Service`` in C++ == Python's ``SWMLService``; rename at emit time.
     # Handled via CLASS_RENAME_MAP below, not via module mapping.
-
     # -- utils ------------------------------------------------------------
     # SchemaUtils + SchemaValidationError both live under
     # signalwire.utils.schema_utils per the canonical Python module layout.
     "SchemaUtils": "signalwire.utils.schema_utils",
     "SchemaValidationError": "signalwire.utils.schema_utils",
-
     # -- rest -------------------------------------------------------------
     "HttpClient": "signalwire.rest._base",
     "CrudResource": "signalwire.rest._base",
@@ -184,7 +172,6 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "SipProfileNamespace": "signalwire.rest.namespaces.sip_profile",
     "VerifiedCallersNamespace": "signalwire.rest.namespaces.verified_callers",
     "VideoNamespace": "signalwire.rest.namespaces.video",
-
     # -- rest sub-resources (Python parity) -------------------------------
     # Fabric sub-resources.
     "FabricAddresses": "signalwire.rest.namespaces.fabric",
@@ -196,19 +183,16 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "FabricResourcePUT": "signalwire.rest.namespaces.fabric",
     "FabricSubscribers": "signalwire.rest.namespaces.fabric",
     "FabricTokens": "signalwire.rest.namespaces.fabric",
-
     # Logs sub-resources.
     "LogsConferences": "signalwire.rest.namespaces.logs",
     "LogsFax": "signalwire.rest.namespaces.logs",
     "LogsMessages": "signalwire.rest.namespaces.logs",
     "LogsVoice": "signalwire.rest.namespaces.logs",
-
     # Registry sub-resources.
     "RegistryBrands": "signalwire.rest.namespaces.registry",
     "RegistryCampaigns": "signalwire.rest.namespaces.registry",
     "RegistryNumbers": "signalwire.rest.namespaces.registry",
     "RegistryOrders": "signalwire.rest.namespaces.registry",
-
     # Video sub-resources.
     "VideoConferences": "signalwire.rest.namespaces.video",
     "VideoConferenceTokens": "signalwire.rest.namespaces.video",
@@ -217,10 +201,8 @@ CLASS_MODULE_MAP: dict[str, str] = {
     "VideoRoomTokens": "signalwire.rest.namespaces.video",
     "VideoRooms": "signalwire.rest.namespaces.video",
     "VideoStreams": "signalwire.rest.namespaces.video",
-
     # Pagination helper -- Python: signalwire.rest._pagination.PaginatedIterator.
     "PaginatedIterator": "signalwire.rest._pagination",
-
     # -- relay ------------------------------------------------------------
     "RelayClient": "signalwire.relay.client",
     "RelayError": "signalwire.relay.client",
@@ -229,14 +211,12 @@ CLASS_MODULE_MAP: dict[str, str] = {
     # Action / RelayEvent / CallEvent / MessageEvent / DialEvent /
     # ComponentEvent have no 1:1 Python analog -- port-only, use native
     # translation.
-
     # -- prefabs ----------------------------------------------------------
     "ConciergeAgent": "signalwire.prefabs.concierge",
     "FAQBotAgent": "signalwire.prefabs.faq_bot",
     "InfoGathererAgent": "signalwire.prefabs.info_gatherer",
     "ReceptionistAgent": "signalwire.prefabs.receptionist",
     "SurveyAgent": "signalwire.prefabs.survey",
-
     # -- logging ----------------------------------------------------------
     # ``Logger`` in signalwire::logging -> Python core.logging_config
     # has no matching class (Python uses module-level functions),
@@ -251,13 +231,15 @@ CLASS_MODULE_MAP: dict[str, str] = {
 CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # (source_ns, source_class) -> (target_module, target_class)
     ("signalwire::swml", "Service"): (
-        "signalwire.core.swml_service", "SWMLService",
+        "signalwire.core.swml_service",
+        "SWMLService",
     ),
     # ``signalwire::pom::Section`` projects to ``signalwire.pom.pom.Section``;
     # disambiguates from ``signalwire::swml::Section`` (which falls through
     # to the native namespace translation as ``signalwire.swml.section``).
     ("signalwire::pom", "Section"): (
-        "signalwire.pom.pom", "Section",
+        "signalwire.pom.pom",
+        "Section",
     ),
     # C++ uses ``XxxNamespace`` for all REST namespaces; Python uses
     # ``XxxResource`` for single-resource namespaces and ``XxxNamespace``
@@ -268,90 +250,114 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # method — the value struct's data fields (timeout/retries/…) are not surface
     # symbols, exactly as the Python dataclass fields aren't (go/ts/ruby/java match).
     ("signalwire::rest", "RequestOptions"): (
-        "signalwire.rest._request_options", "RequestOptions",
+        "signalwire.rest._request_options",
+        "RequestOptions",
     ),
     ("signalwire::rest", "AddressesNamespace"): (
-        "signalwire.rest.namespaces.addresses", "AddressesResource",
+        "signalwire.rest.namespaces.addresses",
+        "AddressesResource",
     ),
     ("signalwire::rest", "ChatNamespace"): (
-        "signalwire.rest.namespaces.chat", "ChatResource",
+        "signalwire.rest.namespaces.chat",
+        "ChatResource",
     ),
     ("signalwire::rest", "ImportedNumbersNamespace"): (
-        "signalwire.rest.namespaces.imported_numbers", "ImportedNumbersResource",
+        "signalwire.rest.namespaces.imported_numbers",
+        "ImportedNumbersResource",
     ),
     ("signalwire::rest", "LookupNamespace"): (
-        "signalwire.rest.namespaces.lookup", "LookupResource",
+        "signalwire.rest.namespaces.lookup",
+        "LookupResource",
     ),
     ("signalwire::rest", "MFANamespace"): (
-        "signalwire.rest.namespaces.mfa", "MfaResource",
+        "signalwire.rest.namespaces.mfa",
+        "MfaResource",
     ),
     ("signalwire::rest", "NumberGroupsNamespace"): (
-        "signalwire.rest.namespaces.number_groups", "NumberGroupsResource",
+        "signalwire.rest.namespaces.number_groups",
+        "NumberGroupsResource",
     ),
     ("signalwire::rest", "PhoneNumbersNamespace"): (
-        "signalwire.rest.namespaces.phone_numbers", "PhoneNumbersResource",
+        "signalwire.rest.namespaces.phone_numbers",
+        "PhoneNumbersResource",
     ),
     ("signalwire::rest", "PubSubNamespace"): (
-        "signalwire.rest.namespaces.pubsub", "PubSubResource",
+        "signalwire.rest.namespaces.pubsub",
+        "PubSubResource",
     ),
     ("signalwire::rest", "QueuesNamespace"): (
-        "signalwire.rest.namespaces.queues", "QueuesResource",
+        "signalwire.rest.namespaces.queues",
+        "QueuesResource",
     ),
     ("signalwire::rest", "RecordingsNamespace"): (
-        "signalwire.rest.namespaces.recordings", "RecordingsResource",
+        "signalwire.rest.namespaces.recordings",
+        "RecordingsResource",
     ),
     ("signalwire::rest", "ShortCodesNamespace"): (
-        "signalwire.rest.namespaces.short_codes", "ShortCodesResource",
+        "signalwire.rest.namespaces.short_codes",
+        "ShortCodesResource",
     ),
     ("signalwire::rest", "SipProfileNamespace"): (
-        "signalwire.rest.namespaces.sip_profile", "SipProfileResource",
+        "signalwire.rest.namespaces.sip_profile",
+        "SipProfileResource",
     ),
     ("signalwire::rest", "VerifiedCallersNamespace"): (
-        "signalwire.rest.namespaces.verified_callers", "VerifiedCallersResource",
+        "signalwire.rest.namespaces.verified_callers",
+        "VerifiedCallersResource",
     ),
     # ProjectTokens is exposed as a nested class on the project namespace.
     ("signalwire::rest", "ProjectTokens"): (
-        "signalwire.rest.namespaces.project", "ProjectTokens",
+        "signalwire.rest.namespaces.project",
+        "ProjectTokens",
     ),
     # DatasphereDocuments is the typed wrapper around the documents
     # CrudResource; Python exposes it as DatasphereDocuments inside
     # namespaces/datasphere.py.
     ("signalwire::rest", "DatasphereDocuments"): (
-        "signalwire.rest.namespaces.datasphere", "DatasphereDocuments",
+        "signalwire.rest.namespaces.datasphere",
+        "DatasphereDocuments",
     ),
     # Fabric: C++ uses ``FabricXxx`` names for sub-resources; Python uses
     # ``XxxResource`` (or shorter names). Map at emit time so the audit
     # treats them as the same class.
     ("signalwire::rest", "FabricCallFlows"): (
-        "signalwire.rest.namespaces.fabric", "CallFlowsResource",
+        "signalwire.rest.namespaces.fabric",
+        "CallFlowsResource",
     ),
     ("signalwire::rest", "FabricConferenceRooms"): (
-        "signalwire.rest.namespaces.fabric", "ConferenceRoomsResource",
+        "signalwire.rest.namespaces.fabric",
+        "ConferenceRoomsResource",
     ),
     ("signalwire::rest", "FabricCxmlApplications"): (
-        "signalwire.rest.namespaces.fabric", "CxmlApplicationsResource",
+        "signalwire.rest.namespaces.fabric",
+        "CxmlApplicationsResource",
     ),
     ("signalwire::rest", "FabricGenericResources"): (
-        "signalwire.rest.namespaces.fabric", "GenericResources",
+        "signalwire.rest.namespaces.fabric",
+        "GenericResources",
     ),
     ("signalwire::rest", "FabricSubscribers"): (
-        "signalwire.rest.namespaces.fabric", "SubscribersResource",
+        "signalwire.rest.namespaces.fabric",
+        "SubscribersResource",
     ),
     # Logs: Python names are ``MessageLogs`` / ``VoiceLogs`` etc; C++ uses
     # ``LogsMessages`` / ``LogsVoice`` for namespace-prefix consistency.
     ("signalwire::rest", "LogsMessages"): (
-        "signalwire.rest.namespaces.logs", "MessageLogs",
+        "signalwire.rest.namespaces.logs",
+        "MessageLogs",
     ),
     ("signalwire::rest", "LogsVoice"): (
-        "signalwire.rest.namespaces.logs", "VoiceLogs",
+        "signalwire.rest.namespaces.logs",
+        "VoiceLogs",
     ),
     ("signalwire::rest", "LogsFax"): (
-        "signalwire.rest.namespaces.logs", "FaxLogs",
+        "signalwire.rest.namespaces.logs",
+        "FaxLogs",
     ),
     ("signalwire::rest", "LogsConferences"): (
-        "signalwire.rest.namespaces.logs", "ConferenceLogs",
+        "signalwire.rest.namespaces.logs",
+        "ConferenceLogs",
     ),
-
     # -- Callback typedef projection -------------------------------------
     # C++ uses ``using XxxHandler = std::function<...>`` aliases for
     # callbacks. libclang emits the typedef name (``InboundCallHandler``
@@ -361,10 +367,12 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
     # Map at emit time so the diff treats handler signatures as the
     # same callable contract regardless of the C++ typedef name.
     ("signalwire::relay", "InboundCallHandler"): (
-        "signalwire.relay.client", "CallHandler",
+        "signalwire.relay.client",
+        "CallHandler",
     ),
     ("signalwire::relay", "InboundMessageHandler"): (
-        "signalwire.relay.client", "MessageHandler",
+        "signalwire.relay.client",
+        "MessageHandler",
     ),
 }
 
@@ -386,11 +394,19 @@ CLASS_RENAME_MAP: dict[tuple[str, str], tuple[str, str]] = {
 # native-namespace translation (signalwire.rest.generated.<snake>) and drift.
 def _load_generated_surface_map() -> dict[str, str]:
     here = Path(__file__).resolve().parent
-    smap = (here.parent / "include" / "signalwire" / "rest" / "namespaces"
-            / "generated" / "generated_surface_map.json")
+    smap = (
+        here.parent
+        / "include"
+        / "signalwire"
+        / "rest"
+        / "namespaces"
+        / "generated"
+        / "generated_surface_map.json"
+    )
     if not smap.is_file():
         return {}
     import json as _json
+
     return _json.loads(smap.read_text())
 
 
@@ -434,10 +450,20 @@ for _bc_cpp, _bc_py in (
 # groups map their whole namespace prefix to the flat reference module.
 _TYPES_NS_PREFIX = "signalwire::rest::generated::types::"
 _TYPES_NS_KEY = {
-    "RelayRest": "relay_rest", "Fabric": "fabric", "Calling": "calling",
-    "Video": "video", "Datasphere": "datasphere", "Logs": "logs",
-    "Message": "message", "Messages": "messages", "Voice": "voice", "Fax": "fax", "Project": "project",
-    "Projects": "projects", "Chat": "chat", "PubSub": "pubsub",
+    "RelayRest": "relay_rest",
+    "Fabric": "fabric",
+    "Calling": "calling",
+    "Video": "video",
+    "Datasphere": "datasphere",
+    "Logs": "logs",
+    "Message": "message",
+    "Messages": "messages",
+    "Voice": "voice",
+    "Fax": "fax",
+    "Project": "project",
+    "Projects": "projects",
+    "Chat": "chat",
+    "PubSub": "pubsub",
     "SwmlWebhooks": "swml_webhooks",
 }
 GENERATED_PAYLOAD_NS = {
@@ -449,7 +475,10 @@ GENERATED_PAYLOAD_NS = {
 }
 # Namespace-path prefixes whose classes are generated method-less types (used by
 # parse_header to force-register a zero-method struct so it surfaces).
-GENERATED_TYPE_NS_PREFIXES = (_TYPES_NS_PREFIX.rstrip(":"),) + tuple(GENERATED_PAYLOAD_NS)
+GENERATED_TYPE_NS_PREFIXES = (
+    _TYPES_NS_PREFIX.rstrip(":"),
+    *tuple(GENERATED_PAYLOAD_NS),
+)
 
 # Set at build_snapshot entry: the ``…/include`` root under which the generated
 # payload header namespaces resolve (``signalwire::core::foo`` -> <root>/signalwire/core/foo).
@@ -462,12 +491,13 @@ def generated_type_module(ns_path: str) -> str | None:
     if ns_path in GENERATED_PAYLOAD_NS:
         return GENERATED_PAYLOAD_NS[ns_path]
     if ns_path.startswith(_TYPES_NS_PREFIX):
-        seg = ns_path[len(_TYPES_NS_PREFIX):].split("::", 1)[0]
+        seg = ns_path[len(_TYPES_NS_PREFIX) :].split("::", 1)[0]
         key = _TYPES_NS_KEY.get(seg)
         if key is None:
             raise SystemExit(
                 f"enumerate_surface.py: generated types namespace {ns_path!r} has "
-                f"unknown segment {seg!r} (add to _TYPES_NS_KEY)")
+                f"unknown segment {seg!r} (add to _TYPES_NS_KEY)"
+            )
         return f"signalwire.rest.namespaces.{key}_types_generated"
     return None
 
@@ -535,10 +565,12 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     # Webhook signature validation (porting-sdk/webhooks.md). C++ uses
     # PascalCase per its naming convention; Python uses snake_case.
     ("signalwire::security", "ValidateWebhookSignature"): (
-        "signalwire.core.security.webhook_validator", "validate_webhook_signature",
+        "signalwire.core.security.webhook_validator",
+        "validate_webhook_signature",
     ),
     ("signalwire::security", "ValidateRequest"): (
-        "signalwire.core.security.webhook_validator", "validate_request",
+        "signalwire.core.security.webhook_validator",
+        "validate_request",
     ),
     # The framework-free webhook-validation decision core (porting-sdk
     # webhooks.md + HIDDEN_SURFACE_AUDIT Pass 1). Python exposes it as a
@@ -548,30 +580,36 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     # cpp-httplib ``WrapWithSignatureValidation`` wrapper stays a
     # PORT_ADDITION idiom on top of this.
     ("signalwire::security", "Validate"): (
-        "signalwire.core.security.webhook_middleware", "validate",
+        "signalwire.core.security.webhook_middleware",
+        "validate",
     ),
     # Standalone security-hygiene utils (security_utils.py). C++ groups them in
     # a nested ``signalwire::security::security_utils`` namespace with PascalCase
     # names; Python keeps them as module-level snake_case functions under
     # ``signalwire.core.security.security_utils``.
     ("signalwire::security::security_utils", "FilterSensitiveHeaders"): (
-        "signalwire.core.security.security_utils", "filter_sensitive_headers",
+        "signalwire.core.security.security_utils",
+        "filter_sensitive_headers",
     ),
     ("signalwire::security::security_utils", "RedactUrl"): (
-        "signalwire.core.security.security_utils", "redact_url",
+        "signalwire.core.security.security_utils",
+        "redact_url",
     ),
     ("signalwire::security::security_utils", "IsValidHostname"): (
-        "signalwire.core.security.security_utils", "is_valid_hostname",
+        "signalwire.core.security.security_utils",
+        "is_valid_hostname",
     ),
     # SWAIG schema inference (type_inference.py). C++ groups these in a nested
     # ``signalwire::swaig::type_inference`` namespace (snake_case names);
     # Python keeps them module-level under
     # ``signalwire.core.agent.tools.type_inference``.
     ("signalwire::swaig::type_inference", "infer_schema"): (
-        "signalwire.core.agent.tools.type_inference", "infer_schema",
+        "signalwire.core.agent.tools.type_inference",
+        "infer_schema",
     ),
     ("signalwire::swaig::type_inference", "create_typed_handler_wrapper"): (
-        "signalwire.core.agent.tools.type_inference", "create_typed_handler_wrapper",
+        "signalwire.core.agent.tools.type_inference",
+        "create_typed_handler_wrapper",
     ),
 }
 
@@ -585,7 +623,13 @@ SKIP_METHOD_NAMES: set[str] = {
     "friend",
     "template",
     "return",
-    "if", "else", "for", "while", "do", "switch", "case",
+    "if",
+    "else",
+    "for",
+    "while",
+    "do",
+    "switch",
+    "case",
 }
 
 
@@ -613,24 +657,47 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     # (module_path, class_name) -> list of method names to copy from
     # the C++ AgentBase class if present there.
     ("signalwire.core.mixins.ai_config_mixin", "AIConfigMixin"): [
-        "add_function_include", "add_hint", "add_hints", "add_internal_filler",
-        "add_language", "add_mcp_server", "add_pattern_hint", "add_pronunciation",
-        "enable_debug_events", "enable_mcp_server",
+        "add_function_include",
+        "add_hint",
+        "add_hints",
+        "add_internal_filler",
+        "add_language",
+        "add_mcp_server",
+        "add_pattern_hint",
+        "add_pronunciation",
+        "enable_debug_events",
+        "enable_mcp_server",
         "get_language_params",
-        "set_function_includes", "set_global_data", "set_internal_fillers",
+        "set_function_includes",
+        "set_global_data",
+        "set_internal_fillers",
         "set_language_params",
-        "set_languages", "set_multilingual", "set_native_functions", "set_param", "set_params",
-        "set_post_prompt_llm_params", "set_prompt_llm_params",
-        "set_pronunciations", "update_global_data",
+        "set_languages",
+        "set_multilingual",
+        "set_native_functions",
+        "set_param",
+        "set_params",
+        "set_post_prompt_llm_params",
+        "set_prompt_llm_params",
+        "set_pronunciations",
+        "update_global_data",
     ],
     ("signalwire.core.mixins.mcp_server_mixin", "MCPServerMixin"): [
         # Empty in Python -- class exists as a marker only.
     ],
     ("signalwire.core.mixins.prompt_mixin", "PromptMixin"): [
-        "contexts", "define_contexts", "get_post_prompt", "get_prompt",
-        "prompt_add_section", "prompt_add_subsection", "prompt_add_to_section",
-        "prompt_has_section", "reset_contexts", "set_post_prompt",
-        "set_prompt_pom", "set_prompt_text",
+        "contexts",
+        "define_contexts",
+        "get_post_prompt",
+        "get_prompt",
+        "prompt_add_section",
+        "prompt_add_subsection",
+        "prompt_add_to_section",
+        "prompt_has_section",
+        "reset_contexts",
+        "set_post_prompt",
+        "set_prompt_pom",
+        "set_prompt_text",
     ],
     # Python additionally extracted a ``PromptManager`` class that
     # PromptMixin delegates to. The user-facing surface is identical
@@ -646,10 +713,18 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     # the fold of that merge: reaching the agent from the manager is exactly as
     # available in C++ as in Python, it is simply already in hand.
     ("signalwire.core.agent.prompt.manager", "PromptManager"): [
-        "__init__", "define_contexts", "get_contexts", "get_post_prompt", "get_prompt",
+        "__init__",
+        "define_contexts",
+        "get_contexts",
+        "get_post_prompt",
+        "get_prompt",
         "get_raw_prompt",
-        "prompt_add_section", "prompt_add_subsection", "prompt_add_to_section",
-        "prompt_has_section", "set_post_prompt", "set_prompt_pom",
+        "prompt_add_section",
+        "prompt_add_subsection",
+        "prompt_add_to_section",
+        "prompt_has_section",
+        "set_post_prompt",
+        "set_prompt_pom",
         "set_prompt_text",
     ],
     ("signalwire.core.mixins.serverless_mixin", "ServerlessMixin"): [
@@ -659,17 +734,27 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "handle_serverless_request",
     ],
     ("signalwire.core.mixins.skill_mixin", "SkillMixin"): [
-        "add_skill", "has_skill", "list_skills", "remove_skill",
+        "add_skill",
+        "has_skill",
+        "list_skills",
+        "remove_skill",
     ],
     ("signalwire.core.mixins.state_mixin", "StateMixin"): [
         "validate_tool_token",
     ],
     ("signalwire.core.mixins.tool_mixin", "ToolMixin"): [
-        "define_tool", "define_tools", "on_function_call", "register_swaig_function",
+        "define_tool",
+        "define_tools",
+        "on_function_call",
+        "register_swaig_function",
     ],
     ("signalwire.core.agent.tools.registry", "ToolRegistry"): [
-        "__init__", "define_tool", "register_swaig_function",
-        "has_function", "get_function", "get_all_functions",
+        "__init__",
+        "define_tool",
+        "register_swaig_function",
+        "has_function",
+        "get_function",
+        "get_all_functions",
         "remove_function",
     ],
     # Both methods ARE public C++ surface — swml::Service declares them at
@@ -684,12 +769,20 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
     # Python dict literal, the empty stanza had never had any effect. The dead
     # stanza is deleted; this one is and always was the live binding.
     ("signalwire.core.mixins.auth_mixin", "AuthMixin"): [
-        "validate_basic_auth", "get_basic_auth_credentials",
+        "validate_basic_auth",
+        "get_basic_auth_credentials",
     ],
     ("signalwire.core.mixins.web_mixin", "WebMixin"): [
-        "as_router", "enable_debug_routes", "manual_set_proxy_url", "run",
-        "serve", "set_dynamic_config_callback", "on_request", "on_swml_request",
-        "register_routing_callback", "setup_graceful_shutdown",
+        "as_router",
+        "enable_debug_routes",
+        "manual_set_proxy_url",
+        "run",
+        "serve",
+        "set_dynamic_config_callback",
+        "on_request",
+        "on_swml_request",
+        "register_routing_callback",
+        "setup_graceful_shutdown",
     ],
 }
 
@@ -744,49 +837,208 @@ SKILL_SOURCE_DIR = "src/skills/builtin"
 # Methods that live on the shared C++ ``SkillBase`` (so every concrete skill
 # inherits them and they are legitimately part of that skill's callable surface).
 _SKILL_BASE_METHODS = {
-    "setup", "register_tools", "get_hints", "get_global_data",
-    "get_prompt_sections", "get_parameter_schema", "get_instance_key",
-    "cleanup", "get_datamap_functions", "skill_name", "skill_description",
+    "setup",
+    "register_tools",
+    "get_hints",
+    "get_global_data",
+    "get_prompt_sections",
+    "get_parameter_schema",
+    "get_instance_key",
+    "cleanup",
+    "get_datamap_functions",
+    "skill_name",
+    "skill_description",
 }
 SKILL_PROJECTIONS: dict[str, tuple[str, str, list[str]]] = {
     # cpp_class: (python_module, python_class, python_recorded_methods)
-    "ApiNinjasTriviaSkill": ("signalwire.skills.api_ninjas_trivia.skill", "ApiNinjasTriviaSkill",
-        ["__init__", "get_instance_key", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
-    "ClaudeSkillsSkill": ("signalwire.skills.claude_skills.skill", "ClaudeSkillsSkill",
-        ["get_hints", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
-    "DatasphereSkill": ("signalwire.skills.datasphere.skill", "DataSphereSkill",
-        ["cleanup", "get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
-         "get_prompt_sections", "register_tools", "setup"]),
-    "DatasphereServerlessSkill": ("signalwire.skills.datasphere_serverless.skill", "DataSphereServerlessSkill",
-        ["get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
-         "get_prompt_sections", "register_tools", "setup"]),
-    "DateTimeSkill": ("signalwire.skills.datetime.skill", "DateTimeSkill",
-        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
-    "GoogleMapsSkill": ("signalwire.skills.google_maps.skill", "GoogleMapsSkill",
-        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
-    "InfoGathererSkill": ("signalwire.skills.info_gatherer.skill", "InfoGathererSkill",
-        ["get_global_data", "get_instance_key", "get_parameter_schema", "register_tools", "setup"]),
-    "JokeSkill": ("signalwire.skills.joke.skill", "JokeSkill",
-        ["get_global_data", "get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
-    "MathSkill": ("signalwire.skills.math.skill", "MathSkill",
-        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
-    "NativeVectorSearchSkill": ("signalwire.skills.native_vector_search.skill", "NativeVectorSearchSkill",
-        ["cleanup", "get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
-         "get_prompt_sections", "register_tools", "setup"]),
-    "PlayBackgroundFileSkill": ("signalwire.skills.play_background_file.skill", "PlayBackgroundFileSkill",
-        ["__init__", "get_instance_key", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
-    "SpiderSkill": ("signalwire.skills.spider.skill", "SpiderSkill",
-        ["__init__", "cleanup", "get_hints", "get_instance_key", "get_parameter_schema",
-         "register_tools", "remove_xpaths", "setup"]),
-    "SwmlTransferSkill": ("signalwire.skills.swml_transfer.skill", "SWMLTransferSkill",
-        ["get_hints", "get_instance_key", "get_parameter_schema", "get_prompt_sections", "register_tools", "setup"]),
-    "WeatherApiSkill": ("signalwire.skills.weather_api.skill", "WeatherApiSkill",
-        ["__init__", "get_parameter_schema", "get_tools", "register_tools", "setup"]),
-    "WebSearchSkill": ("signalwire.skills.web_search.skill", "WebSearchSkill",
-        ["get_global_data", "get_hints", "get_instance_key", "get_parameter_schema",
-         "get_prompt_sections", "register_tools", "setup"]),
-    "WikipediaSearchSkill": ("signalwire.skills.wikipedia_search.skill", "WikipediaSearchSkill",
-        ["get_hints", "get_parameter_schema", "get_prompt_sections", "register_tools", "search_wiki", "setup"]),
+    "ApiNinjasTriviaSkill": (
+        "signalwire.skills.api_ninjas_trivia.skill",
+        "ApiNinjasTriviaSkill",
+        [
+            "__init__",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_tools",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "ClaudeSkillsSkill": (
+        "signalwire.skills.claude_skills.skill",
+        "ClaudeSkillsSkill",
+        [
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "DatasphereSkill": (
+        "signalwire.skills.datasphere.skill",
+        "DataSphereSkill",
+        [
+            "cleanup",
+            "get_global_data",
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "DatasphereServerlessSkill": (
+        "signalwire.skills.datasphere_serverless.skill",
+        "DataSphereServerlessSkill",
+        [
+            "get_global_data",
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "DateTimeSkill": (
+        "signalwire.skills.datetime.skill",
+        "DateTimeSkill",
+        [
+            "get_hints",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "GoogleMapsSkill": (
+        "signalwire.skills.google_maps.skill",
+        "GoogleMapsSkill",
+        [
+            "get_hints",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "InfoGathererSkill": (
+        "signalwire.skills.info_gatherer.skill",
+        "InfoGathererSkill",
+        [
+            "get_global_data",
+            "get_instance_key",
+            "get_parameter_schema",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "JokeSkill": (
+        "signalwire.skills.joke.skill",
+        "JokeSkill",
+        [
+            "get_global_data",
+            "get_hints",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "MathSkill": (
+        "signalwire.skills.math.skill",
+        "MathSkill",
+        [
+            "get_hints",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "NativeVectorSearchSkill": (
+        "signalwire.skills.native_vector_search.skill",
+        "NativeVectorSearchSkill",
+        [
+            "cleanup",
+            "get_global_data",
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "PlayBackgroundFileSkill": (
+        "signalwire.skills.play_background_file.skill",
+        "PlayBackgroundFileSkill",
+        [
+            "__init__",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_tools",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "SpiderSkill": (
+        "signalwire.skills.spider.skill",
+        "SpiderSkill",
+        [
+            "__init__",
+            "cleanup",
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "register_tools",
+            "remove_xpaths",
+            "setup",
+        ],
+    ),
+    "SwmlTransferSkill": (
+        "signalwire.skills.swml_transfer.skill",
+        "SWMLTransferSkill",
+        [
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "WeatherApiSkill": (
+        "signalwire.skills.weather_api.skill",
+        "WeatherApiSkill",
+        ["__init__", "get_parameter_schema", "get_tools", "register_tools", "setup"],
+    ),
+    "WebSearchSkill": (
+        "signalwire.skills.web_search.skill",
+        "WebSearchSkill",
+        [
+            "get_global_data",
+            "get_hints",
+            "get_instance_key",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "setup",
+        ],
+    ),
+    "WikipediaSearchSkill": (
+        "signalwire.skills.wikipedia_search.skill",
+        "WikipediaSearchSkill",
+        [
+            "get_hints",
+            "get_parameter_schema",
+            "get_prompt_sections",
+            "register_tools",
+            "search_wiki",
+            "setup",
+        ],
+    ),
 }
 
 
@@ -810,7 +1062,7 @@ _TO_DICT_ALIAS_CLASSES: set[tuple[str, str]] = {
 
 
 def _project_to_dict_aliases(modules: dict) -> None:
-    for (mod, cls) in _TO_DICT_ALIAS_CLASSES:
+    for mod, cls in _TO_DICT_ALIAS_CLASSES:
         methods = modules.get(mod, {}).get("classes", {}).get(cls)
         if methods is not None and "to_json" in methods and "to_dict" not in methods:
             methods.append("to_dict")
@@ -831,7 +1083,11 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
     ],
     # Serverless-mode detection free function.
     "signalwire.utils": [
-        ("include/signalwire/utils/serverless.hpp", "is_serverless_mode", "is_serverless_mode"),
+        (
+            "include/signalwire/utils/serverless.hpp",
+            "is_serverless_mode",
+            "is_serverless_mode",
+        ),
     ],
     # URL validation free function.
     "signalwire.utils.url_validator": [
@@ -843,20 +1099,32 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
     # ``signalwire.core.security.security_utils``. Grep the PascalCase C++ name;
     # emit the Python snake_case name.
     "signalwire.core.security.security_utils": [
-        ("include/signalwire/security/security_utils.hpp",
-         "FilterSensitiveHeaders", "filter_sensitive_headers"),
+        (
+            "include/signalwire/security/security_utils.hpp",
+            "FilterSensitiveHeaders",
+            "filter_sensitive_headers",
+        ),
         ("include/signalwire/security/security_utils.hpp", "RedactUrl", "redact_url"),
-        ("include/signalwire/security/security_utils.hpp",
-         "IsValidHostname", "is_valid_hostname"),
+        (
+            "include/signalwire/security/security_utils.hpp",
+            "IsValidHostname",
+            "is_valid_hostname",
+        ),
     ],
     # Inbound-webhook signature validation (webhooks.md). C++ exposes these as
     # PascalCase free functions in ``signalwire::security``; Python keeps them
     # module-level under ``signalwire.core.security.webhook_validator``.
     "signalwire.core.security.webhook_validator": [
-        ("include/signalwire/security/webhook_validator.hpp",
-         "ValidateWebhookSignature", "validate_webhook_signature"),
-        ("include/signalwire/security/webhook_validator.hpp",
-         "ValidateRequest", "validate_request"),
+        (
+            "include/signalwire/security/webhook_validator.hpp",
+            "ValidateWebhookSignature",
+            "validate_webhook_signature",
+        ),
+        (
+            "include/signalwire/security/webhook_validator.hpp",
+            "ValidateRequest",
+            "validate_request",
+        ),
     ],
     # Framework-free webhook-validation decision core (webhooks.md +
     # HIDDEN_SURFACE_AUDIT Pass 1). C++ ships it as the ``Validate`` free
@@ -867,8 +1135,7 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
     # NOT match ``ValidateWebhookSignature(`` / ``ValidateRequest(`` (those
     # have no word-boundary before ``(``), so this surfaces only the core.
     "signalwire.core.security.webhook_middleware": [
-        ("include/signalwire/security/webhook_validator.hpp",
-         "Validate", "validate"),
+        ("include/signalwire/security/webhook_validator.hpp", "Validate", "validate"),
     ],
     # Top-level ``signalwire/__init__.py`` package helpers. C++ implements them
     # as free functions in ``namespace signalwire`` (src/signalwire.cpp,
@@ -877,8 +1144,16 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
     "signalwire": [
         ("include/signalwire/signalwire.hpp", "RestClient", "RestClient"),
         ("include/signalwire/signalwire.hpp", "register_skill", "register_skill"),
-        ("include/signalwire/signalwire.hpp", "add_skill_directory", "add_skill_directory"),
-        ("include/signalwire/signalwire.hpp", "list_skills_with_params", "list_skills_with_params"),
+        (
+            "include/signalwire/signalwire.hpp",
+            "add_skill_directory",
+            "add_skill_directory",
+        ),
+        (
+            "include/signalwire/signalwire.hpp",
+            "list_skills_with_params",
+            "list_skills_with_params",
+        ),
         ("include/signalwire/signalwire.hpp", "list_skills", "list_skills"),
     ],
     # SWAIG schema-inference module-level helpers (type_inference.py). C++
@@ -889,21 +1164,36 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
     # params-builder — same output tuple, idiomatic input.
     "signalwire.core.agent.tools.type_inference": [
         ("include/signalwire/swaig/type_inference.hpp", "infer_schema", "infer_schema"),
-        ("include/signalwire/swaig/type_inference.hpp",
-         "create_typed_handler_wrapper", "create_typed_handler_wrapper"),
+        (
+            "include/signalwire/swaig/type_inference.hpp",
+            "create_typed_handler_wrapper",
+            "create_typed_handler_wrapper",
+        ),
     ],
     # Logging-config module-level helpers. C++ implements them as free functions
     # in ``signalwire::core::logging_config`` (same snake_case names as Python).
     "signalwire.core.logging_config": [
-        ("include/signalwire/core/logging_config.hpp",
-         "configure_logging", "configure_logging"),
+        (
+            "include/signalwire/core/logging_config.hpp",
+            "configure_logging",
+            "configure_logging",
+        ),
         ("include/signalwire/core/logging_config.hpp", "get_logger", "get_logger"),
-        ("include/signalwire/core/logging_config.hpp",
-         "reset_logging_configuration", "reset_logging_configuration"),
-        ("include/signalwire/core/logging_config.hpp",
-         "strip_control_chars", "strip_control_chars"),
-        ("include/signalwire/core/logging_config.hpp",
-         "get_execution_mode", "get_execution_mode"),
+        (
+            "include/signalwire/core/logging_config.hpp",
+            "reset_logging_configuration",
+            "reset_logging_configuration",
+        ),
+        (
+            "include/signalwire/core/logging_config.hpp",
+            "strip_control_chars",
+            "strip_control_chars",
+        ),
+        (
+            "include/signalwire/core/logging_config.hpp",
+            "get_execution_mode",
+            "get_execution_mode",
+        ),
     ],
 }
 
@@ -935,7 +1225,9 @@ def _scan_skill_methods(repo: Path) -> dict[str, set[str]]:
         return defined
     class_re = re.compile(r"\bclass\s+([A-Za-z_]\w*Skill)\b")
     # method def: `<name>(...) override` or `<name>(...) const override` or `<name>(...) {`
-    method_re = re.compile(r"\b([a-z_][a-z0-9_]*)\s*\([^;{]*\)\s*(?:const\s*)?(?:override|noexcept|\{)")
+    method_re = re.compile(
+        r"\b([a-z_][a-z0-9_]*)\s*\([^;{]*\)\s*(?:const\s*)?(?:override|noexcept|\{)"
+    )
     for cpp in sorted(src.glob("*.cpp")):
         text = strip_block_comments(cpp.read_text(encoding="utf-8"))
         # Drop ``//`` line comments too, so a method name mentioned in a doc
@@ -958,9 +1250,11 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
             continue  # skill not implemented in this tree — don't invent it
         own = defined[cpp_cls]
         present = []
-        for m in py_methods:
-            if m == "__init__" or m in own or m in _SKILL_BASE_METHODS:
-                present.append(m)
+        present.extend(
+            m
+            for m in py_methods
+            if m == "__init__" or m in own or m in _SKILL_BASE_METHODS
+        )
         mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
         mod_entry["classes"][py_cls] = sorted(set(present))
 
@@ -1012,14 +1306,28 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
 # Every symbol is verified present in the header before it is emitted (abort-loud
 # on a missing one) so the projection can never invent surface the port lost.
 _AI_CHAT_CLIENT_METHODS = [
-    "__aenter__", "__aexit__", "__init__", "chat", "close", "create_conversation",
-    "delete", "end", "log", "summarize", "url",
+    "__aenter__",
+    "__aexit__",
+    "__init__",
+    "chat",
+    "close",
+    "create_conversation",
+    "delete",
+    "end",
+    "log",
+    "summarize",
+    "url",
 ]
 # Method-less classes the oracle records in ai_chat.client: the base error
 # carries __init__; every error subclass + result struct is bare.
 _AI_CHAT_EMPTY_CLASSES = [
-    "AuthenticationError", "ChatInProgressError", "ChatLog", "ChatResponse",
-    "ConversationInfo", "ConversationNotFoundError", "RateLimitError",
+    "AuthenticationError",
+    "ChatInProgressError",
+    "ChatLog",
+    "ChatResponse",
+    "ConversationInfo",
+    "ConversationNotFoundError",
+    "RateLimitError",
     "SummaryError",
 ]
 
@@ -1038,7 +1346,8 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
             raise SystemExit(
                 f"enumerate_surface: AI-Chat projection expected {what} in "
                 f"{client_hpp.name} but it is gone -- fix the projection, do not "
-                f"emit a symbol the port no longer has")
+                f"emit a symbol the port no longer has"
+            )
 
     # The client class + the RAII lifecycle members the close/enter/exit fold
     # relies on (a public ctor and a declared destructor) must genuinely exist.
@@ -1057,19 +1366,24 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
     # The base error + every typed subclass and result struct.
     _require(r"\bclass\s+AIChatError\b", "class AIChatError")
     _require(r"\bint\s+code\s*\(\s*\)\s*const", "AIChatError::code")
-    _require(r"\bserver_message\s*\(\s*\)\s*const",
-             "AIChatError::server_message (reference ``message``)")
+    _require(
+        r"\bserver_message\s*\(\s*\)\s*const",
+        "AIChatError::server_message (reference ``message``)",
+    )
     for _c in _AI_CHAT_EMPTY_CLASSES:
         kind = r"class" if _c.endswith("Error") else r"struct"
         _require(rf"\b{kind}\s+{_c}\b", f"{kind} {_c}")
 
     # Drop the mis-routed native modules, then emit the single canonical one.
-    for _native in ("signalwire.ai_chat.ai_chat_client",
-                    "signalwire.ai_chat.ai_chat_error"):
+    for _native in (
+        "signalwire.ai_chat.ai_chat_client",
+        "signalwire.ai_chat.ai_chat_error",
+    ):
         modules.pop(_native, None)
 
     client_mod = modules.setdefault(
-        "signalwire.ai_chat.client", {"classes": {}, "functions": []})
+        "signalwire.ai_chat.client", {"classes": {}, "functions": []}
+    )
     client_mod["classes"]["AIChatClient"] = sorted(_AI_CHAT_CLIENT_METHODS)
     # ``server_message()`` is the C++ spelling of the reference's ``message``
     # attribute — ``message`` alone would collide with std::runtime_error::what()
@@ -1146,12 +1460,12 @@ def strip_block_comments(text: str) -> str:
     i = 0
     n = len(text)
     while i < n:
-        if text[i:i + 2] == "/*":
+        if text[i : i + 2] == "/*":
             end = text.find("*/", i + 2)
             if end == -1:
                 break
             # Preserve newlines inside the comment to keep line numbers sane.
-            block = text[i:end + 2]
+            block = text[i : end + 2]
             out.append("\n" * block.count("\n"))
             i = end + 2
         else:
@@ -1227,9 +1541,10 @@ def strip_attributes(line: str) -> str:
 class Scope:
     """A nested scope (namespace or class) stacked during parsing."""
 
-    def __init__(self, kind: str, name: str, brace_depth: int,
-                 visibility: str | None = None):
-        self.kind = kind              # "namespace" | "class" | "struct" | "anon"
+    def __init__(
+        self, kind: str, name: str, brace_depth: int, visibility: str | None = None
+    ):
+        self.kind = kind  # "namespace" | "class" | "struct" | "anon"
         self.name = name
         self.brace_depth = brace_depth
         # Visibility applies to class/struct scopes. struct defaults to public.
@@ -1285,7 +1600,7 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
             opens = code_line.count("{")
             closes = code_line.count("}")
             # Push one Scope per part, all sharing the same brace_depth
-            for i, p in enumerate(parts):
+            for _i, _p in enumerate(parts):
                 # For nested "a::b", only the last part actually opens a brace.
                 # C++ allows "namespace a::b { ... }" with a single pair.
                 # So the first n-1 parts are logical; only the last increments
@@ -1316,12 +1631,14 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
                 closes = code_line.count("}")
                 # The enclosing namespace path at the point this class opens.
                 _ns_here = "::".join(s.name for s in scopes if s.kind == "namespace")
-                scopes.append(Scope(
-                    "struct" if is_struct else "class",
-                    class_name,
-                    brace_depth,
-                    visibility="public" if is_struct else "private",
-                ))
+                scopes.append(
+                    Scope(
+                        "struct" if is_struct else "class",
+                        class_name,
+                        brace_depth,
+                        visibility="public" if is_struct else "private",
+                    )
+                )
                 brace_depth += opens - closes
                 # Generated wire-type / payload structs are METHOD-LESS; the
                 # method-detection path below never registers a class with zero
@@ -1345,14 +1662,15 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
         # Anything deeper is inside a function body (local variables like
         # ``std::lock_guard<std::mutex> lock(mutex_);`` mustn't be misread as
         # methods).
-        if scopes and scopes[-1].kind in ("class", "struct") and \
-                scopes[-1].visibility == "public" and \
-                brace_depth == scopes[-1].brace_depth + 1:
+        if (
+            scopes
+            and scopes[-1].kind in ("class", "struct")
+            and scopes[-1].visibility == "public"
+            and brace_depth == scopes[-1].brace_depth + 1
+        ):
             method_name = extract_method_name(code_line, scopes[-1].name)
             if method_name is not None:
-                ns_path = "::".join(
-                    s.name for s in scopes if s.kind == "namespace"
-                )
+                ns_path = "::".join(s.name for s in scopes if s.kind == "namespace")
                 # Nested classes: include the outer class name chain,
                 # but for this SDK that's rare; we only emit the immediate
                 # class's methods under its own name.
@@ -1375,9 +1693,7 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
                 # separately because fields are oracle-gated downstream.
                 field_name = extract_field_name(code_line)
                 if field_name is not None:
-                    ns_path = "::".join(
-                        s.name for s in scopes if s.kind == "namespace"
-                    )
+                    ns_path = "::".join(s.name for s in scopes if s.kind == "namespace")
                     class_name = scopes[-1].name
                     emit_field = _METHOD_RENAMES.get(field_name, field_name)
                     fields.setdefault((ns_path, class_name), []).append(emit_field)
@@ -1425,9 +1741,21 @@ _FIELD_DECL_RE = re.compile(
 # Type-expression keywords that mean the line is a declaration of something
 # other than a data member (a nested type, an alias, a template).
 _FIELD_TYPE_REJECT = {
-    "using", "typedef", "friend", "template", "enum", "struct", "class",
-    "union", "namespace", "return", "static_assert", "public", "private",
-    "protected", "operator",
+    "using",
+    "typedef",
+    "friend",
+    "template",
+    "enum",
+    "struct",
+    "class",
+    "union",
+    "namespace",
+    "return",
+    "static_assert",
+    "public",
+    "private",
+    "protected",
+    "operator",
 }
 
 
@@ -1512,10 +1840,29 @@ def extract_method_name(code_line: str, class_name: str) -> str | None:
         return None
 
     # Skip control-flow / reserved words matched as "name"
-    if name in {"if", "else", "for", "while", "do", "switch", "case",
-                "return", "sizeof", "throw", "new", "delete",
-                "typedef", "using", "template", "friend",
-                "enum", "union", "struct", "class", "namespace"}:
+    if name in {
+        "if",
+        "else",
+        "for",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "return",
+        "sizeof",
+        "throw",
+        "new",
+        "delete",
+        "typedef",
+        "using",
+        "template",
+        "friend",
+        "enum",
+        "union",
+        "struct",
+        "class",
+        "namespace",
+    }:
         return None
 
     # Skip operator overloads
@@ -1564,6 +1911,7 @@ def extract_method_name(code_line: str, class_name: str) -> str | None:
 # Module-path translation
 # ---------------------------------------------------------------------------
 
+
 def native_ns_to_module(ns_path: str) -> str:
     """Translate ``signalwire::rest`` -> ``signalwire.rest``.
 
@@ -1610,12 +1958,17 @@ def camel_to_snake(name: str) -> str:
 # Top-level
 # ---------------------------------------------------------------------------
 
+
 def git_sha(repo: Path) -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
+        return (
+            subprocess.check_output(
+                ["git", "-C", str(repo), "rev-parse", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
     except Exception:
         return "N/A"
 
@@ -1625,8 +1978,9 @@ def _project_generated_rest_methods(modules: dict) -> None:
     (from the generator's rest_signatures.json) into its surface class list,
     materialising inherited base CRUD verbs the header walker can't see."""
     here = Path(__file__).resolve().parent
-    gen_dir = (here.parent / "include" / "signalwire" / "rest" / "namespaces"
-               / "generated")
+    gen_dir = (
+        here.parent / "include" / "signalwire" / "rest" / "namespaces" / "generated"
+    )
     smap_path = gen_dir / "generated_surface_map.json"
     sc_path = gen_dir / "rest_signatures.json"
     if not smap_path.is_file() or not sc_path.is_file():
@@ -1654,7 +2008,8 @@ def _project_generated_rest_methods(modules: dict) -> None:
         if mod is None:
             raise SystemExit(
                 f"enumerate_surface: sidecar class {cls!r} not in "
-                f"generated_surface_map.json (regenerate the REST layer)")
+                f"generated_surface_map.json (regenerate the REST layer)"
+            )
         mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
         existing = set(mod_entry["classes"].get(cls, []))
         existing.add(canon)
@@ -1738,8 +2093,11 @@ def _fold_setters(module: str, cls: str, members: list[str]) -> list[str]:
     ref_members = ref.get("modules", {}).get(module, {}).get("classes", {}).get(cls)
     allowed: set[str] = set()
     if ref_members:
-        allowed = set(ref_members if isinstance(ref_members, list)
-                      else ref_members.get("members", ref_members))
+        allowed = set(
+            ref_members
+            if isinstance(ref_members, list)
+            else ref_members.get("members", ref_members)
+        )
     if module in _FAMILY_GATE_MODULES:
         allowed |= _agentbase_family_members(ref)
     if not allowed:
@@ -1780,8 +2138,11 @@ def _gate_field_members(module: str, cls: str, decl_fields: list[str]) -> list[s
     ref_members = ref_modules.get(module, {}).get("classes", {}).get(cls)
     allowed: set[str] = set()
     if ref_members:
-        allowed = set(ref_members if isinstance(ref_members, list)
-                      else ref_members.get("members", ref_members))
+        allowed = set(
+            ref_members
+            if isinstance(ref_members, list)
+            else ref_members.get("members", ref_members)
+        )
     if module in _FAMILY_GATE_MODULES:
         allowed |= _agentbase_family_members(ref)
     return [f for f in decl_fields if f in allowed]
@@ -1800,11 +2161,16 @@ def _agentbase_family_members(ref: dict) -> set[str]:
     ``_fold_agentbase_family`` membership rule."""
     out: set[str] = set()
     for mod, entry in ref.get("modules", {}).items():
-        if mod != "signalwire.core.agent_base" and not mod.startswith(_FAMILY_MIXIN_PREFIX):
+        if mod != "signalwire.core.agent_base" and not mod.startswith(
+            _FAMILY_MIXIN_PREFIX
+        ):
             continue
         for members in entry.get("classes", {}).values():
-            out |= set(members if isinstance(members, list)
-                       else members.get("members", members))
+            out |= set(
+                members
+                if isinstance(members, list)
+                else members.get("members", members)
+            )
     return out
 
 
@@ -1833,8 +2199,11 @@ def _project_gen_payload_members(modules: dict) -> None:
             ref_members = ref_classes.get(cls)
             if not ref_members:
                 continue
-            ref_set = set(ref_members if isinstance(ref_members, list)
-                          else ref_members.get("members", ref_members))
+            ref_set = set(
+                ref_members
+                if isinstance(ref_members, list)
+                else ref_members.get("members", ref_members)
+            )
             present = [f for f in fields if f in ref_set]
             if not present:
                 continue
@@ -1864,7 +2233,9 @@ def _project_client_tree_members(modules: dict) -> None:
     gen_dir = _INCLUDE_ROOT / "signalwire" / "rest" / "namespaces" / "generated"
     if not gen_dir.is_dir():
         return
-    mod_entry = modules.setdefault(_CLIENT_TREE_MODULE, {"classes": {}, "functions": []})
+    mod_entry = modules.setdefault(
+        _CLIENT_TREE_MODULE, {"classes": {}, "functions": []}
+    )
     for hdr in sorted(gen_dir.glob("*Namespace.hpp")):
         srctxt = hdr.read_text(encoding="utf-8")
         m = re.search(r"(?:class|struct) (\w+Namespace)\s*\{(.*?)\n\};", srctxt, re.S)
@@ -1874,8 +2245,11 @@ def _project_client_tree_members(modules: dict) -> None:
         ref_members = ref_classes.get(cls)
         if not ref_members:
             continue
-        ref_set = set(ref_members if isinstance(ref_members, list)
-                      else ref_members.get("members", ref_members))
+        ref_set = set(
+            ref_members
+            if isinstance(ref_members, list)
+            else ref_members.get("members", ref_members)
+        )
         # public data members: ``<TypeName> <member>;`` at 2-space indent.
         fields = re.findall(r"^\s{2}([A-Z]\w+)\s+([a-z_]\w*);", body, re.M)
         present = [mem for _t, mem in fields if mem in ref_set]
@@ -1903,7 +2277,8 @@ def _project_client_tree_members(modules: dict) -> None:
 # parser's ``struct Name {`` regex does not handle. Non-greedy to the matching
 # ``\n};`` at column 0.
 _NAMED_STRUCT_RE = re.compile(
-    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S
+)
 
 
 def _struct_public_fields(header_txt: str) -> dict[str, list[str]]:
@@ -1973,8 +2348,11 @@ def _emit_oracle_gated_fields(modules: dict, module: str, header: Path) -> None:
         ref_members = ref_classes.get(cls)
         if not ref_members:
             continue
-        ref_set = set(ref_members if isinstance(ref_members, list)
-                      else ref_members.get("members", ref_members))
+        ref_set = set(
+            ref_members
+            if isinstance(ref_members, list)
+            else ref_members.get("members", ref_members)
+        )
         present = [f for f in fields if f in ref_set]
         if "__init__" in ref_set:
             present.append("__init__")
@@ -2128,7 +2506,9 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             merged = sorted(set(existing) | set(methods) | set(gated_fields))
             # Fold ``set_<x>`` onto ``<x>`` where the reference records ``<x>``
             # on this class — writer/attribute shape idiom (see _fold_setters).
-            mod_entry["classes"][emit_class] = _fold_setters(emit_mod, emit_class, merged)
+            mod_entry["classes"][emit_class] = _fold_setters(
+                emit_mod, emit_class, merged
+            )
 
     # Apply mixin projections: the C++ AgentBase flattens Python's 9 mixin
     # classes. Emit the same method list under each mixin module path so
@@ -2166,8 +2546,10 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # manager is as available in C++ as in Python, it is simply already in hand.
     # Emit it only where the projection actually produced the merged class, so
     # this can never surface a member for a class the port does not have.
-    for _mod, _cls in (("signalwire.core.agent.prompt.manager", "PromptManager"),
-                       ("signalwire.core.agent.tools.registry", "ToolRegistry")):
+    for _mod, _cls in (
+        ("signalwire.core.agent.prompt.manager", "PromptManager"),
+        ("signalwire.core.agent.tools.registry", "ToolRegistry"),
+    ):
         _members = modules.get(_mod, {}).get("classes", {}).get(_cls)
         if _members:
             modules[_mod]["classes"][_cls] = sorted(set(_members) | {"agent"})
@@ -2184,7 +2566,9 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # and FabricResourcePUT is a Python-only PUT-marker subclass with no members
     # (recorded empty). The concrete resources still carry their own method
     # membership; this only reconciles the shared base layer.
-    _base = modules.setdefault("signalwire.rest._base", {"classes": {}, "functions": []})
+    _base = modules.setdefault(
+        "signalwire.rest._base", {"classes": {}, "functions": []}
+    )
     for _bcls, _bmeths in (
         ("BaseResource", ["__init__"]),
         ("ReadResource", ["get", "list", "paginate"]),
@@ -2239,7 +2623,9 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # ``signalwire.relay.action``, a PORT_ADDITION) carries these; project the
     # Python-recorded subset onto relay.call so the base symbol lines up (its
     # richer C++ surface stays under relay.action as the port addition).
-    _action_own = modules.get("signalwire.relay.action", {}).get("classes", {}).get("Action", [])
+    _action_own = (
+        modules.get("signalwire.relay.action", {}).get("classes", {}).get("Action", [])
+    )
     if _action_own:
         # ``control_id`` joins the projected set: it is a ctor param the
         # reference stores publicly (``self.control_id``), which the oracle's
@@ -2248,9 +2634,21 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
         # in ``__init__`` and flips it True on completion — a caller-observable
         # VALUE (class-B2), and the C++ Action already exposes ``completed()``
         # (``is_done()`` is the C++-idiom alias that delegates to it).
-        proj = sorted({"__init__"} | {m for m in ("is_done", "wait", "result", "control_id",
-                                                  "call", "completed")
-                                      if m in _action_own})
+        proj = sorted(
+            {"__init__"}
+            | {
+                m
+                for m in (
+                    "is_done",
+                    "wait",
+                    "result",
+                    "control_id",
+                    "call",
+                    "completed",
+                )
+                if m in _action_own
+            }
+        )
         modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
         modules["signalwire.relay.call"]["classes"]["Action"] = proj
         # ``call`` is REFERENCE surface (``relay.call.Action.call``), projected
@@ -2279,7 +2677,9 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
             re.findall(r"SIGNALWIRE_RELAY_ACTION_SUBCLASS\(([A-Za-z_]\w*)\)", _txt)
         )
         _declared.discard("NAME")  # the macro parameter, not a real subclass
-        call_mod = modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": []})
+        call_mod = modules.setdefault(
+            "signalwire.relay.call", {"classes": {}, "functions": []}
+        )
         for _sub in _declared:
             _meths = {"__init__"}
             for _ctl in RELAY_ACTION_CONTROL_METHODS.get(_sub, []):
@@ -2355,19 +2755,25 @@ def main(argv: list[str]) -> int:
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--include-dir", type=Path, default=default_include,
+        "--include-dir",
+        type=Path,
+        default=default_include,
         help=f"Header root to walk (default: {default_include})",
     )
     parser.add_argument(
-        "--output", type=Path, default=default_output,
+        "--output",
+        type=Path,
+        default=default_output,
         help=f"Where to write JSON (default: {default_output})",
     )
     parser.add_argument(
-        "--stdout", action="store_true",
+        "--stdout",
+        action="store_true",
         help="Print JSON to stdout instead of writing --output",
     )
     parser.add_argument(
-        "--check", action="store_true",
+        "--check",
+        action="store_true",
         help="Compare against the file at --output; exit 1 on drift",
     )
     args = parser.parse_args(argv)
@@ -2408,7 +2814,8 @@ def main(argv: list[str]) -> int:
             print(f"error: {native_output} does not exist", file=sys.stderr)
             return 1
         if strip_meta(native_rendered) != strip_meta(
-                native_output.read_text(encoding="utf-8")):
+            native_output.read_text(encoding="utf-8")
+        ):
             print(
                 "DRIFT: port_surface_native.json is stale relative to headers.\n"
                 "  Regenerate:\n"
@@ -2423,11 +2830,13 @@ def main(argv: list[str]) -> int:
     else:
         args.output.write_text(rendered, encoding="utf-8")
         native_output.write_text(native_rendered, encoding="utf-8")
-        print(f"wrote {args.output} "
-              f"({len(snapshot['modules'])} modules, "
-              f"{sum(len(m['classes']) for m in snapshot['modules'].values())} classes, "
-              f"{sum(sum(len(ms) for ms in m['classes'].values()) for m in snapshot['modules'].values())} methods)",
-              file=sys.stderr)
+        print(
+            f"wrote {args.output} "
+            f"({len(snapshot['modules'])} modules, "
+            f"{sum(len(m['classes']) for m in snapshot['modules'].values())} classes, "
+            f"{sum(sum(len(ms) for ms in m['classes'].values()) for m in snapshot['modules'].values())} methods)",
+            file=sys.stderr,
+        )
     return 0
 
 

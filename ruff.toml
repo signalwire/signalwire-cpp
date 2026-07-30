@@ -1,0 +1,82 @@
+# ruff config for signalwire-cpp — the REPO-LINT / REPO-FMT gates.
+#
+# This is a C++ SDK, but it carries 9 hand-written Python files under scripts/
+# (~10.4k lines) and until 2026-07-30 NOT ONE of them was linted or formatted by
+# any gate. Two of them are load-bearing lint/format infrastructure themselves:
+#
+#   scripts/_cpp_fmt.py         the REST/type generators shell to it to run
+#                               clang-format over emitted C++
+#   scripts/clang_tidy_cache.py the ctcache wrapper the LINT gate itself routes
+#                               every clang-tidy invocation through
+#
+# i.e. the tooling that enforces the bar on the C++ tree was itself below any
+# bar. Linting it found a live defect on the first pass (a duplicate dict key in
+# enumerate_surface.py that made a projection stanza dead code — fe9fd56).
+#
+# The rule selection MIRRORS the reference implementation's
+# (signalwire-python/pyproject.toml) so the fleet is consistent. Do not invent a
+# different set here; if the reference's set changes, follow it.
+
+target-version = "py310"
+line-length = 88
+
+# VENDORED THIRD-PARTY CODE — the one and only exclusion, and it is the same
+# category as deps/ on the C++ side: code we do not own and must not edit.
+#
+# scripts/clang_tidy_cache.py is vendored verbatim from matus-chochlik/ctcache at
+# a pinned upstream SHA (see its header). Editing it to satisfy a linter would
+# fork it from upstream and break the documented re-vendor path ("to upgrade:
+# re-vendor from a newer pinned SHA and re-audit"). Its bare `except: pass`
+# blocks are in the OPTIONAL REST-server cache backend, and that fail-open
+# behaviour is deliberate and audited: any cache error falls through to running
+# the real clang-tidy, so a finding is never skipped (scripts/run-lint.sh:84-88).
+# cpp uses local-filesystem mode only; the network paths are never taken.
+#
+# The other 8 files under scripts/ are first-party and fully linted.
+exclude = ["scripts/clang_tidy_cache.py"]
+
+[format]
+# Pin STABLE formatting explicitly. Without this, `ruff format --check` can
+# resolve preview-mode formatting while a local stable run leaves the file
+# unchanged — a local≠CI split with no visible cause. Same rationale, and the
+# same value, as the reference's [tool.ruff.format].
+preview = false
+
+[lint]
+# E4/E7/E9 + F are the ruff defaults (E501 line-length intentionally excluded —
+# formatting is owned by `ruff format`, not the linter). B = flake8-bugbear
+# (likely-bug patterns), S = flake8-bandit (security smells). Identical to the
+# reference's select list.
+select = ["E4", "E7", "E9", "F", "B", "S", "C4", "PERF", "SIM", "PTH", "RET", "RUF", "UP"]
+
+[lint.per-file-ignores]
+# S603 (subprocess call) and S607 (partial executable path).
+#
+# Every script in scripts/ is developer-run build/enumeration tooling whose JOB
+# is to drive a native toolchain: clang-tidy, clang-format, cmake, git, xcrun.
+# All 22 sites share one shape — a FIXED list-form argv with the default
+# shell=False, so there is no shell to interpolate into, and the only
+# non-literal arguments are paths the script itself computed from the repo root.
+# None of it is untrusted or network input. S607 fires where the binary is
+# resolved from PATH (`git`, `cmake`, `xcrun`, `clang-format`, `clang-tidy`),
+# which here is deliberate: scripts/_env.sh pins tool VERSIONS by prepending to
+# PATH, so PATH resolution IS the pinning mechanism, not a defect.
+#
+# Same rationale as the reference's "signalwire/cli/dokku.py" = ["S603","S607"].
+# Listed PER FILE rather than as a scripts/** blanket so a NEW subprocess call in
+# a file that does not already shell out still reds the gate.
+"scripts/_cpp_fmt.py" = ["S603", "S607"]
+# E402 — module-level import not at top of file. Both sites in this file are
+# STRUCTURALLY FORCED, not sloppiness, and are the same shape the reference
+# grants its own conftest ("MUST insert the project root on sys.path BEFORE
+# importing signalwire.*"):
+#   :167  `from clang.cindex import ...` must follow the
+#         `clang.cindex.Config.set_library_file(_LIBCLANG)` call above it --
+#         importing those names first binds the wrong (or no) native libclang.
+#   :191  `from enumerate_surface import ...` must follow
+#         `sys.path.insert(0, str(HERE))`, which is what puts the sibling module
+#         on the path at all.
+# Moving either import up does not make the file tidier; it makes it not work.
+"scripts/enumerate_signatures.py" = ["S603", "S607", "E402"]
+"scripts/enumerate_surface.py" = ["S603", "S607"]
+"scripts/generate_rest_tests.py" = ["S603", "S607"]

@@ -30,6 +30,7 @@ Usage:
     python3 scripts/generate_relay_protocol.py --check    # GEN-FRESH: fail if stale
     python3 scripts/generate_relay_protocol.py --out DIR  # scratch: emit into DIR
 """
+
 from __future__ import annotations
 
 import argparse
@@ -42,7 +43,9 @@ from pathlib import Path
 
 def _load_rest_generator():
     here = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location("generate_rest", here / "generate_rest.py")
+    spec = importlib.util.spec_from_file_location(
+        "generate_rest", here / "generate_rest.py"
+    )
     if spec is None or spec.loader is None:  # pragma: no cover
         raise SystemExit("generate_relay_protocol.py: cannot load generate_rest.py")
     mod = importlib.util.module_from_spec(spec)
@@ -94,8 +97,11 @@ def build_outputs(psdk: Path) -> dict:
             emitted_names.add(struct)
             fn = "/".join(RELAY_SUBDIR) + f"/{GR.snake(struct)}.hpp"
             outs[fn] = GR.emit_methodless_struct(
-                RELAY_NS, struct, node.get("properties") or {},
-                f"RELAY method {method!r}, {phase}.", "generate_relay_protocol.py",
+                RELAY_NS,
+                struct,
+                node.get("properties") or {},
+                f"RELAY method {method!r}, {phase}.",
+                "generate_relay_protocol.py",
             )
 
     return outs
@@ -103,15 +109,19 @@ def build_outputs(psdk: Path) -> dict:
 
 def main(argv: list) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--check", action="store_true", help="GEN-FRESH: exit non-zero if stale")
+    ap.add_argument(
+        "--check", action="store_true", help="GEN-FRESH: exit non-zero if stale"
+    )
     ap.add_argument("--out", default="", help="scratch: emit into this dir")
     args = ap.parse_args(argv)
 
     psdk = resolve_porting_sdk()
     outs = build_outputs(psdk)
     # Only C++ headers are formatted; any .json sidecars are emitted verbatim.
-    outs = {fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
-            for fn, src in outs.items()}
+    outs = {
+        fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
+        for fn, src in outs.items()
+    }
 
     out_dir = Path(args.out) if args.out else repo_root() / "include" / "signalwire"
 
@@ -129,11 +139,15 @@ def main(argv: list) -> int:
                 if rel not in expected:
                     stale.append(f"{p} (leftover — not in generator output)")
         if stale:
-            sys.stderr.write("GEN-FRESH FAIL: %d generated RELAY-protocol file(s) stale:\n" % len(stale))
+            sys.stderr.write(
+                f"GEN-FRESH FAIL: {len(stale)} generated RELAY-protocol file(s) stale:\n"
+            )
             for s in stale:
-                sys.stderr.write("  - %s\n" % s)
+                sys.stderr.write(f"  - {s}\n")
             return 1
-        print("GEN-FRESH: generated RELAY-protocol files match porting-sdk/relay-protocol/.")
+        print(
+            "GEN-FRESH: generated RELAY-protocol files match porting-sdk/relay-protocol/."
+        )
         return 0
 
     for fn, src in outs.items():

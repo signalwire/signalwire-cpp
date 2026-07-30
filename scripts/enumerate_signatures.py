@@ -3548,7 +3548,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include", type=Path, default=PORT_ROOT / "include")
     parser.add_argument("--out", type=Path, default=PORT_ROOT / "port_signatures.json")
-    parser.add_argument("--strict", action="store_true")
+    # FAIL-LOUD BY DEFAULT (2026-07-30). This used to be an opt-in
+    # `--strict` that NOT ONE of the six gate invocations passed — run-ci.sh,
+    # porting-sdk/scripts/suites/_signatures_fresh.py:156/163 and
+    # _surface_commands.py:448/481/535/562/589/635 all call this script bare. So
+    # the fail-loud path was dead code, and a translation failure printed a
+    # warning and STILL EXITED 0 while the affected symbol vanished from
+    # port_signatures.json entirely. Measured on this repo before the fix: 5
+    # failures at rc=0, with ContextBuilder.attach_tool_name_supplier and
+    # SWMLService.generate_random_hex silently absent despite being declared.
+    #
+    # BooleanOptionalAction with default=True means the six existing callers need
+    # no change — they simply start failing loud. `--no-strict` is the local-only
+    # escape hatch for deliberately inspecting a partial artifact. `--strict`
+    # still parses, so the documented invocation keeps working.
+    parser.add_argument(
+        "--strict",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="fail (exit 1) on any type-translation failure instead of silently "
+        "emitting an artifact that omits the affected symbols (default: enabled)",
+    )
     args = parser.parse_args()
 
     aliases = load_aliases()
@@ -3666,6 +3686,17 @@ def main() -> int:
         if len(failures) > 30:
             print(f"  ... ({len(failures) - 30} more)", file=sys.stderr)
         if args.strict:
+            print(
+                "enumerate_signatures: REFUSING to write a signature artifact that "
+                "silently OMITS the symbols above. A failed translation drops that "
+                "method from port_signatures.json entirely, so the SIGNATURES / DRIFT "
+                "gates would compare against a surface this port does not actually "
+                "have. Add the type to porting-sdk/type_aliases.yaml under aliases.cpp "
+                "if it is real vocabulary, or make the member non-public if it is an "
+                "internal seam. --no-strict emits the partial artifact anyway (local "
+                "inspection only; no gate should ever pass it).",
+                file=sys.stderr,
+            )
             return 1
 
     args.out.write_text(

@@ -97,8 +97,11 @@ int main() {
                                                         {"event_type", ev.event_type},
                                                         {"echoed", ev.params},
                                                     });
+        // The ack is best-effort: this harness only reports whether an event was
+        // OBSERVED (the saw_event flag above), so a failed echo must not change
+        // the audit result or abort the callback. Deliberately empty.
+        // NOLINTNEXTLINE(bugprone-empty-catch)
       } catch (...) {
-        // Audit only needs the saw_event flag; failure to ack is fine.
       }
     });
 

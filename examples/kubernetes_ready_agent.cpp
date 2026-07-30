@@ -4,6 +4,8 @@
 #include <csignal>
 #include <iostream>
 #include <signalwire/agent/agent_base.hpp>
+#include <stdexcept>
+#include <string>
 
 using namespace signalwire;
 using json = nlohmann::json;
@@ -25,7 +27,13 @@ int main() {
     int port = 3000;
     const char* port_env = std::getenv("PORT");
     if (port_env) {
-      port = std::atoi(port_env);
+      // atoi() reports NOTHING on a non-numeric value -- it just returns 0,
+      // so PORT=abc used to bind port 0. Parse it properly and say so.
+      try {
+        port = std::stoi(port_env);
+      } catch (const std::exception&) {
+        std::cerr << "PORT=\"" << port_env << "\" is not a number; using " << port << "\n";
+      }
     }
 
     agent::AgentBase agent("k8s-agent", "/", "0.0.0.0", port);

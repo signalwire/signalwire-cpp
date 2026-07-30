@@ -32,6 +32,7 @@
 #include <iostream>
 #include <signalwire/swaig/function_result.hpp>
 #include <signalwire/swml/service.hpp>
+#include <stdexcept>
 #include <string>
 
 #include "httplib.h"
@@ -74,7 +75,12 @@ int main(int argc, char** argv) {
     int port = 3000;
     std::string public_url = "https://your-host.example.com/sales-sidecar";
     if (argc > 1) {
-      int p = std::atoi(argv[1]);
+      int p = 0;
+      try {
+        p = std::stoi(argv[1]);
+      } catch (const std::exception&) {
+        p = 0;
+      }
       if (p > 0) {
         port = p;
       }

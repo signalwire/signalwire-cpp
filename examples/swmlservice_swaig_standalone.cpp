@@ -32,6 +32,7 @@
 #include <iostream>
 #include <signalwire/swaig/function_result.hpp>
 #include <signalwire/swml/service.hpp>
+#include <stdexcept>
 #include <string>
 
 using namespace signalwire;
@@ -43,8 +44,13 @@ int main(int argc, char** argv) {
   try {
     int port = 3000;
     if (argc > 1) {
-      port = std::atoi(argv[1]);
+      try {
+        port = std::stoi(argv[1]);
+      } catch (const std::exception&) {
+        port = 0;  // fall through to the range check below
+      }
       if (port <= 0) {
+        std::cerr << "port argument \"" << argv[1] << "\" is not usable; using 3000\n";
         port = 3000;
       }
     }

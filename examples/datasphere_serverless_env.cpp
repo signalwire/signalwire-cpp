@@ -6,6 +6,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <signalwire/agent/agent_base.hpp>
+#include <stdexcept>
+#include <string>
 
 using namespace signalwire;
 using json = nlohmann::json;
@@ -27,12 +29,23 @@ int main() {
 
     int count = 3;
     if (auto v = std::getenv("DATASPHERE_COUNT")) {
-      count = std::atoi(v);
+      // atoi() cannot report a bad value -- it returns 0, which would
+      // silently ask for zero results. Parse it properly.
+      try {
+        count = std::stoi(v);
+      } catch (const std::exception&) {
+        std::cerr << "DATASPHERE_COUNT=\"" << v << "\" is not a number; using " << count << "\n";
+      }
     }
 
     double distance = 4.0;
     if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
-      distance = std::atof(v);
+      try {
+        distance = std::stod(v);
+      } catch (const std::exception&) {
+        std::cerr << "DATASPHERE_DISTANCE=\"" << v << "\" is not a number; using " << distance
+                  << "\n";
+      }
     }
 
     agent::AgentBase agent("datasphere-serverless-env", "/datasphere-env");

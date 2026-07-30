@@ -46,9 +46,17 @@ class InfoGathererAgent : public agent::AgentBase {
   /// @param request The request object ``query_params`` and ``headers`` are
   ///   read off. Modelled as a JSON object with those two keys; when it is
   ///   absent or not an object, both are treated as empty maps.
-  json on_swml_request(const json& request_data = nullptr,
-                       const std::optional<std::string>& callback_path = std::nullopt,
-                       const json& request = nullptr);
+  ///
+  /// This is a genuine `override` of swml::Service::on_swml_request. It used to
+  /// take `const json&` and return `json`, which matched neither the base's
+  /// arity nor its return type, so it HID the base overload instead of
+  /// overriding it and the virtual dispatch in src/swml/service.cpp never
+  /// reached it. Returning std::nullopt is the "no override" answer (it was
+  /// previously a null `json`).
+  std::optional<json> on_swml_request(
+      const std::optional<json>& request_data = std::nullopt,
+      const std::optional<std::string>& callback_path = std::nullopt,
+      const std::optional<json>& request = std::nullopt) override;
 
   /// SWAIG tool handler: return the first question. Reads
   /// questions/question_index from global_data (in raw_data).

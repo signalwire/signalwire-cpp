@@ -270,12 +270,17 @@ class CustomSwmlService : public signalwire::swml::Service {
  public:
   json last_request_data;
   std::string last_callback_path;
+  std::optional<json> last_request;
+  bool saw_request_arg = false;
   std::optional<json> custom_return;
 
   std::optional<json> on_swml_request(const std::optional<json>& request_data,
-                                      const std::optional<std::string>& callback_path) override {
+                                      const std::optional<std::string>& callback_path,
+                                      const std::optional<json>& request) override {
     last_request_data = request_data.value_or(json{});
     last_callback_path = callback_path.value_or(std::string{});
+    last_request = request;
+    saw_request_arg = request.has_value();
     return custom_return;
   }
 };
@@ -292,6 +297,45 @@ TEST(web_on_request_delegates_to_on_swml_request) {
   ASSERT_EQ(svc.last_callback_path, std::string{"/cb"});
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ((*result)["custom"].get<bool>(), true);
+  // on_request carries no request object; the reference passes None from this
+  // path (web_mixin.py:1342), so the override must observe an empty optional.
+  ASSERT_FALSE(svc.saw_request_arg);
+  return true;
+}
+
+// The third parameter is the whole point of widening this hook: before it
+// existed, a C++ subclass overriding on_swml_request could not reach the
+// inbound request AT ALL, so query params and headers were invisible to the
+// dispatch hook. This asserts the argument actually arrives at the override.
+TEST(web_on_swml_request_receives_the_request_object) {
+  CustomSwmlService svc;
+  json req{{"query_params", {{"tenant", "acme"}}}, {"headers", {{"x-trace", "abc123"}}}};
+
+  auto result = svc.on_swml_request(json{{"data", "val"}}, std::string{"/cb"}, req);
+  (void)result;
+
+  ASSERT_TRUE(svc.saw_request_arg);
+  ASSERT_TRUE(svc.last_request.has_value());
+  ASSERT_EQ((*svc.last_request)["query_params"]["tenant"].get<std::string>(), std::string{"acme"});
+  ASSERT_EQ((*svc.last_request)["headers"]["x-trace"].get<std::string>(), std::string{"abc123"});
+  return true;
+}
+
+// The base is virtual and the prefab now genuinely OVERRIDES it (it used to
+// take `const json&` / return `json`, matching neither arity nor return type,
+// so it HID the base and virtual dispatch never reached it).
+TEST(web_on_swml_request_dispatches_virtually_through_a_base_reference) {
+  CustomSwmlService svc;
+  svc.custom_return = json{{"via", "base-ref"}};
+  signalwire::swml::Service& base = svc;
+
+  json req{{"query_params", {{"k", "v"}}}, {"headers", json::object()}};
+  auto result = base.on_swml_request(std::nullopt, std::nullopt, req);
+
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ((*result)["via"].get<std::string>(), std::string{"base-ref"});
+  ASSERT_TRUE(svc.saw_request_arg);
+  ASSERT_EQ((*svc.last_request)["query_params"]["k"].get<std::string>(), std::string{"v"});
   return true;
 }
 

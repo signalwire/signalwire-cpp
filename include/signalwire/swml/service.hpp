@@ -374,9 +374,24 @@ class Service {
 
   /// Customization point for subclasses to modify SWML based on
   /// request data. Default returns std::nullopt (no modification).
+  ///
+  /// @param request_data The parsed POST body, or std::nullopt when absent.
+  /// @param callback_path Optional callback path.
+  /// @param request The inbound request, modelled as a JSON object carrying
+  ///   `query_params` and `headers` — the reference passes its framework
+  ///   Request object and reads those same two attributes off it. std::nullopt
+  ///   when the call did not originate from a live request: `on_request` passes
+  ///   nothing here, exactly as the reference passes `None` from that path.
+  ///
+  /// The third parameter was added 2026-07-30. Without it a C++ subclass
+  /// overriding this hook could not reach the inbound request AT ALL, so query
+  /// params and headers were invisible to the dispatch hook — a capability gap
+  /// against the reference, which keeps its DISPATCH hook request-aware and
+  /// made only the SECURITY half request-agnostic.
   virtual std::optional<json> on_swml_request(
       const std::optional<json>& request_data = std::nullopt,
-      const std::optional<std::string>& callback_path = std::nullopt);
+      const std::optional<std::string>& callback_path = std::nullopt,
+      const std::optional<json>& request = std::nullopt);
 
  protected:
   /// Override to customize SWML rendering

@@ -593,11 +593,14 @@ json Service::render_main_swml(const httplib::Request&) const { return on_render
 
 std::optional<json> Service::on_request(const std::optional<json>& request_data,
                                         const std::optional<std::string>& callback_path) {
-  return on_swml_request(request_data, callback_path);
+  // No request object on this path — the reference passes None here too
+  // (web_mixin.py:1342), so std::nullopt is the faithful mapping.
+  return on_swml_request(request_data, callback_path, std::nullopt);
 }
 
 std::optional<json> Service::on_swml_request(const std::optional<json>& /*request_data*/,
-                                             const std::optional<std::string>& /*callback_path*/) {
+                                             const std::optional<std::string>& /*callback_path*/,
+                                             const std::optional<json>& /*request*/) {
   return std::nullopt;
 }
 

@@ -91,12 +91,12 @@ InfoGathererAgent& InfoGathererAgent::set_question_callback(QuestionCallback cb)
   return *this;
 }
 
-json InfoGathererAgent::on_swml_request(const json& request_data,
-                                        const std::optional<std::string>& /*callback_path*/,
-                                        const json& request) {
+std::optional<json> InfoGathererAgent::on_swml_request(
+    const std::optional<json>& request_data, const std::optional<std::string>& /*callback_path*/,
+    const std::optional<json>& request) {
   // Static mode: no dynamic override.
   if (has_static_questions_) {
-    return json();  // null
+    return std::nullopt;
   }
   if (!question_callback_) {
     return global_data_override(fallback_questions());
@@ -105,15 +105,16 @@ json InfoGathererAgent::on_swml_request(const json& request_data,
   // to {} when it (or the attribute) is absent; body_params is `request_data or {}`.
   json qp = json::object();
   json hd = json::object();
-  if (request.is_object()) {
-    if (request.contains("query_params") && request["query_params"].is_object()) {
-      qp = request["query_params"];
+  if (request.has_value() && request->is_object()) {
+    if (request->contains("query_params") && (*request)["query_params"].is_object()) {
+      qp = (*request)["query_params"];
     }
-    if (request.contains("headers") && request["headers"].is_object()) {
-      hd = request["headers"];
+    if (request->contains("headers") && (*request)["headers"].is_object()) {
+      hd = (*request)["headers"];
     }
   }
-  json bp = request_data.is_object() ? request_data : json::object();
+  json bp =
+      (request_data.has_value() && request_data->is_object()) ? *request_data : json::object();
   try {
     std::vector<json> questions = question_callback_(qp, bp, hd);
     if (questions.empty()) {

@@ -190,6 +190,11 @@ struct SwaigQueryParam {
 /// per-request dynamic-config path); copy ASSIGNMENT is deleted.
 class AgentBase : public swml::Service {
   friend class signalwire::server::AgentServer;
+  // The serverless dispatchers extract the credential from their own envelope
+  // and then hand it to the SAME `swaig_validate_token` core the HTTP endpoint
+  // uses. They need reach into that protected core; granting it here keeps the
+  // decision in ONE place rather than duplicating it per transport.
+  friend struct signalwire::utils::ServerlessTokenAccess;
 
  public:
   /// Construct an agent.
@@ -780,6 +785,35 @@ class AgentBase : public swml::Service {
 
   // Handle SWAIG request
   void handle_swaig_request(const httplib::Request& req, httplib::Response& res);
+
+  /// The SOLE `secure` enforcement decision for one SWAIG call, deliberately
+  /// free of any request/transport type so that EVERY transport — the HTTP
+  /// `/swaig` endpoint and all four serverless envelopes (lambda, cgi,
+  /// google_cloud_function, azure_function) — reaches the identical check with
+  /// identical semantics. Each transport is responsible only for EXTRACTING the
+  /// credential from its own payload shape; none of them re-implements the
+  /// decision, so serverless cannot drift away from HTTP.
+  ///
+  /// A tool registered with `secure = true` REQUIRES a valid token. An ABSENT
+  /// token is refused exactly like a forged one — omitting the credential must
+  /// never be weaker than presenting a wrong one, or `secure` would be a flag
+  /// that permits anonymous calls. A token can only be checked against a
+  /// `call_id`, so an absent `call_id` counts as UNVALIDATED, never a bypass.
+  /// A tool with `secure = false` is never refused.
+  ///
+  /// @param function_name The SWAIG function being invoked.
+  /// @param token The credential from the caller's query string, or
+  ///        `std::nullopt` when absent.
+  /// @param call_id The call the token must be bound to, or `std::nullopt`
+  ///        when absent.
+  /// @return `std::nullopt` to proceed with dispatch, or the refusal to return
+  ///         INSTEAD of dispatching. The refusal is always delivered as a
+  ///         200 + FunctionResult body, never an HTTP error status: the engine
+  ///         has no handling for a refusal status, so a non-200 would be
+  ///         dropped rather than relayed to the caller.
+  [[nodiscard]] std::optional<swaig::FunctionResult> swaig_validate_token(
+      const std::string& function_name, const std::optional<std::string>& token,
+      const std::optional<std::string>& call_id) const;
 
   // Handle post_prompt request
   void handle_post_prompt_request(const httplib::Request& req, httplib::Response& res);

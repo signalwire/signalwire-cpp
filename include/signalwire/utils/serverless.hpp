@@ -20,6 +20,17 @@ namespace utils {
 using json = nlohmann::json;
 
 /**
+ * Access shim letting the serverless dispatchers reach `AgentBase`'s protected
+ * `swaig_validate_token` core. Each envelope (lambda / cgi / gcf / azure)
+ * extracts the credential from its own payload shape and then routes the
+ * DECISION through that single shared core, so a serverless deployment enforces
+ * `secure` exactly as the HTTP endpoint does. Declared here (and befriended by
+ * `AgentBase`) so the enforcement lives in one place instead of being
+ * re-implemented per transport.
+ */
+struct ServerlessTokenAccess;
+
+/**
  * Cross-language SDK contract: `signalwire.utils.is_serverless_mode`
  * returns `true` whenever the SDK is running inside any short-lived /
  * event-driven invocation environment (anything other than `"server"`).

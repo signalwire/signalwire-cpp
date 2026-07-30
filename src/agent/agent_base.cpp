@@ -533,6 +533,33 @@ bool AgentBase::validate_tool_token(const std::string& function_name, const std:
   }
 }
 
+std::optional<swaig::FunctionResult> AgentBase::swaig_validate_token(
+    const std::string& function_name, const std::optional<std::string>& token,
+    const std::optional<std::string>& call_id) const {
+  auto tool_it = tools_.find(function_name);
+  if (tool_it == tools_.end() || !tool_it->second.secure) {
+    // Unknown function (the caller reports that separately) or an explicitly
+    // insecure tool: never refused here, it runs ungated.
+    return std::nullopt;
+  }
+
+  // A token can only be validated against a call_id; without one there is
+  // nothing to check it against, so treat it as unvalidated rather than as a
+  // bypass. An empty-string token counts as ABSENT, not as "present but wrong".
+  const bool have_token = token.has_value() && !token->empty();
+  const bool valid =
+      have_token && call_id.has_value() && validate_tool_token(function_name, *token, *call_id);
+  if (valid) {
+    return std::nullopt;
+  }
+
+  get_logger().warn("swaig secure_function_refused function=" + function_name +
+                    " token_present=" + (have_token ? "true" : "false"));
+  return swaig::FunctionResult(
+      "I'm sorry, the security token for this function is invalid or expired. "
+      "I cannot execute this action.");
+}
+
 // ============================================================================
 // AI Config Methods
 // ============================================================================
@@ -2097,24 +2124,31 @@ void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Respo
     args = body["argument"]["parsed"][0];
   }
 
-  // Check the security token if the tool is secure. The token travels on the
-  // QUERY STRING as ``__token`` (with ``token`` accepted as the reference's
-  // fallback spelling) — reference agent_base.py:1414
-  // ``request.query_params.get("__token") or request.query_params.get("token")``.
-  // It is the same value build_swaig_functions appended to this tool's
-  // ``web_hook_url`` at render time. (``meta_data_token`` is a DIFFERENT wire
-  // field: the SWML ``UserSWAIGFunction`` meta_data SCOPING token, not a
-  // credential — reading it here validated the wrong value.)
-  auto tool_it = tools_.find(func_name);
-  if (tool_it != tools_.end() && tool_it->second.secure) {
-    std::string token = req.get_param_value("__token");
-    if (token.empty()) {
+  // Enforce `secure` through the transport-agnostic core every transport
+  // shares, so the HTTP endpoint and the serverless envelopes cannot drift
+  // apart. The credential travels on the QUERY STRING as ``__token`` (with
+  // ``token`` accepted as the fallback spelling) — the same value
+  // build_swaig_functions appended to this tool's ``web_hook_url`` at render
+  // time. The ``call_id`` travels in the POST BODY. (``meta_data_token`` is a
+  // DIFFERENT wire field: the SWML ``UserSWAIGFunction`` meta_data SCOPING
+  // token, not a credential — reading it here validated the wrong value.)
+  //
+  // A refusal is a 200 + FunctionResult body, NOT an HTTP error status: the
+  // engine has no handling for a refusal status, so a non-200 would be dropped
+  // rather than relayed to the caller as "I cannot execute this action".
+  {
+    std::optional<std::string> token;
+    if (req.has_param("__token")) {
+      token = req.get_param_value("__token");
+    } else if (req.has_param("token")) {
       token = req.get_param_value("token");
     }
-    std::string call_id = body.value("call_id", "");
-    if (!session_manager_.validate_token(token, func_name, call_id)) {
-      res.status = 403;
-      res.set_content("{\"error\":\"invalid or expired token\"}", "application/json");
+    std::optional<std::string> call_id;
+    if (body.contains("call_id") && body["call_id"].is_string()) {
+      call_id = body["call_id"].get<std::string>();
+    }
+    if (auto refusal = swaig_validate_token(func_name, token, call_id)) {
+      res.set_content(refusal->to_string(), "application/json");
       return;
     }
   }

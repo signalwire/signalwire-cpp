@@ -84,6 +84,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_served_routing.cpp"
 #include "test_default_fold.cpp"
 #include "test_tier2_behavioral.cpp"
+#include "test_swaig_secure_token.cpp"
 #include "test_media_enums.cpp"
 #include "test_security.cpp"
 #include "test_security_config.cpp"

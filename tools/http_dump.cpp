@@ -244,6 +244,34 @@ int main() {
     out["http_serverless_lambda_swaig"] = reduce_serverless(res);
   }
   {
+    // The POSITIVE half of the serverless token contract: identical to the
+    // fixture above in every respect EXCEPT that it carries a GENUINELY MINTED
+    // token in the lambda query string, so it pins that a valid credential is
+    // ACCEPTED and the secure tool RUNS. Without it the contract would only
+    // ever be proven in the refusing direction, and an implementation that
+    // refused EVERYTHING would sail through.
+    //
+    // The token cannot be a corpus literal: it is an HMAC keyed by this
+    // agent's per-process random secret and it expires. It is minted HERE,
+    // from the SAME agent instance the fixture drives, exactly as the oracle
+    // mints its own.
+    AgentBase a("demo", "/demo");
+    a.set_auth(kUser, kPassword);
+    signalwire::swaig::ToolHandler handler = [](const json&, const json&) {
+      return FunctionResult("hello there");
+    };
+    a.define_tool("say_hello", "greet", json::object(), handler);
+    const std::string token = a.create_tool_token("say_hello", "c1");
+    json event = {
+        {"rawPath", "/swaig"},
+        {"headers",
+         {{"authorization", basic_auth(kUser, kPassword)}, {"content-type", "application/json"}}},
+        {"queryStringParameters", {{"__token", token}}},
+        {"body", R"({"function":"say_hello","argument":{"parsed":[{}]},"call_id":"c1"})"}};
+    auto res = signalwire::utils::handle_lambda(a, event);
+    out["http_serverless_lambda_swaig_valid_token"] = reduce_serverless(res);
+  }
+  {
     AgentBase a("demo", "/demo");
     a.set_auth(kUser, kPassword);
     json event = {{"rawPath", "/"}, {"headers", json::object()}, {"body", nullptr}};

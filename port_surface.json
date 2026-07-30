@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ a118f06f406a8c8d0fb906787ae656ff4504769b",
+  "generated_from": "signalwire-cpp @ 7472079ecf26701d68e99bc90a023f561a1c7800",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -359,7 +359,6 @@
         "ContextBuilder": [
           "__init__",
           "add_context",
-          "attach_tool_name_supplier",
           "get_context",
           "has_contexts",
           "reset",

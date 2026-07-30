@@ -9100,6 +9100,16 @@
               ],
               "returns": "bool"
             },
+            "generate_random_hex": {
+              "params": [
+                {
+                  "name": "bytes",
+                  "type": "int",
+                  "required": true
+                }
+              ],
+              "returns": "string"
+            },
             "get_all_functions": {
               "params": [
                 {
@@ -21063,6 +21073,15 @@
               ],
               "returns": "class:signalwire.rest._base.HttpClient"
             },
+            "index": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
+            },
             "items": {
               "params": [
                 {
@@ -30193,6 +30212,15 @@
                 }
               ],
               "returns": "class:signalwire.swaig.parameter_schema.ParameterSchema"
+            },
+            "size": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "int"
             },
             "string": {
               "params": [

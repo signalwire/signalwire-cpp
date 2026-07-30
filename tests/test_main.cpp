@@ -242,6 +242,7 @@ static std::vector<TestCase>& get_tests() {
 // verifying client. Each pairs a positive (verified) assertion with a negative
 // control (untrusted CA -> rejected). They skip cleanly when the --tls mocks
 // aren't reachable (infra); CI brings the mocks up so the assertions run.
+#include "test_tls_relay_no_downgrade.cpp"
 #include "test_tls_relay_wss.cpp"
 #include "test_tls_rest_https.cpp"
 #include "test_tls_server_https.cpp"

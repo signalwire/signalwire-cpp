@@ -95,12 +95,40 @@ else
     tidy_cmd=("$ct")
 fi
 
-# bash-3.2 compatible (macOS default): stream find -> xargs, NUL-delimited so paths
-# with spaces are safe. -n 1 = one clang-tidy (cached) per file; -P = fan across cores.
-if ! find src include -name '*.cpp' | grep -q .; then
+# SCOPE (widened 2026-07-30). Previously src/ + include/ only. tools/ (19 TUs)
+# was FORMATTED but never LINTED, and examples/ (73 TUs across examples/,
+# rest/examples/, relay/examples/) was neither -- all excluded by this hard
+# `find` path list with no rationale anywhere. The only exclusion this repo ever
+# WROTE DOWN a reason for is vendored deps/, and that reason ("third-party code
+# we do not own") does not extend to our own tools or our own shipped examples.
+#
+# Per the owner: examples and tests are shipping code too, and there is ONE bar.
+# Linting these trees found real defects -- 11 discarded [[nodiscard]] results in
+# the RELAY/REST examples, 7 atoi/atof calls that turned a bad PORT into port 0,
+# and 87 main() functions that answered an exception with std::terminate.
+#
+# deps/ stays out, now enforced at the compiler (CMake marks it a SYSTEM include)
+# rather than by a path list, because clang-diagnostic-* are compiler warnings
+# that --header-filter cannot reach.
+#
+# tests/ is NOT in this list yet, and that is a KNOWN GAP awaiting an owner
+# ruling rather than a silent carve-out. It cannot be added without either
+# suppressing checks that fire only from inside the test framework's own macros,
+# or changing that framework:
+#   * 319/320 performance-unnecessary-copy-initialization and 231/231
+#     readability-simplify-boolean-expr come from the ASSERT_* expansions, not
+#     from test source. The `auto _a = (a)` copy in ASSERT_EQ is LOAD-BEARING --
+#     binding by const& instead makes `mock.requests()[0].method` a reference
+#     into a by-value temporary, and that change fails 5 tests (measured).
+#   * 123 bugprone-suspicious-include ARE the single-translation-unit design
+#     documented at CLAUDE.md:96 ("All test files are #included into
+#     test_main.cpp and compiled as one translation unit").
+# Everything in tests/ that is NOT one of those has been burned to zero, so the
+# gap is exactly those three checks. See the lane report.
+if ! find src include tools examples rest/examples relay/examples -name '*.cpp' | grep -q .; then
     echo "no C++ sources found to lint" >&2; exit 1
 fi
-find src include -name '*.cpp' -print0 \
+find src include tools examples rest/examples relay/examples -name '*.cpp' -print0 \
   | xargs -0 -P "$jobs" -n 1 "${tidy_cmd[@]}" -p "$tidy_build" \
-        --header-filter='signalwire-cpp/(src|include)/' --quiet
+        --header-filter='signalwire-cpp/(src|include|tools|examples|rest|relay)/' --quiet
 exit $?

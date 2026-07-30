@@ -440,6 +440,15 @@ lint_gate() {
     bash "$PORT_ROOT/scripts/run-lint.sh"
 }
 
+# PY-LINT gate: ruff (lint + format) over the hand-written Python under
+# scripts/. Delegates to the CANONICAL scripts/run-pylint.sh, and follows the
+# same LOCAL-applies / CI-checks contract as fmt_gate above: an unformatted
+# commit must not be green locally and red in CI on the very formatting the
+# local run applied.
+pylint_gate() {
+    bash "$PORT_ROOT/scripts/run-pylint.sh" ${CI:+--check}
+}
+
 # STRICT-MOCKS (§2.2 / Part 1.4): re-run the RELAY mock suite with mock_relay in
 # STRICT mode (MOCK_RELAY_STRICT=1 → 400s an unknown field / duplicate id instead
 # of tolerantly journaling it) so a wire-shape regression fails loud. cpp's relay
@@ -642,6 +651,15 @@ run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
 
 # LINT — clang-tidy curated set burned to zero (WarningsAsErrors:'*')
 run_gate "LINT" "clang-tidy curated set, zero findings" lint_gate
+
+# PY-LINT — ruff over the 9 hand-written Python files under scripts/ (~10.4k
+# lines), which no gate covered before 2026-07-30 even though two of them
+# (_cpp_fmt.py, clang_tidy_cache.py) are the lint/format infrastructure the FMT
+# and LINT gates above run THROUGH. Rule selection mirrors the reference
+# implementation's (signalwire-python/pyproject.toml); config in ruff.toml.
+# Dual-mode exactly like FMT: LOCAL applies fixes in place, CI ($CI set) passes
+# --check for the read-only verification.
+run_gate "PY-LINT" "ruff over scripts/*.py (local: apply, CI: check)" pylint_gate
 
 # DEAD-PUBLIC-ERROR — exported error types are raised/caught/user-signalled
 run_gate "DEAD-PUBLIC-ERROR" "exported error types are raised/caught/user-signalled (no dead error surface)" \

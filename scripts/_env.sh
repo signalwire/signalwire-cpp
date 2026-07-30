@@ -111,3 +111,14 @@ if ! command -v ccache >/dev/null 2>&1; then
     echo "note: ccache not found — C++ rebuilds will be uncached (optional)." >&2
     echo "      Install it for near-instant warm rebuilds:  brew install ccache" >&2
 fi
+
+# ruff — the PY-LINT gate's linter/formatter for the hand-written Python under
+# scripts/. A HINT here rather than a hard failure, because the C++ build/test
+# path does not need it; the gate itself (scripts/run-pylint.sh) fails loud with
+# the same hint when it is actually required. Declared in BOTH layers per
+# AGENT_RULES §7 — here for local devs, and as a pip install in the CI workflow
+# next to the pinned clang-format — so a fresh clone or a CI runner has it.
+if ! command -v ruff >/dev/null 2>&1; then
+    echo "note: ruff not found — the PY-LINT gate (scripts/*.py) cannot run." >&2
+    echo "      Install it with:  pip install ruff   (or: brew install ruff)" >&2
+fi

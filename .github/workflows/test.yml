@@ -102,6 +102,9 @@ jobs:
       - name: Install pinned clang-format + clang-tidy 18.1.8 + clang-18 compiler
         run: |
           pip install "clang-format==18.1.8" "clang-tidy==18.1.8"
+          # ruff drives the PY-LINT gate (scripts/*.py). Declared here as well
+          # as in scripts/_env.sh so a CI runner has it, per AGENT_RULES §7.
+          pip install ruff
           sudo apt-get install -y clang-18
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100

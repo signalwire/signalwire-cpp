@@ -20,6 +20,8 @@ Prefer them over calling `clang-format` / `clang-tidy` / `run_tests` directly.
 bash scripts/run-format.sh          # format the tree in place (clang-format -i)
 bash scripts/run-format.sh --check  # verify-only (clang-format --dry-run -Werror); CI FMT gate
 bash scripts/run-lint.sh            # lint (clang-tidy curated set, zero findings)
+bash scripts/run-pylint.sh          # lint + format the Python under scripts/ (ruff)
+bash scripts/run-pylint.sh --check  # verify-only; CI PY-LINT gate
 bash scripts/run-tests.sh           # build + run the full test suite (run_tests)
 bash scripts/run-tests.sh rest_mock_ # run a subset (filter passed through to run_tests)
 ```
@@ -36,8 +38,32 @@ g++ -std=c++20 -I include -I deps examples/simple_agent.cpp -L build -lsignalwir
 ```
 
 The full local-and-CI gate runner is `bash scripts/run-ci.sh`; its FMT / LINT /
-TEST gates now delegate to the three scripts above (all four source
+PY-LINT / TEST gates delegate to the scripts above (all source
 `scripts/_env.sh` for the clang-18 PATH bootstrap).
+
+**Lint/format scope (widened 2026-07-30).** There is ONE bar, and it is the bar
+the shipped library meets:
+
+| gate | covers |
+|---|---|
+| FMT | `src/` `include/` `tools/` `tests/` `examples/` `rest/examples/` `relay/examples/` |
+| LINT | `src/` `include/` `tools/` `examples/` `rest/examples/` `relay/examples/` |
+| PY-LINT | `scripts/*.py` |
+
+The only tree deliberately outside all of them is **`deps/`** — vendored
+third-party code (httplib.h, json.hpp, nlohmann/) we do not own. That exclusion
+is enforced at the compiler (CMake marks `deps/` a SYSTEM include directory),
+not by a path list, because `clang-diagnostic-*` findings are compiler warnings
+that clang-tidy's `--header-filter` cannot reach. `scripts/clang_tidy_cache.py`
+is excluded from PY-LINT for the same reason: it is vendored verbatim from
+matus-chochlik/ctcache at a pinned SHA.
+
+`tests/` is under FMT but **not yet under LINT** — a known, documented gap
+awaiting an owner ruling, not a silent carve-out. Everything in `tests/` that is
+not one of three specific checks has been burned to zero; the remainder is
+structural (the `ASSERT_*` macro expansions, and the single-translation-unit
+design in which `test_main.cpp` `#include`s 123 `.cpp` files). See the rationale
+block at the top of `scripts/run-lint.sh`.
 
 ## Architecture
 

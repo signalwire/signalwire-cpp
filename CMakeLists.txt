@@ -53,8 +53,15 @@ if(SIGNALWIRE_SANITIZE)
     message(STATUS "Sanitizer enabled: ${SIGNALWIRE_SANITIZE}")
 endif()
 
-# Header-only deps
-include_directories(${CMAKE_SOURCE_DIR}/deps)
+# Header-only deps. SYSTEM, because deps/ is VENDORED THIRD-PARTY code we do not
+# own (httplib.h, json.hpp, nlohmann/) -- marking it system tells the compiler to
+# suppress warnings originating inside those headers, which is the correct
+# mechanism for "not our code to fix". Without it, -Wall on the example targets
+# surfaces httplib.h's own -Wmismatched-tags as findings against this repo, and
+# clang-tidy's --header-filter cannot exclude them (clang-diagnostic-* are
+# compiler warnings, not clang-tidy checks, so the filter does not apply).
+# Our own include/ deliberately stays non-SYSTEM: we DO want its warnings.
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # OpenSSL
@@ -133,9 +140,12 @@ endif()
 # place signalwire/ + nlohmann/json.hpp.
 target_include_directories(signalwire PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+# deps/ is vendored third-party; SYSTEM so consumers do not inherit warnings
+# from httplib.h / json.hpp as if they were ours (same reasoning as above).
+target_include_directories(signalwire SYSTEM PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>)
 # Namespaced alias so add_subdirectory/FetchContent consumers can use the SAME
 # `signalwire::signalwire` name the installed package exports.
 add_library(signalwire::signalwire ALIAS signalwire)

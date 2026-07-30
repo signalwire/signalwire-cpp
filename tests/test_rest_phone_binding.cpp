@@ -121,7 +121,9 @@ class LocalCaptureServer {
   }
   ~LocalCaptureServer() {
     server_.stop();
-    if (thread_.joinable()) thread_.join();
+    if (thread_.joinable()) {
+      thread_.join();
+    }
   }
 
   int port() const { return port_; }

@@ -211,7 +211,9 @@ TEST(tier2_native_vector_search_remote_http_post) {
     std::thread& t;
     ~Guard() {
       s.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
     }
   } guard{srv, server_thread};
 
@@ -333,7 +335,9 @@ TEST(tier2_sip_routing_served_dispatch) {
     std::thread& t;
     ~Guard() {
       a.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_BASIC_AUTH_USER");
       ::unsetenv("SWML_BASIC_AUTH_PASSWORD");
     }

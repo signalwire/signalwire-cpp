@@ -53,7 +53,7 @@ class SalesSidecar : public swml::Service {
     // POST /<route>/events — ai_sidecar POSTs each lifecycle / transcription
     // event as JSON. Reply with 200 and any non-redirect body.
     const std::string events_path = route() + "/events";
-    server.Post(events_path.c_str(), [](const httplib::Request& req, httplib::Response& res) {
+    server.Post(events_path, [](const httplib::Request& req, httplib::Response& res) {
       json body;
       try {
         body = json::parse(req.body);
@@ -61,7 +61,7 @@ class SalesSidecar : public swml::Service {
         body = json::object();
       }
       const auto type = body.value("type", std::string{"<unknown>"});
-      std::cout << "[sidecar event] type=" << type << " body=" << body.dump() << std::endl;
+      std::cout << "[sidecar event] type=" << type << " body=" << body.dump() << '\n';
       res.set_content("{\"ok\":true}", "application/json");
     });
   }
@@ -72,7 +72,9 @@ int main(int argc, char** argv) {
   std::string public_url = "https://your-host.example.com/sales-sidecar";
   if (argc > 1) {
     int p = std::atoi(argv[1]);
-    if (p > 0) port = p;
+    if (p > 0) {
+      port = p;
+    }
   }
   if (argc > 2) {
     public_url = argv[2];
@@ -143,7 +145,9 @@ int main(int argc, char** argv) {
             << "          or watch the [INFO] log line printed by serve() for\n"
             << "          the auto-generated user / password.\n"
             << "  Tools:  ";
-  for (const auto& n : svc.list_tool_names()) std::cout << n << " ";
+  for (const auto& n : svc.list_tool_names()) {
+    std::cout << n << " ";
+  }
   std::cout << "\n\nSWML document:\n" << svc.render_swml().dump(2) << "\n";
 
   svc.serve();

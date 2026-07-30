@@ -111,7 +111,9 @@ TEST(tls_sdk_sslserver_verified_by_client) {
     std::thread& t;
     ~Guard() {
       s.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_SSL_ENABLED");
       ::unsetenv("SWML_SSL_CERT_PATH");
       ::unsetenv("SWML_SSL_KEY_PATH");
@@ -129,7 +131,7 @@ TEST(tls_sdk_sslserver_verified_by_client) {
   while (std::chrono::steady_clock::now() < deadline) {
     httplib::Client cli(base);
     cli.set_connection_timeout(1, 0);
-    cli.set_ca_cert_path(ca.c_str());
+    cli.set_ca_cert_path(ca);
     cli.enable_server_certificate_verification(true);
     auto res = cli.Get("/health");
     if (res && res->status == 200) {

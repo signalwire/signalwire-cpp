@@ -117,7 +117,9 @@ TEST(served_path_routing_307_401_200_through_handle_request) {
     std::thread& t;
     ~Guard() {
       a.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_BASIC_AUTH_USER");
       ::unsetenv("SWML_BASIC_AUTH_PASSWORD");
     }

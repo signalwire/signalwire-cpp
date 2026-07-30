@@ -79,10 +79,14 @@ json extract(const json& doc, const std::string& path) {
 
 // pick reduces a map fragment to the listed keys (mirrors the oracle's `pick`).
 json pick(const json& frag, const std::vector<std::string>& keys) {
-  if (!frag.is_object()) return frag;
+  if (!frag.is_object()) {
+    return frag;
+  }
   json out = json::object();
   for (const auto& k : keys) {
-    if (frag.contains(k)) out[k] = frag[k];
+    if (frag.contains(k)) {
+      out[k] = frag[k];
+    }
   }
   return out;
 }

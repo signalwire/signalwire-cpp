@@ -264,13 +264,17 @@ int main(int argc, char** argv) {
   }
 
   auto matches_filter = [&filter](const std::string& name) {
-    if (filter.empty()) return true;
+    if (filter.empty()) {
+      return true;
+    }
     return name.find(filter) != std::string::npos;
   };
 
   std::vector<TestCase> selected;
   for (const auto& tc : get_tests()) {
-    if (matches_filter(tc.name)) selected.push_back(tc);
+    if (matches_filter(tc.name)) {
+      selected.push_back(tc);
+    }
   }
 
   // Concurrency knob. SW_TEST_PARALLEL=<N> runs the test cases on an N-thread
@@ -287,7 +291,9 @@ int main(int argc, char** argv) {
     if (env && *env) {
       try {
         int n = std::stoi(env);
-        if (n > 1) parallel = n;
+        if (n > 1) {
+          parallel = n;
+        }
       } catch (const std::exception& e) {
         // Silently ignoring this meant a typo'd SW_TEST_PARALLEL (e.g. "4x")
         // ran the suite serially with no indication why. Say so and continue
@@ -300,11 +306,17 @@ int main(int argc, char** argv) {
   if (parallel > static_cast<int>(selected.size())) {
     parallel = static_cast<int>(selected.size());
   }
-  if (parallel < 1) parallel = 1;
+  if (parallel < 1) {
+    parallel = 1;
+  }
 
   std::cerr << "Running " << selected.size() << " tests";
-  if (!filter.empty()) std::cerr << " (filter: " << filter << ")";
-  if (parallel > 1) std::cerr << " on " << parallel << " threads";
+  if (!filter.empty()) {
+    std::cerr << " (filter: " << filter << ")";
+  }
+  if (parallel > 1) {
+    std::cerr << " on " << parallel << " threads";
+  }
   std::cerr << "...\n\n";
 
   std::mutex io_mutex;  // serialize stderr writes only
@@ -333,7 +345,9 @@ int main(int argc, char** argv) {
   };
 
   if (parallel <= 1) {
-    for (const auto& tc : selected) run_one(tc);
+    for (const auto& tc : selected) {
+      run_one(tc);
+    }
   } else {
     // Only the SESSION-ISOLATED mock-backed cases run concurrently — those
     // are the ones proving isolation under real parallel load. They are
@@ -349,26 +363,35 @@ int main(int argc, char** argv) {
     };
     std::vector<const TestCase*> par, serial;
     for (const auto& tc : selected) {
-      if (is_mock_backed(tc.name))
+      if (is_mock_backed(tc.name)) {
         par.push_back(&tc);
-      else
+      } else {
         serial.push_back(&tc);
+      }
     }
     // Serial batch first (e.g. TLS sets/unsets global env), then the
     // concurrent mock-backed batch.
-    for (const auto* tc : serial) run_one(*tc);
+    for (const auto* tc : serial) {
+      run_one(*tc);
+    }
     std::atomic<size_t> next{0};
     auto worker = [&]() {
       for (;;) {
         size_t i = next.fetch_add(1);
-        if (i >= par.size()) break;
+        if (i >= par.size()) {
+          break;
+        }
         run_one(*par[i]);
       }
     };
     std::vector<std::thread> pool;
     pool.reserve(parallel);
-    for (int t = 0; t < parallel; ++t) pool.emplace_back(worker);
-    for (auto& th : pool) th.join();
+    for (int t = 0; t < parallel; ++t) {
+      pool.emplace_back(worker);
+    }
+    for (auto& th : pool) {
+      th.join();
+    }
   }
 
   std::cerr << "\n========================================\n";

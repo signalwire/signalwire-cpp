@@ -237,6 +237,6 @@ int main() {
   out["define_tool_explicit_insecure"] =
       emit(by_name, kInsecureTool, agent.recorded_secure(kInsecureTool));
 
-  std::cout << out.dump() << std::endl;
+  std::cout << out.dump() << '\n';
   return 0;
 }

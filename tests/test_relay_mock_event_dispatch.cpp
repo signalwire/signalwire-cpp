@@ -33,7 +33,9 @@ template <class P>
 bool spin_evt(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;
@@ -51,7 +53,9 @@ json bare_event_frame(const std::string& event_type, const json& params) {
 
 Call* setup_answered_call_evt(RelayClient& client, const std::string& call_id) {
   Call* call = mt::drive_inbound_call(client, call_id, {"created"});
-  if (!call) return nullptr;
+  if (!call) {
+    return nullptr;
+  }
   call->update_state("answered");
   return call;
 }
@@ -233,10 +237,18 @@ TEST(relay_mock_event_ack_sent_back_to_server) {
   spin_evt(
       [&] {
         for (auto& e : mt::journal()) {
-          if (e.direction != "recv") continue;
-          if (!e.frame.contains("id")) continue;
-          if (e.frame["id"].get<std::string>() != evt_id) continue;
-          if (e.frame.contains("result")) return true;
+          if (e.direction != "recv") {
+            continue;
+          }
+          if (!e.frame.contains("id")) {
+            continue;
+          }
+          if (e.frame["id"].get<std::string>() != evt_id) {
+            continue;
+          }
+          if (e.frame.contains("result")) {
+            return true;
+          }
         }
         return false;
       },
@@ -244,9 +256,15 @@ TEST(relay_mock_event_ack_sent_back_to_server) {
 
   bool found = false;
   for (auto& e : mt::journal()) {
-    if (e.direction != "recv") continue;
-    if (!e.frame.contains("id")) continue;
-    if (e.frame["id"].get<std::string>() != evt_id) continue;
+    if (e.direction != "recv") {
+      continue;
+    }
+    if (!e.frame.contains("id")) {
+      continue;
+    }
+    if (e.frame["id"].get<std::string>() != evt_id) {
+      continue;
+    }
     if (e.frame.contains("result")) {
       found = true;
       break;
@@ -274,10 +292,18 @@ TEST(relay_mock_server_ping_acked_by_sdk) {
   spin_evt(
       [&] {
         for (auto& e : mt::journal()) {
-          if (e.direction != "recv") continue;
-          if (!e.frame.contains("id")) continue;
-          if (e.frame["id"].get<std::string>() != ping_id) continue;
-          if (e.frame.contains("result")) return true;
+          if (e.direction != "recv") {
+            continue;
+          }
+          if (!e.frame.contains("id")) {
+            continue;
+          }
+          if (e.frame["id"].get<std::string>() != ping_id) {
+            continue;
+          }
+          if (e.frame.contains("result")) {
+            return true;
+          }
         }
         return false;
       },
@@ -285,9 +311,15 @@ TEST(relay_mock_server_ping_acked_by_sdk) {
 
   bool found = false;
   for (auto& e : mt::journal()) {
-    if (e.direction != "recv") continue;
-    if (!e.frame.contains("id")) continue;
-    if (e.frame["id"].get<std::string>() != ping_id) continue;
+    if (e.direction != "recv") {
+      continue;
+    }
+    if (!e.frame.contains("id")) {
+      continue;
+    }
+    if (e.frame["id"].get<std::string>() != ping_id) {
+      continue;
+    }
     if (e.frame.contains("result")) {
       found = true;
       break;

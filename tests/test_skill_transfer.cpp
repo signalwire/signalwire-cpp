@@ -57,11 +57,13 @@ TEST(skill_transfer_has_hints) {
   skill->setup(
       json::object({{"transfers", json::object({{"sales-team", json::object({{"url", "x"}})}})}}));
   auto hints = skill->get_hints();
-  ASSERT_TRUE(hints.size() >= 1u);
+  ASSERT_TRUE(!hints.empty());
   // Should contain at least "transfer" or "connect"
   bool has_any = false;
   for (const auto& h : hints) {
-    if (h == "transfer" || h == "connect") has_any = true;
+    if (h == "transfer" || h == "connect") {
+      has_any = true;
+    }
   }
   ASSERT_TRUE(has_any);
   return true;

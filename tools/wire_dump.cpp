@@ -134,20 +134,34 @@ int main() {
     // so decode the token the SDK emitted.
     auto b64url_decode = [](const std::string& s) {
       auto val = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '-') return 62;
-        if (c == '_') return 63;
+        if (c >= 'A' && c <= 'Z') {
+          return c - 'A';
+        }
+        if (c >= 'a' && c <= 'z') {
+          return c - 'a' + 26;
+        }
+        if (c >= '0' && c <= '9') {
+          return c - '0' + 52;
+        }
+        if (c == '-') {
+          return 62;
+        }
+        if (c == '_') {
+          return 63;
+        }
         return -1;
       };
       std::string decoded;
       uint32_t buf = 0;
       int bits = 0;
       for (char c : s) {
-        if (c == '=') break;
+        if (c == '=') {
+          break;
+        }
         int v = val(c);
-        if (v < 0) continue;
+        if (v < 0) {
+          continue;
+        }
         buf = (buf << 6) | static_cast<uint32_t>(v);
         bits += 6;
         if (bits >= 8) {
@@ -174,14 +188,14 @@ int main() {
     std::string nonce = parts.size() > 3 ? parts[3] : "";
     bool nonce_is_hex = parts.size() > 3;
     for (char c : nonce) {
-      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
+      if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
         nonce_is_hex = false;
         break;
       }
     }
     json tf = json::object();
     tf["n_fields"] = parts.size();
-    tf["call_id"] = parts.size() > 0 ? json(parts[0]) : json(nullptr);
+    tf["call_id"] = !parts.empty() ? json(parts[0]) : json(nullptr);
     tf["function_name"] = parts.size() > 1 ? json(parts[1]) : json(nullptr);
     tf["nonce_len"] = nonce.size();
     tf["nonce_is_hex"] = nonce_is_hex;
@@ -209,20 +223,34 @@ int main() {
     // decode
     auto b64url_decode = [](const std::string& s) {
       auto val = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '-') return 62;
-        if (c == '_') return 63;
+        if (c >= 'A' && c <= 'Z') {
+          return c - 'A';
+        }
+        if (c >= 'a' && c <= 'z') {
+          return c - 'a' + 26;
+        }
+        if (c >= '0' && c <= '9') {
+          return c - '0' + 52;
+        }
+        if (c == '-') {
+          return 62;
+        }
+        if (c == '_') {
+          return 63;
+        }
         return -1;
       };
       std::string decoded;
       uint32_t buf = 0;
       int bits = 0;
       for (char c : s) {
-        if (c == '=') break;
+        if (c == '=') {
+          break;
+        }
         int v = val(c);
-        if (v < 0) continue;
+        if (v < 0) {
+          continue;
+        }
         buf = (buf << 6) | static_cast<uint32_t>(v);
         bits += 6;
         if (bits >= 8) {
@@ -252,7 +280,9 @@ int main() {
   // wire_validate_webhook_signature_bad: wrong sig -> invalid.
   {
     std::string bad;
-    for (int i = 0; i < 8; ++i) bad += "deadbeef";
+    for (int i = 0; i < 8; ++i) {
+      bad += "deadbeef";
+    }
     out["wire_validate_webhook_signature_bad"] =
         json{{"valid", ValidateWebhookSignature(kSecret, bad, wh_url, wh_body)}};
   }
@@ -268,7 +298,9 @@ int main() {
         {"Authorization", "Bearer x"}, {"X-Api-Key", "y"}, {"Content-Type", "application/json"}};
     auto filtered = FilterSensitiveHeaders(headers);
     json fj = json::object();
-    for (const auto& [k, v] : filtered) fj[k] = v;
+    for (const auto& [k, v] : filtered) {
+      fj[k] = v;
+    }
     out["wire_filter_sensitive_headers"] = json{{"filtered", fj}};
   }
 

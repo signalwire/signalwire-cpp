@@ -23,7 +23,9 @@ TEST(render_default_has_answer_and_ai) {
   ASSERT_TRUE(main[0].contains("answer"));
   bool has_ai = false;
   for (const auto& v : main) {
-    if (v.contains("ai")) has_ai = true;
+    if (v.contains("ai")) {
+      has_ai = true;
+    }
   }
   ASSERT_TRUE(has_ai);
   return true;

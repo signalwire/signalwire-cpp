@@ -90,7 +90,9 @@ class CaptureServer {
   }
   ~CaptureServer() {
     server_.stop();
-    if (thread_.joinable()) thread_.join();
+    if (thread_.joinable()) {
+      thread_.join();
+    }
   }
 
   std::string base_url() const { return "http://127.0.0.1:" + std::to_string(port_); }
@@ -124,7 +126,9 @@ std::string templatize(const std::string& path) {
     std::string seg =
         (slash == std::string::npos) ? p.substr(start) : p.substr(start, slash - start);
     out += (seg == SENTINEL) ? "{id}" : seg;
-    if (slash == std::string::npos) break;
+    if (slash == std::string::npos) {
+      break;
+    }
     out += "/";
     start = slash + 1;
   }

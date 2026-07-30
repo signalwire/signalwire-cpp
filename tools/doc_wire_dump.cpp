@@ -40,7 +40,9 @@ std::string env_or(const char* name, const std::string& fallback = "") {
 // explicit URL, fall back to the port on loopback.
 std::string mock_base_url() {
   std::string url = env_or("SIGNALWIRE_MOCK_URL");
-  if (!url.empty()) return url;
+  if (!url.empty()) {
+    return url;
+  }
   std::string port = env_or("MOCK_SIGNALWIRE_PORT");
   if (port.empty()) {
     std::cerr << "doc_wire_dump: neither SIGNALWIRE_MOCK_URL nor "

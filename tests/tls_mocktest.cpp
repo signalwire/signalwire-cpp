@@ -42,16 +42,22 @@ std::string discover_certs_dir() {
   std::string dir = ".";
 #endif
   while (true) {
-    while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
+    while (dir.size() > 1 && dir.back() == '/') {
+      dir.pop_back();
+    }
     auto slash = dir.find_last_of('/');
-    if (slash == std::string::npos || slash == 0) return std::string();
+    if (slash == std::string::npos || slash == 0) {
+      return std::string();
+    }
     std::string parent = dir.substr(0, slash);
     std::string candidate = parent + "/porting-sdk/test_harness/tls/certs";
     struct stat st;
     if (::stat((candidate + "/ca.crt").c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
       return candidate;
     }
-    if (parent == dir) return std::string();
+    if (parent == dir) {
+      return std::string();
+    }
     dir = parent;
   }
 }
@@ -65,7 +71,7 @@ httplib::Client tls_control_client(const std::string& base) {
   cli.set_read_timeout(10, 0);
   std::string ca = ca_cert_path();
   if (!ca.empty()) {
-    cli.set_ca_cert_path(ca.c_str());
+    cli.set_ca_cert_path(ca);
     cli.enable_server_certificate_verification(true);
   }
   return cli;
@@ -90,7 +96,9 @@ std::string ca_cert_path() {
 
 std::string trust_test_ca() {
   std::string ca = ca_cert_path();
-  if (!ca.empty()) ::setenv("SSL_CERT_FILE", ca.c_str(), 1);
+  if (!ca.empty()) {
+    ::setenv("SSL_CERT_FILE", ca.c_str(), 1);
+  }
   return ca;
 }
 
@@ -155,12 +163,20 @@ std::vector<json> relay_journal_recv(const std::string& method) {
   auto cli = plain_control_client("127.0.0.1", relay_tls_http_port());
   auto res = cli.Get("/__mock__/journal");
   std::vector<json> out;
-  if (!res || res->status != 200) return out;
+  if (!res || res->status != 200) {
+    return out;
+  }
   json arr = json::parse(res->body);
-  if (!arr.is_array()) return out;
+  if (!arr.is_array()) {
+    return out;
+  }
   for (const auto& e : arr) {
-    if (e.value("direction", "") != "recv") continue;
-    if (!method.empty() && e.value("method", "") != method) continue;
+    if (e.value("direction", "") != "recv") {
+      continue;
+    }
+    if (!method.empty() && e.value("method", "") != method) {
+      continue;
+    }
     out.push_back(e);
   }
   return out;

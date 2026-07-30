@@ -59,7 +59,9 @@ TEST(prefab_concierge_full_config) {
   auto& main = swml["sections"]["main"];
   bool has_ai = false;
   for (const auto& v : main) {
-    if (v.contains("ai")) has_ai = true;
+    if (v.contains("ai")) {
+      has_ai = true;
+    }
   }
   ASSERT_TRUE(has_ai);
   return true;

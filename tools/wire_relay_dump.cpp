@@ -145,7 +145,9 @@ class MockRelay {
 // the porting-sdk free-port contract for mock-binding harnesses).
 int pick_free_port() {
   int sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock < 0) return 0;
+  if (sock < 0) {
+    return 0;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -251,7 +253,9 @@ int main() {
       [mock, &server](const std::shared_ptr<ix::ConnectionState>& /*state*/, ix::WebSocket& ws,
                       const ix::WebSocketMessagePtr& msg) {
         if (msg->type == ix::WebSocketMessageType::Open) {
-          if (std::getenv("RELAY_DUMP_DEBUG")) std::cerr << "[mock] client opened\n";
+          if (std::getenv("RELAY_DUMP_DEBUG")) {
+            std::cerr << "[mock] client opened\n";
+          }
           // Track this client so the mock can push server-initiated events.
           for (auto& client : server.getClients()) {
             if (client.get() == &ws) {
@@ -265,8 +269,9 @@ int main() {
           }
           mock->on_message(ws, msg->str);
         } else if (msg->type == ix::WebSocketMessageType::Error) {
-          if (std::getenv("RELAY_DUMP_DEBUG"))
+          if (std::getenv("RELAY_DUMP_DEBUG")) {
             std::cerr << "[mock] error: " << msg->errorInfo.reason << "\n";
+          }
         }
       });
 
@@ -279,7 +284,9 @@ int main() {
   server.start();
   // Give the accept loop a moment to come up before the client dials in.
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  if (std::getenv("RELAY_DUMP_DEBUG")) std::cerr << "[mock] listening on port " << port << "\n";
+  if (std::getenv("RELAY_DUMP_DEBUG")) {
+    std::cerr << "[mock] listening on port " << port << "\n";
+  }
 
   // Point the client at the mock over plain ws://.
   ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);

@@ -457,7 +457,9 @@ TEST(parameter_schema_define_tool_matches_handwritten_render) {
     for (const auto& verb : swml["sections"]["main"]) {
       if (verb.contains("ai") && verb["ai"].contains("SWAIG")) {
         for (const auto& f : verb["ai"]["SWAIG"]["functions"]) {
-          if (f.value("function", "") == "search") return f;
+          if (f.value("function", "") == "search") {
+            return f;
+          }
         }
       }
     }

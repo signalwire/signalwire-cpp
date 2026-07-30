@@ -40,7 +40,9 @@ constexpr int kStartupTimeoutSeconds = 30;
 // Returns a negative value on failure; callers throw.
 int pick_free_port() {
   int s = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (s < 0) return -1;
+  if (s < 0) {
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -107,7 +109,9 @@ std::string session_query() {
 std::pair<std::string, int> split_url(const std::string& base) {
   std::string s = base;
   auto pos = s.find("://");
-  if (pos != std::string::npos) s = s.substr(pos + 3);
+  if (pos != std::string::npos) {
+    s = s.substr(pos + 3);
+  }
   auto cpos = s.find(':');
   std::string host = (cpos == std::string::npos) ? s : s.substr(0, cpos);
   int port = (cpos == std::string::npos) ? 80 : std::stoi(s.substr(cpos + 1));
@@ -120,7 +124,9 @@ bool probe_health(const std::string& base_url) {
   cli.set_connection_timeout(2, 0);
   cli.set_read_timeout(2, 0);
   auto res = cli.Get("/__mock__/health");
-  if (!res || res->status != 200) return false;
+  if (!res || res->status != 200) {
+    return false;
+  }
   try {
     auto j = json::parse(res->body);
     return j.contains("schemas_loaded");
@@ -157,7 +163,9 @@ json post_json(const std::string& base_url, const std::string& path, const json&
     throw std::runtime_error("relay_mocktest: POST " + path + " returned status " +
                              std::to_string(res->status) + " body=" + res->body);
   }
-  if (res->body.empty()) return json::object();
+  if (res->body.empty()) {
+    return json::object();
+  }
   try {
     return json::parse(res->body);
   } catch (...) {
@@ -190,13 +198,17 @@ std::string discover_porting_sdk_package(const std::string& name) {
 #ifndef PROJECT_SOURCE_DIR
   std::string anchor = __FILE__;
   auto last = anchor.find_last_of('/');
-  if (last != std::string::npos) anchor = anchor.substr(0, last);
+  if (last != std::string::npos) {
+    anchor = anchor.substr(0, last);
+  }
 #else
   std::string anchor = PROJECT_SOURCE_DIR;
 #endif
   std::string dir = anchor;
   while (true) {
-    while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
+    while (dir.size() > 1 && dir.back() == '/') {
+      dir.pop_back();
+    }
     auto last = dir.find_last_of('/');
     if (last == std::string::npos || last == 0) {
       return std::string();
@@ -208,7 +220,9 @@ std::string discover_porting_sdk_package(const std::string& name) {
     if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
       return candidate;
     }
-    if (parent == dir) return std::string();
+    if (parent == dir) {
+      return std::string();
+    }
     dir = parent;
   }
 }
@@ -267,7 +281,9 @@ JournalEntry parse_entry(const json& e) {
   if (e.contains("session_id") && e["session_id"].is_string()) {
     je.session_id = e["session_id"].get<std::string>();
   }
-  if (e.contains("frame")) je.frame = e["frame"];
+  if (e.contains("frame")) {
+    je.frame = e["frame"];
+  }
   return je;
 }
 
@@ -326,7 +342,9 @@ int resolve_http_port() {
 
 std::string ensure_server() {
   std::lock_guard<std::mutex> lock(server_mutex());
-  if (server_started()) return http_url_cache();
+  if (server_started()) {
+    return http_url_cache();
+  }
 
   int ws_port = resolve_ws_port();
   int http_port = resolve_http_port();
@@ -393,8 +411,12 @@ std::vector<JournalEntry> journal_recv(const std::string& method) {
   auto all = journal();
   std::vector<JournalEntry> out;
   for (auto& e : all) {
-    if (e.direction != "recv") continue;
-    if (!method.empty() && e.method != method) continue;
+    if (e.direction != "recv") {
+      continue;
+    }
+    if (!method.empty() && e.method != method) {
+      continue;
+    }
     out.push_back(e);
   }
   return out;
@@ -404,16 +426,26 @@ std::vector<JournalEntry> journal_send(const std::string& event_type) {
   auto all = journal();
   std::vector<JournalEntry> out;
   for (auto& e : all) {
-    if (e.direction != "send") continue;
+    if (e.direction != "send") {
+      continue;
+    }
     if (event_type.empty()) {
       out.push_back(e);
       continue;
     }
-    if (!e.frame.contains("method")) continue;
-    if (e.frame.value("method", "") != "signalwire.event") continue;
+    if (!e.frame.contains("method")) {
+      continue;
+    }
+    if (e.frame.value("method", "") != "signalwire.event") {
+      continue;
+    }
     json p = e.frame.value("params", json::object());
-    if (!p.is_object()) continue;
-    if (p.value("event_type", "") != event_type) continue;
+    if (!p.is_object()) {
+      continue;
+    }
+    if (p.value("event_type", "") != event_type) {
+      continue;
+    }
     out.push_back(e);
   }
   return out;
@@ -452,7 +484,9 @@ json push(const json& frame, const std::string& session_id) {
   // frame reaches only this test's client (empty => broadcast, legacy).
   std::string target = session_id.empty() ? active_session_ref() : session_id;
   std::string path = "/__mock__/push";
-  if (!target.empty()) path += "?session_id=" + url_encode(target);
+  if (!target.empty()) {
+    path += "?session_id=" + url_encode(target);
+  }
   return post_json(url, path, {{"frame", frame}});
 }
 
@@ -461,7 +495,9 @@ json push(const json& frame, const std::string& session_id) {
 // this test's client and expect_recv matches only this session's frames.
 static json scope_ops(const json& ops) {
   const std::string& sid = active_session_ref();
-  if (sid.empty() || !ops.is_array()) return ops;
+  if (sid.empty() || !ops.is_array()) {
+    return ops;
+  }
   json out = json::array();
   for (const auto& op : ops) {
     json o = op;
@@ -494,11 +530,15 @@ json inbound_call(const InboundCallOpts& opts) {
   } else {
     body["auto_states"] = json::array({"created"});
   }
-  if (!opts.call_id.empty()) body["call_id"] = opts.call_id;
+  if (!opts.call_id.empty()) {
+    body["call_id"] = opts.call_id;
+  }
   // Explicit opts.session_id wins; otherwise target this thread's active
   // session so the inbound-call sequence reaches only this test's client.
   std::string target = opts.session_id.empty() ? active_session_ref() : opts.session_id;
-  if (!target.empty()) body["session_id"] = target;
+  if (!target.empty()) {
+    body["session_id"] = target;
+  }
   return post_json(url, "/__mock__/inbound_call", body);
 }
 
@@ -507,7 +547,9 @@ std::vector<json> sessions() {
   json j = get_json(url, "/__mock__/sessions");
   std::vector<json> out;
   if (j.contains("sessions") && j["sessions"].is_array()) {
-    for (auto& s : j["sessions"]) out.push_back(s);
+    for (auto& s : j["sessions"]) {
+      out.push_back(s);
+    }
   }
   return out;
 }
@@ -579,7 +621,9 @@ bool wait_for_session(int timeout_ms) {
   std::string last_error;
   while (std::chrono::steady_clock::now() < deadline) {
     try {
-      if (!sessions().empty()) return true;
+      if (!sessions().empty()) {
+        return true;
+      }
       last_error.clear();
     } catch (const std::exception& e) {
       last_error = e.what();
@@ -604,7 +648,9 @@ Call* drive_inbound_call(RelayClient& client, const std::string& call_id,
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
     Call* c = client.find_call(call_id);
-    if (c) return c;
+    if (c) {
+      return c;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return nullptr;

@@ -60,7 +60,9 @@ template <class P>
 bool spin_until(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;

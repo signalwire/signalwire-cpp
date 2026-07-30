@@ -46,14 +46,18 @@ int main() {
 
     // Global data
     json global = {{"department", department}, {"service_level", is_vip ? "vip" : "standard"}};
-    if (!customer_id.empty()) global["customer_id"] = customer_id;
+    if (!customer_id.empty()) {
+      global["customer_id"] = customer_id;
+    }
     ephemeral.set_global_data(global);
 
     // Role prompt
     std::string role = customer_id.empty()
                            ? "You are a professional customer service representative."
                            : "You are a customer service rep helping customer " + customer_id + ".";
-    if (is_vip) role += " This is a VIP customer who receives priority service.";
+    if (is_vip) {
+      role += " This is a VIP customer who receives priority service.";
+    }
     ephemeral.prompt_add_section("Role", role);
 
     // Department expertise

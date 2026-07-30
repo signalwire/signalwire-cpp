@@ -45,7 +45,7 @@ TEST(skill_mcp_with_services) {
                                                        json::object({{"name", "email"}})})}}));
   auto tools = skill->register_tools();
   // Tools should exist
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   return true;
 }
 
@@ -54,7 +54,7 @@ TEST(skill_mcp_tool_handler_works) {
   skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
                              {"services", json::array({json::object({{"name", "svc1"}})})}}));
   auto tools = skill->register_tools();
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   auto result = tools[0].handler(json::object({{"query", "test"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
   ASSERT_FALSE(resp.empty());
@@ -66,10 +66,12 @@ TEST(skill_mcp_has_hints) {
   skill->setup(json::object(
       {{"gateway_url", "x"}, {"services", json::array({json::object({{"name", "search"}})})}}));
   auto hints = skill->get_hints();
-  ASSERT_TRUE(hints.size() >= 1u);
+  ASSERT_TRUE(!hints.empty());
   bool has_mcp = false;
   for (const auto& h : hints) {
-    if (h == "MCP" || h == "gateway") has_mcp = true;
+    if (h == "MCP" || h == "gateway") {
+      has_mcp = true;
+    }
   }
   ASSERT_TRUE(has_mcp);
   return true;
@@ -133,8 +135,12 @@ struct HttpsGateway {
     ok = (port != 0);
   }
   ~HttpsGateway() {
-    if (srv) srv->stop();
-    if (th.joinable()) th.join();
+    if (srv) {
+      srv->stop();
+    }
+    if (th.joinable()) {
+      th.join();
+    }
     delete srv;
   }
   std::string base() const { return "https://127.0.0.1:" + std::to_string(port); }
@@ -144,7 +150,9 @@ std::string run_first_tool(const json& setup_params) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
   skill->setup(setup_params);
   auto tools = skill->register_tools();
-  if (tools.empty()) return "<no-tools>";
+  if (tools.empty()) {
+    return "<no-tools>";
+  }
   auto result = tools[0].handler(json::object({{"query", "hi"}}), json::object());
   return result.to_json()["response"].get<std::string>();
 }

@@ -158,7 +158,9 @@ TEST(auth_generate_uuid_format) {
   // Should have 4 hyphens
   int hyphens = 0;
   for (char c : uuid) {
-    if (c == '-') hyphens++;
+    if (c == '-') {
+      hyphens++;
+    }
   }
   ASSERT_EQ(hyphens, 4);
   // Should be roughly 36 chars (8-4-4-4-12)

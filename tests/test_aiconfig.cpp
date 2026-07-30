@@ -10,7 +10,9 @@ using json = nlohmann::json;
 static json find_ai_verb(const json& swml) {
   auto& main = swml["sections"]["main"];
   for (const auto& verb : main) {
-    if (verb.contains("ai")) return verb["ai"];
+    if (verb.contains("ai")) {
+      return verb["ai"];
+    }
   }
   return json::object();
 }

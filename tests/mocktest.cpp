@@ -43,7 +43,9 @@ constexpr int kStartupTimeoutSeconds = 30;
 // negative value on failure; the caller throws.
 int pick_free_port() {
   int s = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (s < 0) return -1;
+  if (s < 0) {
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
@@ -113,7 +115,9 @@ std::string mt_url_encode(const std::string& s) {
 std::pair<std::string, int> split_url(const std::string& base) {
   std::string s = base;
   auto pos = s.find("://");
-  if (pos != std::string::npos) s = s.substr(pos + 3);
+  if (pos != std::string::npos) {
+    s = s.substr(pos + 3);
+  }
   auto cpos = s.find(':');
   std::string host = (cpos == std::string::npos) ? s : s.substr(0, cpos);
   int port = (cpos == std::string::npos) ? 80 : std::stoi(s.substr(cpos + 1));
@@ -126,7 +130,9 @@ bool probe_health(const std::string& base_url) {
   cli.set_connection_timeout(2, 0);
   cli.set_read_timeout(2, 0);
   auto res = cli.Get("/__mock__/health");
-  if (!res || res->status != 200) return false;
+  if (!res || res->status != 200) {
+    return false;
+  }
   try {
     auto j = json::parse(res->body);
     return j.contains("specs_loaded");
@@ -172,7 +178,9 @@ std::string discover_porting_sdk_package(const std::string& name) {
   std::string dir = anchor;
   while (true) {
     // Strip trailing slash for consistent parent computation.
-    while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
+    while (dir.size() > 1 && dir.back() == '/') {
+      dir.pop_back();
+    }
     auto last = dir.find_last_of('/');
     if (last == std::string::npos || last == 0) {
       // No more parents to walk to.
@@ -185,7 +193,9 @@ std::string discover_porting_sdk_package(const std::string& name) {
     if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
       return candidate;
     }
-    if (parent == dir) return std::string();
+    if (parent == dir) {
+      return std::string();
+    }
     dir = parent;
   }
 }
@@ -270,7 +280,9 @@ int resolve_port() {
 
 std::string ensure_server() {
   std::lock_guard<std::mutex> lock(server_mutex());
-  if (server_started()) return server_url_cache();
+  if (server_started()) {
+    return server_url_cache();
+  }
 
   int port = resolve_port();
   std::string url = "http://127.0.0.1:" + std::to_string(port);
@@ -319,7 +331,9 @@ void journal_reset() {
   // No-op when scoped: the auth-filtered view starts empty for a fresh
   // client, and a global wipe would race a concurrent test. Unscoped
   // callers keep the legacy global reset.
-  if (!active_auth_ref().empty()) return;
+  if (!active_auth_ref().empty()) {
+    return;
+  }
   std::string url = ensure_server();
   post_no_body(url, "/__mock__/journal/reset");
   post_no_body(url, "/__mock__/scenarios/reset");
@@ -356,7 +370,9 @@ std::vector<JournalEntry> journal() {
           h = it->get<std::string>();
         }
       }
-      if (h != my_auth) continue;
+      if (h != my_auth) {
+        continue;
+      }
     }
     JournalEntry je;
     if (e.contains("timestamp") && e["timestamp"].is_number()) {
@@ -373,7 +389,9 @@ std::vector<JournalEntry> journal() {
         std::vector<std::string> values;
         if (it.value().is_array()) {
           for (const auto& v : it.value()) {
-            if (v.is_string()) values.push_back(v.get<std::string>());
+            if (v.is_string()) {
+              values.push_back(v.get<std::string>());
+            }
           }
         }
         je.query_params[it.key()] = std::move(values);
@@ -386,7 +404,9 @@ std::vector<JournalEntry> journal() {
         }
       }
     }
-    if (e.contains("body")) je.body = e["body"];
+    if (e.contains("body")) {
+      je.body = e["body"];
+    }
     if (e.contains("matched_route") && e["matched_route"].is_string()) {
       je.matched_route = e["matched_route"].get<std::string>();
     }
@@ -418,7 +438,9 @@ void scenario_set(const std::string& endpoint_id, int status, const json& body) 
   // consume it. Unscoped => shared (legacy).
   std::string path = "/__mock__/scenarios/" + endpoint_id;
   const std::string& my_auth = active_auth_ref();
-  if (!my_auth.empty()) path += "?session_id=" + mt_url_encode(my_auth);
+  if (!my_auth.empty()) {
+    path += "?session_id=" + mt_url_encode(my_auth);
+  }
   auto res = cli.Post(path, payload.dump(), "application/json");
   if (!res) {
     throw std::runtime_error("mocktest: POST /__mock__/scenarios failed");

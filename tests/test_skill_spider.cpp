@@ -30,7 +30,7 @@ TEST(skill_spider_registers_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
   skill->setup(json::object());
   auto tools = skill->register_tools();
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   // First tool should contain "scrape"
   ASSERT_TRUE(tools[0].name.find("scrape") != std::string::npos);
   return true;
@@ -63,7 +63,7 @@ TEST(skill_spider_handler_works) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
   skill->setup(json::object());
   auto tools = skill->register_tools();
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   auto result =
       tools[0].handler(json::object({{"url", "https://example.com/page"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -82,7 +82,7 @@ TEST(skill_spider_has_hints) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
   skill->setup(json::object());
   auto hints = skill->get_hints();
-  ASSERT_TRUE(hints.size() >= 1u);
+  ASSERT_TRUE(!hints.empty());
   return true;
 }
 
@@ -124,7 +124,7 @@ TEST(skill_spider_remove_xpaths_drops_script_style_and_chrome) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
   skill->setup(json::object());
   auto tools = skill->register_tools();
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   auto result =
       tools[0].handler(json::object({{"url", "https://example.com/page"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -186,7 +186,7 @@ TEST(skill_spider_live_impl_is_the_builtin_and_strips_script_and_nav) {
   ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   skill->setup(json::object());
   auto tools = skill->register_tools();
-  ASSERT_TRUE(tools.size() >= 1u);
+  ASSERT_TRUE(!tools.empty());
   auto result =
       tools[0].handler(json::object({{"url", "https://example.com/page"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();

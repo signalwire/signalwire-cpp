@@ -7,7 +7,9 @@ using json = nlohmann::json;
 static json find_verb(const json& swml, const std::string& key) {
   const auto& main = swml["sections"]["main"];
   for (const auto& verb : main) {
-    if (verb.contains(key)) return verb[key];
+    if (verb.contains(key)) {
+      return verb[key];
+    }
   }
   return json();
 }

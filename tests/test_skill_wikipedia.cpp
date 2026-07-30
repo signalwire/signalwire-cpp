@@ -86,6 +86,6 @@ TEST(skill_wikipedia_prompt_sections) {
   auto skill = sw_skills::SkillRegistry::instance().create("wikipedia_search");
   skill->setup(json::object());
   auto sections = skill->get_prompt_sections();
-  ASSERT_TRUE(sections.size() >= 1u);
+  ASSERT_TRUE(!sections.empty());
   return true;
 }

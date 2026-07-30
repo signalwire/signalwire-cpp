@@ -131,6 +131,6 @@ int main() {
       .set_end(true);
 
   auto swml = agent.render_swml();
-  std::cout << swml.dump(2) << std::endl;
+  std::cout << swml.dump(2) << '\n';
   return 0;
 }

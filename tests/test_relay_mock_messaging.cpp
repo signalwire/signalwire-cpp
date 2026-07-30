@@ -37,7 +37,9 @@ template <class P>
 bool spin_until_msg(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;
@@ -53,7 +55,9 @@ json messaging_state_frame(const std::string& message_id, const std::string& sta
   json& p = frame["params"]["params"];
   p["message_id"] = message_id;
   p["message_state"] = state;
-  if (!reason.empty()) p["reason"] = reason;
+  if (!reason.empty()) {
+    p["reason"] = reason;
+  }
   return frame;
 }
 

@@ -135,7 +135,9 @@ namespace {
 std::string make_temp_dir() {
   char tmpl[] = "/tmp/swcpp_skill_dir_XXXXXX";
   char* dir = mkdtemp(tmpl);
-  if (!dir) return std::string();
+  if (!dir) {
+    return std::string();
+  }
   return std::string(dir);
 }
 }  // namespace
@@ -199,14 +201,20 @@ TEST(skill_registry_add_skill_directory_dedup) {
   ASSERT_FALSE(dir.empty());
   auto before = reg.external_paths();
   int before_count = 0;
-  for (const auto& p : before)
-    if (p == dir) before_count++;
+  for (const auto& p : before) {
+    if (p == dir) {
+      before_count++;
+    }
+  }
   reg.add_skill_directory(dir);
   reg.add_skill_directory(dir);  // second call, should not duplicate
   auto after = reg.external_paths();
   int after_count = 0;
-  for (const auto& p : after)
-    if (p == dir) after_count++;
+  for (const auto& p : after) {
+    if (p == dir) {
+      after_count++;
+    }
+  }
   ASSERT_EQ(after_count, before_count + 1);
   rmdir(dir.c_str());
   return true;

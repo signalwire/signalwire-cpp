@@ -804,7 +804,9 @@ TEST(relay_client_subscribe) {
   client.subscribe({"new-context"});
   bool found = false;
   for (const auto& c : client.config().contexts) {
-    if (c == "new-context") found = true;
+    if (c == "new-context") {
+      found = true;
+    }
   }
   ASSERT_TRUE(found);
   return true;

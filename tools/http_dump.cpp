@@ -74,10 +74,16 @@ json observe_response(int status, const std::map<std::string, std::string>& head
   json out = json::object();
   out["status"] = status;
   std::vector<std::string> keys;
-  for (const auto& [k, v] : headers) keys.push_back(k);
+  for (const auto& [k, v] : headers) {
+    keys.push_back(k);
+  }
   out["header_keys"] = keys;  // std::map already sorted
-  if (headers.count("Location")) out["location"] = headers.at("Location");
-  if (headers.count("WWW-Authenticate")) out["www_authenticate"] = headers.at("WWW-Authenticate");
+  if (headers.count("Location")) {
+    out["location"] = headers.at("Location");
+  }
+  if (headers.count("WWW-Authenticate")) {
+    out["www_authenticate"] = headers.at("WWW-Authenticate");
+  }
   if (kind == "response_full") {
     if (body_str.empty()) {
       out["body"] = "";
@@ -216,7 +222,9 @@ int main() {
       {{"x-signalwire-signature", webhook_sig(kWhUrl, kWhBody, kSigningKey)}}, kSigningKey);
   {
     std::string bad;
-    for (int i = 0; i < 5; ++i) bad += "deadbeef";
+    for (int i = 0; i < 5; ++i) {
+      bad += "deadbeef";
+    }
     out["http_webhook_validate_bad_sig"] =
         webhook_decision("POST", kWhUrl, kWhBody, {{"x-signalwire-signature", bad}}, kSigningKey);
   }

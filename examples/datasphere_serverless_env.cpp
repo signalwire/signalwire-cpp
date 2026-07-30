@@ -22,10 +22,14 @@ int main() {
   std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
 
   int count = 3;
-  if (auto v = std::getenv("DATASPHERE_COUNT")) count = std::atoi(v);
+  if (auto v = std::getenv("DATASPHERE_COUNT")) {
+    count = std::atoi(v);
+  }
 
   double distance = 4.0;
-  if (auto v = std::getenv("DATASPHERE_DISTANCE")) distance = std::atof(v);
+  if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
+    distance = std::atof(v);
+  }
 
   agent::AgentBase agent("datasphere-serverless-env", "/datasphere-env");
 
@@ -50,7 +54,9 @@ int main() {
       tag_array.push_back(t.substr(0, pos));
       t.erase(0, pos + 1);
     }
-    if (!t.empty()) tag_array.push_back(t);
+    if (!t.empty()) {
+      tag_array.push_back(t);
+    }
     config["tags"] = tag_array;
   }
 

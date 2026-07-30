@@ -36,8 +36,12 @@ std::string mw_b64(const std::string& data) {
       valb -= 6;
     }
   }
-  if (valb > -6) out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
-  while (out.size() % 4) out.push_back('=');
+  if (valb > -6) {
+    out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+  }
+  while (out.size() % 4) {
+    out.push_back('=');
+  }
   return out;
 }
 
@@ -77,7 +81,9 @@ struct TestServer {
 
   ~TestServer() {
     srv.stop();
-    if (th.joinable()) th.join();
+    if (th.joinable()) {
+      th.join();
+    }
   }
 };
 
@@ -327,7 +333,9 @@ struct AgentServerHarness {
   }
   ~AgentServerHarness() {
     srv.stop();
-    if (th.joinable()) th.join();
+    if (th.joinable()) {
+      th.join();
+    }
   }
 };
 

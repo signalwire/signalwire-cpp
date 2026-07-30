@@ -268,7 +268,7 @@ int main() {
   out["authorization_state"] =
       json::object({{"leaked", captured.find(kAuthorizationState) != std::string::npos}});
 
-  std::cout << out.dump() << std::endl;
+  std::cout << out.dump() << '\n';
 
   std::error_code ec;
   std::filesystem::remove(capture, ec);

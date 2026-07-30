@@ -53,6 +53,6 @@ int main() {
   // verifies. The (int, const std::string&) constructor takes the reference's
   // ``secret_key`` STRING, whose bytes key the HMAC (NOT 32 raw bytes).
   const signalwire::security::SessionManager manager(900, secret_key);
-  std::cout << manager.generate_token(function_name, call_id) << std::endl;
+  std::cout << manager.generate_token(function_name, call_id) << '\n';
   return 0;
 }

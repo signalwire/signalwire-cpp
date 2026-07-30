@@ -135,9 +135,13 @@ int main() {
     s.register_sip_username("sales", "/sales");
     json lookup_missing = json(nullptr);
     std::string missing = s.lookup_sip_route("nope");
-    if (!missing.empty()) lookup_missing = missing;
+    if (!missing.empty()) {
+      lookup_missing = missing;
+    }
     json mapping = json::object();
-    for (const auto& [k, v] : s.get_sip_username_mapping()) mapping[k] = v;
+    for (const auto& [k, v] : s.get_sip_username_mapping()) {
+      mapping[k] = v;
+    }
     out["server_sip_username_mapping"] = json{{"mapping", mapping},
                                               {"lookup_bob", s.lookup_sip_route("bob")},
                                               {"lookup_BOB", s.lookup_sip_route("BOB")},
@@ -194,13 +198,17 @@ int main() {
     // nothing the rest of this block does not.
     auto& reg = signalwire::skills::SkillRegistry::instance();
     std::set<std::string> before;
-    for (const auto& n : reg.list_skills()) before.insert(n);
+    for (const auto& n : reg.list_skills()) {
+      before.insert(n);
+    }
     auto noop_factory = []() -> std::unique_ptr<signalwire::skills::SkillBase> { return nullptr; };
     reg.register_skill("custom_alpha", noop_factory);
     reg.register_skill("custom_beta", noop_factory);
     std::vector<std::string> added;
     for (const auto& n : reg.list_skills()) {
-      if (before.find(n) == before.end()) added.push_back(n);
+      if (before.find(n) == before.end()) {
+        added.push_back(n);
+      }
     }
     std::sort(added.begin(), added.end());
     out["state_register_skill"] = added;

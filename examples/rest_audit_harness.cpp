@@ -54,9 +54,15 @@ std::string env_or(const char* name, const std::string& fallback = "") {
 
 /// Convert a JSON value to a string (for query-string params).
 std::string to_query_string(const json& v) {
-  if (v.is_string()) return v.get<std::string>();
-  if (v.is_number()) return v.dump();
-  if (v.is_boolean()) return v.get<bool>() ? "true" : "false";
+  if (v.is_string()) {
+    return v.get<std::string>();
+  }
+  if (v.is_number()) {
+    return v.dump();
+  }
+  if (v.is_boolean()) {
+    return v.get<bool>() ? "true" : "false";
+  }
   return v.dump();
 }
 

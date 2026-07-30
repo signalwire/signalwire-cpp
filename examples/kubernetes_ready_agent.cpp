@@ -11,14 +11,18 @@ static agent::AgentBase* g_agent = nullptr;
 
 void signal_handler(int sig) {
   (void)sig;
-  if (g_agent) g_agent->stop();
+  if (g_agent) {
+    g_agent->stop();
+  }
 }
 
 int main() {
   // Read port from env (Kubernetes can set this)
   int port = 3000;
   const char* port_env = std::getenv("PORT");
-  if (port_env) port = std::atoi(port_env);
+  if (port_env) {
+    port = std::atoi(port_env);
+  }
 
   agent::AgentBase agent("k8s-agent", "/", "0.0.0.0", port);
   g_agent = &agent;

@@ -41,7 +41,9 @@ int main(int argc, char** argv) {
   int port = 3000;
   if (argc > 1) {
     port = std::atoi(argv[1]);
-    if (port <= 0) port = 3000;
+    if (port <= 0) {
+      port = 3000;
+    }
   }
 
   swml::Service svc;
@@ -86,7 +88,9 @@ int main(int argc, char** argv) {
             << "         or watch the [INFO] log line printed by serve() for\n"
             << "         the auto-generated user / password.\n"
             << "  Tools: ";
-  for (const auto& n : svc.list_tool_names()) std::cout << n << " ";
+  for (const auto& n : svc.list_tool_names()) {
+    std::cout << n << " ";
+  }
   std::cout << "\n\n"
             << "SWML document:\n"
             << svc.render_swml().dump(2) << "\n";

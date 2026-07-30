@@ -96,8 +96,12 @@ TEST(service_sidecar_pattern_emits_verb_and_registers_tool) {
   ASSERT_TRUE(main.is_array());
   bool has_answer = false, has_sidecar = false;
   for (const auto& v : main) {
-    if (v.contains("answer")) has_answer = true;
-    if (v.contains("ai_sidecar")) has_sidecar = true;
+    if (v.contains("answer")) {
+      has_answer = true;
+    }
+    if (v.contains("ai_sidecar")) {
+      has_sidecar = true;
+    }
   }
   ASSERT_TRUE(has_answer);
   ASSERT_TRUE(has_sidecar);

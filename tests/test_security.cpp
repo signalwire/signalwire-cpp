@@ -363,7 +363,9 @@ std::string c7_b64url(const std::string& data) {
       valb -= 6;
     }
   }
-  if (valb > -6) out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+  if (valb > -6) {
+    out.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+  }
   return out;  // no '=' padding
 }
 

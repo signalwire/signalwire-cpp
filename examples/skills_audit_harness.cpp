@@ -73,12 +73,13 @@ std::string expand_template(const std::string& tmpl, const json& args) {
     // for the audit; the captured wire path is what the fixture sees.
     std::string body = inner;
     while (true) {
-      if (body.compare(0, 3, "lc:") == 0)
+      if (body.compare(0, 3, "lc:") == 0) {
         body = body.substr(3);
-      else if (body.compare(0, 4, "enc:") == 0)
+      } else if (body.compare(0, 4, "enc:") == 0) {
         body = body.substr(4);
-      else
+      } else {
         break;
+      }
     }
 
     if (body.compare(0, 5, "args.") == 0) {
@@ -104,12 +105,18 @@ std::string expand_template(const std::string& tmpl, const json& args) {
 /// path-substring assertion (`trivia`, `current.json`, etc.) still
 /// matches.
 std::string redirect_to_fixture(const std::string& url, const std::string& fixture) {
-  if (fixture.empty()) return url;
+  if (fixture.empty()) {
+    return url;
+  }
   auto scheme_end = url.find("://");
-  if (scheme_end == std::string::npos) return url;
+  if (scheme_end == std::string::npos) {
+    return url;
+  }
   auto path_start = url.find('/', scheme_end + 3);
   std::string fix = fixture;
-  while (!fix.empty() && fix.back() == '/') fix.pop_back();
+  while (!fix.empty() && fix.back() == '/') {
+    fix.pop_back();
+  }
   if (path_start == std::string::npos) {
     return fix;
   }
@@ -120,7 +127,9 @@ std::string redirect_to_fixture(const std::string& url, const std::string& fixtu
 const swaig::ToolDefinition* find_tool(const std::vector<swaig::ToolDefinition>& tools,
                                        const std::string& name) {
   for (const auto& t : tools) {
-    if (t.name == name) return &t;
+    if (t.name == name) {
+      return &t;
+    }
   }
   return nullptr;
 }
@@ -131,9 +140,13 @@ json build_skill_params(const std::string& skill_name) {
   if (skill_name == "web_search") {
     // Audit sets GOOGLE_API_KEY / GOOGLE_CSE_ID + WEB_SEARCH_BASE_URL.
     const std::string k = env_or("GOOGLE_API_KEY");
-    if (!k.empty()) p["api_key"] = k;
+    if (!k.empty()) {
+      p["api_key"] = k;
+    }
     const std::string c = env_or("GOOGLE_CSE_ID");
-    if (!c.empty()) p["search_engine_id"] = c;
+    if (!c.empty()) {
+      p["search_engine_id"] = c;
+    }
   } else if (skill_name == "datasphere") {
     // Audit sets DATASPHERE_TOKEN + DATASPHERE_BASE_URL. Plug
     // synthetic project_id / space_name / document_id so setup()
@@ -142,13 +155,19 @@ json build_skill_params(const std::string& skill_name) {
     p["project_id"] = "audit-project";
     p["document_id"] = "audit-doc";
     const std::string t = env_or("DATASPHERE_TOKEN");
-    if (!t.empty()) p["token"] = t;
+    if (!t.empty()) {
+      p["token"] = t;
+    }
   } else if (skill_name == "weather_api") {
     const std::string k = env_or("WEATHER_API_KEY");
-    if (!k.empty()) p["api_key"] = k;
+    if (!k.empty()) {
+      p["api_key"] = k;
+    }
   } else if (skill_name == "api_ninjas_trivia") {
     const std::string k = env_or("API_NINJAS_KEY");
-    if (!k.empty()) p["api_key"] = k;
+    if (!k.empty()) {
+      p["api_key"] = k;
+    }
   }
   return p;
 }
@@ -245,7 +264,9 @@ int main() {
   }
 
   const std::string skill_name = env_or("SKILL_NAME");
-  if (skill_name.empty()) die("SKILL_NAME required");
+  if (skill_name.empty()) {
+    die("SKILL_NAME required");
+  }
 
   const std::string args_raw = env_or("SKILL_HANDLER_ARGS", "{}");
   json args;
@@ -262,7 +283,9 @@ int main() {
   }
 
   auto skill = reg.create(skill_name);
-  if (!skill) die("failed to create skill: " + skill_name);
+  if (!skill) {
+    die("failed to create skill: " + skill_name);
+  }
 
   json params = build_skill_params(skill_name);
   if (!skill->setup(params)) {
@@ -289,7 +312,9 @@ int main() {
     // accepts a wildcard request without one. Synthesize a default
     // so the URL template still expands cleanly.
     json effective = args;
-    if (!effective.is_object()) effective = json::object();
+    if (!effective.is_object()) {
+      effective = json::object();
+    }
     if (!effective.contains("category")) {
       effective["category"] = "general";
     }

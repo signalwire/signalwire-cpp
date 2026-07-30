@@ -20,7 +20,9 @@ int main() {
 
   auto skills = agent.list_skills();
   std::cout << "Loaded skills:";
-  for (const auto& s : skills) std::cout << " " << s;
+  for (const auto& s : skills) {
+    std::cout << " " << s;
+  }
   std::cout << "\n";
 
   std::cout << "Skills demo at http://0.0.0.0:3000/assistant\n";

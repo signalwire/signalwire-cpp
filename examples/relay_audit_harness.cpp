@@ -51,7 +51,9 @@ std::vector<std::string> split_csv(const std::string& s) {
     // trim whitespace
     size_t a = item.find_first_not_of(" \t");
     size_t b = item.find_last_not_of(" \t");
-    if (a == std::string::npos) continue;
+    if (a == std::string::npos) {
+      continue;
+    }
     out.push_back(item.substr(a, b - a + 1));
   }
   return out;
@@ -115,7 +117,9 @@ int main() {
   // Wait up to 5 seconds for an inbound event.
   auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (saw_event.load()) break;
+    if (saw_event.load()) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
   }
 

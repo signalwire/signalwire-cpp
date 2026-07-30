@@ -17,7 +17,9 @@ namespace {
 
 bool contains_string(const std::vector<std::string>& haystack, const std::string& needle) {
   for (const auto& s : haystack) {
-    if (s == needle) return true;
+    if (s == needle) {
+      return true;
+    }
   }
   return false;
 }

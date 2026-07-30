@@ -44,10 +44,11 @@ TEST(logging_suppress_unsuppress) {
   ASSERT_FALSE(logger.is_suppressed());
 
   // Restore original state
-  if (was_suppressed)
+  if (was_suppressed) {
     logger.suppress();
-  else
+  } else {
     logger.unsuppress();
+  }
   return true;
 }
 
@@ -62,10 +63,11 @@ TEST(logging_log_methods_no_crash) {
   logger.error("test error message");
 
   // Restore
-  if (!was_suppressed)
+  if (!was_suppressed) {
     logger.unsuppress();
-  else
+  } else {
     logger.suppress();
+  }
   return true;
 }
 
@@ -169,7 +171,9 @@ TEST(log_output_has_control_chars_stripped) {
   std::streambuf* saved = std::cout.rdbuf(capture.rdbuf());
   logger.info("user\x01said\x1b[31mRED\x07");
   std::cout.rdbuf(saved);
-  if (was_suppressed) logger.suppress();
+  if (was_suppressed) {
+    logger.suppress();
+  }
 
   const std::string line = capture.str();
   for (char bad : {'\x01', '\x1b', '\x07'}) {
@@ -189,7 +193,9 @@ TEST(log_output_keeps_legal_whitespace) {
   std::streambuf* saved = std::cout.rdbuf(capture.rdbuf());
   logger.info("line1\tcol\nline2\r end");
   std::cout.rdbuf(saved);
-  if (was_suppressed) logger.suppress();
+  if (was_suppressed) {
+    logger.suppress();
+  }
 
   ASSERT_TRUE(capture.str().find("line1\tcol\nline2\r end") != std::string::npos);
   return true;

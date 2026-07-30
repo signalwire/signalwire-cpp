@@ -27,7 +27,9 @@ template <class P>
 bool spin_dial(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;
@@ -402,10 +404,18 @@ TEST(relay_mock_dial_records_call_state_progression_on_winner) {
   bool created = false, ringing = false, answered = false;
   for (auto& e : state_events) {
     json pp = e.frame["params"]["params"];
-    if (pp.value("call_id", "") != "WIN-PROG") continue;
-    if (pp.value("call_state", "") == "created") created = true;
-    if (pp.value("call_state", "") == "ringing") ringing = true;
-    if (pp.value("call_state", "") == "answered") answered = true;
+    if (pp.value("call_id", "") != "WIN-PROG") {
+      continue;
+    }
+    if (pp.value("call_state", "") == "created") {
+      created = true;
+    }
+    if (pp.value("call_state", "") == "ringing") {
+      ringing = true;
+    }
+    if (pp.value("call_state", "") == "answered") {
+      answered = true;
+    }
   }
   ASSERT_TRUE(created);
   ASSERT_TRUE(ringing);

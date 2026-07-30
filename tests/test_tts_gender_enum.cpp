@@ -36,7 +36,9 @@ TEST(tts_gender_enum_maps_to_wire_string) {
 static json build_tts_media(const std::string& text, const std::string& gender) {
   json tts;
   tts["text"] = text;
-  if (!gender.empty()) tts["gender"] = gender;
+  if (!gender.empty()) {
+    tts["gender"] = gender;
+  }
   return json::array({{{"type", "tts"}, {"params", tts}}});
 }
 

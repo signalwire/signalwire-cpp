@@ -115,6 +115,6 @@ int main() {
   // exactly which steps have a `functions` key in the output and
   // which don't.
   auto swml = agent.render_swml();
-  std::cout << swml.dump(2) << std::endl;
+  std::cout << swml.dump(2) << '\n';
   return 0;
 }

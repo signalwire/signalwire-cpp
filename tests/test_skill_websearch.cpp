@@ -127,7 +127,9 @@ static std::string run_websearch_with_params(const json& extra_params,
 
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
   json setup_params = json::object({{"api_key", "k"}, {"search_engine_id", "s"}});
-  for (auto& [k, v] : extra_params.items()) setup_params[k] = v;
+  for (auto& [k, v] : extra_params.items()) {
+    setup_params[k] = v;
+  }
   skill->setup(setup_params);
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", query}}), json::object());
@@ -228,7 +230,7 @@ TEST(skill_websearch_has_prompt_sections) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
   skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
   auto sections = skill->get_prompt_sections();
-  ASSERT_TRUE(sections.size() >= 1u);
+  ASSERT_TRUE(!sections.empty());
   return true;
 }
 
@@ -308,7 +310,9 @@ struct LatencyFixture {
   ~LatencyFixture() {
     stopping.store(true);
     srv.stop();
-    if (th.joinable()) th.join();
+    if (th.joinable()) {
+      th.join();
+    }
     ::unsetenv("WEB_SEARCH_BASE_URL");
   }
 };
@@ -319,7 +323,9 @@ static std::pair<std::string, long> run_latency_handler(const json& extra,
                                                         const std::string& query) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
   json setup = json::object({{"api_key", "k"}, {"search_engine_id", "s"}, {"num_results", 2}});
-  for (auto& [k, v] : extra.items()) setup[k] = v;
+  for (auto& [k, v] : extra.items()) {
+    setup[k] = v;
+  }
   skill->setup(setup);
   auto tools = skill->register_tools();
   auto t0 = std::chrono::steady_clock::now();

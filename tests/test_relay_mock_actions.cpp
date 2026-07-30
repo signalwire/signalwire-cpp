@@ -42,7 +42,9 @@ template <class P>
 bool spin(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;
@@ -53,7 +55,9 @@ bool spin(P pred, int timeout_ms = 5000) {
 // subsequent action calls don't think the call is gone.
 Call* setup_answered_call(RelayClient& client, const std::string& call_id) {
   Call* call = mt::drive_inbound_call(client, call_id, {"created"});
-  if (!call) return nullptr;
+  if (!call) {
+    return nullptr;
+  }
   call->update_state("answered");
   return call;
 }
@@ -169,7 +173,9 @@ TEST(relay_mock_play_on_completed_callback_fires) {
   json media = json::array({{{"type", "silence"}, {"params", {{"duration", 1}}}}});
   Action action = call->play(media, 0.0, "play-ctl-cb");
   action.on_completed([&](const Action& a) {
-    if (a.state() == "finished") fired.store(true);
+    if (a.state() == "finished") {
+      fired.store(true);
+    }
   });
   (void)action.wait(5000);
   spin([&] { return fired.load(); }, 2000);

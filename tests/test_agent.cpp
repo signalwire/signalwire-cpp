@@ -492,7 +492,9 @@ TEST(agent_post_answer_verbs) {
   bool found_play = false;
   bool found_ai = false;
   for (const auto& verb : main) {
-    if (verb.contains("play")) found_play = true;
+    if (verb.contains("play")) {
+      found_play = true;
+    }
     if (verb.contains("ai")) {
       ASSERT_TRUE(found_play);  // play should come before ai
       found_ai = true;

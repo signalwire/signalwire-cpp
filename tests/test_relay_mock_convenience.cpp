@@ -40,7 +40,9 @@ template <class P>
 bool spin_conv(P pred, int timeout_ms = 5000) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
   while (std::chrono::steady_clock::now() < deadline) {
-    if (pred()) return true;
+    if (pred()) {
+      return true;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   return false;
@@ -48,7 +50,9 @@ bool spin_conv(P pred, int timeout_ms = 5000) {
 
 Call* setup_answered_call_conv(RelayClient& client, const std::string& call_id) {
   Call* call = mt::drive_inbound_call(client, call_id, {"created"});
-  if (!call) return nullptr;
+  if (!call) {
+    return nullptr;
+  }
   call->update_state("answered");
   return call;
 }
@@ -68,7 +72,9 @@ json bare_event_conv(const std::string& event_type, const json& params) {
 // id. The media/detect payload shape is the load-bearing assertion.
 json first_recv_params(const std::string& method) {
   auto entries = mt::journal_recv(method);
-  if (entries.empty()) return json::object();
+  if (entries.empty()) {
+    return json::object();
+  }
   return entries[0].frame["params"];
 }
 

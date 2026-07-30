@@ -148,7 +148,9 @@ TEST(prefab_tools_info_gatherer_submit_answer_advances) {
   bool has_update = false;
   if (out.contains("action")) {
     for (const auto& a : out["action"]) {
-      if (a.contains("set_global_data")) has_update = true;
+      if (a.contains("set_global_data")) {
+        has_update = true;
+      }
     }
   }
   ASSERT_TRUE(has_update);

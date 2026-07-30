@@ -21,10 +21,14 @@ int main() {
   std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
 
   int count = 3;
-  if (auto v = std::getenv("DATASPHERE_COUNT")) count = std::atoi(v);
+  if (auto v = std::getenv("DATASPHERE_COUNT")) {
+    count = std::atoi(v);
+  }
 
   double distance = 4.0;
-  if (auto v = std::getenv("DATASPHERE_DISTANCE")) distance = std::atof(v);
+  if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
+    distance = std::atof(v);
+  }
 
   agent::AgentBase agent("datasphere-webhook-env", "/datasphere-webhook");
 

@@ -104,7 +104,9 @@ std::string dfold_served_route(signalwire::agent::AgentBase& agent,
     std::thread& t;
     ~Guard() {
       a.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_BASIC_AUTH_USER");
       ::unsetenv("SWML_BASIC_AUTH_PASSWORD");
     }
@@ -255,7 +257,9 @@ TEST(default_fold_agent_routing_callback_defaults_to_sip_and_is_served) {
     std::thread& t;
     ~Guard() {
       a.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_BASIC_AUTH_USER");
       ::unsetenv("SWML_BASIC_AUTH_PASSWORD");
     }

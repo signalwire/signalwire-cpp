@@ -3910,20 +3910,6 @@
               ],
               "returns": "void"
             },
-            "body": {
-              "params": [
-                {
-                  "name": "self",
-                  "kind": "self"
-                },
-                {
-                  "name": "data",
-                  "type": "any",
-                  "required": true
-                }
-              ],
-              "returns": "class:signalwire.core.data_map.DataMap"
-            },
             "description": {
               "params": [
                 {
@@ -5399,12 +5385,12 @@
         "strip_control_chars": {
           "params": [
             {
-              "name": "value",
-              "type": "string",
+              "name": "event_dict",
+              "type": "any",
               "required": true
             }
           ],
-          "returns": "string"
+          "returns": "any"
         }
       }
     },

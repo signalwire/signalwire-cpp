@@ -2176,34 +2176,9 @@ data_map.webhook(
     json{{"Authorization", "Bearer YOUR_API_TOKEN"}});  // Use static credentials
 ```
 
-##### `body(const json& data) -> DataMap&`
-Set the JSON body for the last-added webhook (POST/PUT requests).
-
-**Parameters:**
-- `data` (`json`): JSON body data (supports `${variable}` substitution)
-
-**Usage:**
-```cpp
-// Static body with parameter substitution
-data_map.body({
-    {"query", "${args.search_term}"},
-    {"limit", 5},
-    {"filters", {
-        {"category", "${args.category}"},
-        {"active", true}
-    }}
-});
-
-// Body with call-related data (NOT sensitive info)
-data_map.body({
-    {"customer_id", "${global_data.customer_id}"},
-    {"request_id", "${meta_data.call_id}"},
-    {"search", "${args.query}"}
-});
-```
-
 ##### `params(const json& data) -> DataMap&`
-Set request params for the last-added webhook (alias for `body`).
+Set request params for the last-added webhook — including the data sent with
+POST/PUT requests.
 
 **Parameters:**
 - `data` (`json`): Query parameters (supports `${variable}` substitution)
@@ -2460,7 +2435,7 @@ auto search_tool = signalwire::datamap::DataMap("search_knowledge")
         "POST",
         "https://api.company.com/search",
         json{{"Authorization", "Bearer TOKEN"}})
-    .body({
+    .params({
         {"query", "${args.query}"},
         {"category", "${args.category}"},
         {"limit", 5}

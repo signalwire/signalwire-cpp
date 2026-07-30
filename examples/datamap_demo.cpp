@@ -40,7 +40,7 @@ int main() {
         .parameter("query", "string", "Search query", true)
         .webhook("POST", "https://api.knowledge.com/search",
             {{"Authorization", "Bearer TOKEN"}, {"Content-Type", "application/json"}})
-        .body({{"query", "${query}"}, {"limit", 5}})
+        .params({{"query", "${query}"}, {"limit", 5}})
         .foreach({{"input_key", "${response.results}"}, {"output_key", "foreach"}, {"append", true}})
         .output(swaig::FunctionResult("Found: ${foreach.title} - ${foreach.summary}"));
     agent.register_swaig_function(search.to_swaig_function());

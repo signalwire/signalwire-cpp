@@ -95,14 +95,6 @@ DataMap& DataMap::webhook_expressions(const std::vector<json>& expressions) {
   return *this;
 }
 
-DataMap& DataMap::body(const json& data) {
-  if (webhooks_.empty()) {
-    throw std::runtime_error("Must add webhook before setting body");
-  }
-  webhooks_.back()["body"] = data;
-  return *this;
-}
-
 DataMap& DataMap::params(const json& data) {
   if (webhooks_.empty()) {
     throw std::runtime_error("Must add webhook before setting params");

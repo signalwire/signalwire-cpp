@@ -88,27 +88,57 @@ TEST(datamap_webhook_with_headers) {
     return true;
 }
 
-TEST(datamap_webhook_body) {
-    DataMap dm("test");
-    dm.webhook("POST", "https://api.example.com/data");
-    dm.body(json::object({{"query", "${args.query}"}}));
-    auto j = dm.to_swaig_function();
-    ASSERT_TRUE(j["data_map"]["webhooks"][0].contains("body"));
+// ``DataMap::body()`` is GONE — the key it wrote is invalid, not merely ignored.
+//
+// Owner-ruled 2026-07-29 (signalwire-python 71eed0c), extending the f171ce3
+// ruling ("if the server doesn't read them, remove them") from the
+// ``create_simple_api_tool`` PARAMETER to the public BUILDER METHOD. The same
+// three sources condemn both:
+//
+//   * porting-sdk/schema.json $defs/Webhook declares exactly ten properties
+//     under ``unevaluatedProperties: {"not": {}}`` — ``body`` is not among them,
+//     so emitting it is a SCHEMA VIOLATION.
+//   * mod_openai/actions.c:735-739 and bedrock.c:4920-4926 read url, method,
+//     form_param, ``params`` and ``headers`` and nothing else; grep -n '"body"'
+//     across both returns ZERO matches.
+//   * So the method's only possible effect was producing an invalid document
+//     while silently discarding the caller's payload.
+//
+// ``params()`` is the correct method for POST/PUT request data — it writes the
+// ``params`` key, which IS in the contract and IS read.
+//
+// Python asserts absence with ``not hasattr(DataMap, "body")``. The C++ analog
+// of ``hasattr`` is compile-time detection: this SFINAE probe is well-formed
+// only while ``DataMap::body(const json&)`` is callable, so the trait is the
+// exact static mirror of the reference's runtime assertion.
+template <typename T, typename = void>
+struct sw_datamap_has_body : std::false_type {};
+
+template <typename T>
+struct sw_datamap_has_body<
+    T, std::void_t<decltype(std::declval<T&>().body(std::declval<const json&>()))>>
+    : std::true_type {};
+
+TEST(datamap_body_builder_is_gone) {
+    // DataMap::body() must be removed — it writes a schema-forbidden key that no
+    // engine reader consumes; use params() instead.
+    ASSERT_FALSE(sw_datamap_has_body<DataMap>::value);
     return true;
 }
 
 TEST(datamap_webhook_params) {
+    // params() writes the ``params`` webhook key — the one in the contract — and
+    // no ``body`` key rides along. Was joined by ``datamap_webhook_body``, which
+    // asserted the emitted document CONTAINED the schema-forbidden ``body`` key,
+    // pinning the defect as correct.
     DataMap dm("test");
-    dm.webhook("GET", "https://api.example.com/data");
-    dm.params(json::object({{"q", "${args.query}"}}));
+    dm.webhook("POST", "https://api.example.com/data");
+    dm.params(json::object({{"q", "${args.query}"}, {"query", "${args.search}"}}));
     auto j = dm.to_swaig_function();
-    ASSERT_TRUE(j["data_map"]["webhooks"][0].contains("params"));
-    return true;
-}
-
-TEST(datamap_body_requires_webhook) {
-    DataMap dm("test");
-    ASSERT_THROWS(dm.body(json::object({{"key", "value"}})));
+    const auto& wh = j["data_map"]["webhooks"][0];
+    ASSERT_EQ(wh["params"],
+              json::object({{"q", "${args.query}"}, {"query", "${args.search}"}}));
+    ASSERT_FALSE(wh.contains("body"));
     return true;
 }
 

@@ -83,10 +83,7 @@ class DataMap {
   /// Add expressions that run after the most recent webhook
   DataMap& webhook_expressions(const std::vector<json>& expressions);
 
-  /// Set request body for the last added webhook
-  DataMap& body(const json& data);
-
-  /// Set request params for the last added webhook (alias for body)
+  /// Set request params for the last added webhook (POST/PUT request data too)
   DataMap& params(const json& data);
 
   /// Set foreach configuration for the last webhook

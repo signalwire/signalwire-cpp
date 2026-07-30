@@ -1855,6 +1855,14 @@ def collect(
     # Signature-side twin of enumerate_surface's ``_project_builtin_skills``.
     _project_skill_accessors(out_modules)
 
+    # Built-in-skill SkillBase HOOK surface, same reason: the concrete skill
+    # classes are .cpp-only, so libclang never sees the hooks they define or
+    # inherit. porting-sdk 8496c77 made all 18 skill modules visible to the
+    # signature oracle, which is contract this enumerator must project rather
+    # than excuse. Emits the C++ SkillBase's OWN walked signatures, so it must
+    # run AFTER the header walk has populated signalwire.core.skill_base.
+    _project_builtin_skill_hooks(out_modules)
+
     # AI-Chat signature fold: the Python reference records the whole AI-Chat
     # surface in ONE module (signalwire.ai_chat.client) with kwargs-exploded
     # method params; the C++ port splits it across ai_chat_client.hpp /
@@ -2902,6 +2910,138 @@ def _project_skill_accessors(out_modules: dict) -> None:
                     "returns": "list<string>",
                 },
             )
+
+
+# ---------------------------------------------------------------------------
+# Built-in-skill HOOK projection (the signature-side twin of
+# enumerate_surface's ``_project_builtin_skills``)
+# ---------------------------------------------------------------------------
+# Until 2026-07-30 the SIGNATURE oracle recorded only 7 of the 18 builtin skill
+# modules: ``enumerate_python_signatures`` dropped every base-identical override,
+# which emptied a skill class's ``methods_out`` and deleted the CLASS — and with
+# it the module. porting-sdk 8496c77 fixed that (class survival is now the
+# invariant), so all 18 skill modules are visible and each skill's SkillBase hook
+# set (``setup``/``register_tools``/``get_hints``/``get_global_data``/
+# ``get_prompt_sections``/``get_parameter_schema``/``get_instance_key``/
+# ``cleanup``) is recorded contract.
+#
+# This enumerator carried the matching stale assumption: it projected exactly ONE
+# skill member (``SpiderSkill.remove_xpaths``, above) on the premise that the
+# signature oracle recorded skill subclasses method-LESS. That premise is dead,
+# so the hooks now project generally.
+#
+# THE HOOKS ARE REAL C++ SURFACE, NOT INVENTED. Every C++ builtin skill derives
+# from ``signalwire::skills::SkillBase``, whose hooks are virtual with real
+# bodies (``get_hints``/``get_global_data``/``get_prompt_sections``/
+# ``get_parameter_schema``/``get_instance_key``/``cleanup``) or pure-virtual and
+# overridden in each skill (``setup``/``register_tools``). A caller holding a
+# concrete skill can call all of them; libclang simply never sees the classes
+# because they live in ``src/skills/builtin/*.cpp`` implementation files that the
+# HEADER walk does not open.
+#
+# The emitted signature is the C++ ``SkillBase``'s OWN recorded signature for
+# that hook — read back out of ``out_modules`` after the header walk, never
+# hand-written — so the audit compares the port's genuine shape against the
+# reference. Nothing is flattened to a convenient shape to go green: of the eight
+# hooks, five (``get_hints``/``get_global_data``/``get_instance_key``/
+# ``cleanup``/``get_parameter_schema``) match the reference exactly and go
+# straight to zero drift.
+#
+# Three hooks do NOT go to zero, and that is the correct outcome rather than a
+# gap in this projection. ``setup`` (C++ takes the params json at attach time),
+# ``register_tools`` and ``get_prompt_sections`` (C++ RETURNS the typed payload
+# instead of calling back into the agent) genuinely diverge from the reference on
+# ``SkillBase`` ITSELF — a real, pre-existing C++ design divergence already
+# recorded once on the base in PORT_SIGNATURE_OMISSIONS
+# (``cpp_typed_overload_subset`` / ``cpp_typed_skill_pipeline``). PHP, which
+# absorbed the same oracle change with zero findings, implements the reference
+# shapes literally (``setup(self) -> bool``, ``register_tools() -> void``), so
+# this is C++'s divergence and not an artifact of the audit.
+#
+# They are projected ANYWAY, with their true C++ shape, so the audit reports what
+# actually diverges (``param-count-mismatch`` / ``return-mismatch``) rather than
+# the false ``missing-port`` that withholding them would produce — the methods
+# are real, present and callable; only their shape differs.
+#
+# Fail-honest, four ways:
+#   1. the skill's ``.cpp`` must exist and define the C++ class (the shared
+#      ``enumerate_surface._scan_skill_methods`` scan, same source of truth as
+#      the surface projection);
+#   2. the member must be one the C++ class genuinely has — own-defined or a
+#      real ``SkillBase`` hook it inherits;
+#   3. the reference oracle must record that member on that class (read LIVE from
+#      python_signatures.json, never from a hand-maintained list — the surface
+#      enumerator's ``py_methods`` lists are the SURFACE oracle's and are wider
+#      than the signature oracle's, so trusting them emitted four skills'
+#      hooks the signature reference does not record);
+#   4. ``SkillBase`` must genuinely carry that hook in the walked headers.
+# A member failing any of the four is dropped, never invented.
+_SKILL_BASE_ORACLE_KEY = "signalwire.core.skill_base"
+_SKILL_BASE_CPP_CLASS = "SkillBase"
+
+
+def _project_builtin_skill_hooks(out_modules: dict) -> None:
+    """Project each builtin skill's SkillBase hook surface into its Python-
+    canonical module, reusing the C++ ``SkillBase``'s own walked signatures."""
+    try:
+        from enumerate_surface import (  # type: ignore
+            SKILL_PROJECTIONS,
+            _SKILL_BASE_METHODS,
+            _scan_skill_methods,
+        )
+    except ImportError:  # pragma: no cover - enumerate_surface is a hard sibling
+        return
+
+    ref = _load_python_signatures()
+    ref_modules = ref.get("modules", {}) if ref else {}
+    if not ref_modules:
+        return  # no oracle to gate against -- emit nothing rather than guess
+
+    base_methods = (
+        out_modules.get(_SKILL_BASE_ORACLE_KEY, {})
+        .get("classes", {})
+        .get(_SKILL_BASE_CPP_CLASS, {})
+        .get("methods", {})
+    )
+    if not base_methods:
+        raise SystemExit(
+            "enumerate_signatures: builtin-skill hook projection found no walked "
+            f"{_SKILL_BASE_ORACLE_KEY}.{_SKILL_BASE_CPP_CLASS} signatures -- the "
+            "header walk changed; fix the projection rather than emitting a "
+            "hand-written shape"
+        )
+
+    defined = _scan_skill_methods(PORT_ROOT)
+    for cpp_cls, (module, py_cls, _py_methods) in SKILL_PROJECTIONS.items():
+        if cpp_cls not in defined:
+            continue  # skill not implemented in this tree -- don't invent it
+        ref_members = (
+            ref_modules.get(module, {})
+            .get("classes", {})
+            .get(py_cls, {})
+            .get("methods", {})
+        )
+        if not ref_members:
+            continue  # the signature oracle records nothing here -- nothing to fold
+        own = defined[cpp_cls]
+        mod_entry = out_modules.setdefault(module, {"classes": {}, "functions": {}})
+        cls_entry = mod_entry.setdefault("classes", {}).setdefault(
+            py_cls, {"methods": {}}
+        )
+        for member in sorted(ref_members):
+            # ``__init__`` and skill-specific helpers (``get_tools`` /
+            # ``search_wiki`` / ``remove_xpaths``) are NOT projected here: the
+            # ctor is a per-skill construction shape, and the helpers are covered
+            # by the accessor projection above.
+            if member not in _SKILL_BASE_METHODS:
+                continue
+            # The C++ class must genuinely have it: own-defined, or inherited.
+            if member not in own and member not in _SKILL_BASE_METHODS:
+                continue
+            sig = base_methods.get(member)
+            if sig is None:
+                continue  # SkillBase lost the hook -- drop, never invent
+            cls_entry["methods"].setdefault(member, json.loads(json.dumps(sig)))
 
 
 def _project_gen_payload_getters(out_modules: dict) -> None:

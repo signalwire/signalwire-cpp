@@ -6317,6 +6317,12 @@
                   "type": "optional<string>",
                   "required": false,
                   "default": null
+                },
+                {
+                  "name": "request",
+                  "type": "optional<any>",
+                  "required": false,
+                  "default": null
                 }
               ],
               "returns": "optional<any>"
@@ -9418,6 +9424,12 @@
                 {
                   "name": "callback_path",
                   "type": "optional<string>",
+                  "required": false,
+                  "default": null
+                },
+                {
+                  "name": "request",
+                  "type": "optional<any>",
                   "required": false,
                   "default": null
                 }
@@ -15345,7 +15357,7 @@
                 },
                 {
                   "name": "request_data",
-                  "type": "any",
+                  "type": "optional<any>",
                   "required": false,
                   "default": null
                 },
@@ -15357,12 +15369,12 @@
                 },
                 {
                   "name": "request",
-                  "type": "any",
+                  "type": "optional<any>",
                   "required": false,
                   "default": null
                 }
               ],
-              "returns": "any"
+              "returns": "optional<any>"
             },
             "set_completion_message": {
               "params": [

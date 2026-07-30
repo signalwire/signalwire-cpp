@@ -66,6 +66,16 @@ if not PSDK.is_dir():
 sys.path.insert(0, str(PSDK / "test_harness" / "mock_signalwire"))
 from mock_signalwire.specs import SpecLoader  # type: ignore  # noqa: E402
 
+# The generated tests must be clang-format-clean AT EMIT. Otherwise GEN-FRESH-TESTS
+# (byte-compares a fresh regen against the tree) and the FMT gate (--check) are
+# MUTUALLY EXCLUSIVE and one of them is always red -- AGENT_RULES §5. We use the
+# real clang-format rather than the pure-python subset in format_generated_cpp:
+# that subset targets DECLARATIONS and mis-wraps the `(void)(...)` cast these
+# templates emit (it breaks the line after the opening paren). Shelling out to the
+# same binary the FMT gate runs makes agreement true by construction.
+sys.path.insert(0, str(HERE))
+from _cpp_fmt import clang_format_source  # type: ignore  # noqa: E402
+
 TESTS_DIR = PORT_ROOT / "tests"
 GEN_PREFIX = "test_rest_generated_"
 
@@ -252,7 +262,9 @@ def generate(plan: dict, routes: list) -> dict[str, str]:
                 ERROR_TMPL.format(test_name=f"{base}_err", endpoint=endpoint, call=call)
             )
         fname = f"{GEN_PREFIX}{ns.replace('-', '_')}.cpp"
-        out[fname] = "".join(parts)
+        out[fname] = clang_format_source(
+            "".join(parts), assume_filename=f"tests/{fname}"
+        )
     return out
 
 

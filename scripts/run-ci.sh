@@ -543,6 +543,20 @@ run_gate "SURFACE" "surface parity suite (SIGNATURES/DRIFT/SURFACE-FRESH/SURFACE
 run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 85)" \
     python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 85
 
+# SIGNATURES-FRESH: the committed port_signatures.json must match a fresh regen.
+# Nothing previously guarded it — SURFACE-FRESH covers only port_surface.json.
+# That artifact is DRIFT's INPUT, so a stale one means the parity gate compares
+# against a fiction and reports clean while real drift hides behind it.
+#
+# STANDALONE, deliberately not a _surface_commands.py table entry: only 8 of the
+# 10 run-ci scripts read that table, so a table entry would be silently skipped
+# in the two that do not. cpp schedules serially via run_gate rather than the DAG
+# scheduler, so this is the run_gate form of the other ports' sched_gate line.
+# Placed after SURFACE because it regenerates the same artifacts that gate reads.
+run_gate "SIGNATURES-FRESH" "committed port_signatures.json matches a fresh regen" \
+    python3 "$PORTING_SDK_DIR/scripts/suites/_signatures_fresh.py" \
+        --port cpp --repo "$PORT_ROOT" --porting-sdk "$PORTING_SDK_DIR"
+
 # GEN (regen-from-specs family): GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS.
 # GEN-FRESH-TESTS reuses cpp's route_registry binary via the suite's cpp branch.
 run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS)" \

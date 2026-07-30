@@ -206,10 +206,13 @@ from enumerate_surface import (  # type: ignore
     CLASS_RENAME_MAP,
     FREE_FUNCTION_RENAMES,
     MIXIN_PROJECTIONS,
+    SKILL_SOURCE_DIR,
     _METHOD_RENAMES,
     camel_to_snake,
     module_for_class,
     native_ns_to_module,
+    strip_block_comments,
+    strip_line_comments,
 )
 
 # Methods whose canonical name should resolve to the OVERLOAD WITH THE MOST
@@ -2976,13 +2979,147 @@ def _project_skill_accessors(out_modules: dict) -> None:
 #      hooks the signature reference does not record);
 #   4. ``SkillBase`` must genuinely carry that hook in the walked headers.
 # A member failing any of the four is dropped, never invented.
+#
+# ---------------------------------------------------------------------------
+# INHERITED-DIVERGENCE FOLD (the per-subclass repetition of a base-level fact)
+# ---------------------------------------------------------------------------
+# Projecting the base's true C++ shape onto all 18 subclasses made the audit
+# report the SAME THREE divergences 31 more times — once per concrete skill that
+# inherits ``setup`` / ``register_tools`` / ``get_prompt_sections``. Those three
+# are one C++ design decision taken ONCE on ``SkillBase`` and already described
+# exactly once in PORT_SIGNATURE_OMISSIONS (``cpp_typed_overload_subset`` /
+# ``cpp_typed_skill_pipeline``). A subclass that merely inherits it is not a
+# second divergence; re-reporting it per-subclass is the audit counting one fact
+# 31 times, which is idiom repetition, and idiom folds at the emitter (RULES §2).
+#
+# So: when a concrete skill's override is SIGNATURE-IDENTICAL to the hook
+# ``SkillBase`` declares, the subclass adds no divergence of its own, and the
+# projected member is emitted in the REFERENCE's shape — the base keeps the one
+# recorded description of the difference, and the subclass compares equal.
+#
+# THE FOLD CANNOT HIDE A GENUINE MEMBER. It is gated on the C++ SOURCE, not on a
+# hand-kept list: ``_scan_skill_hook_decls`` reads each skill's own ``.cpp`` and
+# ``SkillBase``'s header and compares the NORMALIZED DECLARATION TEXT (return
+# type, parameter list, const-qualifier). A skill whose override diverges from
+# the base in ANY of those — a different return type, an extra/renamed/retyped
+# parameter, a dropped ``const`` — does NOT match, is emitted with the true C++
+# ``SkillBase``-walked signature instead, and surfaces as drift exactly as it
+# does today. Likewise a hook the base does not declare, or a skill whose source
+# the scan cannot read, never folds. (Negative control: perturbing one skill's
+# override in the source re-reds the gate — see the commit message.)
+#
+# Only the base-divergent hooks are foldable. The five hooks that already match
+# the reference (``get_hints`` / ``get_global_data`` / ``get_instance_key`` /
+# ``cleanup`` / ``get_parameter_schema``) need no fold and are excluded, so the
+# fold is scoped to the divergence it describes rather than blanketing the hook
+# set.
 _SKILL_BASE_ORACLE_KEY = "signalwire.core.skill_base"
 _SKILL_BASE_CPP_CLASS = "SkillBase"
+_SKILL_BASE_HEADER = "include/signalwire/skills/skill_base.hpp"
+
+# The hooks whose C++ shape diverges from the reference ON ``SkillBase`` ITSELF,
+# recorded once each in PORT_SIGNATURE_OMISSIONS. These — and only these — are
+# the members whose per-subclass repetition is folded. Keep this in step with
+# the base entries: a hook listed here MUST be excused on ``SkillBase``, or the
+# fold would be hiding a divergence nothing describes. ``_project_builtin_skill_hooks``
+# enforces that at runtime against PORT_SIGNATURE_OMISSIONS.
+_SKILL_BASE_DIVERGENT_HOOKS = {
+    "setup",  # cpp_typed_overload_subset: C++ takes the params json
+    "register_tools",  # cpp_typed_skill_pipeline: C++ returns the typed payload
+    "get_prompt_sections",  # cpp_typed_skill_pipeline: ditto
+}
+
+
+def _normalize_decl(text: str) -> str:
+    """Collapse a C++ declarator to comparable text (whitespace-insensitive)."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _scan_skill_hook_decls(
+    repo: Path,
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """Read the C++ SOURCE and return the normalized declaration text for each
+    base hook, on ``SkillBase`` and on every builtin skill that overrides it.
+
+    Returns ``(base_decls, per_skill_decls)`` where ``base_decls`` maps
+    ``hook -> "<ret> <name>(<params>)[ const]"`` for ``SkillBase``, and
+    ``per_skill_decls`` maps ``cpp_class -> {hook: same-shaped text}``. A hook a
+    skill does not override is simply absent (it inherits, so its shape IS the
+    base's).
+
+    This is the fold's gate: a subclass folds only when its text equals the
+    base's. Anything the scan cannot read yields no entry and therefore no fold.
+    """
+    hooks = "|".join(sorted(_SKILL_BASE_DIVERGENT_HOOKS))
+    # ``<return type> <hook>(<params>) [const] [override] {`` or ``... = 0;``
+    decl_re = re.compile(
+        r"(?:\[\[nodiscard\]\]\s*)?(?:virtual\s+)?"
+        r"([A-Za-z_][\w:<>,\s*&]*?)\s+"
+        r"\b(" + hooks + r")\s*"
+        r"\(([^;{]*?)\)\s*"
+        r"(const\b)?\s*"
+        r"(?:override\b\s*)?(?:noexcept\b\s*)?(?:=\s*0\s*;|\{)"
+    )
+
+    def _decls(text: str) -> tuple[dict[str, str], str]:
+        text = strip_block_comments(text)
+        text = "\n".join(strip_line_comments(ln) for ln in text.splitlines())
+        out: dict[str, str] = {}
+        for ret, name, params, is_const in decl_re.findall(text):
+            out.setdefault(
+                name,
+                _normalize_decl(f"{ret} {name}({params}) {is_const}"),
+            )
+        return out, text
+
+    base_path = repo / _SKILL_BASE_HEADER
+    base_decls: dict[str, str] = {}
+    if base_path.is_file():
+        base_decls, _ = _decls(base_path.read_text(encoding="utf-8"))
+
+    per_skill: dict[str, dict[str, str]] = {}
+    src = repo / SKILL_SOURCE_DIR
+    if src.is_dir():
+        class_re = re.compile(r"\bclass\s+([A-Za-z_]\w*Skill)\b")
+        for cpp in sorted(src.glob("*.cpp")):
+            decls, stripped = _decls(cpp.read_text(encoding="utf-8"))
+            for cls in class_re.findall(stripped):
+                per_skill.setdefault(cls, {}).update(decls)
+    return base_decls, per_skill
+
+
+def _skill_base_divergences_are_recorded() -> set[str]:
+    """Return the subset of ``_SKILL_BASE_DIVERGENT_HOOKS`` that the port's
+    PORT_SIGNATURE_OMISSIONS genuinely excuses on ``SkillBase``.
+
+    The fold's premise is that the divergence is described exactly ONCE, on the
+    base. If an entry is ever deleted, the fold must stop folding that hook —
+    otherwise the subclasses would silently absorb a difference nothing records.
+    Read the ledger, never assume it.
+    """
+    doc = PORT_ROOT / "PORT_SIGNATURE_OMISSIONS.md"
+    if not doc.is_file():
+        return set()
+    text = doc.read_text(encoding="utf-8")
+    recorded = set()
+    for hook in _SKILL_BASE_DIVERGENT_HOOKS:
+        if re.search(
+            r"^\s*signalwire\.core\.skill_base\.SkillBase\."
+            + re.escape(hook)
+            + r"\s*:",
+            text,
+            re.MULTILINE,
+        ):
+            recorded.add(hook)
+    return recorded
 
 
 def _project_builtin_skill_hooks(out_modules: dict) -> None:
     """Project each builtin skill's SkillBase hook surface into its Python-
-    canonical module, reusing the C++ ``SkillBase``'s own walked signatures."""
+    canonical module, reusing the C++ ``SkillBase``'s own walked signatures —
+    except for the three hooks whose divergence is a BASE-level fact already
+    recorded once, where a signature-identical override folds to the reference
+    shape (see the block comment above)."""
     try:
         from enumerate_surface import (  # type: ignore
             SKILL_PROJECTIONS,
@@ -3010,6 +3147,15 @@ def _project_builtin_skill_hooks(out_modules: dict) -> None:
             "header walk changed; fix the projection rather than emitting a "
             "hand-written shape"
         )
+
+    base_decls, skill_decls = _scan_skill_hook_decls(PORT_ROOT)
+    if not base_decls:
+        raise SystemExit(
+            "enumerate_signatures: could not read the SkillBase hook declarations "
+            f"from {_SKILL_BASE_HEADER} -- the inherited-divergence fold is gated "
+            "on that source text; fix the scan rather than folding blind"
+        )
+    foldable = _SKILL_BASE_DIVERGENT_HOOKS & _skill_base_divergences_are_recorded()
 
     defined = _scan_skill_methods(PORT_ROOT)
     for cpp_cls, (module, py_cls, _py_methods) in SKILL_PROJECTIONS.items():
@@ -3041,6 +3187,18 @@ def _project_builtin_skill_hooks(out_modules: dict) -> None:
             sig = base_methods.get(member)
             if sig is None:
                 continue  # SkillBase lost the hook -- drop, never invent
+            # INHERITED-DIVERGENCE FOLD. Only for a hook whose base-level
+            # divergence the ledger genuinely records, and only when this
+            # skill's own C++ declaration is byte-equal (modulo whitespace) to
+            # the one SkillBase declares. Anything else keeps the true C++
+            # shape and stays visible to the audit.
+            if member in foldable:
+                base_text = base_decls.get(member)
+                own_text = skill_decls.get(cpp_cls, {}).get(member, base_text)
+                if base_text is not None and own_text == base_text:
+                    ref_sig = ref_members.get(member)
+                    if ref_sig is not None:
+                        sig = ref_sig
             cls_entry["methods"].setdefault(member, json.loads(json.dumps(sig)))
 
 

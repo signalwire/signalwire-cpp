@@ -29896,18 +29896,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -29972,7 +29967,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -29981,18 +29976,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30048,7 +30038,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30057,18 +30047,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30106,7 +30091,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30115,18 +30100,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30164,7 +30144,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30173,18 +30153,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30231,18 +30206,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30289,7 +30259,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30298,18 +30268,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30347,7 +30312,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30356,18 +30321,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30432,7 +30392,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30441,18 +30401,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30664,7 +30619,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30673,18 +30628,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"
@@ -30747,7 +30697,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.skill_prompt_section.SkillPromptSection>"
+              "returns": "list<dict<string,any>>"
             },
             "register_tools": {
               "params": [
@@ -30756,18 +30706,13 @@
                   "kind": "self"
                 }
               ],
-              "returns": "list<class:signalwire.core.swaig_function.ToolDefinition>"
+              "returns": "void"
             },
             "setup": {
               "params": [
                 {
                   "name": "self",
                   "kind": "self"
-                },
-                {
-                  "name": "params",
-                  "type": "any",
-                  "required": true
                 }
               ],
               "returns": "bool"

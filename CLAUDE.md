@@ -182,8 +182,10 @@ ctx.add_step("step1")
 
 - Library is built as a shared library `libsignalwire` (CMake `add_library(signalwire SHARED)`)
 - No package manager required; all deps vendored
-- CPPHTTPLIB_OPENSSL_SUPPORT is disabled (requires OpenSSL 3.0+)
-- SSL for httplib handled externally; crypto primitives use OpenSSL directly
+- CPPHTTPLIB_OPENSSL_SUPPORT is **enabled** (`CMakeLists.txt:116`) — build with an
+  OpenSSL 3.0+ toolchain (1.1.1 is EOL). It gives `httplib::Client` `https://` for
+  REST and `httplib::SSLServer` for the webhook server (in-process TLS termination).
+- Crypto primitives (HMAC-SHA256, random bytes) use OpenSSL directly
 - RELAY client: IXWebSocket-backed transport implemented (src/relay/websocket.cpp, client.cpp) — Blade/JSON-RPC session + real frame I/O
 - C wrapper (`signalwire_c.h`) provides FFI for other languages
 - Examples are standalone `.cpp` files meant to illustrate usage, not built by CMake

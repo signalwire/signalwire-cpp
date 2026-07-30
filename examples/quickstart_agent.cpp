@@ -7,6 +7,7 @@
 
 // region: agent
 #include <ctime>
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -30,7 +31,14 @@ class MyAgent : public agent::AgentBase {
 };
 
 int main() {
-  MyAgent agent;
-  agent.run();  // Serves on http://0.0.0.0:3000/agent
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    MyAgent agent;
+    agent.run();  // Serves on http://0.0.0.0:3000/agent
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 // endregion: agent

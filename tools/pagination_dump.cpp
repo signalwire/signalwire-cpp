@@ -225,11 +225,18 @@ json classify(const Fixture& f) {
 }  // namespace
 
 int main() {
-  signalwire::Logger::instance().suppress();
-  json out = json::object();
-  for (const auto& f : corpus()) {
-    out[f.id] = classify(f);
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    signalwire::Logger::instance().suppress();
+    json out = json::object();
+    for (const auto& f : corpus()) {
+      out[f.id] = classify(f);
+    }
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-  std::cout << out.dump() << "\n";
-  return 0;
 }

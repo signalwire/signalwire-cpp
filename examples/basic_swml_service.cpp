@@ -58,25 +58,32 @@ static void build_transfer(swml::Service& svc) {
 }
 
 int main() {
-  swml::Service svc;
-  svc.set_name("basic-swml").set_route("/swml");
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    swml::Service svc;
+    svc.set_name("basic-swml").set_route("/swml");
 
-  const char* flow = std::getenv("FLOW");
-  std::string which = flow ? flow : "voicemail";
-  if (which == "ivr") {
-    build_ivr(svc);
-  } else if (which == "transfer") {
-    build_transfer(svc);
-  } else {
-    build_voicemail(svc);
+    const char* flow = std::getenv("FLOW");
+    std::string which = flow ? flow : "voicemail";
+    if (which == "ivr") {
+      build_ivr(svc);
+    } else if (which == "transfer") {
+      build_transfer(svc);
+    } else {
+      build_voicemail(svc);
+    }
+
+    std::cout << "Basic SWMLService — flow: " << which << "\n";
+    std::cout << "  URL:  http://0.0.0.0:" << svc.port() << svc.route() << "\n";
+    std::cout << "  Auth: set SWML_BASIC_AUTH_USER / SWML_BASIC_AUTH_PASSWORD,\n"
+              << "        or watch the [INFO] log line for auto-generated creds.\n\n";
+    std::cout << "Document:\n" << svc.render_swml().dump(2) << "\n\n";
+
+    svc.serve();
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  std::cout << "Basic SWMLService — flow: " << which << "\n";
-  std::cout << "  URL:  http://0.0.0.0:" << svc.port() << svc.route() << "\n";
-  std::cout << "  Auth: set SWML_BASIC_AUTH_USER / SWML_BASIC_AUTH_PASSWORD,\n"
-            << "        or watch the [INFO] log line for auto-generated creds.\n\n";
-  std::cout << "Document:\n" << svc.render_swml().dump(2) << "\n\n";
-
-  svc.serve();
-  return 0;
 }

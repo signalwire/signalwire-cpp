@@ -45,14 +45,21 @@ std::string required(const char* name) {
 }  // namespace
 
 int main() {
-  const std::string secret_key = required("SW_TOKEN_INTEROP_SECRET_KEY");
-  const std::string call_id = required("SW_TOKEN_INTEROP_CALL_ID");
-  const std::string function_name = required("SW_TOKEN_INTEROP_FUNCTION_NAME");
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    const std::string secret_key = required("SW_TOKEN_INTEROP_SECRET_KEY");
+    const std::string call_id = required("SW_TOKEN_INTEROP_CALL_ID");
+    const std::string function_name = required("SW_TOKEN_INTEROP_FUNCTION_NAME");
 
-  // Default expiry — the token must carry a FUTURE expiry, which the checker
-  // verifies. The (int, const std::string&) constructor takes the reference's
-  // ``secret_key`` STRING, whose bytes key the HMAC (NOT 32 raw bytes).
-  const signalwire::security::SessionManager manager(900, secret_key);
-  std::cout << manager.generate_token(function_name, call_id) << '\n';
-  return 0;
+    // Default expiry — the token must carry a FUTURE expiry, which the checker
+    // verifies. The (int, const std::string&) constructor takes the reference's
+    // ``secret_key`` STRING, whose bytes key the HMAC (NOT 32 raw bytes).
+    const signalwire::security::SessionManager manager(900, secret_key);
+    std::cout << manager.generate_token(function_name, call_id) << '\n';
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -235,218 +235,225 @@ void decode_events(json& out) {
 }  // namespace
 
 int main() {
-  if (!std::getenv("RELAY_DUMP_DEBUG")) {
-    signalwire::Logger::instance().suppress();
-  }
-  ix::initNetSystem();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    if (!std::getenv("RELAY_DUMP_DEBUG")) {
+      signalwire::Logger::instance().suppress();
+    }
+    ix::initNetSystem();
 
-  auto mock = std::make_shared<MockRelay>();
+    auto mock = std::make_shared<MockRelay>();
 
-  // Bind the mock WS server on a self-picked free loopback port.
-  int port = pick_free_port();
-  if (port == 0) {
-    std::cerr << "wire-relay-dump: could not pick a free port\n";
-    return 1;
-  }
-  ix::WebSocketServer server(port, "127.0.0.1");
-  server.setOnClientMessageCallback(
-      [mock, &server](const std::shared_ptr<ix::ConnectionState>& /*state*/, ix::WebSocket& ws,
-                      const ix::WebSocketMessagePtr& msg) {
-        if (msg->type == ix::WebSocketMessageType::Open) {
-          if (std::getenv("RELAY_DUMP_DEBUG")) {
-            std::cerr << "[mock] client opened\n";
-          }
-          // Track this client so the mock can push server-initiated events.
-          for (auto& client : server.getClients()) {
-            if (client.get() == &ws) {
-              mock->register_client(client);
-              break;
+    // Bind the mock WS server on a self-picked free loopback port.
+    int port = pick_free_port();
+    if (port == 0) {
+      std::cerr << "wire-relay-dump: could not pick a free port\n";
+      return 1;
+    }
+    ix::WebSocketServer server(port, "127.0.0.1");
+    server.setOnClientMessageCallback(
+        [mock, &server](const std::shared_ptr<ix::ConnectionState>& /*state*/, ix::WebSocket& ws,
+                        const ix::WebSocketMessagePtr& msg) {
+          if (msg->type == ix::WebSocketMessageType::Open) {
+            if (std::getenv("RELAY_DUMP_DEBUG")) {
+              std::cerr << "[mock] client opened\n";
+            }
+            // Track this client so the mock can push server-initiated events.
+            for (auto& client : server.getClients()) {
+              if (client.get() == &ws) {
+                mock->register_client(client);
+                break;
+              }
+            }
+          } else if (msg->type == ix::WebSocketMessageType::Message) {
+            if (std::getenv("RELAY_DUMP_DEBUG")) {
+              std::cerr << "[mock] recv: " << msg->str.substr(0, 120) << "\n";
+            }
+            mock->on_message(ws, msg->str);
+          } else if (msg->type == ix::WebSocketMessageType::Error) {
+            if (std::getenv("RELAY_DUMP_DEBUG")) {
+              std::cerr << "[mock] error: " << msg->errorInfo.reason << "\n";
             }
           }
-        } else if (msg->type == ix::WebSocketMessageType::Message) {
-          if (std::getenv("RELAY_DUMP_DEBUG")) {
-            std::cerr << "[mock] recv: " << msg->str.substr(0, 120) << "\n";
-          }
-          mock->on_message(ws, msg->str);
-        } else if (msg->type == ix::WebSocketMessageType::Error) {
-          if (std::getenv("RELAY_DUMP_DEBUG")) {
-            std::cerr << "[mock] error: " << msg->errorInfo.reason << "\n";
-          }
-        }
-      });
+        });
 
-  server.disablePerMessageDeflate();
-  auto res = server.listen();
-  if (!res.first) {
-    std::cerr << "wire-relay-dump: listen failed: " << res.second << "\n";
-    return 1;
-  }
-  server.start();
-  // Give the accept loop a moment to come up before the client dials in.
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  if (std::getenv("RELAY_DUMP_DEBUG")) {
-    std::cerr << "[mock] listening on port " << port << "\n";
-  }
+    server.disablePerMessageDeflate();
+    auto res = server.listen();
+    if (!res.first) {
+      std::cerr << "wire-relay-dump: listen failed: " << res.second << "\n";
+      return 1;
+    }
+    server.start();
+    // Give the accept loop a moment to come up before the client dials in.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (std::getenv("RELAY_DUMP_DEBUG")) {
+      std::cerr << "[mock] listening on port " << port << "\n";
+    }
 
-  // Point the client at the mock over plain ws://.
-  ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);
-  std::string host = std::string("127.0.0.1:") + std::to_string(port);
+    // Point the client at the mock over plain ws://.
+    ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1);
+    std::string host = std::string("127.0.0.1:") + std::to_string(port);
 
-  json out = json::object();
-  decode_events(out);
+    json out = json::object();
+    decode_events(out);
 
-  relay::RelayClient client("proj-1", "tok-1", host, {"default"});
-  if (!client.connect()) {
-    std::cerr << "wire-relay-dump: client connect failed\n";
-    server.stop();
-    return 1;
-  }
+    relay::RelayClient client("proj-1", "tok-1", host, {"default"});
+    if (!client.connect()) {
+      std::cerr << "wire-relay-dump: client connect failed\n";
+      server.stop();
+      return 1;
+    }
 
-  // Build a Call bound to the client to drive the verb cases directly (the
-  // corpus verbs are pure frame builders — an inbound call is not required to
-  // observe the frame they send).
-  relay::Call call(kCall, kNode, &client);
+    // Build a Call bound to the client to drive the verb cases directly (the
+    // corpus verbs are pure frame builders — an inbound call is not required to
+    // observe the frame they send).
+    relay::Call call(kCall, kNode, &client);
 
-  // relay_play
-  call.play(json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 5.0,
-            kCid);
-  settle();
-  out["relay_play"] = frame("calling.play", mock->last_frame("calling.play"));
-
-  // relay_play_tts — play_tts(text, language, gender, voice, volume); the corpus
-  // sets voice, so pass it as the 4th positional (gender stays empty).
-  call.play_tts("Hello world", "", "", "en-US-Neural");
-  settle();
-  out["relay_play_tts"] = frame("calling.play", mock->last_frame("calling.play"));
-
-  // relay_record
-  call.record(json{{"audio", {{"format", "mp3"}, {"beep", true}}}}, kCid);
-  settle();
-  out["relay_record"] = frame("calling.record", mock->last_frame("calling.record"));
-
-  // relay_connect
-  call.connect(
-      json::array(
-          {json::array({{{"type", "phone"}, {"params", {{"to_number", "+15551112222"}}}}})}),
-      json{{"ringback", json::array({{{"type", "ringtone"}, {"params", {{"name", "us"}}}}})},
-           {"tag", "leg-1"},
-           {"max_duration", 3600}});
-  settle();
-  out["relay_connect"] = frame("calling.connect", mock->last_frame("calling.connect"));
-
-  // relay_collect
-  call.collect(json{{"digits", {{"max", 4}, {"terminators", "#"}}},
-                    {"speech", {{"language", "en-US"}}},
-                    {"initial_timeout", 5.0},
-                    {"partial_results", true}},
-               kCid);
-  settle();
-  out["relay_collect"] = frame("calling.collect", mock->last_frame("calling.collect"));
-
-  // relay_prompt (play_and_collect) — prompt_tts(text, collect, language, gender,
-  // voice, volume); pass voice as the 5th positional (gender empty).
-  call.prompt_tts("Enter your PIN", json{{"digits", {{"max", 4}}}}, "", "", "en-US-Neural");
-  settle();
-  out["relay_prompt"] =
-      frame("calling.play_and_collect", mock->last_frame("calling.play_and_collect"));
-
-  // relay_detect — detect(params, control_id) merges params into the frame; the
-  // detect descriptor is nested under "detect" with a sibling top-level timeout.
-  call.detect(json{{"detect", {{"type", "machine"}, {"params", {{"initial_timeout", 4.0}}}}},
-                   {"timeout", 30.0}},
+    // relay_play
+    call.play(json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 5.0,
               kCid);
-  settle();
-  out["relay_detect"] = frame("calling.detect", mock->last_frame("calling.detect"));
-
-  // relay_detect_amd
-  call.detect_answering_machine(json{{"initial_timeout", 4.0}, {"machine_words_threshold", 6}},
-                                30.0);
-  settle();
-  out["relay_detect_amd"] = frame("calling.detect", mock->last_frame("calling.detect"));
-
-  // relay_tap
-  call.tap(json{{"tap", {{"type", "audio"}, {"params", {{"direction", "both"}}}}},
-                {"device", {{"type", "ws"}, {"params", {{"uri", "wss://x/tap"}}}}}},
-           kCid);
-  settle();
-  out["relay_tap"] = frame("calling.tap", mock->last_frame("calling.tap"));
-
-  // relay_send_fax
-  call.send_fax("https://x/doc.pdf", "Hdr", "+15550001111", kCid);
-  settle();
-  out["relay_send_fax"] = frame("calling.send_fax", mock->last_frame("calling.send_fax"));
-
-  // relay_live_transcribe — the caller's action descriptor MUST be wrapped as
-  // params.action on the wire (schema requires it); this pins that shape.
-  call.live_transcribe(json{{"start", {{"lang", "en"}}}});
-  settle();
-  out["relay_live_transcribe"] =
-      frame("calling.live_transcribe", mock->last_frame("calling.live_transcribe"));
-
-  // relay_live_translate — same action-wrap contract, plus the optional
-  // sibling status_url param.
-  call.live_translate(json{{"start", {{"from_lang", "en"}, {"to_lang", "es"}}}}, "https://x/cb");
-  settle();
-  out["relay_live_translate"] =
-      frame("calling.live_translate", mock->last_frame("calling.live_translate"));
-
-  // ---- control-ops (Action methods) ----
-  {
-    auto pa = call.play(
-        json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
     settle();
-    pa.stop();
+    out["relay_play"] = frame("calling.play", mock->last_frame("calling.play"));
+
+    // relay_play_tts — play_tts(text, language, gender, voice, volume); the corpus
+    // sets voice, so pass it as the 4th positional (gender stays empty).
+    call.play_tts("Hello world", "", "", "en-US-Neural");
     settle();
-    out["relay_play_stop"] = frame("calling.play.stop", mock->last_frame("calling.play.stop"));
+    out["relay_play_tts"] = frame("calling.play", mock->last_frame("calling.play"));
+
+    // relay_record
+    call.record(json{{"audio", {{"format", "mp3"}, {"beep", true}}}}, kCid);
+    settle();
+    out["relay_record"] = frame("calling.record", mock->last_frame("calling.record"));
+
+    // relay_connect
+    call.connect(
+        json::array(
+            {json::array({{{"type", "phone"}, {"params", {{"to_number", "+15551112222"}}}}})}),
+        json{{"ringback", json::array({{{"type", "ringtone"}, {"params", {{"name", "us"}}}}})},
+             {"tag", "leg-1"},
+             {"max_duration", 3600}});
+    settle();
+    out["relay_connect"] = frame("calling.connect", mock->last_frame("calling.connect"));
+
+    // relay_collect
+    call.collect(json{{"digits", {{"max", 4}, {"terminators", "#"}}},
+                      {"speech", {{"language", "en-US"}}},
+                      {"initial_timeout", 5.0},
+                      {"partial_results", true}},
+                 kCid);
+    settle();
+    out["relay_collect"] = frame("calling.collect", mock->last_frame("calling.collect"));
+
+    // relay_prompt (play_and_collect) — prompt_tts(text, collect, language, gender,
+    // voice, volume); pass voice as the 5th positional (gender empty).
+    call.prompt_tts("Enter your PIN", json{{"digits", {{"max", 4}}}}, "", "", "en-US-Neural");
+    settle();
+    out["relay_prompt"] =
+        frame("calling.play_and_collect", mock->last_frame("calling.play_and_collect"));
+
+    // relay_detect — detect(params, control_id) merges params into the frame; the
+    // detect descriptor is nested under "detect" with a sibling top-level timeout.
+    call.detect(json{{"detect", {{"type", "machine"}, {"params", {{"initial_timeout", 4.0}}}}},
+                     {"timeout", 30.0}},
+                kCid);
+    settle();
+    out["relay_detect"] = frame("calling.detect", mock->last_frame("calling.detect"));
+
+    // relay_detect_amd
+    call.detect_answering_machine(json{{"initial_timeout", 4.0}, {"machine_words_threshold", 6}},
+                                  30.0);
+    settle();
+    out["relay_detect_amd"] = frame("calling.detect", mock->last_frame("calling.detect"));
+
+    // relay_tap
+    call.tap(json{{"tap", {{"type", "audio"}, {"params", {{"direction", "both"}}}}},
+                  {"device", {{"type", "ws"}, {"params", {{"uri", "wss://x/tap"}}}}}},
+             kCid);
+    settle();
+    out["relay_tap"] = frame("calling.tap", mock->last_frame("calling.tap"));
+
+    // relay_send_fax
+    call.send_fax("https://x/doc.pdf", "Hdr", "+15550001111", kCid);
+    settle();
+    out["relay_send_fax"] = frame("calling.send_fax", mock->last_frame("calling.send_fax"));
+
+    // relay_live_transcribe — the caller's action descriptor MUST be wrapped as
+    // params.action on the wire (schema requires it); this pins that shape.
+    call.live_transcribe(json{{"start", {{"lang", "en"}}}});
+    settle();
+    out["relay_live_transcribe"] =
+        frame("calling.live_transcribe", mock->last_frame("calling.live_transcribe"));
+
+    // relay_live_translate — same action-wrap contract, plus the optional
+    // sibling status_url param.
+    call.live_translate(json{{"start", {{"from_lang", "en"}, {"to_lang", "es"}}}}, "https://x/cb");
+    settle();
+    out["relay_live_translate"] =
+        frame("calling.live_translate", mock->last_frame("calling.live_translate"));
+
+    // ---- control-ops (Action methods) ----
+    {
+      auto pa = call.play(
+          json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
+      settle();
+      pa.stop();
+      settle();
+      out["relay_play_stop"] = frame("calling.play.stop", mock->last_frame("calling.play.stop"));
+    }
+    {
+      auto pa = call.play(
+          json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
+      settle();
+      pa.pause("silence");
+      settle();
+      out["relay_play_pause"] = frame("calling.play.pause", mock->last_frame("calling.play.pause"));
+    }
+    {
+      auto ra = call.record(json{{"audio", {{"format", "mp3"}}}}, kCid);
+      settle();
+      ra.resume();
+      settle();
+      out["relay_record_resume"] =
+          frame("calling.record.resume", mock->last_frame("calling.record.resume"));
+    }
+    {
+      auto pa = call.play(
+          json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
+      settle();
+      pa.volume(3.5);
+      settle();
+      out["relay_play_volume"] =
+          frame("calling.play.volume", mock->last_frame("calling.play.volume"));
+    }
+
+    // ---- RelayClient-level frames ----
+    // relay_client_execute
+    client.execute("calling.answer", json{{"node_id", kNode}, {"call_id", kCall}});
+    settle();
+    out["relay_client_execute"] = frame("calling.answer", mock->last_frame("calling.answer"));
+
+    // relay_send_message
+    client.send_message("+15553334444", "+15551112222", "hi", {}, {"t1"});
+    settle();
+    out["relay_send_message"] = frame("messaging.send", mock->last_frame("messaging.send"));
+
+    // relay_dial
+    client.dial(json::array({json::array(
+                    {{{"type", "phone"}, {"params", {{"to_number", "+15551112222"}}}}})}),
+                "dial-1", /*max_duration=*/600, /*dial_timeout=*/3.0);
+    settle();
+    out["relay_dial"] = frame("calling.dial", mock->last_frame("calling.dial"));
+
+    client.disconnect();
+    server.stop();
+    ix::uninitNetSystem();
+
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-  {
-    auto pa = call.play(
-        json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
-    settle();
-    pa.pause("silence");
-    settle();
-    out["relay_play_pause"] = frame("calling.play.pause", mock->last_frame("calling.play.pause"));
-  }
-  {
-    auto ra = call.record(json{{"audio", {{"format", "mp3"}}}}, kCid);
-    settle();
-    ra.resume();
-    settle();
-    out["relay_record_resume"] =
-        frame("calling.record.resume", mock->last_frame("calling.record.resume"));
-  }
-  {
-    auto pa = call.play(
-        json::array({{{"type", "audio"}, {"params", {{"url", "https://x/a.mp3"}}}}}), 0.0, kCid);
-    settle();
-    pa.volume(3.5);
-    settle();
-    out["relay_play_volume"] =
-        frame("calling.play.volume", mock->last_frame("calling.play.volume"));
-  }
-
-  // ---- RelayClient-level frames ----
-  // relay_client_execute
-  client.execute("calling.answer", json{{"node_id", kNode}, {"call_id", kCall}});
-  settle();
-  out["relay_client_execute"] = frame("calling.answer", mock->last_frame("calling.answer"));
-
-  // relay_send_message
-  client.send_message("+15553334444", "+15551112222", "hi", {}, {"t1"});
-  settle();
-  out["relay_send_message"] = frame("messaging.send", mock->last_frame("messaging.send"));
-
-  // relay_dial
-  client.dial(json::array({json::array(
-                  {{{"type", "phone"}, {"params", {{"to_number", "+15551112222"}}}}})}),
-              "dial-1", /*max_duration=*/600, /*dial_timeout=*/3.0);
-  settle();
-  out["relay_dial"] = frame("calling.dial", mock->last_frame("calling.dial"));
-
-  client.disconnect();
-  server.stop();
-  ix::uninitNetSystem();
-
-  std::cout << out.dump() << "\n";
-  return 0;
 }

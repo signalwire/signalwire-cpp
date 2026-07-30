@@ -67,13 +67,22 @@ class CaptureServer {
  public:
   CaptureServer() {
     auto handler = [this](const std::string& method) {
-      return [this, method](const httplib::Request& req, httplib::Response& res) {
-        {
-          std::lock_guard<std::mutex> lock(mutex_);
-          captured_.emplace_back(method, req.path);
+      // The body is wrapped in try/catch(...) below, so nothing actually
+      // escapes into httplib's worker thread; clang-tidy cannot see through the
+      // lambda boundary, hence the inline suppression on the capture list.
+      // Same shape and rationale as src/web/web_service.cpp:205.
+      return [this, method](  // NOLINT(bugprone-exception-escape)
+                 const httplib::Request& req, httplib::Response& res) {
+        try {
+          {
+            std::lock_guard<std::mutex> lock(mutex_);
+            captured_.emplace_back(method, req.path);
+          }
+          res.status = 200;
+          res.set_content("{}", "application/json");
+        } catch (...) {
+          res.status = 500;
         }
-        res.status = 200;
-        res.set_content("{}", "application/json");
       };
     };
     server_.Get(".*", handler("GET"));
@@ -522,44 +531,51 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
 }  // namespace
 
 int main() {
-  CaptureServer srv;
-  g_srv = &srv;
-  RestClient client = RestClient::with_base_url(srv.base_url(), SENTINEL, "tok");
-
-  std::vector<std::pair<std::string, std::string>> skipped;
-  json errors = json::array();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
   try {
-    skipped = invoke_all(client);
-  } catch (const std::exception& e) {
-    errors.push_back(std::string("invoke_all threw: ") + e.what());
-  }
+    CaptureServer srv;
+    g_srv = &srv;
+    RestClient client = RestClient::with_base_url(srv.base_url(), SENTINEL, "tok");
 
-  // Dedupe plan entries by (method, template); keep the first via/call for each.
-  json route_recs = json::array();
-  std::map<std::pair<std::string, std::string>, PlanEntry> uniq;
-  std::vector<std::pair<std::string, std::string>> order;
-  for (const auto& pe : g_plan) {
-    auto key = std::make_pair(pe.method, pe.path_template);
-    if (uniq.find(key) == uniq.end()) {
-      uniq[key] = pe;
-      order.push_back(key);
+    std::vector<std::pair<std::string, std::string>> skipped;
+    json errors = json::array();
+    try {
+      skipped = invoke_all(client);
+    } catch (const std::exception& e) {
+      errors.push_back(std::string("invoke_all threw: ") + e.what());
     }
-  }
-  std::sort(order.begin(), order.end());
-  for (const auto& key : order) {
-    const auto& pe = uniq[key];
-    route_recs.push_back({{"method", pe.method},
-                          {"path_template", pe.path_template},
-                          {"via", pe.via},
-                          {"call", pe.call}});
-  }
 
-  json skipped_recs = json::array();
-  for (const auto& kr : skipped) {
-    skipped_recs.push_back({{"key", kr.first}, {"reason", kr.second}});
-  }
+    // Dedupe plan entries by (method, template); keep the first via/call for each.
+    json route_recs = json::array();
+    std::map<std::pair<std::string, std::string>, PlanEntry> uniq;
+    std::vector<std::pair<std::string, std::string>> order;
+    for (const auto& pe : g_plan) {
+      auto key = std::make_pair(pe.method, pe.path_template);
+      if (uniq.find(key) == uniq.end()) {
+        uniq[key] = pe;
+        order.push_back(key);
+      }
+    }
+    std::sort(order.begin(), order.end());
+    for (const auto& key : order) {
+      const auto& pe = uniq[key];
+      route_recs.push_back({{"method", pe.method},
+                            {"path_template", pe.path_template},
+                            {"via", pe.via},
+                            {"call", pe.call}});
+    }
 
-  json out = {{"routes", route_recs}, {"skipped", skipped_recs}, {"errors", errors}};
-  std::cout << out.dump(2) << "\n";
-  return 0;
+    json skipped_recs = json::array();
+    for (const auto& kr : skipped) {
+      skipped_recs.push_back({{"key", kr.first}, {"reason", kr.second}});
+    }
+
+    json out = {{"routes", route_recs}, {"skipped", skipped_recs}, {"errors", errors}};
+    std::cout << out.dump(2) << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

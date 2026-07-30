@@ -62,78 +62,85 @@ std::vector<std::string> split_csv(const std::string& s) {
 }  // namespace
 
 int main() {
-  // Quiet logging so the audit's stdout/stderr capture stays small.
-  if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
-    ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
-  }
-
-  const std::string project = env_or("SIGNALWIRE_PROJECT_ID", "audit");
-  const std::string token = env_or("SIGNALWIRE_API_TOKEN", "audit");
-  const std::string host = env_or("SIGNALWIRE_RELAY_HOST", "127.0.0.1:0");
-  const auto contexts = split_csv(env_or("SIGNALWIRE_CONTEXTS", "audit_ctx"));
-
-  relay::RelayConfig cfg;
-  cfg.project = project;
-  cfg.token = token;
-  cfg.host = host;
-  cfg.contexts = contexts.empty() ? std::vector<std::string>{"audit_ctx"} : contexts;
-  relay::RelayClient client(cfg);
-
-  // Wire a generic event observer. The audit fixture pushes a single
-  // `signalwire.event` (event_type=calling.call.state, call_state=ringing);
-  // we flip the saw_event flag AND emit a `signalwire.event`-method
-  // frame back over the socket — that's the hook the porting-sdk
-  // fixture watches for to confirm dispatch happened (see
-  // audit_relay_handshake.py: `state.event_dispatched = True` branch).
-  std::atomic<bool> saw_event{false};
-  client.on_event([&](const relay::RelayEvent& ev) {
-    saw_event.store(true);
-    try {
-      client.send_raw_request("signalwire.event", json{
-                                                      {"dispatched", true},
-                                                      {"event_type", ev.event_type},
-                                                      {"echoed", ev.params},
-                                                  });
-    } catch (...) {
-      // Audit only needs the saw_event flag; failure to ack is fine.
-    }
-  });
-
-  if (!client.connect()) {
-    std::cerr << "relay_audit_harness: connect failed\n";
-    return 1;
-  }
-
-  // Explicit signalwire.subscribe so the audit fixture sees the method
-  // name (its watcher only marks subscribe_seen on a literal
-  // `signalwire.subscribe` frame).
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
   try {
-    client.send_raw_request("signalwire.subscribe", json{{"contexts", cfg.contexts}});
-  } catch (const std::exception& e) {
-    std::cerr << "relay_audit_harness: subscribe failed: " << e.what() << "\n";
-    return 1;
-  }
-
-  // Wait up to 5 seconds for an inbound event.
-  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-  while (std::chrono::steady_clock::now() < deadline) {
-    if (saw_event.load()) {
-      break;
+    // Quiet logging so the audit's stdout/stderr capture stays small.
+    if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
+      ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  }
 
-  bool got = saw_event.load();
+    const std::string project = env_or("SIGNALWIRE_PROJECT_ID", "audit");
+    const std::string token = env_or("SIGNALWIRE_API_TOKEN", "audit");
+    const std::string host = env_or("SIGNALWIRE_RELAY_HOST", "127.0.0.1:0");
+    const auto contexts = split_csv(env_or("SIGNALWIRE_CONTEXTS", "audit_ctx"));
 
-  // Give the writer a moment to flush the ack frame before we close.
-  std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  client.disconnect();
+    relay::RelayConfig cfg;
+    cfg.project = project;
+    cfg.token = token;
+    cfg.host = host;
+    cfg.contexts = contexts.empty() ? std::vector<std::string>{"audit_ctx"} : contexts;
+    relay::RelayClient client(cfg);
 
-  if (!got) {
-    std::cerr << "relay_audit_harness: no event arrived within 5s\n";
+    // Wire a generic event observer. The audit fixture pushes a single
+    // `signalwire.event` (event_type=calling.call.state, call_state=ringing);
+    // we flip the saw_event flag AND emit a `signalwire.event`-method
+    // frame back over the socket — that's the hook the porting-sdk
+    // fixture watches for to confirm dispatch happened (see
+    // audit_relay_handshake.py: `state.event_dispatched = True` branch).
+    std::atomic<bool> saw_event{false};
+    client.on_event([&](const relay::RelayEvent& ev) {
+      saw_event.store(true);
+      try {
+        client.send_raw_request("signalwire.event", json{
+                                                        {"dispatched", true},
+                                                        {"event_type", ev.event_type},
+                                                        {"echoed", ev.params},
+                                                    });
+      } catch (...) {
+        // Audit only needs the saw_event flag; failure to ack is fine.
+      }
+    });
+
+    if (!client.connect()) {
+      std::cerr << "relay_audit_harness: connect failed\n";
+      return 1;
+    }
+
+    // Explicit signalwire.subscribe so the audit fixture sees the method
+    // name (its watcher only marks subscribe_seen on a literal
+    // `signalwire.subscribe` frame).
+    try {
+      client.send_raw_request("signalwire.subscribe", json{{"contexts", cfg.contexts}});
+    } catch (const std::exception& e) {
+      std::cerr << "relay_audit_harness: subscribe failed: " << e.what() << "\n";
+      return 1;
+    }
+
+    // Wait up to 5 seconds for an inbound event.
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (std::chrono::steady_clock::now() < deadline) {
+      if (saw_event.load()) {
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    bool got = saw_event.load();
+
+    // Give the writer a moment to flush the ack frame before we close.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    client.disconnect();
+
+    if (!got) {
+      std::cerr << "relay_audit_harness: no event arrived within 5s\n";
+      return 1;
+    }
+
+    std::cout << "relay_audit_harness: event dispatched\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
     return 1;
   }
-
-  std::cout << "relay_audit_harness: event dispatched\n";
-  return 0;
 }

@@ -67,66 +67,73 @@ void probe(const char* label, Fn&& fn) {
 }  // namespace
 
 int main() {
-  if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
-    ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
+      ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
+    }
+    const std::string base = mock_base_url();
+    rest::RestClient client =
+        rest::RestClient::with_base_url(base, "doc-wire-project", "doc-wire-token");
+
+    // ---- Phone numbers: search query params (README / rest/README / namespaces) ----
+    probe("phone_numbers.search",
+          [&] { return client.phone_numbers().search({{"areacode", "512"}}); });
+    probe("phone_numbers.search+type", [&] {
+      return client.phone_numbers().search(
+          {{"areacode", "512"}, {"number_type", "local"}, {"max_results", "3"}});
+    });
+    // Filter param is the spec's `filter_name` (the SDK forwards query keys
+    // verbatim, so a bare `name` would land off-spec — see DOC-WIRE §2.1).
+    probe("phone_numbers.list",
+          [&] { return client.phone_numbers().list({{"filter_name", "Main"}}); });
+
+    // ---- Fabric AI agents: create body (rest_manage_resources / api_reference) ----
+    probe("fabric.ai_agents.create", [&] {
+      return client.fabric().ai_agents.create(
+          {{"name", "Demo Support Bot"},
+           {"prompt", {{"text", "You are a friendly support agent."}}}});
+    });
+    probe("fabric.ai_agents.list", [&] { return client.fabric().ai_agents.list(); });
+
+    // ---- Calling: dial body (README quickstart / rest examples) ----
+    probe("calling.dial", [&] {
+      rest::generated::Calling::DialParams p;
+      p.from = "+15559876543";
+      p.to = "+15551234567";
+      p.url = "https://example.com/handler";
+      return client.calling().dial(p);
+    });
+
+    // ---- Datasphere: document search body (README / namespaces) ----
+    probe("datasphere.documents.search", [&] {
+      rest::generated::DatasphereDocuments::SearchParams p;
+      p.query_string = "billing policy";
+      p.count = 5;
+      return client.datasphere().documents.search(p);
+    });
+    probe("datasphere.documents.create", [&] {
+      return client.datasphere().documents.create(
+          {{"url", "https://example.com/doc.pdf"}, {"tags", {"support"}}});
+    });
+
+    // ---- Video rooms: create body (namespaces) ----
+    probe("video.rooms.create",
+          [&] { return client.video().rooms.create({{"name", "standup"}, {"max_members", 10}}); });
+
+    // ---- Queues: create body (namespaces) ----
+    probe("queues.create", [&] { return client.queues().create({{"name", "Support"}}); });
+
+    // ---- Registry brands: create body (namespaces 10DLC) ----
+    probe("registry.brands.create", [&] {
+      return client.registry().brands.create({{"name", "My Brand"}, {"ein", "12-3456789"}});
+    });
+
+    std::cout << "doc_wire_dump: replayed documented REST call shapes against " << base << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-  const std::string base = mock_base_url();
-  rest::RestClient client =
-      rest::RestClient::with_base_url(base, "doc-wire-project", "doc-wire-token");
-
-  // ---- Phone numbers: search query params (README / rest/README / namespaces) ----
-  probe("phone_numbers.search",
-        [&] { return client.phone_numbers().search({{"areacode", "512"}}); });
-  probe("phone_numbers.search+type", [&] {
-    return client.phone_numbers().search(
-        {{"areacode", "512"}, {"number_type", "local"}, {"max_results", "3"}});
-  });
-  // Filter param is the spec's `filter_name` (the SDK forwards query keys
-  // verbatim, so a bare `name` would land off-spec — see DOC-WIRE §2.1).
-  probe("phone_numbers.list",
-        [&] { return client.phone_numbers().list({{"filter_name", "Main"}}); });
-
-  // ---- Fabric AI agents: create body (rest_manage_resources / api_reference) ----
-  probe("fabric.ai_agents.create", [&] {
-    return client.fabric().ai_agents.create(
-        {{"name", "Demo Support Bot"},
-         {"prompt", {{"text", "You are a friendly support agent."}}}});
-  });
-  probe("fabric.ai_agents.list", [&] { return client.fabric().ai_agents.list(); });
-
-  // ---- Calling: dial body (README quickstart / rest examples) ----
-  probe("calling.dial", [&] {
-    rest::generated::Calling::DialParams p;
-    p.from = "+15559876543";
-    p.to = "+15551234567";
-    p.url = "https://example.com/handler";
-    return client.calling().dial(p);
-  });
-
-  // ---- Datasphere: document search body (README / namespaces) ----
-  probe("datasphere.documents.search", [&] {
-    rest::generated::DatasphereDocuments::SearchParams p;
-    p.query_string = "billing policy";
-    p.count = 5;
-    return client.datasphere().documents.search(p);
-  });
-  probe("datasphere.documents.create", [&] {
-    return client.datasphere().documents.create(
-        {{"url", "https://example.com/doc.pdf"}, {"tags", {"support"}}});
-  });
-
-  // ---- Video rooms: create body (namespaces) ----
-  probe("video.rooms.create",
-        [&] { return client.video().rooms.create({{"name", "standup"}, {"max_members", 10}}); });
-
-  // ---- Queues: create body (namespaces) ----
-  probe("queues.create", [&] { return client.queues().create({{"name", "Support"}}); });
-
-  // ---- Registry brands: create body (namespaces 10DLC) ----
-  probe("registry.brands.create", [&] {
-    return client.registry().brands.create({{"name", "My Brand"}, {"ein", "12-3456789"}});
-  });
-
-  std::cout << "doc_wire_dump: replayed documented REST call shapes against " << base << "\n";
-  return 0;
 }

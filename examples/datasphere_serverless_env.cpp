@@ -4,6 +4,7 @@
 // Optional: DATASPHERE_COUNT, DATASPHERE_DISTANCE, DATASPHERE_TAGS
 
 #include <cstdlib>
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -19,51 +20,58 @@ std::string require_env(const char* name) {
 }
 
 int main() {
-  std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
 
-  int count = 3;
-  if (auto v = std::getenv("DATASPHERE_COUNT")) {
-    count = std::atoi(v);
-  }
-
-  double distance = 4.0;
-  if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
-    distance = std::atof(v);
-  }
-
-  agent::AgentBase agent("datasphere-serverless-env", "/datasphere-env");
-
-  agent.prompt_add_section("Role",
-                           "You are a knowledge assistant with access to a document library via "
-                           "serverless DataSphere.");
-
-  agent.add_language({"English", "en-US", "inworld.Mark"});
-  agent.set_params({{"ai_model", "gpt-4.1-nano"}});
-
-  agent.add_skill("datetime", {});
-  agent.add_skill("math", {});
-
-  json config = {{"document_id", document_id}, {"count", count}, {"distance", distance}};
-
-  if (auto tags = std::getenv("DATASPHERE_TAGS")) {
-    // Simple comma-split
-    json tag_array = json::array();
-    std::string t(tags);
-    size_t pos = 0;
-    while ((pos = t.find(',')) != std::string::npos) {
-      tag_array.push_back(t.substr(0, pos));
-      t.erase(0, pos + 1);
+    int count = 3;
+    if (auto v = std::getenv("DATASPHERE_COUNT")) {
+      count = std::atoi(v);
     }
-    if (!t.empty()) {
-      tag_array.push_back(t);
+
+    double distance = 4.0;
+    if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
+      distance = std::atof(v);
     }
-    config["tags"] = tag_array;
+
+    agent::AgentBase agent("datasphere-serverless-env", "/datasphere-env");
+
+    agent.prompt_add_section("Role",
+                             "You are a knowledge assistant with access to a document library via "
+                             "serverless DataSphere.");
+
+    agent.add_language({"English", "en-US", "inworld.Mark"});
+    agent.set_params({{"ai_model", "gpt-4.1-nano"}});
+
+    agent.add_skill("datetime", {});
+    agent.add_skill("math", {});
+
+    json config = {{"document_id", document_id}, {"count", count}, {"distance", distance}};
+
+    if (auto tags = std::getenv("DATASPHERE_TAGS")) {
+      // Simple comma-split
+      json tag_array = json::array();
+      std::string t(tags);
+      size_t pos = 0;
+      while ((pos = t.find(',')) != std::string::npos) {
+        tag_array.push_back(t.substr(0, pos));
+        t.erase(0, pos + 1);
+      }
+      if (!t.empty()) {
+        tag_array.push_back(t);
+      }
+      config["tags"] = tag_array;
+    }
+
+    agent.add_skill("datasphere", config);
+
+    std::cout << "DataSphere Serverless Environment Demo\n";
+    std::cout << "  Document: " << document_id << "\n";
+    std::cout << "  Count: " << count << ", Distance: " << distance << "\n";
+    agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  agent.add_skill("datasphere", config);
-
-  std::cout << "DataSphere Serverless Environment Demo\n";
-  std::cout << "  Document: " << document_id << "\n";
-  std::cout << "  Count: " << count << ", Distance: " << distance << "\n";
-  agent.run();
 }

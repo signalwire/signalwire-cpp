@@ -43,78 +43,85 @@
 using namespace signalwire;
 
 int main() {
-  agent::AgentBase agent("step_function_inheritance_demo", "/");
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    agent::AgentBase agent("step_function_inheritance_demo", "/");
 
-  // Register three SWAIG tools so we have something to whitelist.
-  // In a real agent these would call out to webhooks; here they're
-  // stubs.
-  agent.define_tool("lookup_account", "Look up customer account details by account number",
-                    {{"account_number", {{"type", "string"}}}},
-                    [](const nlohmann::json&, const nlohmann::json&) {
-                      return swaig::FunctionResult("looked up");
-                    });
+    // Register three SWAIG tools so we have something to whitelist.
+    // In a real agent these would call out to webhooks; here they're
+    // stubs.
+    agent.define_tool("lookup_account", "Look up customer account details by account number",
+                      {{"account_number", {{"type", "string"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("looked up");
+                      });
 
-  agent.define_tool("process_payment", "Process a payment for the current customer",
-                    {{"amount", {{"type", "number"}}}},
-                    [](const nlohmann::json&, const nlohmann::json&) {
-                      return swaig::FunctionResult("payment processed");
-                    });
+    agent.define_tool("process_payment", "Process a payment for the current customer",
+                      {{"amount", {{"type", "number"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("payment processed");
+                      });
 
-  agent.define_tool(
-      "send_receipt", "Email a receipt to the customer", {{"email", {{"type", "string"}}}},
-      [](const nlohmann::json&, const nlohmann::json&) { return swaig::FunctionResult("sent"); });
+    agent.define_tool(
+        "send_receipt", "Email a receipt to the customer", {{"email", {{"type", "string"}}}},
+        [](const nlohmann::json&, const nlohmann::json&) { return swaig::FunctionResult("sent"); });
 
-  // Build the contexts.
-  auto& cb = agent.define_contexts();
-  auto& ctx = cb.add_context("default");
+    // Build the contexts.
+    auto& cb = agent.define_contexts();
+    auto& ctx = cb.add_context("default");
 
-  // -- Step 1: explicit whitelist --
-  // `lookup_account` is the only tool active in this step.
-  ctx.add_step("step_lookup")
-      .set_text(
-          "Greet the customer and ask for their account number. "
-          "Use lookup_account to fetch their details.")
-      .set_functions(std::vector<std::string>{"lookup_account"})
-      .set_valid_steps({"step_inherit"});
+    // -- Step 1: explicit whitelist --
+    // `lookup_account` is the only tool active in this step.
+    ctx.add_step("step_lookup")
+        .set_text(
+            "Greet the customer and ask for their account number. "
+            "Use lookup_account to fetch their details.")
+        .set_functions(std::vector<std::string>{"lookup_account"})
+        .set_valid_steps({"step_inherit"});
 
-  // -- Step 2: NO set_functions() call → inheritance --
-  // Because we didn't call set_functions(), this step inherits the
-  // active set from step_lookup. `lookup_account` is STILL callable
-  // here, even though we never asked for it. Most of the time this
-  // is a bug. To break the inheritance, call set_functions() with
-  // an explicit list (even if it's empty).
-  ctx.add_step("step_inherit")
-      .set_text(
-          "Confirm the customer's identity. (No set_functions() "
-          "here, so lookup_account is still active — this is the "
-          "inheritance trap.)")
-      .set_valid_steps({"step_explicit"});
+    // -- Step 2: NO set_functions() call → inheritance --
+    // Because we didn't call set_functions(), this step inherits the
+    // active set from step_lookup. `lookup_account` is STILL callable
+    // here, even though we never asked for it. Most of the time this
+    // is a bug. To break the inheritance, call set_functions() with
+    // an explicit list (even if it's empty).
+    ctx.add_step("step_inherit")
+        .set_text(
+            "Confirm the customer's identity. (No set_functions() "
+            "here, so lookup_account is still active — this is the "
+            "inheritance trap.)")
+        .set_valid_steps({"step_explicit"});
 
-  // -- Step 3: explicit replacement --
-  // Whitelist replaces the inherited set. lookup_account is now
-  // inactive; only process_payment is active.
-  ctx.add_step("step_explicit")
-      .set_text(
-          "Take the customer's payment. Use process_payment. "
-          "lookup_account is no longer available.")
-      .set_functions(std::vector<std::string>{"process_payment"})
-      .set_valid_steps({"step_disabled"});
+    // -- Step 3: explicit replacement --
+    // Whitelist replaces the inherited set. lookup_account is now
+    // inactive; only process_payment is active.
+    ctx.add_step("step_explicit")
+        .set_text(
+            "Take the customer's payment. Use process_payment. "
+            "lookup_account is no longer available.")
+        .set_functions(std::vector<std::string>{"process_payment"})
+        .set_valid_steps({"step_disabled"});
 
-  // -- Step 4: explicit disable-all --
-  // Pass an empty vector (or "none") to lock out every user-defined
-  // tool. Internal navigation tools (next_step) are unaffected.
-  ctx.add_step("step_disabled")
-      .set_text(
-          "Thank the customer and wrap up. No tools are needed "
-          "here, so we lock everything down with "
-          "set_functions(std::vector<std::string>{}).")
-      .set_functions(std::vector<std::string>{})
-      .set_end(true);
+    // -- Step 4: explicit disable-all --
+    // Pass an empty vector (or "none") to lock out every user-defined
+    // tool. Internal navigation tools (next_step) are unaffected.
+    ctx.add_step("step_disabled")
+        .set_text(
+            "Thank the customer and wrap up. No tools are needed "
+            "here, so we lock everything down with "
+            "set_functions(std::vector<std::string>{}).")
+        .set_functions(std::vector<std::string>{})
+        .set_end(true);
 
-  // Render and pretty-print the resulting SWML so you can see
-  // exactly which steps have a `functions` key in the output and
-  // which don't.
-  auto swml = agent.render_swml();
-  std::cout << swml.dump(2) << '\n';
-  return 0;
+    // Render and pretty-print the resulting SWML so you can see
+    // exactly which steps have a `functions` key in the output and
+    // which don't.
+    auto swml = agent.render_swml();
+    std::cout << swml.dump(2) << '\n';
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

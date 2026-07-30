@@ -38,63 +38,70 @@ using namespace signalwire;
 using json = nlohmann::json;
 
 int main(int argc, char** argv) {
-  int port = 3000;
-  if (argc > 1) {
-    port = std::atoi(argv[1]);
-    if (port <= 0) {
-      port = 3000;
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    int port = 3000;
+    if (argc > 1) {
+      port = std::atoi(argv[1]);
+      if (port <= 0) {
+        port = 3000;
+      }
     }
+
+    swml::Service svc;
+    svc.set_name("standalone-swaig").set_route("/standalone").set_port(port);
+
+    // 1. Build a minimal SWML document. Any verbs are fine — the SWAIG
+    //    HTTP surface is independent of what the document contains.
+    svc.answer();
+    svc.hangup();
+
+    // 2. Register a SWAIG function. `define_tool` lives on Service, not
+    //    just AgentBase. The handler receives parsed arguments plus the
+    //    raw POST body.
+    svc.define_tool(swaig::ToolDefinition{
+        /*name=*/"lookup_competitor",
+        /*description=*/
+        "Look up competitor pricing by company name. Use this when the user "
+        "asks how a competitor's price compares to ours.",
+        /*parameters=*/
+        json::object({
+            {"type", "object"},
+            {"properties",
+             json::object({
+                 {"competitor", json::object({
+                                    {"type", "string"},
+                                    {"description", "The competitor's company name, e.g. 'ACME'."},
+                                })},
+             })},
+            {"required", json::array({"competitor"})},
+        }),
+        /*handler=*/
+        [](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
+          const std::string competitor = args.value("competitor", std::string{"<unknown>"});
+          return swaig::FunctionResult(competitor + " pricing is $99/seat; we're $79/seat.");
+        },
+        /*secure=*/false,
+    });
+
+    std::cout << "Standalone SWAIG service\n"
+              << "  URL:   http://0.0.0.0:" << svc.port() << svc.route() << "\n"
+              << "  Auth:  set SWML_BASIC_AUTH_USER / SWML_BASIC_AUTH_PASSWORD,\n"
+              << "         or watch the [INFO] log line printed by serve() for\n"
+              << "         the auto-generated user / password.\n"
+              << "  Tools: ";
+    for (const auto& n : svc.list_tool_names()) {
+      std::cout << n << " ";
+    }
+    std::cout << "\n\n"
+              << "SWML document:\n"
+              << svc.render_swml().dump(2) << "\n";
+
+    svc.serve();
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  swml::Service svc;
-  svc.set_name("standalone-swaig").set_route("/standalone").set_port(port);
-
-  // 1. Build a minimal SWML document. Any verbs are fine — the SWAIG
-  //    HTTP surface is independent of what the document contains.
-  svc.answer();
-  svc.hangup();
-
-  // 2. Register a SWAIG function. `define_tool` lives on Service, not
-  //    just AgentBase. The handler receives parsed arguments plus the
-  //    raw POST body.
-  svc.define_tool(swaig::ToolDefinition{
-      /*name=*/"lookup_competitor",
-      /*description=*/
-      "Look up competitor pricing by company name. Use this when the user "
-      "asks how a competitor's price compares to ours.",
-      /*parameters=*/
-      json::object({
-          {"type", "object"},
-          {"properties",
-           json::object({
-               {"competitor", json::object({
-                                  {"type", "string"},
-                                  {"description", "The competitor's company name, e.g. 'ACME'."},
-                              })},
-           })},
-          {"required", json::array({"competitor"})},
-      }),
-      /*handler=*/
-      [](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
-        const std::string competitor = args.value("competitor", std::string{"<unknown>"});
-        return swaig::FunctionResult(competitor + " pricing is $99/seat; we're $79/seat.");
-      },
-      /*secure=*/false,
-  });
-
-  std::cout << "Standalone SWAIG service\n"
-            << "  URL:   http://0.0.0.0:" << svc.port() << svc.route() << "\n"
-            << "  Auth:  set SWML_BASIC_AUTH_USER / SWML_BASIC_AUTH_PASSWORD,\n"
-            << "         or watch the [INFO] log line printed by serve() for\n"
-            << "         the auto-generated user / password.\n"
-            << "  Tools: ";
-  for (const auto& n : svc.list_tool_names()) {
-    std::cout << n << " ";
-  }
-  std::cout << "\n\n"
-            << "SWML document:\n"
-            << svc.render_swml().dump(2) << "\n";
-
-  svc.serve();
-  return 0;
 }

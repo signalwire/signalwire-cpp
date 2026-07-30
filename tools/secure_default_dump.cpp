@@ -208,35 +208,42 @@ json emit(const std::map<std::string, json>& by_name, const std::string& tool,
 }  // namespace
 
 int main() {
-  // stdout must carry ONLY the JSON payload; the library logger writes
-  // debug/info to stdout, so suppress it.
-  signalwire::get_logger().suppress();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    // stdout must carry ONLY the JSON payload; the library logger writes
+    // debug/info to stdout, so suppress it.
+    signalwire::get_logger().suppress();
 
-  FixtureAgent agent;
+    FixtureAgent agent;
 
-  const json params = json::object({{"type", "object"}, {"properties", json::object()}});
-  signalwire::swaig::ToolHandler handler = [](const json&, const json&) {
-    return signalwire::swaig::FunctionResult("ok");
-  };
+    const json params = json::object({{"type", "object"}, {"properties", json::object()}});
+    signalwire::swaig::ToolHandler handler = [](const json&, const json&) {
+      return signalwire::swaig::FunctionResult("ok");
+    };
 
-  // Both corpus tools on ONE agent, rendered in ONE pass (mirrors the oracle).
-  // NO explicit secure argument — the library default is what is under test.
-  agent.define_tool(kDefaultTool, "secure-default fixture tool", params, handler);
-  agent.define_tool(kInsecureTool, "secure-default fixture tool", params, handler, false);
+    // Both corpus tools on ONE agent, rendered in ONE pass (mirrors the oracle).
+    // NO explicit secure argument — the library default is what is under test.
+    agent.define_tool(kDefaultTool, "secure-default fixture tool", params, handler);
+    agent.define_tool(kInsecureTool, "secure-default fixture tool", params, handler, false);
 
-  // Render with the fixed corpus call_id so a secure tool deterministically
-  // mints its per-tool token (the reference reads call_id from exactly this
-  // query parameter, swml_service.py:807).
-  const std::map<std::string, std::string> query = {{"call_id", kCallId}};
-  const json doc = agent.render_swml_for_request(query, json::object(), {});
-  const std::map<std::string, json> by_name = swaig_functions_by_name(doc);
+    // Render with the fixed corpus call_id so a secure tool deterministically
+    // mints its per-tool token (the reference reads call_id from exactly this
+    // query parameter, swml_service.py:807).
+    const std::map<std::string, std::string> query = {{"call_id", kCallId}};
+    const json doc = agent.render_swml_for_request(query, json::object(), {});
+    const std::map<std::string, json> by_name = swaig_functions_by_name(doc);
 
-  json out = json::object();
-  out["define_tool_default_is_secure"] =
-      emit(by_name, kDefaultTool, agent.recorded_secure(kDefaultTool));
-  out["define_tool_explicit_insecure"] =
-      emit(by_name, kInsecureTool, agent.recorded_secure(kInsecureTool));
+    json out = json::object();
+    out["define_tool_default_is_secure"] =
+        emit(by_name, kDefaultTool, agent.recorded_secure(kDefaultTool));
+    out["define_tool_explicit_insecure"] =
+        emit(by_name, kInsecureTool, agent.recorded_secure(kInsecureTool));
 
-  std::cout << out.dump() << '\n';
-  return 0;
+    std::cout << out.dump() << '\n';
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -5,6 +5,7 @@
 // For local testing, runs as a normal HTTP server.
 
 #include <ctime>
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -50,8 +51,15 @@ static agent::AgentBase& get_agent() {
 // In production: wrap get_agent() HTTP endpoints with a Lambda adapter.
 // For local testing:
 int main() {
-  auto& agent = get_agent();
-  std::cout << "Starting Lambda agent (local testing) at http://0.0.0.0:3000/\n";
-  std::cout << "In production, wrap render_swml() / HTTP handlers with a Lambda adapter.\n";
-  agent.run();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    auto& agent = get_agent();
+    std::cout << "Starting Lambda agent (local testing) at http://0.0.0.0:3000/\n";
+    std::cout << "In production, wrap render_swml() / HTTP handlers with a Lambda adapter.\n";
+    agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

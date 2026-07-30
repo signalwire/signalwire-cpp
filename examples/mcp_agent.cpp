@@ -12,6 +12,7 @@
 // Build: cmake --build build
 // Run:   ./build/examples/mcp_agent
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -71,7 +72,14 @@ class McpAgent : public agent::AgentBase {
 };
 
 int main() {
-  McpAgent agent;
-  agent.run();
-  return 0;
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    McpAgent agent;
+    agent.run();
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

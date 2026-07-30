@@ -2,6 +2,7 @@
 // Simple agent demonstrating POM prompts, SWAIG tools, hints, and languages.
 
 #include <ctime>
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -76,7 +77,14 @@ class SimpleAgent : public agent::AgentBase {
 };
 
 int main() {
-  SimpleAgent agent;
-  std::cout << "Starting simple agent at http://0.0.0.0:3000/simple\n";
-  agent.run();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    SimpleAgent agent;
+    std::cout << "Starting simple agent at http://0.0.0.0:3000/simple\n";
+    agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

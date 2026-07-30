@@ -259,68 +259,75 @@ int run_datamap_skill(skills::SkillBase& skill, const std::string& tool_name, co
 }  // namespace
 
 int main() {
-  if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
-    ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
-  }
-
-  const std::string skill_name = env_or("SKILL_NAME");
-  if (skill_name.empty()) {
-    die("SKILL_NAME required");
-  }
-
-  const std::string args_raw = env_or("SKILL_HANDLER_ARGS", "{}");
-  json args;
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
   try {
-    args = json::parse(args_raw);
-  } catch (const json::parse_error& e) {
-    die(std::string("SKILL_HANDLER_ARGS not JSON: ") + e.what());
-  }
-
-  skills::ensure_builtin_skills_registered();
-  auto& reg = skills::SkillRegistry::instance();
-  if (!reg.has_skill(skill_name)) {
-    die("skill not registered: " + skill_name);
-  }
-
-  auto skill = reg.create(skill_name);
-  if (!skill) {
-    die("failed to create skill: " + skill_name);
-  }
-
-  json params = build_skill_params(skill_name);
-  if (!skill->setup(params)) {
-    die("skill setup() returned false");
-  }
-
-  if (skill_name == "web_search") {
-    return run_handler_skill(*skill, "web_search", args);
-  }
-  if (skill_name == "wikipedia_search") {
-    return run_handler_skill(*skill, "search_wiki", args);
-  }
-  if (skill_name == "datasphere") {
-    return run_handler_skill(*skill, "search_knowledge", args);
-  }
-  if (skill_name == "spider") {
-    return run_handler_skill(*skill, "scrape_url", args);
-  }
-  if (skill_name == "weather_api") {
-    return run_datamap_skill(*skill, "get_weather", args);
-  }
-  if (skill_name == "api_ninjas_trivia") {
-    // The audit doesn't pass `category`; the upstream endpoint
-    // accepts a wildcard request without one. Synthesize a default
-    // so the URL template still expands cleanly.
-    json effective = args;
-    if (!effective.is_object()) {
-      effective = json::object();
+    if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
+      ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
     }
-    if (!effective.contains("category")) {
-      effective["category"] = "general";
-    }
-    return run_datamap_skill(*skill, "get_trivia", effective);
-  }
 
-  die("unsupported skill: " + skill_name);
-  return 1;  // unreachable
+    const std::string skill_name = env_or("SKILL_NAME");
+    if (skill_name.empty()) {
+      die("SKILL_NAME required");
+    }
+
+    const std::string args_raw = env_or("SKILL_HANDLER_ARGS", "{}");
+    json args;
+    try {
+      args = json::parse(args_raw);
+    } catch (const json::parse_error& e) {
+      die(std::string("SKILL_HANDLER_ARGS not JSON: ") + e.what());
+    }
+
+    skills::ensure_builtin_skills_registered();
+    auto& reg = skills::SkillRegistry::instance();
+    if (!reg.has_skill(skill_name)) {
+      die("skill not registered: " + skill_name);
+    }
+
+    auto skill = reg.create(skill_name);
+    if (!skill) {
+      die("failed to create skill: " + skill_name);
+    }
+
+    json params = build_skill_params(skill_name);
+    if (!skill->setup(params)) {
+      die("skill setup() returned false");
+    }
+
+    if (skill_name == "web_search") {
+      return run_handler_skill(*skill, "web_search", args);
+    }
+    if (skill_name == "wikipedia_search") {
+      return run_handler_skill(*skill, "search_wiki", args);
+    }
+    if (skill_name == "datasphere") {
+      return run_handler_skill(*skill, "search_knowledge", args);
+    }
+    if (skill_name == "spider") {
+      return run_handler_skill(*skill, "scrape_url", args);
+    }
+    if (skill_name == "weather_api") {
+      return run_datamap_skill(*skill, "get_weather", args);
+    }
+    if (skill_name == "api_ninjas_trivia") {
+      // The audit doesn't pass `category`; the upstream endpoint
+      // accepts a wildcard request without one. Synthesize a default
+      // so the URL template still expands cleanly.
+      json effective = args;
+      if (!effective.is_object()) {
+        effective = json::object();
+      }
+      if (!effective.contains("category")) {
+        effective["category"] = "general";
+      }
+      return run_datamap_skill(*skill, "get_trivia", effective);
+    }
+
+    die("unsupported skill: " + skill_name);
+    return 1;  // unreachable
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

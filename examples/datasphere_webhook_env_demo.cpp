@@ -4,6 +4,7 @@
 // Required: DATASPHERE_DOCUMENT_ID
 
 #include <cstdlib>
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
@@ -18,38 +19,45 @@ std::string require_env(const char* name) {
 }
 
 int main() {
-  std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    std::string document_id = require_env("DATASPHERE_DOCUMENT_ID");
 
-  int count = 3;
-  if (auto v = std::getenv("DATASPHERE_COUNT")) {
-    count = std::atoi(v);
+    int count = 3;
+    if (auto v = std::getenv("DATASPHERE_COUNT")) {
+      count = std::atoi(v);
+    }
+
+    double distance = 4.0;
+    if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
+      distance = std::atof(v);
+    }
+
+    agent::AgentBase agent("datasphere-webhook-env", "/datasphere-webhook");
+
+    agent.prompt_add_section(
+        "Role", "You are a knowledge assistant using webhook-based DataSphere for retrieval.");
+
+    agent.add_language({"English", "en-US", "inworld.Mark"});
+    agent.set_params({{"ai_model", "gpt-4.1-nano"}});
+
+    agent.add_skill("datetime", {});
+    agent.add_skill("math", {});
+
+    agent.add_skill("datasphere", {{"document_id", document_id},
+                                   {"count", count},
+                                   {"distance", distance},
+                                   {"mode", "webhook"}});
+
+    std::cout << "DataSphere Webhook Environment Demo\n";
+    std::cout << "  Document: " << document_id << "\n";
+    std::cout << "  Execution: Webhook-based (traditional)\n\n";
+    std::cout << "  Webhook:    Full control, custom error handling\n";
+    std::cout << "  Serverless: No webhooks, lower latency, executes on SignalWire\n";
+    agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  double distance = 4.0;
-  if (auto v = std::getenv("DATASPHERE_DISTANCE")) {
-    distance = std::atof(v);
-  }
-
-  agent::AgentBase agent("datasphere-webhook-env", "/datasphere-webhook");
-
-  agent.prompt_add_section(
-      "Role", "You are a knowledge assistant using webhook-based DataSphere for retrieval.");
-
-  agent.add_language({"English", "en-US", "inworld.Mark"});
-  agent.set_params({{"ai_model", "gpt-4.1-nano"}});
-
-  agent.add_skill("datetime", {});
-  agent.add_skill("math", {});
-
-  agent.add_skill("datasphere", {{"document_id", document_id},
-                                 {"count", count},
-                                 {"distance", distance},
-                                 {"mode", "webhook"}});
-
-  std::cout << "DataSphere Webhook Environment Demo\n";
-  std::cout << "  Document: " << document_id << "\n";
-  std::cout << "  Execution: Webhook-based (traditional)\n\n";
-  std::cout << "  Webhook:    Full control, custom error handling\n";
-  std::cout << "  Serverless: No webhooks, lower latency, executes on SignalWire\n";
-  agent.run();
 }

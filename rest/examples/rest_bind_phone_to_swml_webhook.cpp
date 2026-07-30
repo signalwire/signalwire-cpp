@@ -33,42 +33,49 @@ static std::string env_or_die(const char* key) {
 }
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
   try {
-    const std::string pn_sid = env_or_die("PHONE_NUMBER_SID");
-    const std::string webhook_url = env_or_die("SWML_WEBHOOK_URL");
+    try {
+      const std::string pn_sid = env_or_die("PHONE_NUMBER_SID");
+      const std::string webhook_url = env_or_die("SWML_WEBHOOK_URL");
 
-    auto client = RestClient::from_env();
+      auto client = RestClient::from_env();
 
-    // The typed helper — one line. It returns the updated phone-number record;
-    // keep it so you can confirm the binding actually took.
-    std::cout << "Binding " << pn_sid << " to " << webhook_url << " ...\n";
-    auto bound = client.phone_numbers().set_swml_webhook(pn_sid, {.url = webhook_url});
-    std::cout << "Bound: " << bound.dump() << "\n";
+      // The typed helper — one line. It returns the updated phone-number record;
+      // keep it so you can confirm the binding actually took.
+      std::cout << "Binding " << pn_sid << " to " << webhook_url << " ...\n";
+      auto bound = client.phone_numbers().set_swml_webhook(pn_sid, {.url = webhook_url});
+      std::cout << "Bound: " << bound.dump() << "\n";
 
-    // The equivalent wire-level form (use this if you need unusual fields):
-    //
-    // client.phone_numbers().update(pn_sid, {
-    //     {"call_handler", to_wire_string(PhoneCallHandler::RelayScript)},
-    //     {"call_relay_script_url", webhook_url},
-    // });
+      // The equivalent wire-level form (use this if you need unusual fields):
+      //
+      // client.phone_numbers().update(pn_sid, {
+      //     {"call_handler", to_wire_string(PhoneCallHandler::RelayScript)},
+      //     {"call_relay_script_url", webhook_url},
+      // });
 
-    // Verify: the server auto-created a swml_webhook Fabric resource.
-    auto pn = client.phone_numbers().get(pn_sid);
-    std::cout << "  call_handler = " << pn.value("call_handler", "") << "\n";
-    std::cout << "  call_relay_script_url = " << pn.value("call_relay_script_url", "") << "\n";
-    std::cout << "  calling_handler_resource_id (server-derived) = "
-              << pn.value("calling_handler_resource_id", "") << "\n";
+      // Verify: the server auto-created a swml_webhook Fabric resource.
+      auto pn = client.phone_numbers().get(pn_sid);
+      std::cout << "  call_handler = " << pn.value("call_handler", "") << "\n";
+      std::cout << "  call_relay_script_url = " << pn.value("call_relay_script_url", "") << "\n";
+      std::cout << "  calling_handler_resource_id (server-derived) = "
+                << pn.value("calling_handler_resource_id", "") << "\n";
 
-    // To route to something other than an SWML webhook, use:
-    //   client.phone_numbers().set_cxml_webhook(sid, {.url = url})            // LAML /
-    //   Twilio-compat client.phone_numbers().set_ai_agent(sid, {.agent_id = agent_id})     // AI
-    //   Agent client.phone_numbers().set_call_flow(sid, {.flow_id = flow_id})      // Call Flow
-    //   client.phone_numbers().set_relay_application(sid, {.name = name})    // Named RELAY app
-    //   client.phone_numbers().set_relay_topic(sid, {.topic = topic})        // RELAY topic
+      // To route to something other than an SWML webhook, use:
+      //   client.phone_numbers().set_cxml_webhook(sid, {.url = url})            // LAML /
+      //   Twilio-compat client.phone_numbers().set_ai_agent(sid, {.agent_id = agent_id})     // AI
+      //   Agent client.phone_numbers().set_call_flow(sid, {.flow_id = flow_id})      // Call Flow
+      //   client.phone_numbers().set_relay_application(sid, {.name = name})    // Named RELAY app
+      //   client.phone_numbers().set_relay_topic(sid, {.topic = topic})        // RELAY topic
 
-  } catch (const SignalWireRestError& e) {
-    std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
+    } catch (const SignalWireRestError& e) {
+      std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
+      return 1;
+    }
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
     return 1;
   }
-  return 0;
 }

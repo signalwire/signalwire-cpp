@@ -8,19 +8,26 @@ using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
   try {
-    auto client = RestClient::from_env();
+    try {
+      auto client = RestClient::from_env();
 
-    // Search for numbers
-    std::cout << "Searching numbers in area code 512...\n";
-    auto available = client.phone_numbers().search({{"areacode", "512"}, {"max_results", "5"}});
-    std::cout << "Available: " << available.dump(2) << "\n";
+      // Search for numbers
+      std::cout << "Searching numbers in area code 512...\n";
+      auto available = client.phone_numbers().search({{"areacode", "512"}, {"max_results", "5"}});
+      std::cout << "Available: " << available.dump(2) << "\n";
 
-    // List owned numbers
-    auto owned = client.phone_numbers().list();
-    std::cout << "\nOwned numbers: " << owned.dump(2) << "\n";
+      // List owned numbers
+      auto owned = client.phone_numbers().list();
+      std::cout << "\nOwned numbers: " << owned.dump(2) << "\n";
 
-  } catch (const SignalWireRestError& e) {
-    std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
+    } catch (const SignalWireRestError& e) {
+      std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
+    }
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
 }

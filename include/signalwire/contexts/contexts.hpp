@@ -11,6 +11,16 @@
 #include <vector>
 
 namespace signalwire {
+
+// Forward declaration for the friendship below: AgentBase is the only intended
+// caller of ContextBuilder's private attach_tool_name_supplier() wiring seam.
+// Declared rather than #included to keep contexts.hpp free of an agent/ include
+// (agent_base.hpp already includes this header, so including it back would be
+// circular).
+namespace agent {
+class AgentBase;
+}
+
 namespace contexts {
 
 using json = nlohmann::json;
@@ -554,12 +564,6 @@ class ContextBuilder {
   /// Get an existing context
   [[nodiscard]] Context* get_context(const std::string& name);
 
-  /// Attach a tool-name supplier so validate() can check
-  /// user-defined SWAIG tool names against
-  /// reserved_native_tool_names(). AgentBase::define_contexts()
-  /// wires this up automatically.
-  ContextBuilder& attach_tool_name_supplier(std::function<std::vector<std::string>()> supplier);
-
   /// Validate all contexts. Checks:
   ///   - At least one context is defined
   ///   - A single context must be named "default"
@@ -575,6 +579,24 @@ class ContextBuilder {
   [[nodiscard]] bool has_contexts() const { return !contexts_.empty(); }
 
  private:
+  /// INTERNAL WIRING SEAM — deliberately NOT public API.
+  ///
+  /// Attaches a tool-name supplier so validate() can check user-defined SWAIG
+  /// tool names against reserved_native_tool_names().
+  ///
+  /// The Python reference has no equivalent method: there, the agent reaches its
+  /// own tool registry directly. C++ cannot, so AgentBase hands the builder a
+  /// closure over list_tools() (agent_base.cpp:897) — an implementation detail
+  /// of how this port wires the two together, not a capability a caller is meant
+  /// to reach for. It was public by accident, which put an invented method on
+  /// the audited surface and, because its std::function parameter has no
+  /// vocabulary type, silently dropped the symbol from port_signatures.json.
+  /// Made private 2026-07-30; behaviour is unchanged.
+  ContextBuilder& attach_tool_name_supplier(std::function<std::vector<std::string>()> supplier);
+
+  /// AgentBase::define_contexts() is the ONLY intended caller of the seam above.
+  friend class ::signalwire::agent::AgentBase;
+
   std::map<std::string, Context> contexts_;
   std::vector<std::string> context_order_;
   std::function<std::vector<std::string>()> tool_name_supplier_;

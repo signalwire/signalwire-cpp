@@ -114,7 +114,6 @@ signalwire.core.contexts.Context.step_order: cpp_typed_accessor: const-reference
 signalwire.core.contexts.Context.steps: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.Context.to_json: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.Context.valid_contexts: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
-signalwire.core.contexts.ContextBuilder.attach_tool_name_supplier: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.ContextBuilder.has_contexts: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.ContextBuilder.to_json: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.
 signalwire.core.contexts.GatherInfo.completion_action: cpp_typed_accessor: const-reference accessor on the C++ class; Python exposes equivalent state via attribute reads not enumerated.

@@ -1,5 +1,6 @@
 // Contexts & Steps tests
 
+#include "signalwire/agent/agent_base.hpp"
 #include "signalwire/contexts/contexts.hpp"
 
 using namespace signalwire::contexts;
@@ -601,5 +602,53 @@ TEST(step_add_gather_question_isolated_override) {
   // Explicit true override is on the wire.
   ASSERT_TRUE(qs[2].contains("isolated"));
   ASSERT_EQ(qs[2]["isolated"].get<bool>(), true);
+  return true;
+}
+
+// ========================================================================
+// Tool-name supplier — the internal wiring seam
+// ========================================================================
+
+// ContextBuilder::attach_tool_name_supplier is PRIVATE (an internal seam; the
+// Python reference has no equivalent, because there the agent reaches its own
+// tool registry directly). AgentBase is its only caller and its only friend.
+//
+// These two tests pin the BEHAVIOUR the seam exists for, through the public
+// AgentBase API, so hiding the method cannot silently disable it: define_contexts()
+// must still hand the builder a live view of the agent's registered tools, and
+// validate() must still reject a user tool that collides with a reserved
+// native name.
+TEST(contexts_reserved_tool_name_collision_is_rejected_via_agent) {
+  signalwire::agent::AgentBase agent("collide-agent", "/c");
+  // "next_step" is auto-injected by the runtime when contexts are present.
+  agent.define_tool(
+      "next_step", "collides with a reserved native tool", json::object(),
+      [](const json&, const json&) { return signalwire::swaig::FunctionResult("nope"); });
+
+  auto& builder = agent.define_contexts();
+  builder.add_context("default").add_step("start").set_text("hi");
+
+  bool threw = false;
+  try {
+    builder.validate();
+  } catch (const std::exception& e) {
+    threw = true;
+    // The message must name the offending tool, or the diagnostic is useless.
+    ASSERT_TRUE(std::string(e.what()).find("next_step") != std::string::npos);
+  }
+  ASSERT_TRUE(threw);
+  return true;
+}
+
+TEST(contexts_non_reserved_tool_name_passes_validation_via_agent) {
+  signalwire::agent::AgentBase agent("ok-agent", "/o");
+  agent.define_tool(
+      "lookup_order", "does not collide", json::object(),
+      [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
+
+  auto& builder = agent.define_contexts();
+  builder.add_context("default").add_step("start").set_text("hi");
+
+  builder.validate();  // must NOT throw
   return true;
 }

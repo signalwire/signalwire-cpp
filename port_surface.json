@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ a08c34a4a27ce42db7c4f10b2914865087897741",
+  "generated_from": "signalwire-cpp @ 0eda3bd88b22ef5bca5f8d23ebd14fb1efb3f189",
   "modules": {
     "signalwire": {
       "classes": {},

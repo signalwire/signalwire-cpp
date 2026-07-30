@@ -453,7 +453,7 @@ GENERATED_TYPE_NS_PREFIXES = (_TYPES_NS_PREFIX.rstrip(":"),) + tuple(GENERATED_P
 
 # Set at build_snapshot entry: the ``…/include`` root under which the generated
 # payload header namespaces resolve (``signalwire::core::foo`` -> <root>/signalwire/core/foo).
-_INCLUDE_ROOT: Path = Path(".")
+_INCLUDE_ROOT: Path = Path()
 
 
 def generated_type_module(ns_path: str) -> str | None:
@@ -2053,8 +2053,15 @@ def build_native_names(include_dir: Path) -> dict:
     for path in header_files:
         try:
             findings = parse_header(path)
-        except Exception:  # pragma: no cover — build_snapshot already warns
-            continue
+        except Exception as e:
+            # Same reasoning as build_snapshot: this feeds
+            # port_surface_native.json, which the doc gates use to resolve
+            # references. A skipped header makes real symbols look undefined.
+            raise RuntimeError(
+                f"enumerate_surface: failed to parse {path}: {e}. "
+                "Refusing to emit a native-name snapshot that silently omits "
+                "this header's symbols."
+            ) from e
         for _ns_path, class_name, methods, decl_fields in findings:
             names.add(class_name)
             names.update(methods)
@@ -2079,9 +2086,19 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     for path in header_files:
         try:
             findings = parse_header(path)
-        except Exception as e:  # pragma: no cover
-            print(f"warning: failed to parse {path}: {e}", file=sys.stderr)
-            continue
+        except Exception as e:
+            # ABORT, do not skip. This function produces port_surface.json, which
+            # the SURFACE-DIFF / DRIFT gates read as ground truth for what the
+            # port exposes. Swallowing a parse failure silently DROPS every
+            # symbol in that header, and the gate then reports them as omissions
+            # the port is missing -- pointing the blame at the port instead of at
+            # this parser. It used to `print(warning); continue`, which a gate
+            # that only inspects the exit code cannot see.
+            raise RuntimeError(
+                f"enumerate_surface: failed to parse {path}: {e}. "
+                "Refusing to emit a surface snapshot that silently omits this "
+                "header's symbols."
+            ) from e
 
         for ns_path, class_name, methods, decl_fields in findings:
             # Apply class rename (e.g. swml::Service -> SWMLService)

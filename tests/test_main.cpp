@@ -69,6 +69,12 @@ static std::vector<TestCase>& get_tests() {
   do {                                                                                      \
     bool threw = false;                                                                     \
     try {                                                                                   \
+      /* `expr` is emitted as a STATEMENT, not fed to a sink, because callers    */         \
+      /* also pass DECLARATIONS (e.g. ASSERT_THROWS(SessionManager sm(secret)))  */         \
+      /* which are not expressions and cannot be an argument. A [[nodiscard]]    */         \
+      /* result is therefore discarded here on purpose: this macro asserts that  */         \
+      /* evaluating `expr` THROWS, so any value it returns is irrelevant.        */         \
+      /* NOLINTNEXTLINE(clang-diagnostic-unused-result) */                                  \
       expr;                                                                                 \
     } catch (...) {                                                                         \
       threw = true;                                                                         \
@@ -248,156 +254,163 @@ static std::vector<TestCase>& get_tests() {
 #include "test_relay_states_mock.cpp"
 
 int main(int argc, char** argv) {
-  // Suppress logging during tests
-  signalwire::Logger::instance().suppress();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    // Suppress logging during tests
+    signalwire::Logger::instance().suppress();
 
-  // Optional filter argument. Catch2-style "[tag]" (e.g. "[rest_mock]")
-  // is treated as a substring match against the test name with the
-  // brackets stripped. A bare substring (no brackets) is also matched
-  // verbatim so callers can run a single test by exact name.
-  std::string filter;
-  if (argc > 1) {
-    filter = argv[1];
-    if (!filter.empty() && filter.front() == '[' && filter.back() == ']') {
-      filter = filter.substr(1, filter.size() - 2);
+    // Optional filter argument. Catch2-style "[tag]" (e.g. "[rest_mock]")
+    // is treated as a substring match against the test name with the
+    // brackets stripped. A bare substring (no brackets) is also matched
+    // verbatim so callers can run a single test by exact name.
+    std::string filter;
+    if (argc > 1) {
+      filter = argv[1];
+      if (!filter.empty() && filter.front() == '[' && filter.back() == ']') {
+        filter = filter.substr(1, filter.size() - 2);
+      }
     }
-  }
 
-  auto matches_filter = [&filter](const std::string& name) {
-    if (filter.empty()) {
-      return true;
+    auto matches_filter = [&filter](const std::string& name) {
+      if (filter.empty()) {
+        return true;
+      }
+      return name.find(filter) != std::string::npos;
+    };
+
+    std::vector<TestCase> selected;
+    for (const auto& tc : get_tests()) {
+      if (matches_filter(tc.name)) {
+        selected.push_back(tc);
+      }
     }
-    return name.find(filter) != std::string::npos;
-  };
 
-  std::vector<TestCase> selected;
-  for (const auto& tc : get_tests()) {
-    if (matches_filter(tc.name)) {
-      selected.push_back(tc);
+    // Concurrency knob. SW_TEST_PARALLEL=<N> runs the test cases on an N-thread
+    // pool; unset or "1" keeps the legacy serial behavior. The mock-backed
+    // cases (REST + RELAY) are session-isolated — each test's harness scope is
+    // a per-thread thread-local keyed by a unique session id (RELAY handshake
+    // `sessionid`) or a unique random project's auth header (REST) — so they
+    // run safely concurrently against the one shared mock. This is the point of
+    // the parallel runner: prove session-isolation under real parallel load,
+    // not merely keep the suite serial. Pure-unit cases are thread-safe too
+    // (no shared mutable global state beyond the atomics/mutex below).
+    int parallel = 1;
+    if (const char* env = std::getenv("SW_TEST_PARALLEL")) {
+      if (env && *env) {
+        try {
+          int n = std::stoi(env);
+          if (n > 1) {
+            parallel = n;
+          }
+        } catch (const std::exception& e) {
+          // Silently ignoring this meant a typo'd SW_TEST_PARALLEL (e.g. "4x")
+          // ran the suite serially with no indication why. Say so and continue
+          // with the default.
+          std::cerr << "warning: SW_TEST_PARALLEL=\"" << env << "\" is not a number (" << e.what()
+                    << "); running serially\n";
+        }
+      }
     }
-  }
+    if (parallel > static_cast<int>(selected.size())) {
+      parallel = static_cast<int>(selected.size());
+    }
+    if (parallel < 1) {
+      parallel = 1;
+    }
 
-  // Concurrency knob. SW_TEST_PARALLEL=<N> runs the test cases on an N-thread
-  // pool; unset or "1" keeps the legacy serial behavior. The mock-backed
-  // cases (REST + RELAY) are session-isolated — each test's harness scope is
-  // a per-thread thread-local keyed by a unique session id (RELAY handshake
-  // `sessionid`) or a unique random project's auth header (REST) — so they
-  // run safely concurrently against the one shared mock. This is the point of
-  // the parallel runner: prove session-isolation under real parallel load,
-  // not merely keep the suite serial. Pure-unit cases are thread-safe too
-  // (no shared mutable global state beyond the atomics/mutex below).
-  int parallel = 1;
-  if (const char* env = std::getenv("SW_TEST_PARALLEL")) {
-    if (env && *env) {
+    std::cerr << "Running " << selected.size() << " tests";
+    if (!filter.empty()) {
+      std::cerr << " (filter: " << filter << ")";
+    }
+    if (parallel > 1) {
+      std::cerr << " on " << parallel << " threads";
+    }
+    std::cerr << "...\n\n";
+
+    std::mutex io_mutex;  // serialize stderr writes only
+
+    auto run_one = [&io_mutex](const TestCase& tc) {
+      tests_total++;
+      std::string line;
+      bool ok = false;
+      std::string err;
       try {
-        int n = std::stoi(env);
-        if (n > 1) {
-          parallel = n;
-        }
+        ok = tc.func();
       } catch (const std::exception& e) {
-        // Silently ignoring this meant a typo'd SW_TEST_PARALLEL (e.g. "4x")
-        // ran the suite serially with no indication why. Say so and continue
-        // with the default.
-        std::cerr << "warning: SW_TEST_PARALLEL=\"" << env << "\" is not a number (" << e.what()
-                  << "); running serially\n";
+        err = std::string("EXCEPTION: ") + e.what();
+      } catch (...) {
+        err = "UNKNOWN EXCEPTION";
       }
-    }
-  }
-  if (parallel > static_cast<int>(selected.size())) {
-    parallel = static_cast<int>(selected.size());
-  }
-  if (parallel < 1) {
-    parallel = 1;
-  }
-
-  std::cerr << "Running " << selected.size() << " tests";
-  if (!filter.empty()) {
-    std::cerr << " (filter: " << filter << ")";
-  }
-  if (parallel > 1) {
-    std::cerr << " on " << parallel << " threads";
-  }
-  std::cerr << "...\n\n";
-
-  std::mutex io_mutex;  // serialize stderr writes only
-
-  auto run_one = [&io_mutex](const TestCase& tc) {
-    tests_total++;
-    std::string line;
-    bool ok = false;
-    std::string err;
-    try {
-      ok = tc.func();
-    } catch (const std::exception& e) {
-      err = std::string("EXCEPTION: ") + e.what();
-    } catch (...) {
-      err = "UNKNOWN EXCEPTION";
-    }
-    if (ok) {
-      tests_passed++;
-      line = "  " + tc.name + "... OK\n";
-    } else {
-      tests_failed++;
-      line = "  " + tc.name + "... " + (err.empty() ? "FAILED" : err) + "\n";
-    }
-    std::lock_guard<std::mutex> lk(io_mutex);
-    std::cerr << line;
-  };
-
-  if (parallel <= 1) {
-    for (const auto& tc : selected) {
-      run_one(tc);
-    }
-  } else {
-    // Only the SESSION-ISOLATED mock-backed cases run concurrently — those
-    // are the ones proving isolation under real parallel load. They are
-    // named with a "rest_mock_" or "relay_mock_" prefix; each gets its own
-    // RELAY session (handshake `sessionid`) or REST random-project auth
-    // header, scoped via a per-thread thread-local. Everything else runs
-    // serially: pure-unit cases touch process-global singletons (skill
-    // registry, logger) and the TLS capability cases mutate global env
-    // (SIGNALWIRE_RELAY_SCHEME / SSL_CERT_FILE) — neither is safe to run
-    // concurrently with anything, and neither exercises session isolation.
-    auto is_mock_backed = [](const std::string& n) {
-      return n.rfind("rest_mock_", 0) == 0 || n.rfind("relay_mock_", 0) == 0;
-    };
-    std::vector<const TestCase*> par, serial;
-    for (const auto& tc : selected) {
-      if (is_mock_backed(tc.name)) {
-        par.push_back(&tc);
+      if (ok) {
+        tests_passed++;
+        line = "  " + tc.name + "... OK\n";
       } else {
-        serial.push_back(&tc);
+        tests_failed++;
+        line = "  " + tc.name + "... " + (err.empty() ? "FAILED" : err) + "\n";
       }
-    }
-    // Serial batch first (e.g. TLS sets/unsets global env), then the
-    // concurrent mock-backed batch.
-    for (const auto* tc : serial) {
-      run_one(*tc);
-    }
-    std::atomic<size_t> next{0};
-    auto worker = [&]() {
-      for (;;) {
-        size_t i = next.fetch_add(1);
-        if (i >= par.size()) {
-          break;
-        }
-        run_one(*par[i]);
-      }
+      std::lock_guard<std::mutex> lk(io_mutex);
+      std::cerr << line;
     };
-    std::vector<std::thread> pool;
-    pool.reserve(parallel);
-    for (int t = 0; t < parallel; ++t) {
-      pool.emplace_back(worker);
+
+    if (parallel <= 1) {
+      for (const auto& tc : selected) {
+        run_one(tc);
+      }
+    } else {
+      // Only the SESSION-ISOLATED mock-backed cases run concurrently — those
+      // are the ones proving isolation under real parallel load. They are
+      // named with a "rest_mock_" or "relay_mock_" prefix; each gets its own
+      // RELAY session (handshake `sessionid`) or REST random-project auth
+      // header, scoped via a per-thread thread-local. Everything else runs
+      // serially: pure-unit cases touch process-global singletons (skill
+      // registry, logger) and the TLS capability cases mutate global env
+      // (SIGNALWIRE_RELAY_SCHEME / SSL_CERT_FILE) — neither is safe to run
+      // concurrently with anything, and neither exercises session isolation.
+      auto is_mock_backed = [](const std::string& n) {
+        return n.rfind("rest_mock_", 0) == 0 || n.rfind("relay_mock_", 0) == 0;
+      };
+      std::vector<const TestCase*> par, serial;
+      for (const auto& tc : selected) {
+        if (is_mock_backed(tc.name)) {
+          par.push_back(&tc);
+        } else {
+          serial.push_back(&tc);
+        }
+      }
+      // Serial batch first (e.g. TLS sets/unsets global env), then the
+      // concurrent mock-backed batch.
+      for (const auto* tc : serial) {
+        run_one(*tc);
+      }
+      std::atomic<size_t> next{0};
+      auto worker = [&]() {
+        for (;;) {
+          size_t i = next.fetch_add(1);
+          if (i >= par.size()) {
+            break;
+          }
+          run_one(*par[i]);
+        }
+      };
+      std::vector<std::thread> pool;
+      pool.reserve(parallel);
+      for (int t = 0; t < parallel; ++t) {
+        pool.emplace_back(worker);
+      }
+      for (auto& th : pool) {
+        th.join();
+      }
     }
-    for (auto& th : pool) {
-      th.join();
-    }
+
+    std::cerr << "\n========================================\n";
+    std::cerr << "Total: " << tests_total.load() << "  Passed: " << tests_passed.load()
+              << "  Failed: " << tests_failed.load() << "\n";
+    std::cerr << "========================================\n";
+
+    return tests_failed.load() > 0 ? 1 : 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  std::cerr << "\n========================================\n";
-  std::cerr << "Total: " << tests_total.load() << "  Passed: " << tests_passed.load()
-            << "  Failed: " << tests_failed.load() << "\n";
-  std::cerr << "========================================\n";
-
-  return tests_failed.load() > 0 ? 1 : 0;
 }

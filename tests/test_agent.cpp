@@ -1,8 +1,13 @@
 // AgentBase tests
 
+#include <sys/stat.h>
+
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <iostream>
 
 #include "signalwire/agent/agent_base.hpp"
 
@@ -155,7 +160,12 @@ TEST(agent_ctor_config_file_supplies_service_defaults) {
   // Repo-local scratch dir (never /tmp), same idiom as the ConfigLoader
   // tests; relative to the build dir the test binary runs in.
   std::string dir = ".sw-test-tmp";
-  (void)std::system("mkdir -p .sw-test-tmp");
+  // ::mkdir instead of system("mkdir -p"): no shell is spawned (so nothing in
+  // the path can be interpreted), and EEXIST is the expected steady state.
+  if (::mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
+    std::cerr << "could not create " << dir << ": " << std::strerror(errno) << "\n";
+    return false;
+  }
   std::string cfg = dir + "/agent_ctor_service.json";
   {
     std::ofstream out(cfg);

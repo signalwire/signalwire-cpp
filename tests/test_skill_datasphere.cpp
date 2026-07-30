@@ -29,8 +29,8 @@ TEST(skill_datasphere_setup_with_creds) {
 
 TEST(skill_datasphere_registers_tool) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere");
-  skill->setup(json::object(
-      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"document_id", "doc-1"}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"document_id", "doc-1"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "search_knowledge");
@@ -39,8 +39,8 @@ TEST(skill_datasphere_registers_tool) {
 
 TEST(skill_datasphere_custom_tool_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere");
-  skill->setup(json::object(
-      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"tool_name", "search_docs"}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"tool_name", "search_docs"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools[0].name, "search_docs");
   return true;
@@ -84,8 +84,8 @@ TEST(skill_datasphere_handler_returns_response) {
 
   ::setenv("DATASPHERE_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere");
-  skill->setup(json::object(
-      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"document_id", "doc-1"}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}, {"document_id", "doc-1"}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", "test"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();

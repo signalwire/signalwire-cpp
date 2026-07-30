@@ -33,9 +33,9 @@ TEST(skill_playbg_setup_with_files) {
 
 TEST(skill_playbg_returns_datamap) {
   auto skill = sw_skills::SkillRegistry::instance().create("play_background_file");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"files", json::array({json::object(
-                     {{"key", "music"}, {"url", "https://example.com/music.mp3"}})})}}));
+                     {{"key", "music"}, {"url", "https://example.com/music.mp3"}})})}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_EQ(dm.size(), 1u);
   ASSERT_EQ(dm[0]["function"].get<std::string>(), "play_background_file");
@@ -44,9 +44,9 @@ TEST(skill_playbg_returns_datamap) {
 
 TEST(skill_playbg_custom_tool_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("play_background_file");
-  skill->setup(
+  ASSERT_TRUE(skill->setup(
       json::object({{"tool_name", "bg_music"},
-                    {"files", json::array({json::object({{"key", "music"}, {"url", "x"}})})}}));
+                    {"files", json::array({json::object({{"key", "music"}, {"url", "x"}})})}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_EQ(dm[0]["function"].get<std::string>(), "bg_music");
   return true;
@@ -54,8 +54,8 @@ TEST(skill_playbg_custom_tool_name) {
 
 TEST(skill_playbg_no_webhook_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("play_background_file");
-  skill->setup(
-      json::object({{"files", json::array({json::object({{"key", "m"}, {"url", "x"}})})}}));
+  ASSERT_TRUE(skill->setup(
+      json::object({{"files", json::array({json::object({{"key", "m"}, {"url", "x"}})})}})));
   ASSERT_EQ(skill->register_tools().size(), 0u);
   return true;
 }

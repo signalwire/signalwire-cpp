@@ -15,6 +15,10 @@ using namespace signalwire::utils::url_validator;
 namespace {
 
 void stub_resolver(const std::string& ip) {
+  // A test stub for the DNS resolver hook. The only thing that can throw here
+  // is the vector allocation, i.e. bad_alloc, which is not a condition this
+  // stub can meaningfully handle or that the test is exercising.
+  // NOLINTNEXTLINE(bugprone-exception-escape)
   _set_resolver([ip](const std::string&) -> std::optional<std::vector<std::string>> {
     return std::vector<std::string>{ip};
   });

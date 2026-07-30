@@ -33,9 +33,9 @@ TEST(skill_infogatherer_setup_with_questions) {
 
 TEST(skill_infogatherer_two_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"questions", json::array({json::object(
-                         {{"key_name", "name"}, {"question_text", "What is your name?"}})})}}));
+                         {{"key_name", "name"}, {"question_text", "What is your name?"}})})}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 2u);
   ASSERT_EQ(tools[0].name, "start_questions");
@@ -45,9 +45,9 @@ TEST(skill_infogatherer_two_tools) {
 
 TEST(skill_infogatherer_prefixed_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"prefix", "contact"},
-       {"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}}));
+       {"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools[0].name, "contact_start_questions");
   ASSERT_EQ(tools[1].name, "contact_submit_answer");
@@ -56,9 +56,9 @@ TEST(skill_infogatherer_prefixed_tools) {
 
 TEST(skill_infogatherer_start_handler_returns_response) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"questions", json::array({json::object(
-                         {{"key_name", "name"}, {"question_text", "What is your name?"}})})}}));
+                         {{"key_name", "name"}, {"question_text", "What is your name?"}})})}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object(), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -68,26 +68,26 @@ TEST(skill_infogatherer_start_handler_returns_response) {
 
 TEST(skill_infogatherer_instance_key_default) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
-      {{"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}})));
   ASSERT_EQ(skill->get_instance_key(), "info_gatherer");
   return true;
 }
 
 TEST(skill_infogatherer_instance_key_with_prefix) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"prefix", "contact"},
-       {"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}}));
+       {"questions", json::array({json::object({{"key_name", "n"}, {"question_text", "Q?"}})})}})));
   ASSERT_EQ(skill->get_instance_key(), "info_gatherer_contact");
   return true;
 }
 
 TEST(skill_infogatherer_submit_handler) {
   auto skill = sw_skills::SkillRegistry::instance().create("info_gatherer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"questions",
-        json::array({json::object({{"key_name", "name"}, {"question_text", "Name?"}})})}}));
+        json::array({json::object({{"key_name", "name"}, {"question_text", "Name?"}})})}})));
   auto tools = skill->register_tools();
   // Call submit_answer handler
   auto result = tools[1].handler(json::object({{"answer", "John"}, {"confirmed_by_user", true}}),

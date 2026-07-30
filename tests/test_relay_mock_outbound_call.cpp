@@ -151,30 +151,40 @@ TEST(relay_mock_dial_auto_generates_uuid_tag_when_omitted) {
   // BROADCASTS to every connected session, leaking this test's dial event
   // into a concurrent test's client.
   const std::string sid = client->session_id();
-  std::thread pusher([&, sid]() {
-    mt::set_active_session(sid);
-    for (int i = 0; i < 200; ++i) {
-      auto entries = mt::journal_recv("calling.dial");
-      if (!entries.empty()) {
-        std::string tag = entries.back().frame["params"].value("tag", "");
-        json frame;
-        frame["jsonrpc"] = "2.0";
-        frame["id"] = "auto-tag-1";
-        frame["method"] = "signalwire.event";
-        frame["params"]["event_type"] = "calling.call.dial";
-        json& p = frame["params"]["params"];
-        p["tag"] = tag;
-        p["node_id"] = "node-mock-1";
-        p["dial_state"] = "answered";
-        p["call"]["call_id"] = "auto-tag-winner";
-        p["call"]["node_id"] = "node-mock-1";
-        p["call"]["tag"] = tag;
-        p["call"]["device"] = phone_device();
-        p["call"]["dial_winner"] = true;
-        mt::push(frame);
-        return;
+  // The body below IS wrapped in try/catch; clang-tidy cannot see through the
+  // lambda boundary, hence the suppression on the capture list. Same shape as
+  // src/web/web_service.cpp:205.
+  std::thread pusher([&, sid]() {  // NOLINT(bugprone-exception-escape)
+    // journal_recv() does HTTP and can throw. An exception escaping a
+    // std::thread body is std::terminate -- the whole suite aborts with no
+    // message. Report and let the thread end instead.
+    try {
+      mt::set_active_session(sid);
+      for (int i = 0; i < 200; ++i) {
+        auto entries = mt::journal_recv("calling.dial");
+        if (!entries.empty()) {
+          std::string tag = entries.back().frame["params"].value("tag", "");
+          json frame;
+          frame["jsonrpc"] = "2.0";
+          frame["id"] = "auto-tag-1";
+          frame["method"] = "signalwire.event";
+          frame["params"]["event_type"] = "calling.call.dial";
+          json& p = frame["params"]["params"];
+          p["tag"] = tag;
+          p["node_id"] = "node-mock-1";
+          p["dial_state"] = "answered";
+          p["call"]["call_id"] = "auto-tag-winner";
+          p["call"]["node_id"] = "node-mock-1";
+          p["call"]["tag"] = tag;
+          p["call"]["device"] = phone_device();
+          p["call"]["dial_winner"] = true;
+          mt::push(frame);
+          return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    } catch (const std::exception& e) {
+      std::cerr << "pusher thread: " << e.what() << "\n";
     }
   });
 
@@ -201,23 +211,33 @@ TEST(relay_mock_dial_failed_returns_empty_call) {
   // to all sessions and mt::journal_recv() reads the global journal — both
   // unsafe under the parallel runner.
   const std::string sid = client->session_id();
-  std::thread pusher([&, sid]() {
-    mt::set_active_session(sid);
-    for (int i = 0; i < 200; ++i) {
-      if (!mt::journal_recv("calling.dial").empty()) {
-        json frame;
-        frame["jsonrpc"] = "2.0";
-        frame["id"] = "fail-1";
-        frame["method"] = "signalwire.event";
-        frame["params"]["event_type"] = "calling.call.dial";
-        frame["params"]["params"]["tag"] = "t-fail";
-        frame["params"]["params"]["node_id"] = "node-mock-1";
-        frame["params"]["params"]["dial_state"] = "failed";
-        frame["params"]["params"]["call"] = json::object();
-        mt::push(frame);
-        return;
+  // The body below IS wrapped in try/catch; clang-tidy cannot see through the
+  // lambda boundary, hence the suppression on the capture list. Same shape as
+  // src/web/web_service.cpp:205.
+  std::thread pusher([&, sid]() {  // NOLINT(bugprone-exception-escape)
+    // journal_recv() does HTTP and can throw. An exception escaping a
+    // std::thread body is std::terminate -- the whole suite aborts with no
+    // message. Report and let the thread end instead.
+    try {
+      mt::set_active_session(sid);
+      for (int i = 0; i < 200; ++i) {
+        if (!mt::journal_recv("calling.dial").empty()) {
+          json frame;
+          frame["jsonrpc"] = "2.0";
+          frame["id"] = "fail-1";
+          frame["method"] = "signalwire.event";
+          frame["params"]["event_type"] = "calling.call.dial";
+          frame["params"]["params"]["tag"] = "t-fail";
+          frame["params"]["params"]["node_id"] = "node-mock-1";
+          frame["params"]["params"]["dial_state"] = "failed";
+          frame["params"]["params"]["call"] = json::object();
+          mt::push(frame);
+          return;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    } catch (const std::exception& e) {
+      std::cerr << "pusher thread: " << e.what() << "\n";
     }
   });
 

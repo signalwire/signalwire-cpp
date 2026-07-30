@@ -33,9 +33,9 @@ TEST(skill_transfer_setup_with_transfers) {
 
 TEST(skill_transfer_returns_datamap) {
   auto skill = sw_skills::SkillRegistry::instance().create("swml_transfer");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"transfers",
-        json::object({{"sales", json::object({{"url", "https://example.com/sales"}})}})}}));
+        json::object({{"sales", json::object({{"url", "https://example.com/sales"}})}})}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_EQ(dm.size(), 1u);
   ASSERT_EQ(dm[0]["function"].get<std::string>(), "transfer_call");
@@ -44,9 +44,9 @@ TEST(skill_transfer_returns_datamap) {
 
 TEST(skill_transfer_custom_tool_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("swml_transfer");
-  skill->setup(
+  ASSERT_TRUE(skill->setup(
       json::object({{"tool_name", "route_call"},
-                    {"transfers", json::object({{"dept", json::object({{"url", "x"}})}})}}));
+                    {"transfers", json::object({{"dept", json::object({{"url", "x"}})}})}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_EQ(dm[0]["function"].get<std::string>(), "route_call");
   return true;
@@ -54,8 +54,8 @@ TEST(skill_transfer_custom_tool_name) {
 
 TEST(skill_transfer_has_hints) {
   auto skill = sw_skills::SkillRegistry::instance().create("swml_transfer");
-  skill->setup(
-      json::object({{"transfers", json::object({{"sales-team", json::object({{"url", "x"}})}})}}));
+  ASSERT_TRUE(skill->setup(
+      json::object({{"transfers", json::object({{"sales-team", json::object({{"url", "x"}})}})}})));
   auto hints = skill->get_hints();
   ASSERT_TRUE(!hints.empty());
   // Should contain at least "transfer" or "connect"
@@ -71,8 +71,8 @@ TEST(skill_transfer_has_hints) {
 
 TEST(skill_transfer_no_webhook_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("swml_transfer");
-  skill->setup(
-      json::object({{"transfers", json::object({{"sales", json::object({{"url", "x"}})}})}}));
+  ASSERT_TRUE(skill->setup(
+      json::object({{"transfers", json::object({{"sales", json::object({{"url", "x"}})}})}})));
   ASSERT_EQ(skill->register_tools().size(), 0u);
   return true;
 }

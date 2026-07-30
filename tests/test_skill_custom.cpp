@@ -32,12 +32,12 @@ TEST(skill_custom_setup_with_tools) {
 
 TEST(skill_custom_registers_defined_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("custom_skills");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"tools",
         json::array(
             {json::object({{"name", "greet"}, {"description", "Greet"}, {"response", "Hello!"}}),
              json::object(
-                 {{"name", "bye"}, {"description", "Bye"}, {"response", "Goodbye!"}})})}}));
+                 {{"name", "bye"}, {"description", "Bye"}, {"response", "Goodbye!"}})})}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 2u);
   ASSERT_EQ(tools[0].name, "greet");
@@ -47,10 +47,10 @@ TEST(skill_custom_registers_defined_tools) {
 
 TEST(skill_custom_handler_returns_response) {
   auto skill = sw_skills::SkillRegistry::instance().create("custom_skills");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"tools",
         json::array({json::object(
-            {{"name", "greet"}, {"description", "Greet"}, {"response", "Hello world!"}})})}}));
+            {{"name", "greet"}, {"description", "Greet"}, {"response", "Hello world!"}})})}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object(), json::object());
   ASSERT_EQ(result.to_json()["response"].get<std::string>(), "Hello world!");
@@ -59,9 +59,9 @@ TEST(skill_custom_handler_returns_response) {
 
 TEST(skill_custom_minimal_tool_has_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("custom_skills");
-  skill->setup(json::object({
+  ASSERT_TRUE(skill->setup(json::object({
       {"tools", json::array({json::object()})}  // Minimal tool def
-  }));
+  })));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   // Whatever default name the implementation uses
@@ -71,7 +71,7 @@ TEST(skill_custom_minimal_tool_has_name) {
 
 TEST(skill_custom_tool_with_parameters) {
   auto skill = sw_skills::SkillRegistry::instance().create("custom_skills");
-  skill->setup(json::object(
+  ASSERT_TRUE(skill->setup(json::object(
       {{"tools",
         json::array({json::object(
             {{"name", "lookup"},
@@ -80,7 +80,7 @@ TEST(skill_custom_tool_with_parameters) {
               json::object(
                   {{"type", "object"},
                    {"properties", json::object({{"query", json::object({{"type", "string"}})}})}})},
-             {"response", "Found it"}})})}}));
+             {"response", "Found it"}})})}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools[0].name, "lookup");
   ASSERT_TRUE(tools[0].parameters.contains("properties"));

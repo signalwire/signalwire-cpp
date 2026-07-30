@@ -32,10 +32,10 @@ TEST(skill_ds_serverless_no_webhook_tools) {
 
 TEST(skill_ds_serverless_returns_datamap) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
-  skill->setup(json::object({{"space_name", "test.signalwire.com"},
-                             {"project_id", "proj-123"},
-                             {"token", "tok-456"},
-                             {"document_id", "doc-1"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"space_name", "test.signalwire.com"},
+                                         {"project_id", "proj-123"},
+                                         {"token", "tok-456"},
+                                         {"document_id", "doc-1"}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_EQ(dm.size(), 1u);
   ASSERT_EQ(dm[0]["function"].get<std::string>(), "search_knowledge");
@@ -45,8 +45,8 @@ TEST(skill_ds_serverless_returns_datamap) {
 
 TEST(skill_ds_serverless_datamap_has_webhook) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
-  skill->setup(json::object(
-      {{"space_name", "test.signalwire.com"}, {"project_id", "proj-123"}, {"token", "tok-456"}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"space_name", "test.signalwire.com"}, {"project_id", "proj-123"}, {"token", "tok-456"}})));
   auto dm = skill->get_datamap_functions();
   ASSERT_TRUE(dm[0]["data_map"].contains("webhooks"));
   auto url = dm[0]["data_map"]["webhooks"][0]["url"].get<std::string>();
@@ -60,12 +60,12 @@ TEST(skill_ds_serverless_datamap_has_webhook) {
 // payload was being sent on a key the server ignores.
 TEST(skill_ds_serverless_webhook_carries_params_and_foreach) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
-  skill->setup(json::object({{"space_name", "test.signalwire.com"},
-                             {"project_id", "proj-123"},
-                             {"token", "tok-456"},
-                             {"document_id", "doc-789"},
-                             {"count", 4},
-                             {"distance", 2.5}}));
+  ASSERT_TRUE(skill->setup(json::object({{"space_name", "test.signalwire.com"},
+                                         {"project_id", "proj-123"},
+                                         {"token", "tok-456"},
+                                         {"document_id", "doc-789"},
+                                         {"count", 4},
+                                         {"distance", 2.5}})));
   auto dm = skill->get_datamap_functions();
   auto webhook = dm[0]["data_map"]["webhooks"][0];
 

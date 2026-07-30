@@ -43,8 +43,8 @@ TEST(skill_websearch_registers_tool) {
 
 TEST(skill_websearch_custom_tool_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(
-      json::object({{"api_key", "k"}, {"search_engine_id", "s"}, {"tool_name", "search"}}));
+  ASSERT_TRUE(skill->setup(
+      json::object({{"api_key", "k"}, {"search_engine_id", "s"}, {"tool_name", "search"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools[0].name, "search");
   return true;

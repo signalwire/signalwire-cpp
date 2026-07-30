@@ -40,9 +40,10 @@ TEST(skill_mcp_registers_tools) {
 
 TEST(skill_mcp_with_services) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
-                             {"services", json::array({json::object({{"name", "calendar"}}),
-                                                       json::object({{"name", "email"}})})}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
+                                 {"services", json::array({json::object({{"name", "calendar"}}),
+                                                           json::object({{"name", "email"}})})}})));
   auto tools = skill->register_tools();
   // Tools should exist
   ASSERT_TRUE(!tools.empty());
@@ -51,8 +52,9 @@ TEST(skill_mcp_with_services) {
 
 TEST(skill_mcp_tool_handler_works) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
-                             {"services", json::array({json::object({{"name", "svc1"}})})}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
+                                 {"services", json::array({json::object({{"name", "svc1"}})})}})));
   auto tools = skill->register_tools();
   ASSERT_TRUE(!tools.empty());
   auto result = tools[0].handler(json::object({{"query", "test"}}), json::object());
@@ -63,8 +65,8 @@ TEST(skill_mcp_tool_handler_works) {
 
 TEST(skill_mcp_has_hints) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(json::object(
-      {{"gateway_url", "x"}, {"services", json::array({json::object({{"name", "search"}})})}}));
+  ASSERT_TRUE(skill->setup(json::object(
+      {{"gateway_url", "x"}, {"services", json::array({json::object({{"name", "search"}})})}})));
   auto hints = skill->get_hints();
   ASSERT_TRUE(!hints.empty());
   bool has_mcp = false;
@@ -79,8 +81,9 @@ TEST(skill_mcp_has_hints) {
 
 TEST(skill_mcp_global_data_is_object) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
-                             {"services", json::array({json::object({{"name", "svc1"}})})}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"gateway_url", "https://mcp.example.com"},
+                                 {"services", json::array({json::object({{"name", "svc1"}})})}})));
   auto gd = skill->get_global_data();
   ASSERT_TRUE(gd.is_object());
   return true;

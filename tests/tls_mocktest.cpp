@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 
 #include <cstdlib>
+#include <iostream>
 #include <stdexcept>
 
 #include "httplib.h"
@@ -21,7 +22,11 @@ int env_int(const char* name, int fallback) {
     if (v && *v) {
       try {
         return std::stoi(v);
-      } catch (...) {
+      } catch (const std::exception& e) {
+        // Falling back is the documented behaviour, but do it VISIBLY: a typo'd
+        // override that silently behaves as "unset" is how an afternoon is lost.
+        std::cerr << "warning: " << name << "=\"" << v << "\" is not a number (" << e.what()
+                  << "); using " << fallback << "\n";
       }
     }
   }

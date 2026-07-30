@@ -300,9 +300,13 @@ TEST(request_options_abort_signal_before_send) {
   } catch (const SignalWireRestTransportError& e) {
     threw_transport = true;
     status = e.status_code();
+    // The empty body below IS the assertion. Catching any OTHER typed error
+    // must NOT set threw_transport, so that the ASSERT_TRUE two lines down
+    // fails and names the wrong-exception case. Logging or rethrowing here
+    // would replace a precise assertion failure with a less useful one;
+    // leaving the flag false is the whole mechanism.
+    // NOLINTNEXTLINE(bugprone-empty-catch)
   } catch (const SignalWireRestError&) {
-    // Any other typed error means abort did not short-circuit — leave the
-    // transport flag false so the assertion below fails loudly.
   }
   ASSERT_TRUE(threw_transport);
   ASSERT_EQ(status, 0);

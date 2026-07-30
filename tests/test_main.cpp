@@ -288,7 +288,12 @@ int main(int argc, char** argv) {
       try {
         int n = std::stoi(env);
         if (n > 1) parallel = n;
-      } catch (...) {
+      } catch (const std::exception& e) {
+        // Silently ignoring this meant a typo'd SW_TEST_PARALLEL (e.g. "4x")
+        // ran the suite serially with no indication why. Say so and continue
+        // with the default.
+        std::cerr << "warning: SW_TEST_PARALLEL=\"" << env << "\" is not a number (" << e.what()
+                  << "); running serially\n";
       }
     }
   }

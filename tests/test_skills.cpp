@@ -7,8 +7,9 @@
 namespace sw_skills = signalwire::skills;
 using json = nlohmann::json;
 
-// Force skill registration linkage
-static bool _skills_init = (sw_skills::ensure_builtin_skills_registered(), true);
+// Force skill registration linkage. Not `_skills_init`: a leading underscore at
+// global scope is reserved for the implementation.
+static bool skills_init = (sw_skills::ensure_builtin_skills_registered(), true);
 
 // ========================================================================
 // Registry tests

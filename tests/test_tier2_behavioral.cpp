@@ -188,7 +188,10 @@ TEST(tier2_native_vector_search_remote_http_post) {
     try {
       json body = json::parse(req.body);
       captured_query = body.value("query", "");
-    } catch (...) {
+    } catch (const json::exception& e) {
+      // Swallowing this left captured_query empty and the assertion below
+      // failed with no hint that the body had simply not parsed.
+      std::cerr << "mock /search: body did not parse as JSON (" << e.what() << ")\n";
     }
     json out =
         json({{"results", json::array({json({{"content", "The capital of France is Paris."},

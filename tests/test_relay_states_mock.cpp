@@ -207,12 +207,17 @@ TEST(relay_mock_dial_state_accessor_returns_enum_for_dispatched_dial_event) {
   ASSERT_TRUE(ok);
 
   std::lock_guard<std::mutex> lk(m);
-  ASSERT_EQ(captured->dial_state, "answered");           // bare-string field
-  ASSERT_TRUE(captured->dial_state_enum().has_value());  // typed accessor
-  ASSERT_TRUE(captured->dial_state_enum().value() == DialState::Answered);
+  // spin_st above only reports that the predicate went true; re-assert
+  // engagement here so the guarantee is local (and visible to the analyser).
+  ASSERT_TRUE(captured.has_value());
+  ASSERT_EQ(captured->dial_state, "answered");  // bare-string field
+
+  auto dial_enum = captured->dial_state_enum();  // typed accessor
+  ASSERT_TRUE(dial_enum.has_value());
+  ASSERT_TRUE(dial_enum.value() == DialState::Answered);
   // Agreement + terminal: answered is a terminal dial outcome.
-  ASSERT_EQ(dial_state_value(captured->dial_state_enum().value()), captured->dial_state);
-  ASSERT_TRUE(is_terminal(captured->dial_state_enum().value()));
+  ASSERT_EQ(dial_state_value(dial_enum.value()), captured->dial_state);
+  ASSERT_TRUE(is_terminal(dial_enum.value()));
   client->disconnect();
   return true;
 }

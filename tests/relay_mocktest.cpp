@@ -278,7 +278,13 @@ int resolve_ws_port() {
     if (env && *env) {
       try {
         return std::stoi(env);
-      } catch (...) {
+      } catch (const std::exception& e) {
+        // Do NOT swallow this. Falling through to the dynamic picker below
+        // would silently hand back a DIFFERENT port than the one the CI gate
+        // exported, so the tests would talk to a mock nobody spawned and the
+        // failure would surface as an unexplained connection error.
+        throw std::runtime_error(std::string("MOCK_RELAY_PORT=\"") + env +
+                                 "\" is not a valid port number: " + e.what());
       }
     }
   }
@@ -298,7 +304,13 @@ int resolve_http_port() {
     if (env && *env) {
       try {
         return std::stoi(env);
-      } catch (...) {
+      } catch (const std::exception& e) {
+        // Do NOT swallow this. Falling through to the dynamic picker below
+        // would silently hand back a DIFFERENT port than the one the CI gate
+        // exported, so the tests would talk to a mock nobody spawned and the
+        // failure would surface as an unexplained connection error.
+        throw std::runtime_error(std::string("MOCK_RELAY_HTTP_PORT=\"") + env +
+                                 "\" is not a valid port number: " + e.what());
       }
     }
   }
@@ -560,12 +572,23 @@ std::unique_ptr<RelayClient> make_client_with_config(
 
 bool wait_for_session(int timeout_ms) {
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  // A failed poll early on is normal (the mock may not be listening yet), so we
+  // keep retrying — but remember the last error. Discarding it entirely made a
+  // mock that never came up indistinguishable from one that came up empty, and
+  // both surfaced as a bare "timed out" with no cause.
+  std::string last_error;
   while (std::chrono::steady_clock::now() < deadline) {
     try {
       if (!sessions().empty()) return true;
-    } catch (...) {
+      last_error.clear();
+    } catch (const std::exception& e) {
+      last_error = e.what();
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  if (!last_error.empty()) {
+    std::cerr << "relay_mocktest: wait_for_session timed out after " << timeout_ms
+              << "ms; last poll error: " << last_error << "\n";
   }
   return false;
 }

@@ -247,7 +247,13 @@ int resolve_port() {
     if (env && *env) {
       try {
         return std::stoi(env);
-      } catch (...) {
+      } catch (const std::exception& e) {
+        // Do NOT swallow this. Falling through to the dynamic picker below
+        // would silently hand back a DIFFERENT port than the one the CI gate
+        // exported, so the tests would talk to a mock nobody spawned and the
+        // failure would surface as an unexplained connection error.
+        throw std::runtime_error(std::string("MOCK_SIGNALWIRE_PORT=\"") + env +
+                                 "\" is not a valid port number: " + e.what());
       }
     }
   }

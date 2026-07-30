@@ -398,8 +398,11 @@ _fresh_surface_cache_path() { echo "$PORT_ROOT/.sw-tmp/fresh_port_surface.json";
 #     place so you never hand-run it; notes if it changed files, then re-checks.
 #   * CI ($CI=true)      -> `clang-format --dry-run -Werror` (read-only): FAILS
 #     if any unformatted source reached CI.
-# Scope is first-party src/ + include/ ONLY — vendored deps/ (httplib.h,
-# json.hpp, nlohmann/) and the FetchContent IXWebSocket tree are never touched.
+# Scope is EVERY first-party C++ tree — src/ include/ tools/ tests/ examples/
+# rest/examples/ relay/examples/ (widened 2026-07-30; this comment previously
+# said "src/ + include/ ONLY" and was already stale, since tools/ was in scope).
+# Only genuinely third-party code is excluded: vendored deps/ (httplib.h,
+# json.hpp, nlohmann/) and the FetchContent IXWebSocket tree.
 # clang-format runs on the host regardless of BUILD_MODE (no compiler/SDK
 # needed — it only parses tokens).
 # The FMT gate now delegates to the CANONICAL scripts/run-format.sh (single

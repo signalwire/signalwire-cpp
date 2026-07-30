@@ -14,16 +14,17 @@ using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
-    auto client = RestClient::from_env();
+  auto client = RestClient::from_env();
 
-    auto agents = client.fabric().ai_agents.list();
-    auto call   = client.calling().dial({
-        .from = "+15559876543", .to = "+15551234567",
-        .url = "https://example.com/handler",
-    });
-    auto numbers = client.phone_numbers().search({{"areacode", "512"}});
-    auto results = client.datasphere().documents.search({
-        .query_string = "billing policy",
-    });
+  auto agents = client.fabric().ai_agents.list();
+  auto call = client.calling().dial({
+      .from = "+15559876543",
+      .to = "+15551234567",
+      .url = "https://example.com/handler",
+  });
+  auto numbers = client.phone_numbers().search({{"areacode", "512"}});
+  auto results = client.datasphere().documents.search({
+      .query_string = "billing policy",
+  });
 }
 // endregion: rest

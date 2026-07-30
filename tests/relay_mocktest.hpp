@@ -20,10 +20,10 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 #include "signalwire/relay/client.hpp"
 
@@ -35,13 +35,13 @@ using nlohmann::json;
 
 // JournalEntry mirrors mock_relay.journal.JournalEntry over the wire.
 struct JournalEntry {
-    double timestamp = 0.0;
-    std::string direction;     // "recv" | "send"
-    std::string method;        // JSON-RPC method or empty for responses
-    std::string request_id;
-    json frame;                // The full JSON-RPC frame
-    std::string connection_id;
-    std::string session_id;
+  double timestamp = 0.0;
+  std::string direction;  // "recv" | "send"
+  std::string method;     // JSON-RPC method or empty for responses
+  std::string request_id;
+  json frame;  // The full JSON-RPC frame
+  std::string connection_id;
+  std::string session_id;
 };
 
 // Probe-or-spawn the mock server. Returns the configured HTTP base URL once
@@ -132,13 +132,13 @@ json scenario_play(const json& ops);
 
 // Inject an inbound call announcement.
 struct InboundCallOpts {
-    std::string call_id;
-    std::string from_number = "+15551234567";
-    std::string to_number = "+15559876543";
-    std::string context = "default";
-    std::vector<std::string> auto_states;
-    int delay_ms = 50;
-    std::string session_id;
+  std::string call_id;
+  std::string from_number = "+15551234567";
+  std::string to_number = "+15559876543";
+  std::string context = "default";
+  std::vector<std::string> auto_states;
+  int delay_ms = 50;
+  std::string session_id;
 };
 json inbound_call(const InboundCallOpts& opts);
 
@@ -153,10 +153,9 @@ RelayConfig make_config(const std::string& project = "test_proj",
 // Connect a real RelayClient to the mock and return it. Resets the
 // journal first. The caller owns the lifetime; call client.disconnect()
 // before destroying. The returned pointer is non-null on success.
-std::unique_ptr<RelayClient> make_client(
-    const std::string& project = "test_proj",
-    const std::string& token = "test_tok",
-    const std::vector<std::string>& contexts = {"default"});
+std::unique_ptr<RelayClient> make_client(const std::string& project = "test_proj",
+                                         const std::string& token = "test_tok",
+                                         const std::vector<std::string>& contexts = {"default"});
 
 // Same as make_client(), but lets the caller mutate the RelayConfig (e.g. set a
 // small max_active_calls for the MAP-BOUNDS cap test) before connect(). All the
@@ -173,11 +172,10 @@ bool wait_for_session(int timeout_ms = 2000);
 // the SDK's on_call handler to register the Call into the registry. The
 // handler may answer/play/etc. before this returns. Returns the Call*
 // the SDK created (still owned by the client). Returns nullptr on timeout.
-Call* drive_inbound_call(RelayClient& client,
-                         const std::string& call_id,
+Call* drive_inbound_call(RelayClient& client, const std::string& call_id,
                          const std::vector<std::string>& auto_states = {"created"},
                          int timeout_ms = 5000);
 
-} // namespace mocktest
-} // namespace relay
-} // namespace signalwire
+}  // namespace mocktest
+}  // namespace relay
+}  // namespace signalwire

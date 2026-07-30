@@ -19,32 +19,28 @@ using namespace signalwire::rest;
 using nlohmann::json;
 const std::string kFabricAddressesPath = "/api/fabric/addresses";
 const std::string kFabricAddressesEndpointId = "fabric.list_fabric_addresses";
-}
+}  // namespace
 
 // ---------------------------------------------------------------------------
 // Constructor: records http/path/params/data_key without fetching.
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_init_state) {
-    auto client = mocktest::make_client();
-    PaginatedIterator it(
-        client.http_client(),
-        kFabricAddressesPath,
-        {{"page_size", "2"}},
-        "data");
-    ASSERT_EQ(it.path(), kFabricAddressesPath);
-    auto p = it.params();
-    auto pit = p.find("page_size");
-    ASSERT_TRUE(pit != p.end());
-    ASSERT_EQ(pit->second, std::string("2"));
-    ASSERT_EQ(it.data_key(), std::string("data"));
-    ASSERT_EQ(it.index(), (size_t)0);
-    ASSERT_TRUE(it.items().empty());
-    ASSERT_FALSE(it.done());
-    // Journal must be empty -- no HTTP went out.
-    auto entries = mocktest::journal();
-    ASSERT_TRUE(entries.empty());
-    return true;
+  auto client = mocktest::make_client();
+  PaginatedIterator it(client.http_client(), kFabricAddressesPath, {{"page_size", "2"}}, "data");
+  ASSERT_EQ(it.path(), kFabricAddressesPath);
+  auto p = it.params();
+  auto pit = p.find("page_size");
+  ASSERT_TRUE(pit != p.end());
+  ASSERT_EQ(pit->second, std::string("2"));
+  ASSERT_EQ(it.data_key(), std::string("data"));
+  ASSERT_EQ(it.index(), (size_t)0);
+  ASSERT_TRUE(it.items().empty());
+  ASSERT_FALSE(it.done());
+  // Journal must be empty -- no HTTP went out.
+  auto entries = mocktest::journal();
+  ASSERT_TRUE(entries.empty());
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,15 +48,14 @@ TEST(rest_mock_pagination_init_state) {
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_iter_returns_self) {
-    auto client = mocktest::make_client();
-    PaginatedIterator it(
-        client.http_client(), kFabricAddressesPath, {}, "data");
-    // C++ doesn't have a Python-style ``__iter__`` returning self, but the
-    // semantic equivalent here is: constructing the iterator and never
-    // calling has_next/next leaves the journal empty.
-    auto entries = mocktest::journal();
-    ASSERT_TRUE(entries.empty());
-    return true;
+  auto client = mocktest::make_client();
+  PaginatedIterator it(client.http_client(), kFabricAddressesPath, {}, "data");
+  // C++ doesn't have a Python-style ``__iter__`` returning self, but the
+  // semantic equivalent here is: constructing the iterator and never
+  // calling has_next/next leaves the journal empty.
+  auto entries = mocktest::journal();
+  ASSERT_TRUE(entries.empty());
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -68,64 +63,61 @@ TEST(rest_mock_pagination_iter_returns_self) {
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_next_pages_through_all_items) {
-    auto client = mocktest::make_client();
+  auto client = mocktest::make_client();
 
-    // Page 1 -- has a next page. The server's links.next carries the real wire
-    // param the fabric list endpoint round-trips: page_token (a cursor token
-    // that starts with PA/PB), NOT a "cursor" param (which no SignalWire REST
-    // endpoint accepts -- see rest-apis/fabric/openapi.yaml ListFabricAddressesQuery).
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({
-                {{"id", "addr-1"}, {"name", "first"}},
-                {{"id", "addr-2"}, {"name", "second"}},
-            })},
-            {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
-        });
-    // Page 2 -- terminal (no next).
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({
-                {{"id", "addr-3"}, {"name", "third"}},
-            })},
-            {"links", json::object()},
-        });
+  // Page 1 -- has a next page. The server's links.next carries the real wire
+  // param the fabric list endpoint round-trips: page_token (a cursor token
+  // that starts with PA/PB), NOT a "cursor" param (which no SignalWire REST
+  // endpoint accepts -- see rest-apis/fabric/openapi.yaml ListFabricAddressesQuery).
+  mocktest::scenario_set(
+      kFabricAddressesEndpointId, 200,
+      {
+          {"data", json::array({
+                       {{"id", "addr-1"}, {"name", "first"}},
+                       {{"id", "addr-2"}, {"name", "second"}},
+                   })},
+          {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
+      });
+  // Page 2 -- terminal (no next).
+  mocktest::scenario_set(kFabricAddressesEndpointId, 200,
+                         {
+                             {"data", json::array({
+                                          {{"id", "addr-3"}, {"name", "third"}},
+                                      })},
+                             {"links", json::object()},
+                         });
 
-    PaginatedIterator it(
-        client.http_client(), kFabricAddressesPath, {}, "data");
+  PaginatedIterator it(client.http_client(), kFabricAddressesPath, {}, "data");
 
-    std::vector<std::string> ids;
-    while (it.has_next()) {
-        json item = it.next();
-        ids.push_back(item.value("id", std::string()));
+  std::vector<std::string> ids;
+  while (it.has_next()) {
+    json item = it.next();
+    ids.push_back(item.value("id", std::string()));
+  }
+
+  // All three items, in order.
+  ASSERT_EQ(ids.size(), (size_t)3);
+  ASSERT_EQ(ids[0], std::string("addr-1"));
+  ASSERT_EQ(ids[1], std::string("addr-2"));
+  ASSERT_EQ(ids[2], std::string("addr-3"));
+
+  // Journal must have exactly two GETs at the same path.
+  auto entries = mocktest::journal();
+  int gets = 0;
+  int got_page_token_page2 = 0;
+  for (const auto& e : entries) {
+    if (e.method == "GET" && e.path == kFabricAddressesPath) {
+      ++gets;
+      auto cit = e.query_params.find("page_token");
+      if (cit != e.query_params.end() && !cit->second.empty() &&
+          cit->second.front() == "PA_page2") {
+        ++got_page_token_page2;
+      }
     }
-
-    // All three items, in order.
-    ASSERT_EQ(ids.size(), (size_t)3);
-    ASSERT_EQ(ids[0], std::string("addr-1"));
-    ASSERT_EQ(ids[1], std::string("addr-2"));
-    ASSERT_EQ(ids[2], std::string("addr-3"));
-
-    // Journal must have exactly two GETs at the same path.
-    auto entries = mocktest::journal();
-    int gets = 0;
-    int got_page_token_page2 = 0;
-    for (const auto& e : entries) {
-        if (e.method == "GET" && e.path == kFabricAddressesPath) {
-            ++gets;
-            auto cit = e.query_params.find("page_token");
-            if (cit != e.query_params.end()
-                && !cit->second.empty()
-                && cit->second.front() == "PA_page2") {
-                ++got_page_token_page2;
-            }
-        }
-    }
-    ASSERT_EQ(gets, 2);
-    ASSERT_EQ(got_page_token_page2, 1);
-    return true;
+  }
+  ASSERT_EQ(gets, 2);
+  ASSERT_EQ(got_page_token_page2, 1);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,61 +129,59 @@ TEST(rest_mock_pagination_next_pages_through_all_items) {
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
-    auto client = mocktest::make_client();
+  auto client = mocktest::make_client();
 
-    // Page 1 -- has a next page (real wire param: page_token, see above).
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({
-                {{"id", "addr-1"}, {"name", "first"}},
-                {{"id", "addr-2"}, {"name", "second"}},
-            })},
-            {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
-        });
-    // Page 2 -- terminal (no next).
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({
-                {{"id", "addr-3"}, {"name", "third"}},
-            })},
-            {"links", json::object()},
-        });
+  // Page 1 -- has a next page (real wire param: page_token, see above).
+  mocktest::scenario_set(
+      kFabricAddressesEndpointId, 200,
+      {
+          {"data", json::array({
+                       {{"id", "addr-1"}, {"name", "first"}},
+                       {{"id", "addr-2"}, {"name", "second"}},
+                   })},
+          {"links", {{"next", "http://example.com/api/fabric/addresses?page_token=PA_page2"}}},
+      });
+  // Page 2 -- terminal (no next).
+  mocktest::scenario_set(kFabricAddressesEndpointId, 200,
+                         {
+                             {"data", json::array({
+                                          {{"id", "addr-3"}, {"name", "third"}},
+                                      })},
+                             {"links", json::object()},
+                         });
 
-    signalwire::rest::generated::FabricAddresses addresses(client.http_client());
-    // paginate() returns a PaginatedIterator wired to this resource's base path.
-    auto it = addresses.paginate();
-    ASSERT_EQ(it.path(), kFabricAddressesPath);
+  signalwire::rest::generated::FabricAddresses addresses(client.http_client());
+  // paginate() returns a PaginatedIterator wired to this resource's base path.
+  auto it = addresses.paginate();
+  ASSERT_EQ(it.path(), kFabricAddressesPath);
 
-    std::vector<std::string> ids;
-    while (it.has_next()) {
-        json item = it.next();
-        ids.push_back(item.value("id", std::string()));
+  std::vector<std::string> ids;
+  while (it.has_next()) {
+    json item = it.next();
+    ids.push_back(item.value("id", std::string()));
+  }
+  ASSERT_EQ(ids.size(), (size_t)3);
+  ASSERT_EQ(ids[0], std::string("addr-1"));
+  ASSERT_EQ(ids[1], std::string("addr-2"));
+  ASSERT_EQ(ids[2], std::string("addr-3"));
+
+  // Two GETs at the resource path; the second carries the parsed page_token=PA_page2.
+  auto entries = mocktest::journal();
+  int gets = 0;
+  int got_page_token_page2 = 0;
+  for (const auto& e : entries) {
+    if (e.method == "GET" && e.path == kFabricAddressesPath) {
+      ++gets;
+      auto cit = e.query_params.find("page_token");
+      if (cit != e.query_params.end() && !cit->second.empty() &&
+          cit->second.front() == "PA_page2") {
+        ++got_page_token_page2;
+      }
     }
-    ASSERT_EQ(ids.size(), (size_t)3);
-    ASSERT_EQ(ids[0], std::string("addr-1"));
-    ASSERT_EQ(ids[1], std::string("addr-2"));
-    ASSERT_EQ(ids[2], std::string("addr-3"));
-
-    // Two GETs at the resource path; the second carries the parsed page_token=PA_page2.
-    auto entries = mocktest::journal();
-    int gets = 0;
-    int got_page_token_page2 = 0;
-    for (const auto& e : entries) {
-        if (e.method == "GET" && e.path == kFabricAddressesPath) {
-            ++gets;
-            auto cit = e.query_params.find("page_token");
-            if (cit != e.query_params.end()
-                && !cit->second.empty()
-                && cit->second.front() == "PA_page2") {
-                ++got_page_token_page2;
-            }
-        }
-    }
-    ASSERT_EQ(gets, 2);
-    ASSERT_EQ(got_page_token_page2, 1);
-    return true;
+  }
+  ASSERT_EQ(gets, 2);
+  ASSERT_EQ(got_page_token_page2, 1);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,42 +189,39 @@ TEST(rest_mock_pagination_readresource_paginate_walks_pages) {
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_readresource_paginate_forwards_params) {
-    auto client = mocktest::make_client();
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({{{"id", "addr-1"}}})},
-            {"links", json::object()},
-        });
+  auto client = mocktest::make_client();
+  mocktest::scenario_set(kFabricAddressesEndpointId, 200,
+                         {
+                             {"data", json::array({{{"id", "addr-1"}}})},
+                             {"links", json::object()},
+                         });
 
-    signalwire::rest::generated::FabricAddresses addresses(client.http_client());
-    auto it = addresses.paginate({{"page_size", "2"}});
-    auto p = it.params();
-    auto pit = p.find("page_size");
-    ASSERT_TRUE(pit != p.end());
-    ASSERT_EQ(pit->second, std::string("2"));
+  signalwire::rest::generated::FabricAddresses addresses(client.http_client());
+  auto it = addresses.paginate({{"page_size", "2"}});
+  auto p = it.params();
+  auto pit = p.find("page_size");
+  ASSERT_TRUE(pit != p.end());
+  ASSERT_EQ(pit->second, std::string("2"));
 
-    std::vector<std::string> ids;
-    while (it.has_next()) {
-        ids.push_back(it.next().value("id", std::string()));
+  std::vector<std::string> ids;
+  while (it.has_next()) {
+    ids.push_back(it.next().value("id", std::string()));
+  }
+  ASSERT_EQ(ids.size(), (size_t)1);
+
+  // The first (only) GET carried page_size=2.
+  auto entries = mocktest::journal();
+  int with_page_size = 0;
+  for (const auto& e : entries) {
+    if (e.method == "GET" && e.path == kFabricAddressesPath) {
+      auto cit = e.query_params.find("page_size");
+      if (cit != e.query_params.end() && !cit->second.empty() && cit->second.front() == "2") {
+        ++with_page_size;
+      }
     }
-    ASSERT_EQ(ids.size(), (size_t)1);
-
-    // The first (only) GET carried page_size=2.
-    auto entries = mocktest::journal();
-    int with_page_size = 0;
-    for (const auto& e : entries) {
-        if (e.method == "GET" && e.path == kFabricAddressesPath) {
-            auto cit = e.query_params.find("page_size");
-            if (cit != e.query_params.end()
-                && !cit->second.empty()
-                && cit->second.front() == "2") {
-                ++with_page_size;
-            }
-        }
-    }
-    ASSERT_EQ(with_page_size, 1);
-    return true;
+  }
+  ASSERT_EQ(with_page_size, 1);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,30 +229,28 @@ TEST(rest_mock_pagination_readresource_paginate_forwards_params) {
 // ---------------------------------------------------------------------------
 
 TEST(rest_mock_pagination_next_raises_when_done) {
-    auto client = mocktest::make_client();
+  auto client = mocktest::make_client();
 
-    // One terminal page with a single item.
-    mocktest::scenario_set(
-        kFabricAddressesEndpointId, 200,
-        {
-            {"data", json::array({{{"id", "only-one"}}})},
-            {"links", json::object()},
-        });
+  // One terminal page with a single item.
+  mocktest::scenario_set(kFabricAddressesEndpointId, 200,
+                         {
+                             {"data", json::array({{{"id", "only-one"}}})},
+                             {"links", json::object()},
+                         });
 
-    PaginatedIterator it(
-        client.http_client(), kFabricAddressesPath, {}, "data");
+  PaginatedIterator it(client.http_client(), kFabricAddressesPath, {}, "data");
 
-    json first = it.next();
-    ASSERT_EQ(first.value("id", std::string()), std::string("only-one"));
+  json first = it.next();
+  ASSERT_EQ(first.value("id", std::string()), std::string("only-one"));
 
-    bool threw = false;
-    try {
-        (void)it.next();
-    } catch (const std::out_of_range&) {
-        threw = true;
-    } catch (const std::exception&) {
-        threw = true;
-    }
-    ASSERT_TRUE(threw);
-    return true;
+  bool threw = false;
+  try {
+    (void)it.next();
+  } catch (const std::out_of_range&) {
+    threw = true;
+  } catch (const std::exception&) {
+    threw = true;
+  }
+  ASSERT_TRUE(threw);
+  return true;
 }

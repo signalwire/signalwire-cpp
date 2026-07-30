@@ -1,36 +1,36 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // REST client demo: manage resources, place calls.
 
-#include <signalwire/rest/rest_client.hpp>
 #include <iostream>
+#include <signalwire/rest/rest_client.hpp>
 
 using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
-    try {
-        auto client = RestClient::from_env();
+  try {
+    auto client = RestClient::from_env();
 
-        // List AI agents
-        std::cout << "Listing AI agents...\n";
-        auto agents = client.fabric().ai_agents.list();
-        std::cout << "  Found: " << agents.dump(2) << "\n";
+    // List AI agents
+    std::cout << "Listing AI agents...\n";
+    auto agents = client.fabric().ai_agents.list();
+    std::cout << "  Found: " << agents.dump(2) << "\n";
 
-        // Search phone numbers
-        std::cout << "\nSearching phone numbers...\n";
-        auto numbers = client.phone_numbers().search({{"areacode", "512"}});
-        std::cout << "  Results: " << numbers.dump(2) << "\n";
+    // Search phone numbers
+    std::cout << "\nSearching phone numbers...\n";
+    auto numbers = client.phone_numbers().search({{"areacode", "512"}});
+    std::cout << "  Results: " << numbers.dump(2) << "\n";
 
-        // Place a test call
-        std::cout << "\nPlacing test call...\n";
-        auto result = client.calling().dial({
-            .from = "+15559876543",
-            .to = "+15551234567",
-            .url = "https://example.com/handler",
-        });
-        std::cout << "  Call: " << result.dump(2) << "\n";
+    // Place a test call
+    std::cout << "\nPlacing test call...\n";
+    auto result = client.calling().dial({
+        .from = "+15559876543",
+        .to = "+15551234567",
+        .url = "https://example.com/handler",
+    });
+    std::cout << "  Call: " << result.dump(2) << "\n";
 
-    } catch (const SignalWireRestError& e) {
-        std::cerr << "REST error " << e.status_code() << ": " << e.what() << "\n";
-    }
+  } catch (const SignalWireRestError& e) {
+    std::cerr << "REST error " << e.status_code() << ": " << e.what() << "\n";
+  }
 }

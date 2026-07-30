@@ -212,8 +212,8 @@ TEST(validating_path_renderer_record_call_survives_validator) {
   svc.set_name("s").set_route("/s");
   signalwire::core::RenderOptions opts;
   opts.record_call = true;
-  std::string s = signalwire::core::SwmlRenderer::render_swml(
-      json::object({{"text", "hi"}}), svc, opts);
+  std::string s =
+      signalwire::core::SwmlRenderer::render_swml(json::object({{"text", "hi"}}), svc, opts);
   ASSERT_TRUE(vp_document_survives_validator(json::parse(s)));
   return true;
 }
@@ -234,8 +234,8 @@ TEST(validating_path_renderer_function_response_rejects_invalid_action) {
   signalwire::swml::Service svc;
   svc.set_name("s").set_route("/s");
   std::vector<json> actions = {json::object({{"play", json::object({{"text", "nope"}})}})};
-  ASSERT_THROWS(signalwire::core::SwmlRenderer::render_function_response_swml(
-      "", svc, actions, "json"));
+  ASSERT_THROWS(
+      signalwire::core::SwmlRenderer::render_function_response_swml("", svc, actions, "json"));
   return true;
 }
 
@@ -243,8 +243,8 @@ TEST(validating_path_renderer_function_response_valid_action_ok) {
   signalwire::swml::Service svc;
   svc.set_name("s").set_route("/s");
   std::vector<json> actions = {json::object({{"hangup", json::object()}})};
-  std::string s = signalwire::core::SwmlRenderer::render_function_response_swml(
-      "", svc, actions, "json");
+  std::string s =
+      signalwire::core::SwmlRenderer::render_function_response_swml("", svc, actions, "json");
   ASSERT_TRUE(vp_document_survives_validator(json::parse(s)));
   return true;
 }

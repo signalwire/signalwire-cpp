@@ -23,9 +23,9 @@
 // on infra; CI brings the mocks up so the assertions actually run.
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 namespace signalwire {
 namespace tlstest {
@@ -42,24 +42,24 @@ std::string ca_cert_path();
 std::string trust_test_ca();
 
 // ---- REST (mock_signalwire --tls) --------------------------------------
-int rest_tls_port();                       // default 8773
-std::string rest_tls_base_url();           // https://127.0.0.1:<port>
-std::string rest_tls_control_base();       // https://127.0.0.1:<port> (same host:port)
+int rest_tls_port();                  // default 8773
+std::string rest_tls_base_url();      // https://127.0.0.1:<port>
+std::string rest_tls_control_base();  // https://127.0.0.1:<port> (same host:port)
 // True iff the https:// REST mock answers /__mock__/health when trusting the
 // test CA. Performs a real verified GET.
 bool rest_tls_available();
 // Reset + read the REST mock journal over its (HTTPS) control plane.
 void rest_journal_reset();
-json rest_journal_last();                  // throws if empty
+json rest_journal_last();  // throws if empty
 
 // ---- RELAY (mock_relay --tls) ------------------------------------------
-int relay_tls_ws_port();                   // default 8783
-int relay_tls_http_port();                 // default 9783 (control plane: HTTP)
-std::string relay_tls_http_url();          // http://127.0.0.1:<http_port>
-bool relay_tls_available();                // control-plane /__mock__/health ok
+int relay_tls_ws_port();           // default 8783
+int relay_tls_http_port();         // default 9783 (control plane: HTTP)
+std::string relay_tls_http_url();  // http://127.0.0.1:<http_port>
+bool relay_tls_available();        // control-plane /__mock__/health ok
 void relay_journal_reset();
 // Inbound (SDK->server) journal frames, optionally filtered by JSON-RPC method.
 std::vector<json> relay_journal_recv(const std::string& method = "");
 
-} // namespace tlstest
-} // namespace signalwire
+}  // namespace tlstest
+}  // namespace signalwire

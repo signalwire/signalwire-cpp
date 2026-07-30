@@ -20,12 +20,12 @@
 // That split is identical on the HTTP endpoint and on every serverless mode,
 // so serverless is not a weaker transport -- just a different envelope.
 
+#include <httplib.h>
+
 #include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
-
-#include <httplib.h>
 
 #include "signalwire/agent/agent_base.hpp"
 #include "signalwire/common.hpp"
@@ -414,8 +414,7 @@ TEST(swaig_secure_token_serverless_gcf_does_not_dispatch_swaig) {
                    {"argument", json{{"parsed", json::array({json::object()})}}},
                    {"call_id", "c1"}};
   std::map<std::string, std::string> headers = {
-      {"Authorization", sec_basic_auth(kSecUser, kSecPass)},
-      {"Content-Type", "application/json"}};
+      {"Authorization", sec_basic_auth(kSecUser, kSecPass)}, {"Content-Type", "application/json"}};
 
   auto resp = signalwire::utils::handle_gcf(agent, "POST", "/say_hello", headers, body.dump());
   ASSERT_EQ(resp.status, 200);

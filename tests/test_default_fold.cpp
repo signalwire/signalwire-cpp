@@ -129,8 +129,8 @@ std::string dfold_served_route(signalwire::agent::AgentBase& agent,
 // prefab and probing the WHOLE set means a regression to "/" (or to another
 // prefab's path) is caught, not just a miss on the expected path.
 const std::vector<std::string>& dfold_all_routes() {
-  static const std::vector<std::string> routes = {
-      "/", "/survey", "/concierge", "/faq", "/receptionist", "/info_gatherer"};
+  static const std::vector<std::string> routes = {"/",    "/survey",       "/concierge",
+                                                  "/faq", "/receptionist", "/info_gatherer"};
   return routes;
 }
 

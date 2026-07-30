@@ -23,8 +23,7 @@ TEST(infer_schema_from_typed_builder) {
       .integer("count", "How many")
       .required({"service"});
 
-  auto [parameters, required, description, is_typed, has_raw_data] =
-      sw_ti::infer_schema(schema);
+  auto [parameters, required, description, is_typed, has_raw_data] = sw_ti::infer_schema(schema);
 
   // parameters is the properties map (name -> property).
   ASSERT_TRUE(parameters.is_object());
@@ -64,8 +63,7 @@ TEST(infer_schema_raw_data_excluded_but_flagged) {
   sw_swaig::ParameterSchema schema;
   schema.string("name").string("raw_data").required({"name", "raw_data"});
 
-  auto [parameters, required, description, is_typed, has_raw_data] =
-      sw_ti::infer_schema(schema);
+  auto [parameters, required, description, is_typed, has_raw_data] = sw_ti::infer_schema(schema);
 
   ASSERT_TRUE(parameters.contains("name"));
   ASSERT_FALSE(parameters.contains("raw_data"));
@@ -79,8 +77,7 @@ TEST(infer_schema_raw_data_excluded_but_flagged) {
 
 TEST(infer_schema_empty_builder_is_untyped) {
   sw_swaig::ParameterSchema schema;  // no properties declared
-  auto [parameters, required, description, is_typed, has_raw_data] =
-      sw_ti::infer_schema(schema);
+  auto [parameters, required, description, is_typed, has_raw_data] = sw_ti::infer_schema(schema);
   ASSERT_TRUE(parameters.empty());
   ASSERT_TRUE(required.empty());
   ASSERT_FALSE(is_typed);

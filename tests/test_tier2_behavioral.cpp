@@ -120,14 +120,14 @@ TEST(tier2_info_gatherer_submit_answer_advances_state) {
   });
 
   // Simulate the SWAIG runtime handing back global_data at index 0.
-  json raw = json({{"global_data",
-                    json({{"questions",
-                           json::array({json({{"key_name", "name"},
-                                              {"question_text", "What is your name?"}}),
-                                        json({{"key_name", "city"},
-                                              {"question_text", "What city are you in?"}})})},
-                          {"question_index", 0},
-                          {"answers", json::array()}})}});
+  json raw = json(
+      {{"global_data",
+        json({{"questions",
+               json::array(
+                   {json({{"key_name", "name"}, {"question_text", "What is your name?"}}),
+                    json({{"key_name", "city"}, {"question_text", "What city are you in?"}})})},
+              {"question_index", 0},
+              {"answers", json::array()}})}});
 
   auto result = agent.submit_answer(json({{"answer", "Ada"}}), raw).to_json();
 
@@ -171,10 +171,10 @@ TEST(tier2_native_vector_search_remote_http_post) {
       captured_query = body.value("query", "");
     } catch (...) {
     }
-    json out = json({{"results",
-                      json::array({json({{"content", "The capital of France is Paris."},
-                                         {"score", 0.97},
-                                         {"metadata", json({{"filename", "geo.md"}})}})})}});
+    json out =
+        json({{"results", json::array({json({{"content", "The capital of France is Paris."},
+                                             {"score", 0.97},
+                                             {"metadata", json({{"filename", "geo.md"}})}})})}});
     res.set_content(out.dump(), "application/json");
   });
 

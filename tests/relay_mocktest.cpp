@@ -7,6 +7,14 @@
 // Python conftest fixtures and the REST mocktest.cpp implementation.
 #include "relay_mocktest.hpp"
 
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <cctype>
 #include <chrono>
 #include <cstdlib>
@@ -14,13 +22,6 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
-#include <unistd.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <signal.h>
-#include <fcntl.h>
 
 #include "httplib.h"
 
@@ -38,148 +39,146 @@ constexpr int kStartupTimeoutSeconds = 30;
 // so leftover listeners / parallel runs can't collide on a fixed pair.
 // Returns a negative value on failure; callers throw.
 int pick_free_port() {
-    int s = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) return -1;
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    addr.sin_port = 0;
-    if (::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-        ::close(s);
-        return -1;
-    }
-    socklen_t len = sizeof(addr);
-    if (::getsockname(s, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
-        ::close(s);
-        return -1;
-    }
-    int port = ntohs(addr.sin_port);
+  int s = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (s < 0) return -1;
+  sockaddr_in addr{};
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  addr.sin_port = 0;
+  if (::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
     ::close(s);
-    return port;
+    return -1;
+  }
+  socklen_t len = sizeof(addr);
+  if (::getsockname(s, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    ::close(s);
+    return -1;
+  }
+  int port = ntohs(addr.sin_port);
+  ::close(s);
+  return port;
 }
 
 std::mutex& server_mutex() {
-    static std::mutex m;
-    return m;
+  static std::mutex m;
+  return m;
 }
 
 bool& server_started() {
-    static bool started = false;
-    return started;
+  static bool started = false;
+  return started;
 }
 
 std::string& http_url_cache() {
-    static std::string url;
-    return url;
+  static std::string url;
+  return url;
 }
 
 // Thread-local active session id. make_client() sets it; the parallel runner
 // gives each test its own thread, so harness calls scope to the test's client.
 std::string& active_session_ref() {
-    thread_local std::string sid;
-    return sid;
+  thread_local std::string sid;
+  return sid;
 }
 
 // URL-encode a query value (session ids are hex, but be correct anyway).
 std::string url_encode(const std::string& s) {
-    static const char* hexd = "0123456789ABCDEF";
-    std::string out;
-    out.reserve(s.size());
-    for (unsigned char c : s) {
-        if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
-            out.push_back(static_cast<char>(c));
-        } else {
-            out.push_back('%');
-            out.push_back(hexd[c >> 4]);
-            out.push_back(hexd[c & 0xF]);
-        }
+  static const char* hexd = "0123456789ABCDEF";
+  std::string out;
+  out.reserve(s.size());
+  for (unsigned char c : s) {
+    if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+      out.push_back(static_cast<char>(c));
+    } else {
+      out.push_back('%');
+      out.push_back(hexd[c >> 4]);
+      out.push_back(hexd[c & 0xF]);
     }
-    return out;
+  }
+  return out;
 }
 
 // "?session_id=<active>" when scoped, else "".
 std::string session_query() {
-    const std::string& sid = active_session_ref();
-    return sid.empty() ? std::string() : ("?session_id=" + url_encode(sid));
+  const std::string& sid = active_session_ref();
+  return sid.empty() ? std::string() : ("?session_id=" + url_encode(sid));
 }
 
 std::pair<std::string, int> split_url(const std::string& base) {
-    std::string s = base;
-    auto pos = s.find("://");
-    if (pos != std::string::npos) s = s.substr(pos + 3);
-    auto cpos = s.find(':');
-    std::string host = (cpos == std::string::npos) ? s : s.substr(0, cpos);
-    int port = (cpos == std::string::npos) ? 80 : std::stoi(s.substr(cpos + 1));
-    return {host, port};
+  std::string s = base;
+  auto pos = s.find("://");
+  if (pos != std::string::npos) s = s.substr(pos + 3);
+  auto cpos = s.find(':');
+  std::string host = (cpos == std::string::npos) ? s : s.substr(0, cpos);
+  int port = (cpos == std::string::npos) ? 80 : std::stoi(s.substr(cpos + 1));
+  return {host, port};
 }
 
 bool probe_health(const std::string& base_url) {
-    auto [host, port] = split_url(base_url);
-    httplib::Client cli(host, port);
-    cli.set_connection_timeout(2, 0);
-    cli.set_read_timeout(2, 0);
-    auto res = cli.Get("/__mock__/health");
-    if (!res || res->status != 200) return false;
-    try {
-        auto j = json::parse(res->body);
-        return j.contains("schemas_loaded");
-    } catch (...) {
-        return false;
-    }
+  auto [host, port] = split_url(base_url);
+  httplib::Client cli(host, port);
+  cli.set_connection_timeout(2, 0);
+  cli.set_read_timeout(2, 0);
+  auto res = cli.Get("/__mock__/health");
+  if (!res || res->status != 200) return false;
+  try {
+    auto j = json::parse(res->body);
+    return j.contains("schemas_loaded");
+  } catch (...) {
+    return false;
+  }
 }
 
 void post_no_body(const std::string& base_url, const std::string& path) {
-    auto [host, port] = split_url(base_url);
-    httplib::Client cli(host, port);
-    cli.set_connection_timeout(5, 0);
-    cli.set_read_timeout(5, 0);
-    auto res = cli.Post(path, "", "application/json");
-    if (!res) {
-        throw std::runtime_error("relay_mocktest: POST " + path + " failed");
-    }
-    if (res->status != 200) {
-        throw std::runtime_error("relay_mocktest: POST " + path + " returned status "
-                                 + std::to_string(res->status));
-    }
+  auto [host, port] = split_url(base_url);
+  httplib::Client cli(host, port);
+  cli.set_connection_timeout(5, 0);
+  cli.set_read_timeout(5, 0);
+  auto res = cli.Post(path, "", "application/json");
+  if (!res) {
+    throw std::runtime_error("relay_mocktest: POST " + path + " failed");
+  }
+  if (res->status != 200) {
+    throw std::runtime_error("relay_mocktest: POST " + path + " returned status " +
+                             std::to_string(res->status));
+  }
 }
 
-json post_json(const std::string& base_url, const std::string& path,
-               const json& body) {
-    auto [host, port] = split_url(base_url);
-    httplib::Client cli(host, port);
-    cli.set_connection_timeout(15, 0);
-    cli.set_read_timeout(30, 0);
-    auto res = cli.Post(path, body.dump(), "application/json");
-    if (!res) {
-        throw std::runtime_error("relay_mocktest: POST " + path + " failed");
-    }
-    if (res->status != 200) {
-        throw std::runtime_error(
-            "relay_mocktest: POST " + path + " returned status "
-            + std::to_string(res->status) + " body=" + res->body);
-    }
-    if (res->body.empty()) return json::object();
-    try {
-        return json::parse(res->body);
-    } catch (...) {
-        return json::object();
-    }
+json post_json(const std::string& base_url, const std::string& path, const json& body) {
+  auto [host, port] = split_url(base_url);
+  httplib::Client cli(host, port);
+  cli.set_connection_timeout(15, 0);
+  cli.set_read_timeout(30, 0);
+  auto res = cli.Post(path, body.dump(), "application/json");
+  if (!res) {
+    throw std::runtime_error("relay_mocktest: POST " + path + " failed");
+  }
+  if (res->status != 200) {
+    throw std::runtime_error("relay_mocktest: POST " + path + " returned status " +
+                             std::to_string(res->status) + " body=" + res->body);
+  }
+  if (res->body.empty()) return json::object();
+  try {
+    return json::parse(res->body);
+  } catch (...) {
+    return json::object();
+  }
 }
 
 json get_json(const std::string& base_url, const std::string& path) {
-    auto [host, port] = split_url(base_url);
-    httplib::Client cli(host, port);
-    cli.set_connection_timeout(5, 0);
-    cli.set_read_timeout(5, 0);
-    auto res = cli.Get(path);
-    if (!res) {
-        throw std::runtime_error("relay_mocktest: GET " + path + " failed");
-    }
-    if (res->status != 200) {
-        throw std::runtime_error("relay_mocktest: GET " + path + " returned "
-                                 + std::to_string(res->status));
-    }
-    return json::parse(res->body);
+  auto [host, port] = split_url(base_url);
+  httplib::Client cli(host, port);
+  cli.set_connection_timeout(5, 0);
+  cli.set_read_timeout(5, 0);
+  auto res = cli.Get(path);
+  if (!res) {
+    throw std::runtime_error("relay_mocktest: GET " + path + " failed");
+  }
+  if (res->status != 200) {
+    throw std::runtime_error("relay_mocktest: GET " + path + " returned " +
+                             std::to_string(res->status));
+  }
+  return json::parse(res->body);
 }
 
 // Walk this source file's directory upward looking for an adjacent
@@ -189,423 +188,405 @@ json get_json(const std::string& base_url, const std::string& path) {
 // so the walk is independent of CWD at test-run time.
 std::string discover_porting_sdk_package(const std::string& name) {
 #ifndef PROJECT_SOURCE_DIR
-    std::string anchor = __FILE__;
-    auto last = anchor.find_last_of('/');
-    if (last != std::string::npos) anchor = anchor.substr(0, last);
+  std::string anchor = __FILE__;
+  auto last = anchor.find_last_of('/');
+  if (last != std::string::npos) anchor = anchor.substr(0, last);
 #else
-    std::string anchor = PROJECT_SOURCE_DIR;
+  std::string anchor = PROJECT_SOURCE_DIR;
 #endif
-    std::string dir = anchor;
-    while (true) {
-        while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
-        auto last = dir.find_last_of('/');
-        if (last == std::string::npos || last == 0) {
-            return std::string();
-        }
-        std::string parent = dir.substr(0, last);
-        std::string candidate = parent + "/porting-sdk/test_harness/" + name;
-        std::string init = candidate + "/" + name + "/__init__.py";
-        struct stat st;
-        if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
-            return candidate;
-        }
-        if (parent == dir) return std::string();
-        dir = parent;
+  std::string dir = anchor;
+  while (true) {
+    while (dir.size() > 1 && dir.back() == '/') dir.pop_back();
+    auto last = dir.find_last_of('/');
+    if (last == std::string::npos || last == 0) {
+      return std::string();
     }
+    std::string parent = dir.substr(0, last);
+    std::string candidate = parent + "/porting-sdk/test_harness/" + name;
+    std::string init = candidate + "/" + name + "/__init__.py";
+    struct stat st;
+    if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+      return candidate;
+    }
+    if (parent == dir) return std::string();
+    dir = parent;
+  }
 }
 
 void spawn_mock_server(int ws_port, int http_port) {
-    std::string pkg_dir = discover_porting_sdk_package("mock_relay");
+  std::string pkg_dir = discover_porting_sdk_package("mock_relay");
 
-    pid_t pid = fork();
-    if (pid < 0) {
-        throw std::runtime_error("relay_mocktest: fork() failed");
+  pid_t pid = fork();
+  if (pid < 0) {
+    throw std::runtime_error("relay_mocktest: fork() failed");
+  }
+  if (pid == 0) {
+    int devnull = open("/dev/null", O_RDWR);
+    if (devnull >= 0) {
+      dup2(devnull, STDIN_FILENO);
+      dup2(devnull, STDOUT_FILENO);
+      dup2(devnull, STDERR_FILENO);
+      close(devnull);
     }
-    if (pid == 0) {
-        int devnull = open("/dev/null", O_RDWR);
-        if (devnull >= 0) {
-            dup2(devnull, STDIN_FILENO);
-            dup2(devnull, STDOUT_FILENO);
-            dup2(devnull, STDERR_FILENO);
-            close(devnull);
-        }
-        setsid();
-        if (!pkg_dir.empty()) {
-            const char* existing = std::getenv("PYTHONPATH");
-            std::string new_pp = pkg_dir;
-            if (existing && *existing) {
-                new_pp.push_back(':');
-                new_pp.append(existing);
-            }
-            ::setenv("PYTHONPATH", new_pp.c_str(), 1);
-        }
-        std::string ws_str = std::to_string(ws_port);
-        std::string http_str = std::to_string(http_port);
-        execlp("python", "python",
-               "-m", "mock_relay",
-               "--host", "127.0.0.1",
-               "--ws-port", ws_str.c_str(),
-               "--http-port", http_str.c_str(),
-               "--log-level", "error",
-               (char*)nullptr);
-        _exit(127);
+    setsid();
+    if (!pkg_dir.empty()) {
+      const char* existing = std::getenv("PYTHONPATH");
+      std::string new_pp = pkg_dir;
+      if (existing && *existing) {
+        new_pp.push_back(':');
+        new_pp.append(existing);
+      }
+      ::setenv("PYTHONPATH", new_pp.c_str(), 1);
     }
-    // Parent: don't wait. ensure_server() polls health until ready.
+    std::string ws_str = std::to_string(ws_port);
+    std::string http_str = std::to_string(http_port);
+    execlp("python", "python", "-m", "mock_relay", "--host", "127.0.0.1", "--ws-port",
+           ws_str.c_str(), "--http-port", http_str.c_str(), "--log-level", "error", (char*)nullptr);
+    _exit(127);
+  }
+  // Parent: don't wait. ensure_server() polls health until ready.
 }
 
 JournalEntry parse_entry(const json& e) {
-    JournalEntry je;
-    if (e.contains("timestamp") && e["timestamp"].is_number()) {
-        je.timestamp = e["timestamp"].get<double>();
-    }
-    if (e.contains("direction") && e["direction"].is_string()) {
-        je.direction = e["direction"].get<std::string>();
-    }
-    if (e.contains("method") && e["method"].is_string()) {
-        je.method = e["method"].get<std::string>();
-    }
-    if (e.contains("request_id") && e["request_id"].is_string()) {
-        je.request_id = e["request_id"].get<std::string>();
-    }
-    if (e.contains("connection_id") && e["connection_id"].is_string()) {
-        je.connection_id = e["connection_id"].get<std::string>();
-    }
-    if (e.contains("session_id") && e["session_id"].is_string()) {
-        je.session_id = e["session_id"].get<std::string>();
-    }
-    if (e.contains("frame")) je.frame = e["frame"];
-    return je;
+  JournalEntry je;
+  if (e.contains("timestamp") && e["timestamp"].is_number()) {
+    je.timestamp = e["timestamp"].get<double>();
+  }
+  if (e.contains("direction") && e["direction"].is_string()) {
+    je.direction = e["direction"].get<std::string>();
+  }
+  if (e.contains("method") && e["method"].is_string()) {
+    je.method = e["method"].get<std::string>();
+  }
+  if (e.contains("request_id") && e["request_id"].is_string()) {
+    je.request_id = e["request_id"].get<std::string>();
+  }
+  if (e.contains("connection_id") && e["connection_id"].is_string()) {
+    je.connection_id = e["connection_id"].get<std::string>();
+  }
+  if (e.contains("session_id") && e["session_id"].is_string()) {
+    je.session_id = e["session_id"].get<std::string>();
+  }
+  if (e.contains("frame")) je.frame = e["frame"];
+  return je;
 }
 
-} // namespace
+}  // namespace
 
 int resolve_ws_port() {
-    if (const char* env = std::getenv("MOCK_RELAY_PORT")) {
-        if (env && *env) {
-            try { return std::stoi(env); } catch (...) {}
-        }
+  if (const char* env = std::getenv("MOCK_RELAY_PORT")) {
+    if (env && *env) {
+      try {
+        return std::stoi(env);
+      } catch (...) {
+      }
     }
-    // No override: pick a free port once and memoize it so ensure_server's
-    // spawn and make_config()/test callers all agree on the same ws port.
-    static const int dynamic_ws_port = pick_free_port();
-    if (dynamic_ws_port < 0) {
-        throw std::runtime_error(
-            "relay_mocktest: could not allocate a free ws port for "
-            "`python -m mock_relay` (set MOCK_RELAY_PORT to a pre-running instance)");
-    }
-    return dynamic_ws_port;
+  }
+  // No override: pick a free port once and memoize it so ensure_server's
+  // spawn and make_config()/test callers all agree on the same ws port.
+  static const int dynamic_ws_port = pick_free_port();
+  if (dynamic_ws_port < 0) {
+    throw std::runtime_error(
+        "relay_mocktest: could not allocate a free ws port for "
+        "`python -m mock_relay` (set MOCK_RELAY_PORT to a pre-running instance)");
+  }
+  return dynamic_ws_port;
 }
 
 int resolve_http_port() {
-    if (const char* env = std::getenv("MOCK_RELAY_HTTP_PORT")) {
-        if (env && *env) {
-            try { return std::stoi(env); } catch (...) {}
-        }
+  if (const char* env = std::getenv("MOCK_RELAY_HTTP_PORT")) {
+    if (env && *env) {
+      try {
+        return std::stoi(env);
+      } catch (...) {
+      }
     }
-    // Independent free port (NOT ws+1000), memoized for the same reason.
-    static const int dynamic_http_port = pick_free_port();
-    if (dynamic_http_port < 0) {
-        throw std::runtime_error(
-            "relay_mocktest: could not allocate a free http port for "
-            "`python -m mock_relay` (set MOCK_RELAY_HTTP_PORT to a pre-running instance)");
-    }
-    return dynamic_http_port;
+  }
+  // Independent free port (NOT ws+1000), memoized for the same reason.
+  static const int dynamic_http_port = pick_free_port();
+  if (dynamic_http_port < 0) {
+    throw std::runtime_error(
+        "relay_mocktest: could not allocate a free http port for "
+        "`python -m mock_relay` (set MOCK_RELAY_HTTP_PORT to a pre-running instance)");
+  }
+  return dynamic_http_port;
 }
 
 std::string ensure_server() {
-    std::lock_guard<std::mutex> lock(server_mutex());
-    if (server_started()) return http_url_cache();
+  std::lock_guard<std::mutex> lock(server_mutex());
+  if (server_started()) return http_url_cache();
 
-    int ws_port = resolve_ws_port();
-    int http_port = resolve_http_port();
-    std::string url = "http://127.0.0.1:" + std::to_string(http_port);
+  int ws_port = resolve_ws_port();
+  int http_port = resolve_http_port();
+  std::string url = "http://127.0.0.1:" + std::to_string(http_port);
 
+  if (probe_health(url)) {
+    server_started() = true;
+    http_url_cache() = url;
+    return url;
+  }
+
+  spawn_mock_server(ws_port, http_port);
+
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(kStartupTimeoutSeconds);
+  while (std::chrono::steady_clock::now() < deadline) {
     if (probe_health(url)) {
-        server_started() = true;
-        http_url_cache() = url;
-        return url;
+      server_started() = true;
+      http_url_cache() = url;
+      return url;
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
+  }
 
-    spawn_mock_server(ws_port, http_port);
-
-    auto deadline = std::chrono::steady_clock::now()
-                  + std::chrono::seconds(kStartupTimeoutSeconds);
-    while (std::chrono::steady_clock::now() < deadline) {
-        if (probe_health(url)) {
-            server_started() = true;
-            http_url_cache() = url;
-            return url;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(150));
-    }
-
-    throw std::runtime_error(
-        "relay_mocktest: `python -m mock_relay` did not become ready within "
-        + std::to_string(kStartupTimeoutSeconds) + "s on ws=" + std::to_string(ws_port)
-        + " http=" + std::to_string(http_port)
-        + " (clone porting-sdk next to signalwire-cpp so tests find "
-        + "porting-sdk/test_harness/mock_relay/, or set MOCK_RELAY_PORT / "
-        + "MOCK_RELAY_HTTP_PORT to a pre-running instance)");
+  throw std::runtime_error("relay_mocktest: `python -m mock_relay` did not become ready within " +
+                           std::to_string(kStartupTimeoutSeconds) + "s on ws=" +
+                           std::to_string(ws_port) + " http=" + std::to_string(http_port) +
+                           " (clone porting-sdk next to signalwire-cpp so tests find " +
+                           "porting-sdk/test_harness/mock_relay/, or set MOCK_RELAY_PORT / " +
+                           "MOCK_RELAY_HTTP_PORT to a pre-running instance)");
 }
 
 void force_ws_scheme() {
-    static std::once_flag scheme_once;
-    std::call_once(scheme_once, [] { ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1); });
+  static std::once_flag scheme_once;
+  std::call_once(scheme_once, [] { ::setenv("SIGNALWIRE_RELAY_SCHEME", "ws", 1); });
 }
 
-void set_active_session(const std::string& session_id) {
-    active_session_ref() = session_id;
-}
+void set_active_session(const std::string& session_id) { active_session_ref() = session_id; }
 
-std::string active_session() {
-    return active_session_ref();
-}
+std::string active_session() { return active_session_ref(); }
 
-void clear_active_session() {
-    active_session_ref().clear();
-}
+void clear_active_session() { active_session_ref().clear(); }
 
 void reset() {
-    std::string url = ensure_server();
-    std::string q = session_query();
-    post_no_body(url, "/__mock__/journal/reset" + q);
-    post_no_body(url, "/__mock__/scenarios/reset" + q);
+  std::string url = ensure_server();
+  std::string q = session_query();
+  post_no_body(url, "/__mock__/journal/reset" + q);
+  post_no_body(url, "/__mock__/scenarios/reset" + q);
 }
 
 std::vector<JournalEntry> journal() {
-    std::string url = ensure_server();
-    json arr = get_json(url, "/__mock__/journal" + session_query());
-    std::vector<JournalEntry> out;
-    if (arr.is_array()) {
-        out.reserve(arr.size());
-        for (const auto& e : arr) {
-            out.push_back(parse_entry(e));
-        }
+  std::string url = ensure_server();
+  json arr = get_json(url, "/__mock__/journal" + session_query());
+  std::vector<JournalEntry> out;
+  if (arr.is_array()) {
+    out.reserve(arr.size());
+    for (const auto& e : arr) {
+      out.push_back(parse_entry(e));
     }
-    return out;
+  }
+  return out;
 }
 
 std::vector<JournalEntry> journal_recv(const std::string& method) {
-    auto all = journal();
-    std::vector<JournalEntry> out;
-    for (auto& e : all) {
-        if (e.direction != "recv") continue;
-        if (!method.empty() && e.method != method) continue;
-        out.push_back(e);
-    }
-    return out;
+  auto all = journal();
+  std::vector<JournalEntry> out;
+  for (auto& e : all) {
+    if (e.direction != "recv") continue;
+    if (!method.empty() && e.method != method) continue;
+    out.push_back(e);
+  }
+  return out;
 }
 
 std::vector<JournalEntry> journal_send(const std::string& event_type) {
-    auto all = journal();
-    std::vector<JournalEntry> out;
-    for (auto& e : all) {
-        if (e.direction != "send") continue;
-        if (event_type.empty()) {
-            out.push_back(e);
-            continue;
-        }
-        if (!e.frame.contains("method")) continue;
-        if (e.frame.value("method", "") != "signalwire.event") continue;
-        json p = e.frame.value("params", json::object());
-        if (!p.is_object()) continue;
-        if (p.value("event_type", "") != event_type) continue;
-        out.push_back(e);
+  auto all = journal();
+  std::vector<JournalEntry> out;
+  for (auto& e : all) {
+    if (e.direction != "send") continue;
+    if (event_type.empty()) {
+      out.push_back(e);
+      continue;
     }
-    return out;
+    if (!e.frame.contains("method")) continue;
+    if (e.frame.value("method", "") != "signalwire.event") continue;
+    json p = e.frame.value("params", json::object());
+    if (!p.is_object()) continue;
+    if (p.value("event_type", "") != event_type) continue;
+    out.push_back(e);
+  }
+  return out;
 }
 
 JournalEntry journal_last() {
-    auto entries = journal();
-    if (entries.empty()) {
-        throw std::runtime_error(
-            "relay_mocktest: journal is empty - SDK call did not reach the mock");
-    }
-    return entries.back();
+  auto entries = journal();
+  if (entries.empty()) {
+    throw std::runtime_error("relay_mocktest: journal is empty - SDK call did not reach the mock");
+  }
+  return entries.back();
 }
 
 JournalEntry journal_last_recv(const std::string& method) {
-    auto entries = journal_recv(method);
-    if (entries.empty()) {
-        throw std::runtime_error(
-            "relay_mocktest: no recv entry with method=" + method);
-    }
-    return entries.back();
+  auto entries = journal_recv(method);
+  if (entries.empty()) {
+    throw std::runtime_error("relay_mocktest: no recv entry with method=" + method);
+  }
+  return entries.back();
 }
 
 void arm_method(const std::string& method, const json& events) {
-    std::string url = ensure_server();
-    // Scope the scenario to this session so a parallel test can't consume it.
-    post_json(url, "/__mock__/scenarios/" + method + session_query(), events);
+  std::string url = ensure_server();
+  // Scope the scenario to this session so a parallel test can't consume it.
+  post_json(url, "/__mock__/scenarios/" + method + session_query(), events);
 }
 
 void arm_dial(const json& body) {
-    std::string url = ensure_server();
-    post_json(url, "/__mock__/scenarios/dial" + session_query(), body);
+  std::string url = ensure_server();
+  post_json(url, "/__mock__/scenarios/dial" + session_query(), body);
 }
 
 json push(const json& frame, const std::string& session_id) {
-    std::string url = ensure_server();
-    // Explicit arg wins; otherwise target this thread's active session so the
-    // frame reaches only this test's client (empty => broadcast, legacy).
-    std::string target = session_id.empty() ? active_session_ref() : session_id;
-    std::string path = "/__mock__/push";
-    if (!target.empty()) path += "?session_id=" + url_encode(target);
-    return post_json(url, path, {{"frame", frame}});
+  std::string url = ensure_server();
+  // Explicit arg wins; otherwise target this thread's active session so the
+  // frame reaches only this test's client (empty => broadcast, legacy).
+  std::string target = session_id.empty() ? active_session_ref() : session_id;
+  std::string path = "/__mock__/push";
+  if (!target.empty()) path += "?session_id=" + url_encode(target);
+  return post_json(url, path, {{"frame", frame}});
 }
 
 // Stamp each push/expect_recv op of a scenario_play timeline with the active
 // session id (unless it already carries one), so the timeline targets only
 // this test's client and expect_recv matches only this session's frames.
 static json scope_ops(const json& ops) {
-    const std::string& sid = active_session_ref();
-    if (sid.empty() || !ops.is_array()) return ops;
-    json out = json::array();
-    for (const auto& op : ops) {
-        json o = op;
-        if (o.is_object()) {
-            for (const char* key : {"push", "expect_recv"}) {
-                if (o.contains(key) && o[key].is_object()
-                    && !o[key].contains("session_id")) {
-                    o[key]["session_id"] = sid;
-                }
-            }
+  const std::string& sid = active_session_ref();
+  if (sid.empty() || !ops.is_array()) return ops;
+  json out = json::array();
+  for (const auto& op : ops) {
+    json o = op;
+    if (o.is_object()) {
+      for (const char* key : {"push", "expect_recv"}) {
+        if (o.contains(key) && o[key].is_object() && !o[key].contains("session_id")) {
+          o[key]["session_id"] = sid;
         }
-        out.push_back(std::move(o));
+      }
     }
-    return out;
+    out.push_back(std::move(o));
+  }
+  return out;
 }
 
 json scenario_play(const json& ops) {
-    std::string url = ensure_server();
-    return post_json(url, "/__mock__/scenario_play", scope_ops(ops));
+  std::string url = ensure_server();
+  return post_json(url, "/__mock__/scenario_play", scope_ops(ops));
 }
 
 json inbound_call(const InboundCallOpts& opts) {
-    std::string url = ensure_server();
-    json body;
-    body["from_number"] = opts.from_number;
-    body["to_number"] = opts.to_number;
-    body["context"] = opts.context;
-    body["delay_ms"] = opts.delay_ms;
-    if (!opts.auto_states.empty()) {
-        body["auto_states"] = opts.auto_states;
-    } else {
-        body["auto_states"] = json::array({"created"});
-    }
-    if (!opts.call_id.empty()) body["call_id"] = opts.call_id;
-    // Explicit opts.session_id wins; otherwise target this thread's active
-    // session so the inbound-call sequence reaches only this test's client.
-    std::string target = opts.session_id.empty() ? active_session_ref()
-                                                  : opts.session_id;
-    if (!target.empty()) body["session_id"] = target;
-    return post_json(url, "/__mock__/inbound_call", body);
+  std::string url = ensure_server();
+  json body;
+  body["from_number"] = opts.from_number;
+  body["to_number"] = opts.to_number;
+  body["context"] = opts.context;
+  body["delay_ms"] = opts.delay_ms;
+  if (!opts.auto_states.empty()) {
+    body["auto_states"] = opts.auto_states;
+  } else {
+    body["auto_states"] = json::array({"created"});
+  }
+  if (!opts.call_id.empty()) body["call_id"] = opts.call_id;
+  // Explicit opts.session_id wins; otherwise target this thread's active
+  // session so the inbound-call sequence reaches only this test's client.
+  std::string target = opts.session_id.empty() ? active_session_ref() : opts.session_id;
+  if (!target.empty()) body["session_id"] = target;
+  return post_json(url, "/__mock__/inbound_call", body);
 }
 
 std::vector<json> sessions() {
-    std::string url = ensure_server();
-    json j = get_json(url, "/__mock__/sessions");
-    std::vector<json> out;
-    if (j.contains("sessions") && j["sessions"].is_array()) {
-        for (auto& s : j["sessions"]) out.push_back(s);
-    }
-    return out;
+  std::string url = ensure_server();
+  json j = get_json(url, "/__mock__/sessions");
+  std::vector<json> out;
+  if (j.contains("sessions") && j["sessions"].is_array()) {
+    for (auto& s : j["sessions"]) out.push_back(s);
+  }
+  return out;
 }
 
 RelayConfig make_config(const std::string& project, const std::string& token) {
-    // ensure server is running so the host string is valid.
-    ensure_server();
-    RelayConfig cfg;
-    cfg.project = project;
-    cfg.token = token;
-    cfg.host = "127.0.0.1";
-    cfg.port = resolve_ws_port();
-    cfg.contexts = {"default"};
-    return cfg;
+  // ensure server is running so the host string is valid.
+  ensure_server();
+  RelayConfig cfg;
+  cfg.project = project;
+  cfg.token = token;
+  cfg.host = "127.0.0.1";
+  cfg.port = resolve_ws_port();
+  cfg.contexts = {"default"};
+  return cfg;
 }
 
-std::unique_ptr<RelayClient> make_client(const std::string& project,
-                                          const std::string& token,
-                                          const std::vector<std::string>& contexts) {
-    ensure_server();
-    // Drop any prior thread-local scope before connecting so we don't, e.g.,
-    // accidentally inherit a previous test's session on a reused worker thread.
-    clear_active_session();
-    // Force plain WS scheme in the global env so RelayClient::connect()
-    // takes the connect_plain() path. This applies to every test in the
-    // process; the production code path is still exercised by the regular
-    // `connect()` overload. Set exactly once (process-global env mutated from
-    // multiple worker threads under the parallel runner).
-    force_ws_scheme();
-    RelayConfig cfg = make_config(project, token);
-    cfg.contexts = contexts;
-    auto client = std::make_unique<RelayClient>(cfg);
-    if (!client->connect()) {
-        throw std::runtime_error(
-            "relay_mocktest: client connect() failed (mock URL "
-            + http_url_cache() + ")");
-    }
-    // Scope this thread's subsequent harness calls to THIS client's session.
-    // No reset is needed: a brand-new session starts with an empty (scoped)
-    // journal/scenario view, so the test sees a clean slate and never disturbs
-    // a concurrent test's session.
-    set_active_session(client->session_id());
-    return client;
+std::unique_ptr<RelayClient> make_client(const std::string& project, const std::string& token,
+                                         const std::vector<std::string>& contexts) {
+  ensure_server();
+  // Drop any prior thread-local scope before connecting so we don't, e.g.,
+  // accidentally inherit a previous test's session on a reused worker thread.
+  clear_active_session();
+  // Force plain WS scheme in the global env so RelayClient::connect()
+  // takes the connect_plain() path. This applies to every test in the
+  // process; the production code path is still exercised by the regular
+  // `connect()` overload. Set exactly once (process-global env mutated from
+  // multiple worker threads under the parallel runner).
+  force_ws_scheme();
+  RelayConfig cfg = make_config(project, token);
+  cfg.contexts = contexts;
+  auto client = std::make_unique<RelayClient>(cfg);
+  if (!client->connect()) {
+    throw std::runtime_error("relay_mocktest: client connect() failed (mock URL " +
+                             http_url_cache() + ")");
+  }
+  // Scope this thread's subsequent harness calls to THIS client's session.
+  // No reset is needed: a brand-new session starts with an empty (scoped)
+  // journal/scenario view, so the test sees a clean slate and never disturbs
+  // a concurrent test's session.
+  set_active_session(client->session_id());
+  return client;
 }
 
 std::unique_ptr<RelayClient> make_client_with_config(
-    const std::function<void(RelayConfig&)>& mutate,
-    const std::vector<std::string>& contexts) {
-    ensure_server();
-    clear_active_session();
-    force_ws_scheme();
-    RelayConfig cfg = make_config();
-    cfg.contexts = contexts;
-    if (mutate) {
-        mutate(cfg);
-    }
-    auto client = std::make_unique<RelayClient>(cfg);
-    if (!client->connect()) {
-        throw std::runtime_error(
-            "relay_mocktest: client connect() failed (mock URL "
-            + http_url_cache() + ")");
-    }
-    set_active_session(client->session_id());
-    return client;
+    const std::function<void(RelayConfig&)>& mutate, const std::vector<std::string>& contexts) {
+  ensure_server();
+  clear_active_session();
+  force_ws_scheme();
+  RelayConfig cfg = make_config();
+  cfg.contexts = contexts;
+  if (mutate) {
+    mutate(cfg);
+  }
+  auto client = std::make_unique<RelayClient>(cfg);
+  if (!client->connect()) {
+    throw std::runtime_error("relay_mocktest: client connect() failed (mock URL " +
+                             http_url_cache() + ")");
+  }
+  set_active_session(client->session_id());
+  return client;
 }
 
 bool wait_for_session(int timeout_ms) {
-    auto deadline = std::chrono::steady_clock::now()
-                  + std::chrono::milliseconds(timeout_ms);
-    while (std::chrono::steady_clock::now() < deadline) {
-        try {
-            if (!sessions().empty()) return true;
-        } catch (...) {}
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  while (std::chrono::steady_clock::now() < deadline) {
+    try {
+      if (!sessions().empty()) return true;
+    } catch (...) {
     }
-    return false;
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  return false;
 }
 
-Call* drive_inbound_call(RelayClient& client,
-                         const std::string& call_id,
-                         const std::vector<std::string>& auto_states,
-                         int timeout_ms) {
-    InboundCallOpts opts;
-    opts.call_id = call_id;
-    opts.auto_states = auto_states;
-    opts.delay_ms = 5;
-    inbound_call(opts);
+Call* drive_inbound_call(RelayClient& client, const std::string& call_id,
+                         const std::vector<std::string>& auto_states, int timeout_ms) {
+  InboundCallOpts opts;
+  opts.call_id = call_id;
+  opts.auto_states = auto_states;
+  opts.delay_ms = 5;
+  inbound_call(opts);
 
-    auto deadline = std::chrono::steady_clock::now()
-                  + std::chrono::milliseconds(timeout_ms);
-    while (std::chrono::steady_clock::now() < deadline) {
-        Call* c = client.find_call(call_id);
-        if (c) return c;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    return nullptr;
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout_ms);
+  while (std::chrono::steady_clock::now() < deadline) {
+    Call* c = client.find_call(call_id);
+    if (c) return c;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  return nullptr;
 }
 
-} // namespace mocktest
-} // namespace relay
-} // namespace signalwire
+}  // namespace mocktest
+}  // namespace relay
+}  // namespace signalwire

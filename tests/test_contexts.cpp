@@ -10,20 +10,20 @@ using json = nlohmann::json;
 // ========================================================================
 
 TEST(gather_question_basic) {
-    GatherQuestion q("name", "What is your name?");
-    auto j = q.to_json();
-    ASSERT_EQ(j["key"].get<std::string>(), "name");
-    ASSERT_EQ(j["question"].get<std::string>(), "What is your name?");
-    return true;
+  GatherQuestion q("name", "What is your name?");
+  auto j = q.to_json();
+  ASSERT_EQ(j["key"].get<std::string>(), "name");
+  ASSERT_EQ(j["question"].get<std::string>(), "What is your name?");
+  return true;
 }
 
 TEST(gather_question_with_type_and_confirm) {
-    GatherQuestion q("age", "How old are you?", "integer", true);
-    auto j = q.to_json();
-    ASSERT_EQ(j["type"].get<std::string>(), "integer");
-    ASSERT_TRUE(j.contains("confirm"));
-    ASSERT_EQ(j["confirm"].get<bool>(), true);
-    return true;
+  GatherQuestion q("age", "How old are you?", "integer", true);
+  auto j = q.to_json();
+  ASSERT_EQ(j["type"].get<std::string>(), "integer");
+  ASSERT_TRUE(j.contains("confirm"));
+  ASSERT_EQ(j["confirm"].get<bool>(), true);
+  return true;
 }
 
 // ========================================================================
@@ -31,14 +31,14 @@ TEST(gather_question_with_type_and_confirm) {
 // ========================================================================
 
 TEST(gather_info_basic) {
-    GatherInfo gi("user_data", "next_step", "Please answer these questions");
-    gi.add_question("name", "What is your name?");
-    gi.add_question("email", "What is your email?");
-    auto j = gi.to_json();
-    ASSERT_EQ(j["output_key"].get<std::string>(), "user_data");
-    ASSERT_EQ(j["completion_action"].get<std::string>(), "next_step");
-    ASSERT_EQ(j["questions"].size(), 2u);
-    return true;
+  GatherInfo gi("user_data", "next_step", "Please answer these questions");
+  gi.add_question("name", "What is your name?");
+  gi.add_question("email", "What is your email?");
+  auto j = gi.to_json();
+  ASSERT_EQ(j["output_key"].get<std::string>(), "user_data");
+  ASSERT_EQ(j["completion_action"].get<std::string>(), "next_step");
+  ASSERT_EQ(j["questions"].size(), 2u);
+  return true;
 }
 
 // ========================================================================
@@ -46,145 +46,145 @@ TEST(gather_info_basic) {
 // ========================================================================
 
 TEST(step_set_text) {
-    Step s("greeting");
-    s.set_text("Hello, welcome!");
-    auto j = s.to_json();
-    ASSERT_EQ(j["name"].get<std::string>(), "greeting");
-    ASSERT_EQ(j["text"].get<std::string>(), "Hello, welcome!");
-    return true;
+  Step s("greeting");
+  s.set_text("Hello, welcome!");
+  auto j = s.to_json();
+  ASSERT_EQ(j["name"].get<std::string>(), "greeting");
+  ASSERT_EQ(j["text"].get<std::string>(), "Hello, welcome!");
+  return true;
 }
 
 TEST(step_add_section) {
-    Step s("intro");
-    s.add_section("Task", "Greet the user warmly");
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("text"));
-    ASSERT_TRUE(j["text"].get<std::string>().find("Task") != std::string::npos);
-    return true;
+  Step s("intro");
+  s.add_section("Task", "Greet the user warmly");
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("text"));
+  ASSERT_TRUE(j["text"].get<std::string>().find("Task") != std::string::npos);
+  return true;
 }
 
 TEST(step_add_bullets) {
-    Step s("process");
-    s.add_bullets("Instructions", {"Be polite", "Ask their name"});
-    auto j = s.to_json();
-    std::string text = j["text"].get<std::string>();
-    ASSERT_TRUE(text.find("Be polite") != std::string::npos);
-    ASSERT_TRUE(text.find("Ask their name") != std::string::npos);
-    return true;
+  Step s("process");
+  s.add_bullets("Instructions", {"Be polite", "Ask their name"});
+  auto j = s.to_json();
+  std::string text = j["text"].get<std::string>();
+  ASSERT_TRUE(text.find("Be polite") != std::string::npos);
+  ASSERT_TRUE(text.find("Ask their name") != std::string::npos);
+  return true;
 }
 
 TEST(step_criteria) {
-    Step s("gather");
-    s.set_text("Gather info");
-    s.set_step_criteria("User has provided their name and email");
-    auto j = s.to_json();
-    ASSERT_EQ(j["step_criteria"].get<std::string>(), "User has provided their name and email");
-    return true;
+  Step s("gather");
+  s.set_text("Gather info");
+  s.set_step_criteria("User has provided their name and email");
+  auto j = s.to_json();
+  ASSERT_EQ(j["step_criteria"].get<std::string>(), "User has provided their name and email");
+  return true;
 }
 
 TEST(step_functions_none) {
-    Step s("readonly");
-    s.set_text("No tools");
-    s.set_functions(std::string("none"));
-    auto j = s.to_json();
-    ASSERT_EQ(j["functions"].get<std::string>(), "none");
-    return true;
+  Step s("readonly");
+  s.set_text("No tools");
+  s.set_functions(std::string("none"));
+  auto j = s.to_json();
+  ASSERT_EQ(j["functions"].get<std::string>(), "none");
+  return true;
 }
 
 TEST(step_functions_list) {
-    Step s("limited");
-    s.set_text("Limited tools");
-    s.set_functions(std::vector<std::string>{"get_weather", "search"});
-    auto j = s.to_json();
-    ASSERT_TRUE(j["functions"].is_array());
-    ASSERT_EQ(j["functions"].size(), 2u);
-    return true;
+  Step s("limited");
+  s.set_text("Limited tools");
+  s.set_functions(std::vector<std::string>{"get_weather", "search"});
+  auto j = s.to_json();
+  ASSERT_TRUE(j["functions"].is_array());
+  ASSERT_EQ(j["functions"].size(), 2u);
+  return true;
 }
 
 TEST(step_valid_steps) {
-    Step s("step1");
-    s.set_text("First step");
-    s.set_valid_steps({"step2", "step3"});
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("valid_steps"));
-    ASSERT_EQ(j["valid_steps"].size(), 2u);
-    return true;
+  Step s("step1");
+  s.set_text("First step");
+  s.set_valid_steps({"step2", "step3"});
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("valid_steps"));
+  ASSERT_EQ(j["valid_steps"].size(), 2u);
+  return true;
 }
 
 TEST(step_valid_contexts) {
-    Step s("step1");
-    s.set_text("First");
-    s.set_valid_contexts({"support", "sales"});
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("valid_contexts"));
-    ASSERT_EQ(j["valid_contexts"].size(), 2u);
-    return true;
+  Step s("step1");
+  s.set_text("First");
+  s.set_valid_contexts({"support", "sales"});
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("valid_contexts"));
+  ASSERT_EQ(j["valid_contexts"].size(), 2u);
+  return true;
 }
 
 TEST(step_end) {
-    Step s("final");
-    s.set_text("Goodbye");
-    s.set_end(true);
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("end"));
-    ASSERT_EQ(j["end"].get<bool>(), true);
-    return true;
+  Step s("final");
+  s.set_text("Goodbye");
+  s.set_end(true);
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("end"));
+  ASSERT_EQ(j["end"].get<bool>(), true);
+  return true;
 }
 
 TEST(step_skip_user_turn) {
-    Step s("auto");
-    s.set_text("Auto advance");
-    s.set_skip_user_turn(true);
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("skip_user_turn"));
-    return true;
+  Step s("auto");
+  s.set_text("Auto advance");
+  s.set_skip_user_turn(true);
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("skip_user_turn"));
+  return true;
 }
 
 TEST(step_skip_to_next_step) {
-    Step s("auto");
-    s.set_text("Skip ahead");
-    s.set_skip_to_next_step(true);
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("skip_to_next_step"));
-    return true;
+  Step s("auto");
+  s.set_text("Skip ahead");
+  s.set_skip_to_next_step(true);
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("skip_to_next_step"));
+  return true;
 }
 
 TEST(step_gather_info) {
-    Step s("gather");
-    s.set_text("Gathering info");
-    s.set_gather_info("customer_data", "process", "Let me get your details");
-    s.add_gather_question("name", "What is your name?");
-    s.add_gather_question("email", "What is your email?", "string", true);
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("gather_info"));
-    ASSERT_EQ(j["gather_info"]["questions"].size(), 2u);
-    return true;
+  Step s("gather");
+  s.set_text("Gathering info");
+  s.set_gather_info("customer_data", "process", "Let me get your details");
+  s.add_gather_question("name", "What is your name?");
+  s.add_gather_question("email", "What is your email?", "string", true);
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("gather_info"));
+  ASSERT_EQ(j["gather_info"]["questions"].size(), 2u);
+  return true;
 }
 
 TEST(step_reset_params) {
-    Step s("switch");
-    s.set_text("Switching");
-    s.set_reset_system_prompt("New system prompt");
-    s.set_reset_user_prompt("New user prompt");
-    s.set_reset_consolidate(true);
-    s.set_reset_full_reset(true);
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("reset"));
-    ASSERT_EQ(j["reset"]["system_prompt"].get<std::string>(), "New system prompt");
-    ASSERT_EQ(j["reset"]["user_prompt"].get<std::string>(), "New user prompt");
-    ASSERT_EQ(j["reset"]["consolidate"].get<bool>(), true);
-    ASSERT_EQ(j["reset"]["full_reset"].get<bool>(), true);
-    return true;
+  Step s("switch");
+  s.set_text("Switching");
+  s.set_reset_system_prompt("New system prompt");
+  s.set_reset_user_prompt("New user prompt");
+  s.set_reset_consolidate(true);
+  s.set_reset_full_reset(true);
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("reset"));
+  ASSERT_EQ(j["reset"]["system_prompt"].get<std::string>(), "New system prompt");
+  ASSERT_EQ(j["reset"]["user_prompt"].get<std::string>(), "New user prompt");
+  ASSERT_EQ(j["reset"]["consolidate"].get<bool>(), true);
+  ASSERT_EQ(j["reset"]["full_reset"].get<bool>(), true);
+  return true;
 }
 
 TEST(step_clear_sections) {
-    Step s("test");
-    s.add_section("Title", "Body");
-    s.clear_sections();
-    s.set_text("New text");
-    auto j = s.to_json();
-    ASSERT_EQ(j["text"].get<std::string>(), "New text");
-    return true;
+  Step s("test");
+  s.add_section("Title", "Body");
+  s.clear_sections();
+  s.set_text("New text");
+  auto j = s.to_json();
+  ASSERT_EQ(j["text"].get<std::string>(), "New text");
+  return true;
 }
 
 // ========================================================================
@@ -192,137 +192,137 @@ TEST(step_clear_sections) {
 // ========================================================================
 
 TEST(context_add_step) {
-    Context ctx("default");
-    ctx.add_step("greeting").set_text("Hello!");
-    ctx.add_step("farewell").set_text("Goodbye!");
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("steps"));
-    ASSERT_EQ(j["steps"].size(), 2u);
-    ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "greeting");
-    ASSERT_EQ(j["steps"][1]["name"].get<std::string>(), "farewell");
-    return true;
+  Context ctx("default");
+  ctx.add_step("greeting").set_text("Hello!");
+  ctx.add_step("farewell").set_text("Goodbye!");
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("steps"));
+  ASSERT_EQ(j["steps"].size(), 2u);
+  ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "greeting");
+  ASSERT_EQ(j["steps"][1]["name"].get<std::string>(), "farewell");
+  return true;
 }
 
 TEST(context_step_with_kwargs) {
-    Context ctx("default");
-    ctx.add_step("greet", "Greet the user", {"Be polite", "Ask name"}, "User greeted");
-    auto j = ctx.to_json();
-    ASSERT_EQ(j["steps"].size(), 1u);
-    ASSERT_TRUE(j["steps"][0].contains("step_criteria"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("greet", "Greet the user", {"Be polite", "Ask name"}, "User greeted");
+  auto j = ctx.to_json();
+  ASSERT_EQ(j["steps"].size(), 1u);
+  ASSERT_TRUE(j["steps"][0].contains("step_criteria"));
+  return true;
 }
 
 TEST(context_get_step) {
-    Context ctx("default");
-    ctx.add_step("step1").set_text("Step 1");
-    auto* s = ctx.get_step("step1");
-    ASSERT_TRUE(s != nullptr);
-    ASSERT_TRUE(ctx.get_step("nonexistent") == nullptr);
-    return true;
+  Context ctx("default");
+  ctx.add_step("step1").set_text("Step 1");
+  auto* s = ctx.get_step("step1");
+  ASSERT_TRUE(s != nullptr);
+  ASSERT_TRUE(ctx.get_step("nonexistent") == nullptr);
+  return true;
 }
 
 TEST(context_remove_step) {
-    Context ctx("default");
-    ctx.add_step("step1").set_text("Step 1");
-    ctx.add_step("step2").set_text("Step 2");
-    ctx.remove_step("step1");
-    auto j = ctx.to_json();
-    ASSERT_EQ(j["steps"].size(), 1u);
-    ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "step2");
-    return true;
+  Context ctx("default");
+  ctx.add_step("step1").set_text("Step 1");
+  ctx.add_step("step2").set_text("Step 2");
+  ctx.remove_step("step1");
+  auto j = ctx.to_json();
+  ASSERT_EQ(j["steps"].size(), 1u);
+  ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "step2");
+  return true;
 }
 
 TEST(context_move_step) {
-    Context ctx("default");
-    ctx.add_step("step1").set_text("Step 1");
-    ctx.add_step("step2").set_text("Step 2");
-    ctx.add_step("step3").set_text("Step 3");
-    ctx.move_step("step3", 0);
-    auto j = ctx.to_json();
-    ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "step3");
-    return true;
+  Context ctx("default");
+  ctx.add_step("step1").set_text("Step 1");
+  ctx.add_step("step2").set_text("Step 2");
+  ctx.add_step("step3").set_text("Step 3");
+  ctx.move_step("step3", 0);
+  auto j = ctx.to_json();
+  ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "step3");
+  return true;
 }
 
 TEST(context_set_system_prompt) {
-    Context ctx("support");
-    ctx.add_step("intro").set_text("Welcome to support");
-    ctx.set_system_prompt("You are a support agent");
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("system_prompt"));
-    return true;
+  Context ctx("support");
+  ctx.add_step("intro").set_text("Welcome to support");
+  ctx.set_system_prompt("You are a support agent");
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("system_prompt"));
+  return true;
 }
 
 TEST(context_set_prompt) {
-    Context ctx("default");
-    ctx.add_step("s1").set_text("Step");
-    ctx.set_prompt("Context prompt text");
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("prompt"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("s1").set_text("Step");
+  ctx.set_prompt("Context prompt text");
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("prompt"));
+  return true;
 }
 
 TEST(context_set_post_prompt) {
-    Context ctx("default");
-    ctx.add_step("s1").set_text("Step");
-    ctx.set_post_prompt("Summary please");
-    auto j = ctx.to_json();
-    ASSERT_EQ(j["post_prompt"].get<std::string>(), "Summary please");
-    return true;
+  Context ctx("default");
+  ctx.add_step("s1").set_text("Step");
+  ctx.set_post_prompt("Summary please");
+  auto j = ctx.to_json();
+  ASSERT_EQ(j["post_prompt"].get<std::string>(), "Summary please");
+  return true;
 }
 
 TEST(context_valid_contexts) {
-    Context ctx("main");
-    ctx.add_step("s1").set_text("Step");
-    ctx.set_valid_contexts({"support", "sales"});
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("valid_contexts"));
-    ASSERT_EQ(j["valid_contexts"].size(), 2u);
-    return true;
+  Context ctx("main");
+  ctx.add_step("s1").set_text("Step");
+  ctx.set_valid_contexts({"support", "sales"});
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("valid_contexts"));
+  ASSERT_EQ(j["valid_contexts"].size(), 2u);
+  return true;
 }
 
 TEST(context_consolidate_and_reset) {
-    Context ctx("support");
-    ctx.add_step("s1").set_text("Step");
-    ctx.set_consolidate(true);
-    ctx.set_full_reset(true);
-    ctx.set_isolated(true);
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("consolidate"));
-    ASSERT_TRUE(j.contains("full_reset"));
-    ASSERT_TRUE(j.contains("isolated"));
-    return true;
+  Context ctx("support");
+  ctx.add_step("s1").set_text("Step");
+  ctx.set_consolidate(true);
+  ctx.set_full_reset(true);
+  ctx.set_isolated(true);
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("consolidate"));
+  ASSERT_TRUE(j.contains("full_reset"));
+  ASSERT_TRUE(j.contains("isolated"));
+  return true;
 }
 
 TEST(context_fillers) {
-    Context ctx("default");
-    ctx.add_step("s1").set_text("Step");
-    ctx.add_enter_filler("en-US", {"Welcome!", "Hello there!"});
-    ctx.add_exit_filler("en-US", {"Goodbye!", "Thank you!"});
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("enter_fillers"));
-    ASSERT_TRUE(j.contains("exit_fillers"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("s1").set_text("Step");
+  ctx.add_enter_filler("en-US", {"Welcome!", "Hello there!"});
+  ctx.add_exit_filler("en-US", {"Goodbye!", "Thank you!"});
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("enter_fillers"));
+  ASSERT_TRUE(j.contains("exit_fillers"));
+  return true;
 }
 
 TEST(context_add_system_section) {
-    Context ctx("default");
-    ctx.add_step("s1").set_text("Step");
-    ctx.add_system_section("Personality", "Be friendly");
-    ctx.add_system_bullets("Rules", {"Rule 1", "Rule 2"});
-    auto j = ctx.to_json();
-    ASSERT_TRUE(j.contains("system_prompt"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("s1").set_text("Step");
+  ctx.add_system_section("Personality", "Be friendly");
+  ctx.add_system_bullets("Rules", {"Rule 1", "Rule 2"});
+  auto j = ctx.to_json();
+  ASSERT_TRUE(j.contains("system_prompt"));
+  return true;
 }
 
 TEST(context_add_prompt_sections) {
-    Context ctx("default");
-    ctx.add_step("s1").set_text("Step");
-    ctx.add_section("Overview", "This is an overview");
-    ctx.add_bullets("Guidelines", {"Guideline 1", "Guideline 2"});
-    auto j = ctx.to_json();
-    // Should use rendered prompt since we added sections
-    ASSERT_TRUE(j.contains("prompt"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("s1").set_text("Step");
+  ctx.add_section("Overview", "This is an overview");
+  ctx.add_bullets("Guidelines", {"Guideline 1", "Guideline 2"});
+  auto j = ctx.to_json();
+  // Should use rendered prompt since we added sections
+  ASSERT_TRUE(j.contains("prompt"));
+  return true;
 }
 
 // ========================================================================
@@ -330,85 +330,85 @@ TEST(context_add_prompt_sections) {
 // ========================================================================
 
 TEST(context_builder_single_default) {
-    ContextBuilder cb;
-    auto& ctx = cb.add_context("default");
-    ctx.add_step("greeting").set_text("Hello!");
-    cb.validate(); // Should not throw
-    auto j = cb.to_json();
-    ASSERT_TRUE(j.contains("default"));
-    return true;
+  ContextBuilder cb;
+  auto& ctx = cb.add_context("default");
+  ctx.add_step("greeting").set_text("Hello!");
+  cb.validate();  // Should not throw
+  auto j = cb.to_json();
+  ASSERT_TRUE(j.contains("default"));
+  return true;
 }
 
 TEST(context_builder_single_non_default_fails) {
-    ContextBuilder cb;
-    auto& ctx = cb.add_context("main");
-    ctx.add_step("s1").set_text("Step");
-    ASSERT_THROWS(cb.validate());
-    return true;
+  ContextBuilder cb;
+  auto& ctx = cb.add_context("main");
+  ctx.add_step("s1").set_text("Step");
+  ASSERT_THROWS(cb.validate());
+  return true;
 }
 
 TEST(context_builder_multiple_contexts) {
-    ContextBuilder cb;
-    auto& main = cb.add_context("default");
-    main.add_step("s1").set_text("Main step");
-    main.set_valid_contexts({"support"});
+  ContextBuilder cb;
+  auto& main = cb.add_context("default");
+  main.add_step("s1").set_text("Main step");
+  main.set_valid_contexts({"support"});
 
-    auto& support = cb.add_context("support");
-    support.add_step("s1").set_text("Support step");
+  auto& support = cb.add_context("support");
+  support.add_step("s1").set_text("Support step");
 
-    cb.validate(); // Should not throw
-    auto j = cb.to_json();
-    ASSERT_TRUE(j.contains("default"));
-    ASSERT_TRUE(j.contains("support"));
-    return true;
+  cb.validate();  // Should not throw
+  auto j = cb.to_json();
+  ASSERT_TRUE(j.contains("default"));
+  ASSERT_TRUE(j.contains("support"));
+  return true;
 }
 
 TEST(context_builder_get_context) {
-    ContextBuilder cb;
-    cb.add_context("default").add_step("s1").set_text("Step");
-    ASSERT_TRUE(cb.get_context("default") != nullptr);
-    ASSERT_TRUE(cb.get_context("nonexistent") == nullptr);
-    return true;
+  ContextBuilder cb;
+  cb.add_context("default").add_step("s1").set_text("Step");
+  ASSERT_TRUE(cb.get_context("default") != nullptr);
+  ASSERT_TRUE(cb.get_context("nonexistent") == nullptr);
+  return true;
 }
 
 TEST(context_builder_max_contexts) {
-    ContextBuilder cb;
-    for (int i = 0; i < MAX_CONTEXTS; ++i) {
-        auto& c = cb.add_context("ctx_" + std::to_string(i));
-        c.add_step("s").set_text("Step");
-    }
-    // Adding one more should throw
-    ASSERT_THROWS(cb.add_context("overflow"));
-    return true;
+  ContextBuilder cb;
+  for (int i = 0; i < MAX_CONTEXTS; ++i) {
+    auto& c = cb.add_context("ctx_" + std::to_string(i));
+    c.add_step("s").set_text("Step");
+  }
+  // Adding one more should throw
+  ASSERT_THROWS(cb.add_context("overflow"));
+  return true;
 }
 
 TEST(context_builder_preserves_order) {
-    ContextBuilder cb;
-    cb.add_context("default").add_step("s1").set_text("First");
-    cb.add_context("second").add_step("s1").set_text("Second");
-    cb.add_context("third").add_step("s1").set_text("Third");
+  ContextBuilder cb;
+  cb.add_context("default").add_step("s1").set_text("First");
+  cb.add_context("second").add_step("s1").set_text("Second");
+  cb.add_context("third").add_step("s1").set_text("Third");
 
-    auto j = cb.to_json();
-    // Check that keys come out in insertion order
-    auto it = j.begin();
-    ASSERT_EQ(it.key(), "default");
-    ++it;
-    ASSERT_EQ(it.key(), "second");
-    ++it;
-    ASSERT_EQ(it.key(), "third");
-    return true;
+  auto j = cb.to_json();
+  // Check that keys come out in insertion order
+  auto it = j.begin();
+  ASSERT_EQ(it.key(), "default");
+  ++it;
+  ASSERT_EQ(it.key(), "second");
+  ++it;
+  ASSERT_EQ(it.key(), "third");
+  return true;
 }
 
 TEST(context_step_order_preserved) {
-    Context ctx("default");
-    ctx.add_step("alpha").set_text("A");
-    ctx.add_step("beta").set_text("B");
-    ctx.add_step("gamma").set_text("C");
-    auto j = ctx.to_json();
-    ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "alpha");
-    ASSERT_EQ(j["steps"][1]["name"].get<std::string>(), "beta");
-    ASSERT_EQ(j["steps"][2]["name"].get<std::string>(), "gamma");
-    return true;
+  Context ctx("default");
+  ctx.add_step("alpha").set_text("A");
+  ctx.add_step("beta").set_text("B");
+  ctx.add_step("gamma").set_text("C");
+  auto j = ctx.to_json();
+  ASSERT_EQ(j["steps"][0]["name"].get<std::string>(), "alpha");
+  ASSERT_EQ(j["steps"][1]["name"].get<std::string>(), "beta");
+  ASSERT_EQ(j["steps"][2]["name"].get<std::string>(), "gamma");
+  return true;
 }
 
 // ========================================================================
@@ -416,68 +416,68 @@ TEST(context_step_order_preserved) {
 // ========================================================================
 
 TEST(step_set_history_unset_omits_key) {
-    Step s("greet");
-    s.set_text("Hi");
-    auto j = s.to_json();
-    ASSERT_FALSE(j.contains("history"));
-    return true;
+  Step s("greet");
+  s.set_text("Hi");
+  auto j = s.to_json();
+  ASSERT_FALSE(j.contains("history"));
+  return true;
 }
 
 TEST(step_set_history_each_mode_emits) {
-    for (const std::string& mode : {"keep", "default", "hide"}) {
-        Step s("greet");
-        s.set_text("Hi").set_history(mode);
-        auto j = s.to_json();
-        ASSERT_TRUE(j.contains("history"));
-        ASSERT_EQ(j["history"].get<std::string>(), mode);
-    }
-    return true;
+  for (const std::string& mode : {"keep", "default", "hide"}) {
+    Step s("greet");
+    s.set_text("Hi").set_history(mode);
+    auto j = s.to_json();
+    ASSERT_TRUE(j.contains("history"));
+    ASSERT_EQ(j["history"].get<std::string>(), mode);
+  }
+  return true;
 }
 
 TEST(step_set_history_is_fluent) {
-    Step s("greet");
-    Step& ref = s.set_history("keep");
-    ASSERT_EQ(&ref, &s);
-    return true;
+  Step s("greet");
+  Step& ref = s.set_history("keep");
+  ASSERT_EQ(&ref, &s);
+  return true;
 }
 
 TEST(step_set_history_invalid_throws) {
-    Step s("greet");
-    ASSERT_THROWS(s.set_history("erase"));
-    return true;
+  Step s("greet");
+  ASSERT_THROWS(s.set_history("erase"));
+  return true;
 }
 
 TEST(context_set_history_unset_omits_key) {
-    Context ctx("default");
-    ctx.add_step("s").set_text("Hi");
-    auto j = ctx.to_json();
-    ASSERT_FALSE(j.contains("history"));
-    return true;
+  Context ctx("default");
+  ctx.add_step("s").set_text("Hi");
+  auto j = ctx.to_json();
+  ASSERT_FALSE(j.contains("history"));
+  return true;
 }
 
 TEST(context_set_history_each_mode_emits) {
-    for (const std::string& mode : {"keep", "default", "hide"}) {
-        Context ctx("default");
-        ctx.add_step("s").set_text("Hi");
-        ctx.set_history(mode);
-        auto j = ctx.to_json();
-        ASSERT_TRUE(j.contains("history"));
-        ASSERT_EQ(j["history"].get<std::string>(), mode);
-    }
-    return true;
+  for (const std::string& mode : {"keep", "default", "hide"}) {
+    Context ctx("default");
+    ctx.add_step("s").set_text("Hi");
+    ctx.set_history(mode);
+    auto j = ctx.to_json();
+    ASSERT_TRUE(j.contains("history"));
+    ASSERT_EQ(j["history"].get<std::string>(), mode);
+  }
+  return true;
 }
 
 TEST(context_set_history_is_fluent) {
-    Context ctx("default");
-    Context& ref = ctx.set_history("hide");
-    ASSERT_EQ(&ref, &ctx);
-    return true;
+  Context ctx("default");
+  Context& ref = ctx.set_history("hide");
+  ASSERT_EQ(&ref, &ctx);
+  return true;
 }
 
 TEST(context_set_history_invalid_throws) {
-    Context ctx("default");
-    ASSERT_THROWS(ctx.set_history("bogus"));
-    return true;
+  Context ctx("default");
+  ASSERT_THROWS(ctx.set_history("bogus"));
+  return true;
 }
 
 // ========================================================================
@@ -485,121 +485,121 @@ TEST(context_set_history_invalid_throws) {
 // ========================================================================
 
 TEST(gather_question_isolated_none_omits) {
-    GatherQuestion q("k", "Q?");
-    auto j = q.to_json();
-    ASSERT_FALSE(j.contains("isolated"));
-    return true;
+  GatherQuestion q("k", "Q?");
+  auto j = q.to_json();
+  ASSERT_FALSE(j.contains("isolated"));
+  return true;
 }
 
 TEST(gather_question_isolated_true_emits) {
-    GatherQuestion q("k", "Q?", "string", false, "", {}, true);
-    auto j = q.to_json();
-    ASSERT_TRUE(j.contains("isolated"));
-    ASSERT_EQ(j["isolated"].get<bool>(), true);
-    return true;
+  GatherQuestion q("k", "Q?", "string", false, "", {}, true);
+  auto j = q.to_json();
+  ASSERT_TRUE(j.contains("isolated"));
+  ASSERT_EQ(j["isolated"].get<bool>(), true);
+  return true;
 }
 
 TEST(gather_question_isolated_false_emits) {
-    // Explicit false IS on the wire so it can override an isolated gather.
-    GatherQuestion q("k", "Q?", "string", false, "", {}, false);
-    auto j = q.to_json();
-    ASSERT_TRUE(j.contains("isolated"));
-    ASSERT_EQ(j["isolated"].get<bool>(), false);
-    return true;
+  // Explicit false IS on the wire so it can override an isolated gather.
+  GatherQuestion q("k", "Q?", "string", false, "", {}, false);
+  auto j = q.to_json();
+  ASSERT_TRUE(j.contains("isolated"));
+  ASSERT_EQ(j["isolated"].get<bool>(), false);
+  return true;
 }
 
 TEST(gather_info_isolated_false_default_omits) {
-    GatherInfo gi;
-    gi.add_question("k", "Q?");
-    auto j = gi.to_json();
-    ASSERT_FALSE(j.contains("isolated"));
-    return true;
+  GatherInfo gi;
+  gi.add_question("k", "Q?");
+  auto j = gi.to_json();
+  ASSERT_FALSE(j.contains("isolated"));
+  return true;
 }
 
 TEST(gather_info_isolated_true_emits) {
-    GatherInfo gi(std::nullopt, std::nullopt, std::nullopt, true);
-    gi.add_question("k", "Q?");
-    auto j = gi.to_json();
-    ASSERT_TRUE(j.contains("isolated"));
-    ASSERT_EQ(j["isolated"].get<bool>(), true);
-    return true;
+  GatherInfo gi(std::nullopt, std::nullopt, std::nullopt, true);
+  gi.add_question("k", "Q?");
+  auto j = gi.to_json();
+  ASSERT_TRUE(j.contains("isolated"));
+  ASSERT_EQ(j["isolated"].get<bool>(), true);
+  return true;
 }
 
 // set_gather_info's first three parameters are OPTIONAL in the reference
 // (`str | None = None`, core/contexts.py:407). Calling it with NONE of them
 // supplied exercises the DEFAULTS: all three absent, so none reaches the wire.
 TEST(step_set_gather_info_all_defaults_emit_nothing) {
-    Step s("gather");
-    s.set_text("x");
-    s.set_gather_info();
-    s.add_gather_question("k", "Q?");
-    auto j = s.to_json();
-    ASSERT_TRUE(j.contains("gather_info"));
-    const auto& gi = j["gather_info"];
-    ASSERT_FALSE(gi.contains("output_key"));
-    ASSERT_FALSE(gi.contains("completion_action"));
-    ASSERT_FALSE(gi.contains("prompt"));
-    // Questions still present — the defaults suppress only the three strings.
-    ASSERT_EQ(gi["questions"].size(), 1u);
-    return true;
+  Step s("gather");
+  s.set_text("x");
+  s.set_gather_info();
+  s.add_gather_question("k", "Q?");
+  auto j = s.to_json();
+  ASSERT_TRUE(j.contains("gather_info"));
+  const auto& gi = j["gather_info"];
+  ASSERT_FALSE(gi.contains("output_key"));
+  ASSERT_FALSE(gi.contains("completion_action"));
+  ASSERT_FALSE(gi.contains("prompt"));
+  // Questions still present — the defaults suppress only the three strings.
+  ASSERT_EQ(gi["questions"].size(), 1u);
+  return true;
 }
 
 // A SUPPLIED value does reach the wire — proving the absence modelling is not
 // simply dropping everything.
 TEST(step_set_gather_info_supplied_values_emit) {
-    Step s("gather");
-    s.set_text("x");
-    s.set_gather_info("ok", std::nullopt, "pre");
-    s.add_gather_question("k", "Q?");
-    auto j = s.to_json();
-    const auto& gi = j["gather_info"];
-    ASSERT_EQ(gi["output_key"], "ok");
-    ASSERT_EQ(gi["prompt"], "pre");
-    // The one left absent stays off the wire.
-    ASSERT_FALSE(gi.contains("completion_action"));
-    return true;
+  Step s("gather");
+  s.set_text("x");
+  s.set_gather_info("ok", std::nullopt, "pre");
+  s.add_gather_question("k", "Q?");
+  auto j = s.to_json();
+  const auto& gi = j["gather_info"];
+  ASSERT_EQ(gi["output_key"], "ok");
+  ASSERT_EQ(gi["prompt"], "pre");
+  // The one left absent stays off the wire.
+  ASSERT_FALSE(gi.contains("completion_action"));
+  return true;
 }
 
 // add_gather_question's `prompt` is likewise optional. Omitted -> no key.
 TEST(step_add_gather_question_prompt_omitted) {
-    Step s("gather");
-    s.set_text("x");
-    s.set_gather_info();
-    s.add_gather_question("k", "Q?");
-    auto j = s.to_json();
-    ASSERT_FALSE(j["gather_info"]["questions"][0].contains("prompt"));
-    return true;
+  Step s("gather");
+  s.set_text("x");
+  s.set_gather_info();
+  s.add_gather_question("k", "Q?");
+  auto j = s.to_json();
+  ASSERT_FALSE(j["gather_info"]["questions"][0].contains("prompt"));
+  return true;
 }
 
 TEST(step_set_gather_info_isolated_default) {
-    Step s("gather");
-    s.set_text("x");
-    s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
-    s.add_gather_question("k", "Q?");
-    auto j = s.to_json();
-    ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
-    return true;
+  Step s("gather");
+  s.set_text("x");
+  s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
+  s.add_gather_question("k", "Q?");
+  auto j = s.to_json();
+  ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
+  return true;
 }
 
 TEST(step_add_gather_question_isolated_override) {
-    Step s("gather");
-    s.set_text("x");
-    // Gather-level default true; per-question overrides.
-    s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
-    s.add_gather_question("inherit", "Q1?");
-    s.add_gather_question("override_false", "Q2?", "string", false, std::nullopt, {}, false);
-    s.add_gather_question("override_true", "Q3?", "string", false, std::nullopt, {}, true);
-    auto j = s.to_json();
-    const auto& qs = j["gather_info"]["questions"];
-    // Gather-level default emitted.
-    ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
-    // Inheriting question omits isolated (None).
-    ASSERT_FALSE(qs[0].contains("isolated"));
-    // Explicit false override is on the wire.
-    ASSERT_TRUE(qs[1].contains("isolated"));
-    ASSERT_EQ(qs[1]["isolated"].get<bool>(), false);
-    // Explicit true override is on the wire.
-    ASSERT_TRUE(qs[2].contains("isolated"));
-    ASSERT_EQ(qs[2]["isolated"].get<bool>(), true);
-    return true;
+  Step s("gather");
+  s.set_text("x");
+  // Gather-level default true; per-question overrides.
+  s.set_gather_info(std::nullopt, std::nullopt, std::nullopt, true);
+  s.add_gather_question("inherit", "Q1?");
+  s.add_gather_question("override_false", "Q2?", "string", false, std::nullopt, {}, false);
+  s.add_gather_question("override_true", "Q3?", "string", false, std::nullopt, {}, true);
+  auto j = s.to_json();
+  const auto& qs = j["gather_info"]["questions"];
+  // Gather-level default emitted.
+  ASSERT_TRUE(j["gather_info"]["isolated"].get<bool>());
+  // Inheriting question omits isolated (None).
+  ASSERT_FALSE(qs[0].contains("isolated"));
+  // Explicit false override is on the wire.
+  ASSERT_TRUE(qs[1].contains("isolated"));
+  ASSERT_EQ(qs[1]["isolated"].get<bool>(), false);
+  // Explicit true override is on the wire.
+  ASSERT_TRUE(qs[2].contains("isolated"));
+  ASSERT_EQ(qs[2]["isolated"].get<bool>(), true);
+  return true;
 }

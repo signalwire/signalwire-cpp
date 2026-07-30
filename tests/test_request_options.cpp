@@ -98,9 +98,9 @@ TEST(request_options_merge_unset_inherits) {
 
 TEST(request_options_get_retry_once_succeeds) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set(kGetEndpoint, 503,
-                         json{{"errors", json::array({{{"code", "UNAVAILABLE"},
-                                                       {"message", "transient"}}})}});
+  mocktest::scenario_set(
+      kGetEndpoint, 503,
+      json{{"errors", json::array({{{"code", "UNAVAILABLE"}, {"message", "transient"}}})}});
 
   RequestOptions ro;
   ro.retries = 1;
@@ -155,9 +155,9 @@ TEST(request_options_get_retry_exhausted) {
 
 TEST(request_options_post_500_not_retried) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set(kCreateEndpoint, 500,
-                         json{{"errors", json::array({{{"code", "SERVER_ERROR"},
-                                                       {"message", "boom"}}})}});
+  mocktest::scenario_set(
+      kCreateEndpoint, 500,
+      json{{"errors", json::array({{{"code", "SERVER_ERROR"}, {"message", "boom"}}})}});
 
   RequestOptions ro;
   ro.retries = 2;
@@ -185,9 +185,9 @@ TEST(request_options_post_500_not_retried) {
 
 TEST(request_options_post_503_retried) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set(kCreateEndpoint, 503,
-                         json{{"errors", json::array({{{"code", "UNAVAILABLE"},
-                                                       {"message", "throttled"}}})}});
+  mocktest::scenario_set(
+      kCreateEndpoint, 503,
+      json{{"errors", json::array({{{"code", "UNAVAILABLE"}, {"message", "throttled"}}})}});
 
   RequestOptions ro;
   ro.retries = 1;
@@ -220,20 +220,21 @@ TEST(request_options_post_503_retried) {
 // success — proving request_options reaches the transport layer via the verb.
 TEST(request_options_generated_verb_forwards_to_http) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set(kCreateEndpoint, 503,
-                         json{{"errors", json::array({{{"code", "UNAVAILABLE"},
-                                                       {"message", "throttled"}}})}});
+  mocktest::scenario_set(
+      kCreateEndpoint, 503,
+      json{{"errors", json::array({{{"code", "UNAVAILABLE"}, {"message", "throttled"}}})}});
 
   RequestOptions ro;
-  ro.retries = 1;      // 503 is retryable even for POST (throttle)
+  ro.retries = 1;  // 503 is retryable even for POST (throttle)
   ro.retry_backoff = 0;
 
   bool threw = false;
   try {
-    auto body = client.addresses().create(
-        {.country = "US", .first_name = "Grace", .last_name = "Hopper",
-         .address_type = "commercial"},
-        ro);
+    auto body = client.addresses().create({.country = "US",
+                                           .first_name = "Grace",
+                                           .last_name = "Hopper",
+                                           .address_type = "commercial"},
+                                          ro);
     ASSERT_TRUE(body.is_object());
   } catch (const SignalWireRestError&) {
     threw = true;
@@ -260,8 +261,7 @@ TEST(request_options_not_folded_into_wire_body) {
   ro.retry_on_status = std::set<int>{429, 503};
 
   auto body = client.addresses().create(
-      {.country = "US", .first_name = "Ada", .last_name = "Lovelace",
-       .address_type = "commercial"},
+      {.country = "US", .first_name = "Ada", .last_name = "Lovelace", .address_type = "commercial"},
       ro);
   ASSERT_TRUE(body.is_object());
 
@@ -273,8 +273,8 @@ TEST(request_options_not_folded_into_wire_body) {
   ASSERT_EQ(j.body.value("address_type", std::string()), std::string("commercial"));
   ASSERT_EQ(j.body.value("first_name", std::string()), std::string("Ada"));
   // …and NONE of the request_options knobs leaked into the wire body.
-  for (const char* k : {"timeout", "retries", "retry_backoff", "retry_on_status",
-                        "abort_signal", "request_options"}) {
+  for (const char* k : {"timeout", "retries", "retry_backoff", "retry_on_status", "abort_signal",
+                        "request_options"}) {
     ASSERT_FALSE(j.body.contains(k));
   }
   return true;

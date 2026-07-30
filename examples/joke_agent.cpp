@@ -6,19 +6,17 @@
 using namespace signalwire;
 
 int main() {
-    agent::AgentBase agent("joke-teller", "/jokes");
+  agent::AgentBase agent("joke-teller", "/jokes");
 
-    agent.prompt_add_section("Personality", "You are a hilarious comedian.");
-    agent.prompt_add_section("Instructions", "", {
-        "Tell jokes when asked",
-        "Keep the humor clean and family-friendly",
-        "Use different joke categories to keep things fresh"
-    });
+  agent.prompt_add_section("Personality", "You are a hilarious comedian.");
+  agent.prompt_add_section("Instructions", "",
+                           {"Tell jokes when asked", "Keep the humor clean and family-friendly",
+                            "Use different joke categories to keep things fresh"});
 
-    agent.add_skill("joke");
-    agent.add_skill("datetime");
-    agent.add_language({"English", "en-US", "inworld.Mark"});
+  agent.add_skill("joke");
+  agent.add_skill("datetime");
+  agent.add_language({"English", "en-US", "inworld.Mark"});
 
-    std::cout << "Joke agent at http://0.0.0.0:3000/jokes\n";
-    agent.run();
+  std::cout << "Joke agent at http://0.0.0.0:3000/jokes\n";
+  agent.run();
 }

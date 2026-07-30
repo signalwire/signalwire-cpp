@@ -91,7 +91,8 @@ std::optional<std::string> token_from_query_string(const std::string& query_stri
     const size_t eq = pair.find('=');
     if (eq != std::string::npos) {
       const std::string key = pair.substr(0, eq);
-      const std::string value = percent_decode(pair.substr(eq + 1));
+      // NOT const: `return value` must be able to move rather than copy.
+      std::string value = percent_decode(pair.substr(eq + 1));
       if (!value.empty()) {
         if (key == "__token") {
           return value;  // `__token` wins outright

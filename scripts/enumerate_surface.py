@@ -623,11 +623,6 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "set_post_prompt_llm_params", "set_prompt_llm_params",
         "set_pronunciations", "update_global_data",
     ],
-    ("signalwire.core.mixins.auth_mixin", "AuthMixin"): [
-        # These two AuthMixin methods are implementation-detail protected
-        # helpers in C++ (validate_auth) that aren't part of the public C++
-        # surface. Tracked as a PORT_OMISSIONS exemption, not a projection.
-    ],
     ("signalwire.core.mixins.mcp_server_mixin", "MCPServerMixin"): [
         # Empty in Python -- class exists as a marker only.
     ],
@@ -677,6 +672,17 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "has_function", "get_function", "get_all_functions",
         "remove_function",
     ],
+    # Both methods ARE public C++ surface — swml::Service declares them at
+    # include/signalwire/swml/service.hpp:96 and :100 — so they project.
+    #
+    # This key was previously declared TWICE in this dict: an earlier stanza bound
+    # it to an empty list with a comment asserting the two methods were
+    # "implementation-detail protected helpers ... not part of the public C++
+    # surface. Tracked as a PORT_OMISSIONS exemption, not a projection." That
+    # comment was false on both counts (the methods are public, and PORT_OMISSIONS
+    # has no such entry), and because a later duplicate key silently wins in a
+    # Python dict literal, the empty stanza had never had any effect. The dead
+    # stanza is deleted; this one is and always was the live binding.
     ("signalwire.core.mixins.auth_mixin", "AuthMixin"): [
         "validate_basic_auth", "get_basic_auth_credentials",
     ],

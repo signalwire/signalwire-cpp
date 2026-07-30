@@ -53,8 +53,10 @@ std::string SwmlRenderer::render_swml(const json& prompt, swml::Service& service
   }
 
   if (opts.record_call) {
-    service.document().add_verb("record_call", json::object({{"format", opts.record_format},
-                                                             {"stereo", opts.record_stereo}}));
+    // Through service.add_verb, not service.document().add_verb: the Document
+    // entry point performs no schema check at all (task #194).
+    service.add_verb("record_call", json::object({{"format", opts.record_format},
+                                                  {"stereo", opts.record_stereo}}));
   }
 
   // Assemble the SWAIG function list: startup/hangup hooks first, then the
@@ -123,7 +125,7 @@ std::string SwmlRenderer::render_function_response_swml(
   // ::say next door already use, is `url: "say:<text>"`. Matches the reference
   // (swml_renderer.py: `service.add_verb("play", {"url": f"say:{response_text}"})`).
   if (!response_text.empty()) {
-    service.document().add_verb("play", json::object({{"url", "say:" + response_text}}));
+    service.add_verb("play", json::object({{"url", "say:" + response_text}}));
   }
 
   if (actions.has_value()) {
@@ -131,15 +133,18 @@ std::string SwmlRenderer::render_function_response_swml(
       if (!action.is_object()) {
         continue;
       }
-      // First recognized action verb wins (precedence order).
+      // First recognized action verb wins (precedence order). These configs come
+      // straight from a SWAIG function's caller-supplied result, so they are the
+      // shapes MOST in need of validation — service.add_verb, never
+      // service.document().add_verb (task #194).
       if (action.contains("play")) {
-        service.document().add_verb("play", action.at("play"));
+        service.add_verb("play", action.at("play"));
       } else if (action.contains("hangup")) {
-        service.document().add_verb("hangup", action.at("hangup"));
+        service.add_verb("hangup", action.at("hangup"));
       } else if (action.contains("transfer")) {
-        service.document().add_verb("transfer", action.at("transfer"));
+        service.add_verb("transfer", action.at("transfer"));
       } else if (action.contains("ai")) {
-        service.document().add_verb("ai", action.at("ai"));
+        service.add_verb("ai", action.at("ai"));
       }
     }
   }

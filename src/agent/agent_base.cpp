@@ -1673,6 +1673,19 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     swaig_section["mcp_servers"] = mcp_servers_;
   }
 
+  // Internal fillers live INSIDE the SWAIG object under their canonical name
+  // ``internal_fillers`` — schema ``$defs/SWAIG`` declares exactly
+  // [defaults, functions, includes, internal_fillers, native_functions].
+  // This previously emitted ``ai.fillers``: wrong KEY and wrong NESTING LEVEL at
+  // once. ``$defs/AIObject`` is closed over nine keys via
+  // ``unevaluatedProperties: {"not": {}}`` and ``fillers`` is not one of them, so
+  // every document from an agent with internal fillers was schema-invalid and the
+  // server never read them. Reference: ``agent_base.py:1029``
+  // ``swaig_obj["internal_fillers"] = ...``.
+  if (!internal_fillers_.is_null() && !internal_fillers_.empty()) {
+    swaig_section["internal_fillers"] = internal_fillers_;
+  }
+
   if (!swaig_section.empty()) {
     ai["SWAIG"] = swaig_section;
   }
@@ -1682,14 +1695,17 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     ai["global_data"] = global_data_;
   }
 
-  // Contexts
+  // Contexts belong INSIDE the prompt ($defs/AIPromptText / $defs/AIPromptPom),
+  // not at the ai top level — ``$defs/AIObject`` is closed over nine keys and
+  // ``contexts`` is not among them, so an agent using the steps feature emitted a
+  // document the schema rejects. Reference: ``swml_handler.py:191``
+  // ``prompt_config["contexts"] = contexts``. (Same defect independently found in
+  // the typescript port.)
   if (context_builder_ && context_builder_->has_contexts()) {
-    ai["contexts"] = context_builder_->to_json();
-  }
-
-  // Internal fillers
-  if (!internal_fillers_.is_null() && !internal_fillers_.empty()) {
-    ai["fillers"] = internal_fillers_;
+    if (!ai.contains("prompt") || !ai["prompt"].is_object()) {
+      ai["prompt"] = json::object();
+    }
+    ai["prompt"]["contexts"] = context_builder_->to_json();
   }
 
   return ai;
@@ -1883,9 +1899,22 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
 
   swml::Document doc;
 
+  // Every verb below is schema-checked before it lands in the document (task
+  // #194). The document assembled here is LOCAL — it is not the Service's own
+  // ``document_`` — so ``Service::add_verb`` cannot be used to append to it, and
+  // before this fix nothing validated any of it: an agent rendered whatever the
+  // caller had configured, straight onto the wire. AgentBase derives from
+  // swml::Service, so it validates through the same protected check every
+  // Service-level entry point uses.
+  const auto emit = [this, &doc](const std::string& verb_name, const json& params) {
+    validate_verb_or_throw(verb_name, params);
+    doc.main().add_verb(verb_name, params);
+  };
+  const auto emit_verb = [&emit](const swml::Verb& v) { emit(v.name, v.params); };
+
   // Phase 1: Pre-answer verbs
   for (const auto& v : pre_answer_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   // Phase 2: Answer verb — only when auto_answer is enabled (reference:
@@ -1893,30 +1922,29 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
   // configured answer verbs still win over the default config.
   if (auto_answer_) {
     if (answer_verbs_.empty()) {
-      doc.main().add_verb("answer", json::object({{"max_duration", 3600}}));
+      emit("answer", json::object({{"max_duration", 3600}}));
     } else {
       for (const auto& v : answer_verbs_) {
-        doc.main().add_verb(v);
+        emit_verb(v);
       }
     }
   }
 
   // Phase 3: Post-answer verbs — recording first, as in the reference.
   if (record_call_) {
-    doc.main().add_verb("record_call",
-                        json::object({{"format", record_format_}, {"stereo", record_stereo_}}));
+    emit("record_call", json::object({{"format", record_format_}, {"stereo", record_stereo_}}));
   }
   for (const auto& v : post_answer_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   // Phase 4: AI verb
   json ai_verb = build_ai_verb(webhook_url, call_id);
-  doc.main().add_verb("ai", ai_verb);
+  emit("ai", ai_verb);
 
   // Phase 5: Post-AI verbs
   for (const auto& v : post_ai_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   json swml = doc.to_json();

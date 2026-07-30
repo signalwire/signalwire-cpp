@@ -282,17 +282,22 @@ bool Service::validate_auth(const httplib::Request& req, httplib::Response& res)
 
 Service& Service::add_verb(const std::string& section, const std::string& verb_name,
                            const json& params) {
+  // Was RAW: this delegated straight to document_.add_verb_to_section with no
+  // schema check, despite living on the Service and sharing its name with the
+  // validating 2-arg form. A caller writing `service.add_verb(...)` got
+  // validation or not depending purely on arity.
+  validate_verb_or_throw(verb_name, params);
   document_.add_verb_to_section(section, verb_name, params);
   return *this;
 }
 
-Service& Service::add_verb(const std::string& verb_name, const json& config) {
-  // Strict-render add_verb (Python: SWMLService.add_verb(verb_name, config)).
-  // Validate before appending: unknown verb / misspelled+unknown key /
-  // wrong-typed value raises SchemaValidationError. Handler verbs (ai) are
-  // validated by their handler + a shallow unknown-top-level-key check; their
-  // legitimate DEEP shapes are NOT deep-validated (empty prompt.pom, SWAIG
-  // defaults). No-op checks when schema validation is disabled.
+void Service::validate_verb_or_throw(const std::string& verb_name, const json& config) const {
+  // Strict-render validation (Python: SWMLService.add_verb(verb_name, config)).
+  // Unknown verb / misspelled+unknown key / wrong-typed value raises
+  // SchemaValidationError. Handler verbs (ai) are validated by their handler +
+  // a shallow unknown-top-level-key check; their legitimate DEEP shapes are NOT
+  // deep-validated (empty prompt.pom, SWAIG defaults). No-op checks when schema
+  // validation is disabled.
   auto& su = schema_utils();
 
   bool is_valid = true;
@@ -325,7 +330,10 @@ Service& Service::add_verb(const std::string& verb_name, const json& config) {
   if (!is_valid) {
     throw signalwire::utils::SchemaValidationError(verb_name, errors);
   }
+}
 
+Service& Service::add_verb(const std::string& verb_name, const json& config) {
+  validate_verb_or_throw(verb_name, config);
   document_.add_verb(verb_name, config);
   return *this;
 }
@@ -396,6 +404,8 @@ bool Service::add_section(const std::string& section_name) {
 
 Service& Service::add_verb_to_section(const std::string& section_name, const std::string& verb_name,
                                       const json& config) {
+  // Was RAW, like the 3-arg add_verb it aliases.
+  validate_verb_or_throw(verb_name, config);
   document_.add_verb_to_section(section_name, verb_name, config);
   return *this;
 }

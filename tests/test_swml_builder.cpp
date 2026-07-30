@@ -56,13 +56,20 @@ TEST(swml_builder_ai_pom_and_kwargs) {
   signalwire::swml::Service svc;
   SWMLBuilder b(svc);
   json pom = json::array({{{"title", "Role"}}});
-  json kwargs = {{"temperature", 0.7}};
+  // The kwargs merge at the ai TOP level (reference: `**(params or {})` into
+  // `builder.ai(...)`), so the key must be one `$defs/AIObject` actually
+  // declares — it is closed over nine keys via
+  // `unevaluatedProperties: {"not": {}}`. This fixture used `temperature`, which
+  // is in neither AIObject nor the 92-key `$defs/AIParams`; it rode the raw
+  // document path and produced a schema-invalid document. `global_data` is a
+  // real AIObject key.
+  json kwargs = {{"global_data", json::object({{"company_name", "Acme"}})}};
   b.reset().ai(std::nullopt, std::optional<json>(pom), std::nullopt, std::nullopt, std::nullopt,
                kwargs);
   json ai = find_main_verb(b.build(), "ai");
   ASSERT_TRUE(ai["prompt"].contains("pom"));
   // kwargs merged at top level
-  ASSERT_EQ(ai["temperature"].get<double>(), 0.7);
+  ASSERT_EQ(ai["global_data"]["company_name"].get<std::string>(), std::string("Acme"));
   return true;
 }
 

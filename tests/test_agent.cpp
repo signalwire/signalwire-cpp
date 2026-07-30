@@ -475,7 +475,7 @@ TEST(agent_render_swml_default) {
 
 TEST(agent_pre_answer_verbs) {
     AgentBase agent;
-    agent.add_pre_answer_verb("play", json::object({{"url", "ring.mp3"}}));
+    agent.add_pre_answer_verb("play", json::object({{"url", "https://cdn.example.com/ring.mp3"}}));
     json swml = agent.render_swml();
     auto& main = swml["sections"]["main"];
     // First verb should be the pre-answer play
@@ -485,7 +485,7 @@ TEST(agent_pre_answer_verbs) {
 
 TEST(agent_post_answer_verbs) {
     AgentBase agent;
-    agent.add_post_answer_verb("play", json::object({{"url", "welcome.mp3"}}));
+    agent.add_post_answer_verb("play", json::object({{"url", "https://cdn.example.com/welcome.mp3"}}));
     json swml = agent.render_swml();
     auto& main = swml["sections"]["main"];
     // After answer, before AI

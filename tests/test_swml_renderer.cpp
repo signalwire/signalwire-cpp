@@ -117,10 +117,14 @@ TEST(renderer_prompt_is_pom) {
 TEST(renderer_params_merged) {
   signalwire::swml::Service svc;
   RenderOptions opts;
-  opts.params = json::object({{"temperature", 0.3}});
+  // RenderOptions::params spreads at the ai TOP level (reference:
+  // `**(params or {})`), so it must carry a key `$defs/AIObject` declares — the
+  // object is closed over nine keys. `temperature` is in neither AIObject nor
+  // `$defs/AIParams`; it rode the raw path into a schema-invalid document.
+  opts.params = json::object({{"hints", json::array({"acme"})}});
   std::string s = SwmlRenderer::render_swml("Hi", svc, opts);
   json ai = first_main_verb(json::parse(s), "ai");
-  ASSERT_EQ(ai["temperature"].get<double>(), 0.3);
+  ASSERT_EQ(ai["hints"][0].get<std::string>(), std::string("acme"));
   return true;
 }
 

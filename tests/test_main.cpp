@@ -75,6 +75,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_swaig_function.cpp"
 #include "test_swml_builder.cpp"
 #include "test_swml_renderer.cpp"
+#include "test_swml_validating_path.cpp"
 #include "test_web_service.cpp"
 #include "test_function_result.cpp"
 #include "test_parameter_schema.cpp"

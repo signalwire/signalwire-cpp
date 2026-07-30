@@ -98,3 +98,50 @@ TEST(bedrock_carries_swaig_when_tools_defined) {
     ASSERT_TRUE(bedrock.contains("SWAIG"));
     return true;
 }
+
+// ============================================================================
+// transform_swml is a post-render document REWRITE — it rebuilds the verb
+// key-by-key against a fixed six-key allowlist rather than passing the original
+// through. That shape drops silently: any key the transform does not know about
+// vanishes with no error. The typescript port lost debug_webhook_url/-_level
+// exactly this way. These tests pin what must survive and what must not.
+// ============================================================================
+
+TEST(bedrock_transform_preserves_debug_webhook_params) {
+    // params is copied WHOLESALE (not key-by-key), and $defs/BedrockParams is
+    // open, so debug-event wiring survives the rewrite. If this ever regresses to
+    // a per-key copy against a fixed list, debug events go unreachable on every
+    // Bedrock agent with no error raised.
+    BedrockAgent agent;
+    agent.prompt_add_section("Role", "You are a helpful voice agent.");
+    agent.enable_debug_events(1);
+    json swml = agent.render_swml();
+    json bedrock = find_verb(swml, "amazon_bedrock");
+    ASSERT_TRUE(bedrock.is_object());
+    ASSERT_TRUE(bedrock.contains("params"));
+    ASSERT_TRUE(bedrock["params"].contains("debug_webhook_url"));
+    ASSERT_EQ(bedrock["params"]["debug_webhook_level"].get<int>(), 1);
+    return true;
+}
+
+TEST(bedrock_transform_drops_only_keys_the_schema_forbids) {
+    // $defs/AmazonBedrockObject declares exactly
+    // [SWAIG, global_data, params, post_prompt, post_prompt_url, prompt] and is
+    // CLOSED (unevaluatedProperties: {"not": {}}). hints/languages/pronounce are
+    // valid on `ai` but NOT on `amazon_bedrock`, so dropping them is required by
+    // the schema, not an accident of the allowlist.
+    BedrockAgent agent;
+    agent.prompt_add_section("Role", "You are a helpful voice agent.");
+    agent.add_hint("SignalWire");
+    agent.add_pronunciation("SW", "SignalWire");
+    agent.set_global_data(json::object({{"k", "v"}}));
+    json swml = agent.render_swml();
+    json bedrock = find_verb(swml, "amazon_bedrock");
+    ASSERT_TRUE(bedrock.is_object());
+    ASSERT_FALSE(bedrock.contains("hints"));
+    ASSERT_FALSE(bedrock.contains("pronounce"));
+    ASSERT_FALSE(bedrock.contains("languages"));
+    // global_data IS in the closed set, so it must survive.
+    ASSERT_EQ(bedrock["global_data"]["k"].get<std::string>(), std::string("v"));
+    return true;
+}

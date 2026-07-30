@@ -39,15 +39,21 @@ TEST(render_empty_agent_produces_valid_swml) {
     return true;
 }
 
-TEST(render_contexts_in_ai_verb) {
+TEST(render_contexts_in_ai_prompt) {
+    // Contexts belong INSIDE the prompt ($defs/AIPromptText / $defs/AIPromptPom),
+    // not at the ai top level: $defs/AIObject is closed over nine keys via
+    // `unevaluatedProperties: {"not": {}}` and `contexts` is not among them. This
+    // test previously asserted `ai.contexts` — i.e. it pinned a schema-invalid
+    // document. Reference: swml_handler.py:191 `prompt_config["contexts"] = ...`.
     AgentBase agent;
     auto& ctx = agent.add_context("default");
     ctx.add_step("greet", "Greet the user");
     json swml = agent.render_swml();
     auto& main = swml["sections"]["main"];
     for (const auto& verb : main) {
-        if (verb.contains("ai") && verb["ai"].contains("contexts")) {
-            ASSERT_TRUE(verb["ai"]["contexts"].contains("default"));
+        if (verb.contains("ai")) {
+            ASSERT_FALSE(verb["ai"].contains("contexts"));
+            ASSERT_TRUE(verb["ai"]["prompt"]["contexts"].contains("default"));
             return true;
         }
     }
@@ -119,8 +125,11 @@ TEST(render_all_config_combined) {
             // Debug events ride in ai.params, not a top-level ai.debug_events.
             ASSERT_FALSE(ai.contains("debug_events"));
             ASSERT_TRUE(ai["params"].contains("debug_webhook_level"));
-            ASSERT_TRUE(ai.contains("fillers"));
             ASSERT_TRUE(ai.contains("SWAIG"));
+            // Internal fillers ride at SWAIG.internal_fillers — `ai.fillers` is
+            // not a key $defs/AIObject declares, and that object is closed.
+            ASSERT_FALSE(ai.contains("fillers"));
+            ASSERT_TRUE(ai["SWAIG"].contains("internal_fillers"));
         }
     }
     ASSERT_TRUE(found_ai);

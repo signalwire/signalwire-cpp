@@ -512,6 +512,32 @@ class Service {
   /// the SWML + /swaig base routes.
   virtual void setup_routes(httplib::Server& server);
 
+ protected:
+  /// The single schema check behind EVERY Service-level verb entry point.
+  ///
+  /// Before this existed the Service had three ways in and only one of them
+  /// consulted the schema: the 2-arg ``add_verb(verb, config)`` validated, while
+  /// the 3-arg ``add_verb(section, verb, params)`` and
+  /// ``add_verb_to_section(...)`` — and all 37 of the per-verb convenience
+  /// methods — delegated straight to the Document. Two of those SHARE the name
+  /// ``add_verb``, so whether a caller got validation depended purely on arity;
+  /// nothing at the call site said so. That is how ``play {"text": ...}`` (task
+  /// #180) shipped in five ports: the validating path rejects the key, and
+  /// nothing ever went through the validating path.
+  ///
+  /// Throws ``signalwire::utils::SchemaValidationError`` on an unknown verb, a
+  /// misspelled/unknown top-level key, or a wrong-typed value. A no-op when
+  /// schema validation is disabled.
+  ///
+  /// Protected rather than private so AgentBase — which derives from Service but
+  /// assembles its rendered document in a LOCAL ``swml::Document`` rather than
+  /// the Service's own ``document_`` — can validate the verbs it emits through
+  /// the same check.
+  ///
+  /// ``const``: it only reads the schema (the SchemaUtils cache is ``mutable``),
+  /// so ``AgentBase::render_swml_internal`` — which is const — can call it.
+  void validate_verb_or_throw(const std::string& verb_name, const json& config) const;
+
  private:
   void init_auth() const;
 

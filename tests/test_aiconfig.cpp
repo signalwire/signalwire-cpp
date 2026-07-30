@@ -431,8 +431,15 @@ TEST(aiconfig_set_internal_fillers) {
     agent.set_internal_fillers(fillers);
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
-    ASSERT_TRUE(ai.contains("fillers"));
-    ASSERT_EQ(ai["fillers"]["en-US"].size(), 2u);
+    // Internal fillers live at SWAIG.internal_fillers — schema $defs/SWAIG
+    // declares exactly [defaults, functions, includes, internal_fillers,
+    // native_functions]. This previously asserted `ai.fillers`, which is wrong on
+    // BOTH axes: `fillers` is not a $defs/SWAIG key name, and $defs/AIObject is
+    // closed over nine keys that do not include it. The old assertion was
+    // pinning a schema-invalid document the server never read.
+    ASSERT_FALSE(ai.contains("fillers"));
+    ASSERT_TRUE(ai["SWAIG"].contains("internal_fillers"));
+    ASSERT_EQ(ai["SWAIG"]["internal_fillers"]["en-US"].size(), 2u);
     return true;
 }
 
@@ -442,9 +449,11 @@ TEST(aiconfig_add_internal_filler) {
     agent.add_internal_filler("fr-FR", {"Un instant..."});
     json swml = agent.render_swml();
     auto ai = find_ai_verb(swml);
-    ASSERT_TRUE(ai.contains("fillers"));
-    ASSERT_EQ(ai["fillers"]["en-US"].size(), 2u);
-    ASSERT_EQ(ai["fillers"]["fr-FR"].size(), 1u);
+    // See aiconfig_set_internal_fillers: the canonical location is
+    // SWAIG.internal_fillers, not ai.fillers.
+    ASSERT_FALSE(ai.contains("fillers"));
+    ASSERT_EQ(ai["SWAIG"]["internal_fillers"]["en-US"].size(), 2u);
+    ASSERT_EQ(ai["SWAIG"]["internal_fillers"]["fr-FR"].size(), 1u);
     return true;
 }
 

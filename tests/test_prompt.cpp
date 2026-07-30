@@ -344,8 +344,9 @@ TEST(pom_returns_sections_after_prompt_add_section) {
   auto pom = agent.pom();
   ASSERT_TRUE(pom.has_value());
   ASSERT_EQ(pom->sections.size(), 1u);
-  ASSERT_TRUE(pom->sections[0].title.has_value());
-  ASSERT_EQ(*pom->sections[0].title, std::string("Greeting"));
+  auto& t = pom->sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Greeting"));
   ASSERT_EQ(pom->sections[0].body, std::string("Hello"));
   return true;
 }
@@ -373,7 +374,8 @@ TEST(pom_returns_copy_not_internal_vector) {
   auto fresh = agent.pom();
   ASSERT_TRUE(fresh.has_value());
   ASSERT_EQ(fresh->sections.size(), 1u);
-  ASSERT_TRUE(fresh->sections[0].title.has_value());
-  ASSERT_EQ(*fresh->sections[0].title, std::string("Original"));
+  auto& t = fresh->sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Original"));
   return true;
 }

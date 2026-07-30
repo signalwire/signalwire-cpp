@@ -335,6 +335,7 @@ TEST(web_on_swml_request_dispatches_virtually_through_a_base_reference) {
   ASSERT_TRUE(result.has_value());
   ASSERT_EQ((*result)["via"].get<std::string>(), std::string{"base-ref"});
   ASSERT_TRUE(svc.saw_request_arg);
+  ASSERT_TRUE(svc.last_request.has_value());
   ASSERT_EQ((*svc.last_request)["query_params"]["k"].get<std::string>(), std::string{"v"});
   return true;
 }

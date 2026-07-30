@@ -147,6 +147,7 @@ TEST(pom_add_section_returns_reference) {
   pom_ns::PromptObjectModel pom;
   pom_ns::Section& s = pom.add_section("Greeting", "Hi");
   ASSERT_EQ(pom.sections.size(), 1u);
+  ASSERT_TRUE(s.title.has_value());
   ASSERT_EQ(*s.title, std::string("Greeting"));
   return true;
 }
@@ -360,7 +361,9 @@ TEST(pom_from_json_parses_string) {
   std::string js = "[{\"title\": \"X\", \"body\": \"y\"}]";
   pom_ns::PromptObjectModel pom = pom_ns::PromptObjectModel::from_json(js);
   ASSERT_EQ(pom.sections.size(), 1u);
-  ASSERT_EQ(*pom.sections[0].title, std::string("X"));
+  auto& t = pom.sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("X"));
   ASSERT_EQ(pom.sections[0].body, std::string("y"));
   return true;
 }
@@ -372,10 +375,14 @@ TEST(pom_from_json_round_trip_preserves_bullets_and_subsections) {
   std::string serialised = pom.to_json();
   pom_ns::PromptObjectModel restored = pom_ns::PromptObjectModel::from_json(serialised);
   ASSERT_EQ(restored.sections.size(), 1u);
-  ASSERT_EQ(*restored.sections[0].title, std::string("Parent"));
+  auto& t = restored.sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Parent"));
   ASSERT_EQ(restored.sections[0].bullets[0], std::string("x"));
   ASSERT_EQ(restored.sections[0].subsections.size(), 1u);
-  ASSERT_EQ(*restored.sections[0].subsections[0].title, std::string("Child"));
+  auto& sub_t = restored.sections[0].subsections[0].title;
+  ASSERT_TRUE(sub_t.has_value());
+  ASSERT_EQ(*sub_t, std::string("Child"));
   ASSERT_EQ(restored.sections[0].subsections[0].bullets[0], std::string("cb1"));
   return true;
 }
@@ -419,7 +426,9 @@ TEST(pom_from_yaml_round_trip) {
   std::string y = pom.to_yaml();
   pom_ns::PromptObjectModel restored = pom_ns::PromptObjectModel::from_yaml(y);
   ASSERT_EQ(restored.sections.size(), 1u);
-  ASSERT_EQ(*restored.sections[0].title, std::string("Greeting"));
+  auto& t = restored.sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Greeting"));
   ASSERT_EQ(restored.sections[0].body, std::string("Hello"));
   ASSERT_EQ(restored.sections[0].bullets.size(), 2u);
   ASSERT_EQ(restored.sections[0].bullets[0], std::string("x"));
@@ -435,7 +444,9 @@ TEST(pom_from_yaml_with_subsections_round_trip) {
   pom_ns::PromptObjectModel restored = pom_ns::PromptObjectModel::from_yaml(y);
   ASSERT_EQ(restored.sections.size(), 1u);
   ASSERT_EQ(restored.sections[0].subsections.size(), 1u);
-  ASSERT_EQ(*restored.sections[0].subsections[0].title, std::string("Child"));
+  auto& t = restored.sections[0].subsections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Child"));
   ASSERT_EQ(restored.sections[0].subsections[0].bullets[0], std::string("x"));
   return true;
 }
@@ -451,7 +462,9 @@ TEST(pom_add_pom_as_subsection_by_title) {
   b.add_section("Guest", "gbody");
   a.add_pom_as_subsection("Host", b);
   ASSERT_EQ(a.sections[0].subsections.size(), 1u);
-  ASSERT_EQ(*a.sections[0].subsections[0].title, std::string("Guest"));
+  auto& t = a.sections[0].subsections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Guest"));
   return true;
 }
 
@@ -476,7 +489,9 @@ TEST(pom_agent_base_pom_returns_prompt_object_model) {
   auto maybe_pom = agent.pom();
   ASSERT_TRUE(maybe_pom.has_value());
   ASSERT_EQ(maybe_pom->sections.size(), 1u);
-  ASSERT_EQ(*maybe_pom->sections[0].title, std::string("Greeting"));
+  auto& t = maybe_pom->sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Greeting"));
   ASSERT_EQ(maybe_pom->sections[0].bullets.size(), 2u);
   // Returned model is renderable directly (parity check).
   ASSERT_EQ(maybe_pom->render_markdown(), std::string("## Greeting\n\nHi\n\n- x\n- y\n"));

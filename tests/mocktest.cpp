@@ -187,8 +187,13 @@ std::string discover_porting_sdk_package(const std::string& name) {
       return std::string();
     }
     std::string parent = dir.substr(0, last);
-    std::string candidate = parent + "/porting-sdk/test_harness/" + name;
-    std::string init = candidate + "/" + name + "/__init__.py";
+    std::string candidate = parent;
+    candidate += "/porting-sdk/test_harness/";
+    candidate += name;
+    std::string init = candidate;
+    init += "/";
+    init += name;
+    init += "/__init__.py";
     struct stat st;
     if (::stat(init.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
       return candidate;

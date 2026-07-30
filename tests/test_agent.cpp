@@ -178,6 +178,7 @@ TEST(agent_ctor_config_file_supplies_service_defaults) {
                      false, false, false, cfg);
   ASSERT_EQ(defaults.name(), "from-config");
   ASSERT_EQ(defaults.route(), "/cfg");
+  ASSERT_TRUE(defaults.config_file().has_value());
   ASSERT_EQ(defaults.config_file().value(), cfg);
 
   // Explicit non-default route beats the config file.
@@ -197,6 +198,7 @@ TEST(agent_ctor_schema_path_forwarded_to_schema_utils) {
   CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
                   true, std::nullopt, std::nullopt, std::nullopt,
                   std::string("/nonexistent/schema.json"));
+  ASSERT_TRUE(agent.schema_path().has_value());
   ASSERT_EQ(agent.schema_path().value(), "/nonexistent/schema.json");
   return true;
 }
@@ -237,6 +239,7 @@ TEST(agent_ctor_record_call_emits_record_verb) {
 TEST(agent_ctor_default_webhook_url_emits_swaig_defaults) {
   CtorProbe agent("a", "/", "0.0.0.0", std::nullopt, std::nullopt, true, 3600, true, false, "mp4",
                   true, std::string("https://example.com/hook"));
+  ASSERT_TRUE(agent.default_webhook_url().has_value());
   ASSERT_EQ(agent.default_webhook_url().value(), "https://example.com/hook");
   json swml = agent.render_swml();
   const json& ai = swml["sections"]["main"][1]["ai"];
@@ -256,6 +259,7 @@ TEST(agent_ctor_params_survive_clone) {
   ASSERT_TRUE(copy.record_call_enabled());
   ASSERT_EQ(copy.record_format(), "wav");
   ASSERT_FALSE(copy.record_stereo());
+  ASSERT_TRUE(copy.default_webhook_url().has_value());
   ASSERT_EQ(copy.default_webhook_url().value(), "https://example.com/hook");
   return true;
 }
@@ -875,8 +879,9 @@ TEST(agent_prompt_add_to_section_autocreates) {
   auto pom = agent.pom();
   ASSERT_TRUE(pom.has_value());
   ASSERT_EQ(pom->sections.size(), 1u);
-  ASSERT_TRUE(pom->sections[0].title.has_value());
-  ASSERT_EQ(*pom->sections[0].title, "Fresh");
+  auto& t = pom->sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, "Fresh");
   ASSERT_EQ(pom->sections[0].body, "body text");
   ASSERT_EQ(pom->sections[0].bullets.size(), 1u);
   return true;
@@ -891,7 +896,8 @@ TEST(agent_prompt_add_subsection_autocreates) {
   ASSERT_TRUE(pom.has_value());
   ASSERT_EQ(pom->sections.size(), 1u);
   ASSERT_EQ(pom->sections[0].subsections.size(), 1u);
-  ASSERT_TRUE(pom->sections[0].subsections[0].title.has_value());
-  ASSERT_EQ(*pom->sections[0].subsections[0].title, "Child");
+  auto& t = pom->sections[0].subsections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, "Child");
   return true;
 }

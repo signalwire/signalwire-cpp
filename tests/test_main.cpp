@@ -76,6 +76,9 @@ static std::vector<TestCase>& get_tests() {
       /* evaluating `expr` THROWS, so any value it returns is irrelevant.        */              \
       /* The pragma scopes that to this one line, for the compiler (-Wall now    */              \
       /* reaches run_tests) and for clang-tidy alike.                            */              \
+      /* `expr` also CANNOT be parenthesised: `(SessionManager sm(secret))` is   */              \
+      /* not valid, so bugprone-macro-parentheses is suppressed on that line.    */              \
+      /* NOLINTNEXTLINE(bugprone-macro-parentheses)                              */              \
       _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"") expr; \
       _Pragma("GCC diagnostic pop")                                                              \
     } catch (...) {                                                                              \

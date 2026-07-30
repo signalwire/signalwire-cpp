@@ -51,8 +51,9 @@ TEST(infer_schema_description_passthrough) {
   schema.string("q");
 
   auto result = sw_ti::infer_schema(schema, std::optional<std::string>("Book a service"));
-  ASSERT_TRUE(std::get<2>(result).has_value());
-  ASSERT_EQ(*std::get<2>(result), std::string("Book a service"));
+  auto& t = std::get<2>(result);
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Book a service"));
   ASSERT_TRUE(std::get<3>(result));  // is_typed
   return true;
 }

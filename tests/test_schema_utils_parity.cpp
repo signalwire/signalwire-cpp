@@ -132,3 +132,61 @@ TEST(schema_validation_error_message) {
     ASSERT_EQ(err.errors().size(), static_cast<size_t>(2));
     return true;
 }
+
+// ============================================================================
+// Hangup.reason: the schema's const-union is a HINT, not a closed set
+// ============================================================================
+//
+// `$defs/Hangup.reason` declares anyOf[const "hangup", const "busy",
+// const "decline"] and carries the marker meaning "the platform accepts any
+// value of the base type; this union is only a hint". The validator therefore
+// must NOT reject a legitimate platform value that is absent from the union --
+// rejecting one is a bug on the public API in the direction nobody looks for:
+// too STRICT, refusing documents the platform accepts.
+//
+// The validator reaches that behaviour by not enforcing const/enum VALUES at
+// all. This test pins the OBSERVABLE contract rather than the mechanism, so it
+// keeps holding if const enforcement is ever added -- at which point whoever
+// adds it must make this field read the marker, or go red here. That is the
+// point: widen-awareness is a PRECONDITION of const enforcement, not a
+// follow-up to it.
+TEST(schema_utils_hangup_reason_accepts_values_outside_the_const_union) {
+    SchemaUtils su;
+
+    // In the union -- accepted, obviously.
+    for (const char* in_union : {"hangup", "busy", "decline"}) {
+        auto [ok, errors] = su.validate_verb("hangup", json{{"reason", in_union}});
+        ASSERT_TRUE(ok);
+        ASSERT_TRUE(errors.empty());
+    }
+
+    // NOT in the union, but legitimate platform values. Rejecting either of
+    // these would be the too-strict bug.
+    for (const char* outside : {"no_answer", "user_hangup"}) {
+        auto [ok, errors] = su.validate_verb("hangup", json{{"reason", outside}});
+        ASSERT_TRUE(ok);
+        ASSERT_TRUE(errors.empty());
+    }
+    return true;
+}
+
+// The BASE TYPE still binds. Treating the union as a hint widens the field to
+// "any string" -- it does not erase the type, so a non-string is still wrong
+// and must still be rejected. A validator that accepted 42 here would have
+// widened by deleting the constraint rather than by recovering the base type.
+TEST(schema_utils_hangup_reason_still_rejects_wrong_base_type) {
+    SchemaUtils su;
+    const std::vector<json> not_strings = {json(42), json(true), json::object(), json::array()};
+    for (const auto& bad : not_strings) {
+        auto [ok, errors] = su.validate_verb("hangup", json{{"reason", bad}});
+        ASSERT_FALSE(ok);
+        ASSERT_FALSE(errors.empty());
+    }
+
+    // Object closure is independent of any of this: an unknown key is still
+    // rejected.
+    auto [ok, errors] = su.validate_verb("hangup", json{{"bogus_key", "x"}});
+    ASSERT_FALSE(ok);
+    ASSERT_FALSE(errors.empty());
+    return true;
+}

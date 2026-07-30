@@ -1243,7 +1243,30 @@ def _scan_skill_methods(repo: Path) -> dict[str, set[str]]:
 def _project_builtin_skills(modules: dict, repo: Path) -> None:
     """Project each built-in skill class into its Python-canonical module with the
     intersection of Python's recorded methods and the methods the C++ class
-    genuinely has (own-defined | SkillBase-inherited | ctor)."""
+    genuinely has (own-defined | SkillBase-inherited | ctor).
+
+    ORACLE-GATED, not list-gated. ``SKILL_PROJECTIONS``' per-class ``py_methods``
+    lists are HAND-KEPT and therefore go stale the moment the reference moves a
+    member. They did: the reference made ``SkillBase.get_prompt_sections()`` a
+    final template method that applies the ``skip_prompt`` guard and delegates to
+    a PROTECTED ``_get_prompt_sections()`` hook, so the public member now exists
+    on the BASE ONLY while every subclass overrides the protected one. The oracle
+    dropped the public member from 11 skills; the hand list still named it, so
+    the projection kept emitting public surface the reference does not expose —
+    10 phantom ``missing-reference`` additions.
+
+    So the hand list is now an UPPER BOUND intersected with what the surface
+    oracle LIVE records for that class. A member the reference stopped exposing
+    stops being projected on the next regen, with no hand edit. This is the same
+    discipline the signature enumerator's hook projection uses, for the same
+    reason: a member is emitted only when the C++ class genuinely has it AND the
+    reference genuinely records it.
+
+    Fail-safe: if the oracle cannot be resolved, fall back to the hand list
+    rather than silently emitting an EMPTY class surface (which would read as a
+    mass deletion of real port members).
+    """
+    ref_modules = _load_reference_surface().get("modules", {})
     defined = _scan_skill_methods(repo)
     for cpp_cls, (mod, py_cls, py_methods) in SKILL_PROJECTIONS.items():
         if cpp_cls not in defined:
@@ -1255,6 +1278,13 @@ def _project_builtin_skills(modules: dict, repo: Path) -> None:
             for m in py_methods
             if m == "__init__" or m in own or m in _SKILL_BASE_METHODS
         )
+        # Intersect with the LIVE surface oracle (see docstring). ``__init__`` is
+        # exempt: it is construction shape, recorded separately.
+        if ref_modules:
+            ref_members = set(
+                ref_modules.get(mod, {}).get("classes", {}).get(py_cls, []) or []
+            )
+            present = [m for m in present if m == "__init__" or m in ref_members]
         mod_entry = modules.setdefault(mod, {"classes": {}, "functions": []})
         mod_entry["classes"][py_cls] = sorted(set(present))
 

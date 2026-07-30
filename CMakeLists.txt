@@ -99,6 +99,17 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 # `g++ … -lsignalwire` against a static build fails to resolve OpenSSL/ixwebsocket
 # symbols (PACKAGE-SMOKE #92). The internal tools/tests below link it the same way.
 add_library(signalwire SHARED ${SOURCES})
+
+# -Wall on the SHIPPED LIBRARY. Until 2026-07-30 -Wall was applied only to the
+# example targets (the sole occurrence in this file), so the shipped code was
+# held to a LOWER compiler-warning bar than its own demos -- backwards. It is
+# PRIVATE so consumers of the installed target do not inherit it.
+#
+# Free to enable: the only two warnings left under -Wall are inside the vendored
+# FetchContent IXWebSocket tree, not our code (first-party src/ + include/ is
+# clean). The five -Woverloaded-virtual it used to report were the
+# on_swml_request hiding, fixed by giving that hook its third parameter.
+target_compile_options(signalwire PRIVATE -Wall)
 # cpp-httplib TLS enabled — requires OpenSSL 3.0+ (build with a 3.0+ toolchain;
 # OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
 # httplib::SSLServer for the webhook server (in-process TLS termination).
@@ -437,28 +448,15 @@ foreach(example_src ${EXAMPLE_SOURCES})
 
     add_executable(${target_name} EXCLUDE_FROM_ALL ${example_src})
     target_link_libraries(${target_name} signalwire)
-    # -Wno-overloaded-virtual: this fires on a LIBRARY HEADER
-    # (include/signalwire/prefabs/prefabs.hpp), not on example code — every
-    # example that includes prefabs.hpp reports the same one issue, so the
-    # example targets are simply the wrong place to hear about it.
+    # -Wno-unused-variable only: an example may legitimately declare a value to
+    # SHOW the API returns one without going on to use it.
     #
-    # The underlying issue is real and is recorded as an open owner question, NOT
-    # swept: InfoGathererAgent::on_swml_request takes 3 params and returns json,
-    # while the base swml::Service::on_swml_request is virtual, takes 2 and
-    # returns std::optional<json> — so the derived one HIDES rather than
-    # overrides, and the virtual dispatch in src/swml/service.cpp never reaches
-    # it. The Python reference declares THREE params on both WebMixin and
-    # InfoGathererAgent, so it is the C++ BASE that is short a parameter.
-    # (PORT_SIGNATURE_OMISSIONS.md:288 and :365 already record the divergence.)
-    # Adding `using swml::Service::on_swml_request;` does NOT fix it — both
-    # overloads are then callable with zero arguments and the call becomes
-    # ambiguous (measured: it breaks tests/test_prefab_tools.cpp). Resolving it
-    # means changing a public virtual signature, which needs an owner decision.
-    #
-    # Building the LIBRARY with -Wall reports it in 5 places plus 2
-    # -Wunused-parameter, i.e. the whole blast radius is 7 warnings; that is the
-    # right place to enforce it once the signature question is settled.
-    target_compile_options(${target_name} PRIVATE -Wall -Wno-unused-variable
-                                                  -Wno-overloaded-virtual)
+    # The -Wno-overloaded-virtual that briefly lived here is GONE, because the
+    # thing it was hiding is fixed: InfoGathererAgent::on_swml_request used to
+    # take 3 params and return json against a 2-param optional<json> base, so it
+    # hid rather than overrode. The base now takes the reference's third
+    # `request` parameter and the prefab is a real override, so the warning has
+    # no site left to fire from.
+    target_compile_options(${target_name} PRIVATE -Wall -Wno-unused-variable)
     add_dependencies(examples ${target_name})
 endforeach()

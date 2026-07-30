@@ -65,25 +65,27 @@ static std::vector<TestCase>& get_tests() {
     }                                                                                        \
   } while (0)
 
-#define ASSERT_THROWS(expr)                                                                 \
-  do {                                                                                      \
-    bool threw = false;                                                                     \
-    try {                                                                                   \
-      /* `expr` is emitted as a STATEMENT, not fed to a sink, because callers    */         \
-      /* also pass DECLARATIONS (e.g. ASSERT_THROWS(SessionManager sm(secret)))  */         \
-      /* which are not expressions and cannot be an argument. A [[nodiscard]]    */         \
-      /* result is therefore discarded here on purpose: this macro asserts that  */         \
-      /* evaluating `expr` THROWS, so any value it returns is irrelevant.        */         \
-      /* NOLINTNEXTLINE(clang-diagnostic-unused-result) */                                  \
-      expr;                                                                                 \
-    } catch (...) {                                                                         \
-      threw = true;                                                                         \
-    }                                                                                       \
-    if (!threw) {                                                                           \
-      std::cerr << "  FAIL: expected exception from " << #expr << " at " << __FILE__ << ":" \
-                << __LINE__ << "\n";                                                        \
-      return false;                                                                         \
-    }                                                                                       \
+#define ASSERT_THROWS(expr)                                                                      \
+  do {                                                                                           \
+    bool threw = false;                                                                          \
+    try {                                                                                        \
+      /* `expr` is emitted as a STATEMENT, not fed to a sink, because callers    */              \
+      /* also pass DECLARATIONS (e.g. ASSERT_THROWS(SessionManager sm(secret)))  */              \
+      /* which are not expressions and cannot be an argument. A [[nodiscard]]    */              \
+      /* result is therefore discarded here on purpose: this macro asserts that  */              \
+      /* evaluating `expr` THROWS, so any value it returns is irrelevant.        */              \
+      /* The pragma scopes that to this one line, for the compiler (-Wall now    */              \
+      /* reaches run_tests) and for clang-tidy alike.                            */              \
+      _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"") expr; \
+      _Pragma("GCC diagnostic pop")                                                              \
+    } catch (...) {                                                                              \
+      threw = true;                                                                              \
+    }                                                                                            \
+    if (!threw) {                                                                                \
+      std::cerr << "  FAIL: expected exception from " << #expr << " at " << __FILE__ << ":"      \
+                << __LINE__ << "\n";                                                             \
+      return false;                                                                              \
+    }                                                                                            \
   } while (0)
 
 // Include all test files

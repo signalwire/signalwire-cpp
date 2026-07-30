@@ -27,7 +27,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -44,15 +47,31 @@ namespace {
 
 int dfold_pick_free_port() {
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    std::cerr << "pick_free_port: socket() failed: " << std::strerror(errno) << "\n";
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = 0;
-  ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    std::cerr << "pick_free_port: bind() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   socklen_t len = sizeof(addr);
-  ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
+  if (::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    std::cerr << "pick_free_port: getsockname() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   int port = ntohs(addr.sin_port);
   ::close(fd);
+  if (port <= 0) {
+    std::cerr << "pick_free_port: kernel assigned no port\n";
+    return -1;
+  }
   return port;
 }
 
@@ -71,6 +90,12 @@ std::string dfold_served_route(signalwire::agent::AgentBase& agent,
   ::unsetenv("PORT");
 
   int port = dfold_pick_free_port();
+  if (port <= 0) {
+    // "" is this helper's existing "no route matched" sentinel, so a failed
+    // port pick surfaces as a failed assertion in the caller rather than a
+    // server silently bound to port 0.
+    return "";
+  }
   agent.set_host("127.0.0.1").set_port(port);
 
   std::thread server_thread([&agent]() { agent.serve(); });
@@ -214,6 +239,7 @@ TEST(default_fold_agent_routing_callback_defaults_to_sip_and_is_served) {
   ::unsetenv("PORT");
 
   int port = dfold_pick_free_port();
+  ASSERT_TRUE(port > 0);
   signalwire::agent::AgentBase agent("sip-default-agent", "/");
   agent.set_host("127.0.0.1").set_port(port);
 

@@ -15,7 +15,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -30,15 +33,31 @@ namespace {
 // Bind an ephemeral TCP port, then release it so serve() can claim it.
 int served_pick_free_port() {
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    std::cerr << "pick_free_port: socket() failed: " << std::strerror(errno) << "\n";
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = 0;
-  ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    std::cerr << "pick_free_port: bind() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   socklen_t len = sizeof(addr);
-  ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
+  if (::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    std::cerr << "pick_free_port: getsockname() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   int port = ntohs(addr.sin_port);
   ::close(fd);
+  if (port <= 0) {
+    std::cerr << "pick_free_port: kernel assigned no port\n";
+    return -1;
+  }
   return port;
 }
 
@@ -48,12 +67,36 @@ std::string served_basic_auth(const std::string& user, const std::string& pass) 
 
 }  // namespace
 
+// Regression guard for the ephemeral-port picker. Before this was fixed the
+// picker ignored the return values of socket()/bind()/getsockname(), so any
+// failure fell through to `ntohs(addr.sin_port)` on an unmodified sockaddr and
+// returned 0 -- and the caller then bound a test server to port 0 or dialled
+// nothing, failing later and somewhere else with an unrelated-looking error.
+// The contract now is: a usable port is strictly positive, and any syscall
+// failure returns -1 after reporting errno, so callers can assert on it.
+TEST(pick_free_port_returns_a_usable_port_never_the_silent_zero) {
+  int port = served_pick_free_port();
+  // 0 is exactly what the unchecked version returned on failure.
+  ASSERT_NE(port, 0);
+  ASSERT_TRUE(port > 0);
+  // A kernel-assigned ephemeral port is above the well-known range, in 16 bits.
+  ASSERT_TRUE(port > 1024 && port <= 65535);
+
+  // Successive picks must each really consult the kernel rather than replay a
+  // stale sockaddr -- the failure shape the unchecked version could produce.
+  int second = served_pick_free_port();
+  ASSERT_TRUE(second > 0);
+  ASSERT_TRUE(second > 1024 && second <= 65535);
+  return true;
+}
+
 TEST(served_path_routing_307_401_200_through_handle_request) {
   ::setenv("SWML_BASIC_AUTH_USER", "su", 1);
   ::setenv("SWML_BASIC_AUTH_PASSWORD", "sp", 1);
   ::unsetenv("PORT");  // don't let an ambient PORT override our chosen port
 
   int port = served_pick_free_port();
+  ASSERT_TRUE(port > 0);
 
   signalwire::agent::AgentBase agent("served-agent", "/");
   agent.set_host("127.0.0.1").set_port(port);

@@ -19,7 +19,10 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -36,15 +39,31 @@ namespace {
 
 int tier2_pick_free_port() {
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    std::cerr << "pick_free_port: socket() failed: " << std::strerror(errno) << "\n";
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = 0;
-  ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    std::cerr << "pick_free_port: bind() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   socklen_t len = sizeof(addr);
-  ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
+  if (::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    std::cerr << "pick_free_port: getsockname() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   int port = ntohs(addr.sin_port);
   ::close(fd);
+  if (port <= 0) {
+    std::cerr << "pick_free_port: kernel assigned no port\n";
+    return -1;
+  }
   return port;
 }
 
@@ -298,6 +317,7 @@ TEST(tier2_sip_routing_served_dispatch) {
   ::unsetenv("PORT");
 
   int port = tier2_pick_free_port();
+  ASSERT_TRUE(port > 0);
 
   signalwire::agent::AgentBase agent("support", "/");
   agent.set_host("127.0.0.1").set_port(port);

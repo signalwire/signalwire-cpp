@@ -24,8 +24,11 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -45,15 +48,31 @@ int pick_free_port() {
   httplib::Server probe;  // unused; we just need a socket helper
   (void)probe;
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    std::cerr << "pick_free_port: socket() failed: " << std::strerror(errno) << "\n";
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = 0;
-  ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    std::cerr << "pick_free_port: bind() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   socklen_t len = sizeof(addr);
-  ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
+  if (::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    std::cerr << "pick_free_port: getsockname() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   int port = ntohs(addr.sin_port);
   ::close(fd);
+  if (port <= 0) {
+    std::cerr << "pick_free_port: kernel assigned no port\n";
+    return -1;
+  }
   return port;
 }
 
@@ -71,6 +90,7 @@ TEST(tls_sdk_sslserver_verified_by_client) {
   std::string key = certs_dir + "/server.key";
 
   int port = pick_free_port();
+  ASSERT_TRUE(port > 0);
 
   // Configure TLS exactly like the Python reference (env-driven). serve()
   // reads these via resolve_tls_config_from_env() and builds an SSLServer.

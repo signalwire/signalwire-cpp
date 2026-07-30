@@ -66,7 +66,7 @@ TEST(skill_claude_setup_with_path) {
 TEST(skill_claude_empty_dir_no_tools) {
   TempSkillsDir tmp("empty");
   auto skill = sw_skills::SkillRegistry::instance().create("claude_skills");
-  skill->setup(json::object({{"skills_path", tmp.root.string()}}));
+  ASSERT_TRUE(skill->setup(json::object({{"skills_path", tmp.root.string()}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 0u);
   return true;
@@ -120,7 +120,8 @@ TEST(skill_claude_custom_prefix_and_dir_fallback_name) {
                 "Steps to triage.\n");
 
   auto skill = sw_skills::SkillRegistry::instance().create("claude_skills");
-  skill->setup(json::object({{"skills_path", tmp.root.string()}, {"tool_prefix", "cc_"}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"skills_path", tmp.root.string()}, {"tool_prefix", "cc_"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "cc_triage");
@@ -134,7 +135,7 @@ TEST(skill_claude_discovers_multiple_skills) {
   tmp.add_skill("beta", "---\nname: beta\ndescription: B\n---\nBody B\n");
 
   auto skill = sw_skills::SkillRegistry::instance().create("claude_skills");
-  skill->setup(json::object({{"skills_path", tmp.root.string()}}));
+  ASSERT_TRUE(skill->setup(json::object({{"skills_path", tmp.root.string()}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 2u);
   return true;

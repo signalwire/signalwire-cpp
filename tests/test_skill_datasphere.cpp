@@ -48,7 +48,8 @@ TEST(skill_datasphere_custom_tool_name) {
 
 TEST(skill_datasphere_global_data_contains_enabled) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere");
-  skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}})));
   auto gd = skill->get_global_data();
   ASSERT_TRUE(gd.contains("datasphere_enabled"));
   return true;

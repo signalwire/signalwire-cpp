@@ -35,7 +35,7 @@ TEST(skill_vectorsearch_setup_with_index_file) {
 
 TEST(skill_vectorsearch_registers_tool) {
   auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
-  skill->setup(json::object({{"remote_url", "https://search.example.com"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"remote_url", "https://search.example.com"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "search_knowledge");
@@ -44,7 +44,7 @@ TEST(skill_vectorsearch_registers_tool) {
 
 TEST(skill_vectorsearch_custom_tool_name) {
   auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
-  skill->setup(json::object({{"remote_url", "x"}, {"tool_name", "search_docs"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"remote_url", "x"}, {"tool_name", "search_docs"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools[0].name, "search_docs");
   return true;
@@ -52,7 +52,7 @@ TEST(skill_vectorsearch_custom_tool_name) {
 
 TEST(skill_vectorsearch_handler_empty_query) {
   auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
-  skill->setup(json::object({{"remote_url", "https://search.example.com"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"remote_url", "https://search.example.com"}})));
   auto tools = skill->register_tools();
   // Empty query -> the prompt-for-query message (mirrors Python).
   auto result = tools[0].handler(json::object({{"query", ""}}), json::object());
@@ -68,7 +68,7 @@ TEST(skill_vectorsearch_handler_remote_unreachable_reports_error) {
   // live-POST happy path is covered in test_tier2_behavioral.cpp against a
   // mock server.
   auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
-  skill->setup(json::object({{"remote_url", "http://192.0.2.1:9"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"remote_url", "http://192.0.2.1:9"}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", "test"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -79,7 +79,7 @@ TEST(skill_vectorsearch_handler_remote_unreachable_reports_error) {
 
 TEST(skill_vectorsearch_get_hints) {
   auto skill = sw_skills::SkillRegistry::instance().create("native_vector_search");
-  skill->setup(json::object({{"remote_url", "x"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"remote_url", "x"}})));
   auto hints = skill->get_hints();
   // May return empty or some hints depending on implementation
   // Just verify it doesn't crash and returns a vector

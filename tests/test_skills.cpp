@@ -164,7 +164,7 @@ TEST(skill_create_math) {
 TEST(skill_math_calculate) {
   auto& reg = sw_skills::SkillRegistry::instance();
   auto skill = reg.create("math");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
 
@@ -177,7 +177,7 @@ TEST(skill_math_calculate) {
 TEST(skill_datetime_tools) {
   auto& reg = sw_skills::SkillRegistry::instance();
   auto skill = reg.create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 2u);
   ASSERT_EQ(tools[0].name, "get_current_time");
@@ -188,7 +188,7 @@ TEST(skill_datetime_tools) {
 TEST(skill_datetime_prompt_sections) {
   auto& reg = sw_skills::SkillRegistry::instance();
   auto skill = reg.create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto sections = skill->get_prompt_sections();
   ASSERT_EQ(sections.size(), 1u);
   ASSERT_EQ(sections[0].title, "Date and Time Information");

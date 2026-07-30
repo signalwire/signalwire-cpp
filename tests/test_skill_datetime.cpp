@@ -31,7 +31,7 @@ TEST(skill_datetime_setup_ok) {
 
 TEST(skill_datetime_registers_two_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 2u);
   ASSERT_EQ(tools[0].name, "get_current_time");
@@ -41,7 +41,7 @@ TEST(skill_datetime_registers_two_tools) {
 
 TEST(skill_datetime_tool_handlers_work) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto time_result = tools[0].handler(json::object(), json::object());
   auto date_result = tools[1].handler(json::object(), json::object());
@@ -53,7 +53,7 @@ TEST(skill_datetime_tool_handlers_work) {
 
 TEST(skill_datetime_has_prompt_sections) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto sections = skill->get_prompt_sections();
   ASSERT_EQ(sections.size(), 1u);
   ASSERT_EQ(sections[0].title, "Date and Time Information");
@@ -74,7 +74,7 @@ TEST(skill_datetime_no_env_vars_required) {
 // against the old handler, which hardcoded "%H:%M:%S UTC" regardless of `tz`.
 TEST(skill_datetime_non_utc_zone_is_not_utc) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
 
   json tokyo_args = {{"timezone", "Asia/Tokyo"}};
@@ -101,7 +101,7 @@ TEST(skill_datetime_non_utc_zone_is_not_utc) {
 // assertion robust regardless of when the suite runs.
 TEST(skill_datetime_zone_offset_applied) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
 
   json ny_args = {{"timezone", "America/New_York"}};
@@ -119,7 +119,7 @@ TEST(skill_datetime_zone_offset_applied) {
 // as that zone (glibc/BSD both fall back to UTC on an invalid TZ).
 TEST(skill_datetime_unknown_zone_errors) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
 
   json bad_args = {{"timezone", "Not/AZone"}};
@@ -136,7 +136,7 @@ TEST(skill_datetime_unknown_zone_errors) {
 // Default (no timezone arg) resolves to UTC.
 TEST(skill_datetime_default_is_utc) {
   auto skill = sw_skills::SkillRegistry::instance().create("datetime");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
 
   auto time_res = tools[0].handler(json::object(), json::object());

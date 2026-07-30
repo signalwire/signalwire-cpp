@@ -34,7 +34,7 @@ TEST(skill_websearch_setup_with_keys) {
 
 TEST(skill_websearch_registers_tool) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "web_search");
@@ -81,7 +81,7 @@ TEST(skill_websearch_handler_works) {
 
   ::setenv("WEB_SEARCH_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", "test query"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -130,7 +130,9 @@ static std::string run_websearch_with_params(const json& extra_params,
   for (auto& [k, v] : extra_params.items()) {
     setup_params[k] = v;
   }
-  skill->setup(setup_params);
+  if (!skill->setup(setup_params)) {
+    return "<setup-failed>";
+  }
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", query}}), json::object());
   std::string resp = result.to_json()["response"].get<std::string>();
@@ -213,7 +215,7 @@ TEST(skill_websearch_transport_error_redacts_api_key) {
   const std::string secret = "AIzaSyLEAKTESTSECRETKEY0123456789";
   ::setenv("WEB_SEARCH_BASE_URL", ("http://127.0.0.1:" + std::to_string(dead_port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", secret}, {"search_engine_id", "seid"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", secret}, {"search_engine_id", "seid"}})));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", "test query"}}), json::object());
   std::string resp = result.to_json()["response"].get<std::string>();
@@ -228,7 +230,7 @@ TEST(skill_websearch_transport_error_redacts_api_key) {
 
 TEST(skill_websearch_has_prompt_sections) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto sections = skill->get_prompt_sections();
   ASSERT_TRUE(!sections.empty());
   return true;
@@ -236,7 +238,7 @@ TEST(skill_websearch_has_prompt_sections) {
 
 TEST(skill_websearch_global_data) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto gd = skill->get_global_data();
   ASSERT_TRUE(gd.contains("web_search_enabled"));
   return true;
@@ -326,7 +328,11 @@ static std::pair<std::string, long> run_latency_handler(const json& extra,
   for (auto& [k, v] : extra.items()) {
     setup[k] = v;
   }
-  skill->setup(setup);
+  if (!skill->setup(setup)) {
+    // Same failure-sentinel shape the other helpers use; a failed setup must
+    // not fall through into timing an unconfigured skill.
+    return {"<setup-failed>", -1};
+  }
   auto tools = skill->register_tools();
   auto t0 = std::chrono::steady_clock::now();
   auto result = tools[0].handler(json::object({{"query", query}}), json::object());
@@ -343,7 +349,7 @@ static std::pair<std::string, long> run_latency_handler(const json& extra,
 // default. (Setup() reads them; the schema is the observable surface.)
 TEST(skill_websearch_latency_defaults_in_schema) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto schema = skill->get_parameter_schema();
   ASSERT_TRUE(schema.contains("per_page_timeout"));
   ASSERT_EQ(schema["per_page_timeout"]["type"].get<std::string>(), "number");
@@ -362,7 +368,7 @@ TEST(skill_websearch_latency_defaults_in_schema) {
 // All 6 latency/response params must be advertised, each not required.
 TEST(skill_websearch_schema_advertises_all_six) {
   auto skill = sw_skills::SkillRegistry::instance().create("web_search");
-  skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"api_key", "k"}, {"search_engine_id", "s"}})));
   auto schema = skill->get_parameter_schema();
   for (const char* key : {"response_prefix", "response_postfix", "per_page_timeout",
                           "overall_deadline", "parallel_scrape", "snippets_only"}) {

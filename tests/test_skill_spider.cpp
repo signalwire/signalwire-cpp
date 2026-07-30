@@ -28,7 +28,7 @@ TEST(skill_spider_setup) {
 
 TEST(skill_spider_registers_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_TRUE(!tools.empty());
   // First tool should contain "scrape"
@@ -61,7 +61,7 @@ TEST(skill_spider_handler_works) {
 
   ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_TRUE(!tools.empty());
   auto result =
@@ -80,7 +80,7 @@ TEST(skill_spider_handler_works) {
 
 TEST(skill_spider_has_hints) {
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto hints = skill->get_hints();
   ASSERT_TRUE(!hints.empty());
   return true;
@@ -122,7 +122,7 @@ TEST(skill_spider_remove_xpaths_drops_script_style_and_chrome) {
 
   ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("spider");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_TRUE(!tools.empty());
   auto result =
@@ -184,7 +184,7 @@ TEST(skill_spider_live_impl_is_the_builtin_and_strips_script_and_nav) {
   ASSERT_TRUE(port > 0);
 
   ::setenv("SPIDER_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_TRUE(!tools.empty());
   auto result =

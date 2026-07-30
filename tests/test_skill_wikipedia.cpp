@@ -22,7 +22,7 @@ TEST(skill_wikipedia_setup_no_params) {
 
 TEST(skill_wikipedia_registers_tool) {
   auto skill = sw_skills::SkillRegistry::instance().create("wikipedia_search");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "search_wiki");
@@ -54,7 +54,7 @@ TEST(skill_wikipedia_handler_with_query) {
 
   ::setenv("WIKIPEDIA_BASE_URL", ("http://127.0.0.1:" + std::to_string(port)).c_str(), 1);
   auto skill = sw_skills::SkillRegistry::instance().create("wikipedia_search");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", "Albert Einstein"}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -74,7 +74,7 @@ TEST(skill_wikipedia_handler_with_query) {
 // for an empty query (no fixture needed).
 TEST(skill_wikipedia_empty_query_returns_response) {
   auto skill = sw_skills::SkillRegistry::instance().create("wikipedia_search");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"query", ""}}), json::object());
   auto resp = result.to_json()["response"].get<std::string>();
@@ -84,7 +84,7 @@ TEST(skill_wikipedia_empty_query_returns_response) {
 
 TEST(skill_wikipedia_prompt_sections) {
   auto skill = sw_skills::SkillRegistry::instance().create("wikipedia_search");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto sections = skill->get_prompt_sections();
   ASSERT_TRUE(!sections.empty());
   return true;

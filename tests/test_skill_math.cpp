@@ -12,7 +12,7 @@ TEST(skill_math_name_and_setup) {
 
 TEST(skill_math_single_tool) {
   auto skill = sw_skills::SkillRegistry::instance().create("math");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   ASSERT_EQ(tools.size(), 1u);
   ASSERT_EQ(tools[0].name, "calculate");
@@ -21,7 +21,7 @@ TEST(skill_math_single_tool) {
 
 TEST(skill_math_calculate_addition) {
   auto skill = sw_skills::SkillRegistry::instance().create("math");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"expression", "2 + 3"}}), json::object());
   ASSERT_TRUE(result.to_json()["response"].get<std::string>().find("5") != std::string::npos);
@@ -30,7 +30,7 @@ TEST(skill_math_calculate_addition) {
 
 TEST(skill_math_calculate_multiplication) {
   auto skill = sw_skills::SkillRegistry::instance().create("math");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"expression", "7 * 8"}}), json::object());
   ASSERT_TRUE(result.to_json()["response"].get<std::string>().find("56") != std::string::npos);
@@ -39,7 +39,7 @@ TEST(skill_math_calculate_multiplication) {
 
 TEST(skill_math_calculate_empty_expression) {
   auto skill = sw_skills::SkillRegistry::instance().create("math");
-  skill->setup(json::object());
+  ASSERT_TRUE(skill->setup(json::object()));
   auto tools = skill->register_tools();
   auto result = tools[0].handler(json::object({{"expression", ""}}), json::object());
   // Should return some error/response without crashing

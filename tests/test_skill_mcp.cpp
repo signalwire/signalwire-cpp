@@ -30,7 +30,7 @@ TEST(skill_mcp_setup_with_url) {
 
 TEST(skill_mcp_registers_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(json::object({{"gateway_url", "https://mcp.example.com"}}));
+  ASSERT_TRUE(skill->setup(json::object({{"gateway_url", "https://mcp.example.com"}})));
   auto tools = skill->register_tools();
   // May or may not have tools depending on implementation
   // Just verify it doesn't crash
@@ -148,7 +148,11 @@ struct HttpsGateway {
 
 std::string run_first_tool(const json& setup_params) {
   auto skill = sw_skills::SkillRegistry::instance().create("mcp_gateway");
-  skill->setup(setup_params);
+  if (!skill->setup(setup_params)) {
+    // "<...>" is this helper's existing failure-sentinel shape; a failed
+    // setup must not fall through into asserting on an unconfigured skill.
+    return "<setup-failed>";
+  }
   auto tools = skill->register_tools();
   if (tools.empty()) {
     return "<no-tools>";

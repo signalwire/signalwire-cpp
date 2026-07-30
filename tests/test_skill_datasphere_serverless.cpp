@@ -24,7 +24,8 @@ TEST(skill_ds_serverless_setup) {
 
 TEST(skill_ds_serverless_no_webhook_tools) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
-  skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}})));
   ASSERT_EQ(skill->register_tools().size(), 0u);
   return true;
 }
@@ -88,7 +89,8 @@ TEST(skill_ds_serverless_webhook_carries_params_and_foreach) {
 
 TEST(skill_ds_serverless_global_data) {
   auto skill = sw_skills::SkillRegistry::instance().create("datasphere_serverless");
-  skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}}));
+  ASSERT_TRUE(
+      skill->setup(json::object({{"space_name", "s"}, {"project_id", "p"}, {"token", "t"}})));
   auto gd = skill->get_global_data();
   // get_global_data() may return empty or populated depending on impl
   ASSERT_TRUE(gd.is_object());

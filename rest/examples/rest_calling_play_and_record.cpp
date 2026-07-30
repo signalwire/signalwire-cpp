@@ -20,18 +20,21 @@ int main() {
     std::string call_id = call.value("call_id", "");
     std::cout << "Call ID: " << call_id << "\n";
 
-    // Play audio
-    client.calling().play(
+    // Play audio. Each call returns the API's response body — keep it; that is
+    // where the control id you need to stop/inspect the action comes back.
+    auto play = client.calling().play(
         call_id, {
                      .play = json::array(
                          {{{"type", "tts"}, {"params", {{"text", "Recording will begin now."}}}}}),
                  });
+    std::cout << "  Play: " << play.dump() << "\n";
 
     // Start recording
-    client.calling().record(call_id,
-                            {
-                                .extras = {{"record", {{"stereo", true}, {"format", "wav"}}}},
-                            });
+    auto recording = client.calling().record(
+        call_id, {
+                     .extras = {{"record", {{"stereo", true}, {"format", "wav"}}}},
+                 });
+    std::cout << "  Recording: " << recording.dump() << "\n";
 
     std::cout << "Playing and recording on call " << call_id << "\n";
 

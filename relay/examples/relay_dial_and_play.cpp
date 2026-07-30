@@ -29,13 +29,19 @@ int main() {
   Call call = client.dial(devices);
   std::cout << "Dialing " << to_number << " — call_id: " << call.call_id() << "\n";
 
-  // Play TTS
+  // Play TTS. wait() returns false on timeout rather than completion, so check
+  // it — otherwise "Playback finished" prints even when it did not.
   auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Hello from SignalWire!"}}}}});
-  action.wait();
-  std::cout << "Playback finished\n";
+  if (action.wait()) {
+    std::cout << "Playback finished\n";
+  } else {
+    std::cerr << "Playback timed out\n";
+  }
 
   call.hangup();
-  call.wait_for_ended();
+  if (!call.wait_for_ended()) {
+    std::cerr << "Call did not reach the ended state before the timeout\n";
+  }
   std::cout << "Call ended\n";
 
   client.disconnect();

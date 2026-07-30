@@ -39,9 +39,11 @@ int main() {
 
     auto client = RestClient::from_env();
 
-    // The typed helper — one line:
+    // The typed helper — one line. It returns the updated phone-number record;
+    // keep it so you can confirm the binding actually took.
     std::cout << "Binding " << pn_sid << " to " << webhook_url << " ...\n";
-    client.phone_numbers().set_swml_webhook(pn_sid, {.url = webhook_url});
+    auto bound = client.phone_numbers().set_swml_webhook(pn_sid, {.url = webhook_url});
+    std::cout << "Bound: " << bound.dump() << "\n";
 
     // The equivalent wire-level form (use this if you need unusual fields):
     //

@@ -35,9 +35,10 @@ int main() {
     });
     std::cout << "  Call: " << call.dump() << "\n";
 
-    // Cleanup
-    client.fabric().ai_agents.delete_(agent_id);
-    std::cout << "  Deleted agent\n";
+    // Cleanup. delete_ returns the API's response body; keep it rather than
+    // announcing a deletion you never looked at.
+    auto deleted = client.fabric().ai_agents.delete_(agent_id);
+    std::cout << "  Deleted agent: " << deleted.dump() << "\n";
 
   } catch (const SignalWireRestError& e) {
     std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";

@@ -15,11 +15,17 @@ int main() {
     std::cout << "Inbound call: " << call.call_id() << "\n";
     call.answer();
 
-    // Play IVR menu
+    // Play IVR menu. wait() returns false if the action timed out rather than
+    // completing — always check it, or you will act on a menu the caller never
+    // finished hearing.
     auto menu = call.play(
         {{{"type", "tts"},
           {"params", {{"text", "Press 1 for sales, 2 for support, or 3 for billing."}}}}});
-    menu.wait();
+    if (!menu.wait()) {
+      std::cerr << "Menu playback did not complete; hanging up\n";
+      call.hangup();
+      return;
+    }
 
     // Collect DTMF
     auto collect =
@@ -27,13 +33,19 @@ int main() {
                       {"speech", {{"hints", json::array({"sales", "support", "billing"})}}},
                       {"initial_timeout", 5.0},
                       {"partial_results", true}});
-    collect.wait();
+    if (!collect.wait()) {
+      std::cerr << "No input collected; hanging up\n";
+      call.hangup();
+      return;
+    }
 
     // Route based on input (stub: always route to sales)
     std::cout << "Routing call...\n";
     auto connect_action =
         call.connect({{{{"type", "phone"}, {"params", {{"to_number", "+15551001"}}}}}});
-    connect_action.wait();
+    if (!connect_action.wait()) {
+      std::cerr << "Connect did not complete\n";
+    }
 
     call.hangup();
     std::cout << "Call ended\n";

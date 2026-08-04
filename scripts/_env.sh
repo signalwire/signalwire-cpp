@@ -118,7 +118,19 @@ fi
 # the same hint when it is actually required. Declared in BOTH layers per
 # AGENT_RULES §7 — here for local devs, and as a pip install in the CI workflow
 # next to the pinned clang-format — so a fresh clone or a CI runner has it.
+#
+# PINNED EXACT, for the same reason clang-format is pinned to 18 above: an
+# unbounded linter version is a green-locally/red-in-CI generator. CI installs the
+# newest release at run time while a local dev runs whatever they installed months
+# ago, so a ruff release that adds a rule or changes a format heuristic reds
+# PY-LINT on code that never changed. run-pylint.sh ASSERTS this version, exactly
+# as this file asserts clang-format major 18. Keep in lockstep with the
+# `pip install "ruff==…"` in .github/workflows/{test,nightly}.yml; 0.15.21 is the
+# fleet-wide ruff (python/perl/php/typescript/java pin the same).
+SW_RUFF_VERSION="0.15.21"
+export SW_RUFF_VERSION
+
 if ! command -v ruff >/dev/null 2>&1; then
     echo "note: ruff not found — the PY-LINT gate (scripts/*.py) cannot run." >&2
-    echo "      Install it with:  pip install ruff   (or: brew install ruff)" >&2
+    echo "      Install it with:  pip install ruff==$SW_RUFF_VERSION" >&2
 fi

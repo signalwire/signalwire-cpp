@@ -154,7 +154,13 @@ jobs:
           pip install "clang-format==18.1.8" "clang-tidy==18.1.8"
           # ruff drives the PY-LINT gate (scripts/*.py). Declared here as well
           # as in scripts/_env.sh so a CI runner has it, per AGENT_RULES §7.
-          pip install ruff
+          # PINNED EXACT: an unbounded `pip install ruff` resolves the newest release
+          # at CI time, so a ruff release that adds a rule or changes a format
+          # heuristic reds FMT/LINT on a commit that was green locally. Keep in
+          # lockstep with SW_RUFF_VERSION in scripts/_env.sh.
+          pip install "ruff==0.15.21"
+          ruff --version
+          ruff --version | grep -qw '0\.15\.21' || { echo "FATAL: ruff is not the pinned 0.15.21" >&2; exit 1; }
           sudo apt-get install -y clang-18
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100

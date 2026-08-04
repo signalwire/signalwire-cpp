@@ -26,8 +26,28 @@ cd "$REPO"
 if ! command -v ruff >/dev/null 2>&1; then
     echo "ERROR: ruff not found on PATH." >&2
     echo "       It lints + formats the Python under scripts/." >&2
-    echo "       Install it with:  pip install ruff   (or: brew install ruff)" >&2
+    echo "       Install it with:  pip install ruff==$SW_RUFF_VERSION" >&2
     exit 1
+fi
+
+# ASSERT THE PINNED VERSION, exactly as _env.sh asserts clang-format major 18 and
+# for the same reason: CI installs `ruff==$SW_RUFF_VERSION` while a local dev runs
+# whatever they installed months ago, so an unasserted version lets local and CI
+# disagree about what passes PY-LINT — green here, red there, with no code change.
+# SW_ALLOW_TOOL_VERSION_DRIFT=1 downgrades this to a warning, for a deliberate
+# bump-and-reformat run only (then update _env.sh + the workflows together).
+_RUFF_VERSION="$(ruff --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+if [ "$_RUFF_VERSION" != "$SW_RUFF_VERSION" ]; then
+    if [ "${SW_ALLOW_TOOL_VERSION_DRIFT:-0}" = "1" ]; then
+        echo "WARNING: ruff is '${_RUFF_VERSION:-unknown}', not the pinned $SW_RUFF_VERSION (drift allowed)." >&2
+    else
+        echo "ERROR: ruff on PATH is version '${_RUFF_VERSION:-unknown}', not the pinned $SW_RUFF_VERSION." >&2
+        echo "       CI installs exactly $SW_RUFF_VERSION, so a different version here means" >&2
+        echo "       local and CI disagree about what passes PY-LINT." >&2
+        echo "       Install the pin:  pip install ruff==$SW_RUFF_VERSION" >&2
+        echo "       Or set SW_ALLOW_TOOL_VERSION_DRIFT=1 for a deliberate bump run." >&2
+        exit 1
+    fi
 fi
 
 # Fail loud rather than silently passing on an empty file set — a gate that

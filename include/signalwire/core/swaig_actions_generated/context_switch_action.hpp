@@ -23,12 +23,12 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct ContextSwitchAction {
-  std::optional<json> system_prompt;
-  std::optional<json> user_prompt;
-  std::optional<json> system_pom;
-  std::optional<json> user_pom;
   std::optional<bool> consolidate;
   std::optional<bool> full_reset;
+  std::optional<json> system_pom;
+  std::optional<std::string> system_prompt;
+  std::optional<json> user_pom;
+  std::optional<std::string> user_prompt;
   json extras = json::object();
 };
 

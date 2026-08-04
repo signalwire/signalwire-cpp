@@ -31,9 +31,6 @@ struct PostPromptSystemLogEntry {
   std::optional<int> tokens;
   std::optional<std::string> content_type;
   std::optional<json> metadata;
-  std::optional<std::string> context;
-  std::optional<std::string> step;
-  std::optional<int> step_index;
   json extras = json::object();
 };
 

@@ -23,7 +23,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct HoldAction {
-  std::optional<int> timeout;
+  std::optional<double> timeout;
   json extras = json::object();
 };
 

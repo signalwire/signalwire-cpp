@@ -23,7 +23,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PlaybackBgAction {
-  std::optional<json> file;
+  std::optional<std::string> file;
   std::optional<bool> wait;
   json extras = json::object();
 };

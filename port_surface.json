@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ db0304b099f451e0f7e59ee9e4397857217939d2",
+  "generated_from": "signalwire-cpp @ 96c1e29639092cfcdd3cf066e160766faa2fc88b",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -667,7 +667,9 @@
         "PostPromptEot": [],
         "PostPromptStampsUs": [],
         "PostPromptSwaigLogEntry": [
-          "post_data"
+          "delayed_post_response",
+          "post_data",
+          "post_response"
         ],
         "PostPromptSystemEntry": [],
         "PostPromptSystemLogEntry": [],
@@ -812,6 +814,8 @@
         "ContextSwitchAction": [],
         "HoldAction": [],
         "PlaybackBgAction": [],
+        "SwaigAction": [],
+        "SwaigResponse": [],
         "TransferAction": []
       },
       "functions": []

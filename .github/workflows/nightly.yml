@@ -108,18 +108,52 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install build deps (cmake + g++ + OpenSSL 3 headers)
+      - name: Install build deps (cmake + g++ + OpenSSL 3 headers + ccache)
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libssl-dev
+          sudo apt-get install -y cmake g++ libssl-dev ccache
+
+      # ccache — COMPILER cache, persisted across runs. Distinct from ctcache below
+      # and non-overlapping: ctcache memoizes clang-tidy STATIC-ANALYSIS results,
+      # ccache memoizes COMPILER object output. This nightly job is where the two
+      # heaviest compilations live — the TEST gate's build/ and PACKAGE-SMOKE, which
+      # does a full Release build+install of the whole library into a scratch prefix
+      # and measured 13m07s on the 2026-08-05 nightly (run 30990423636, 08:53:51 ->
+      # 09:06:58). ccache was removed in 1fe7b2c because it "can't touch the LINT
+      # gate"; that is true of LINT and wrong for these builds, and with it absent
+      # every runner printed "note: ccache not found" and built fully cold.
+      # Measured locally (8 cores, 130 TUs, the PACKAGE-SMOKE Release shape):
+      # cold 344.7s -> warm 3.0s (130/130 direct hits) at an unchanged build path,
+      # 32.0s when only preprocessed-mode hits apply. NOTE the path caveat:
+      # package_smoke.py builds in a PID-unique sandbox (.sw-tmp/package-smoke-cpp-<pid>),
+      # so run-to-run it is the preprocessed-mode figure that applies, not the 3.0s one.
+      # CMakeLists.txt already availability-gates ccache as CMAKE_{C,CXX}_COMPILER_LAUNCHER.
+      # Both caches below key off a UTC date stamp; see the staleness note on the
+      # ctcache restore for why. Computed once here so the two agree exactly even
+      # across a UTC midnight boundary mid-job.
+      - name: Cache date stamp (rotates the restore-key daily)
+        id: cachedate
+        run: 'date -u +date=%Y-%m-%d >> "$GITHUB_OUTPUT"'
+
+      # Same daily-rotated restore-key tier as ctcache below, for the same
+      # scope-before-recency reason (see the long note there).
+      - name: Restore compiler cache (ccache)
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cache/ccache
+          key: ccache-cpp-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-cpp-${{ runner.os }}-d${{ steps.cachedate.outputs.date }}-
+            ccache-cpp-${{ runner.os }}-
 
       # clang-tidy result cache (vendored ctcache, scripts/clang_tidy_cache.py).
-      # The LINT gate — clang-tidy over 65 TUs — is cpp's CI wall-clock driver
-      # (~824s serial, ~252s after the xargs fan-out). ccache does NOT help it
-      # (that's compilation; this is static analysis), which is why the old ccache
-      # cache-persistence here was dead weight — removed. Instead persist ctcache's
-      # per-TU result cache: an UNCHANGED TU (source, its headers, checks, config
-      # all identical) returns the cached result without running clang-tidy.
+      # The LINT gate — clang-tidy over 65 TUs — was cpp's CI wall-clock driver
+      # before this cache (~824s serial, ~252s after the xargs fan-out); it now
+      # completes in ~14s on this workflow. ccache does NOT help it (that's
+      # compilation; this is static analysis), which is why this SEPARATE cache
+      # exists. Persist ctcache's per-TU result cache: an UNCHANGED TU (source, its
+      # headers, checks, config all identical) returns the cached result without
+      # running clang-tidy.
       # Stable key + run_id suffix so each run restores the most recent cache and
       # saves an updated one; source-hashing the key would defeat the point (we
       # WANT it to persist across source changes and only miss on the changed TUs).
@@ -128,6 +162,25 @@ jobs:
       # prior step, and every cpp run is currently red on the pre-existing
       # spec-coupling — so a combined cache would never populate. The separate
       # save step below runs with if: always().
+      #
+      # STALENESS FIX (2026-08-05). Actions resolves restore-keys by SCOPE FIRST,
+      # recency second: a run sees its own ref's caches and the default branch's,
+      # and an own-ref match wins even when the main-scope one is far newer. So a
+      # long-lived branch pins itself to whatever entry it wrote long ago and never
+      # advances. Measured on THIS workflow, same gate, same branch:
+      #   run 30908553939 (2026-08-04) restored ctcache-cpp-Linux-30465863814,
+      #     written 2026-07-29 on refs/heads/wave6/ctor-dunder-fold -- SIX DAYS
+      #     stale, chosen over a refs/heads/main entry from 3h earlier that was
+      #     visible to it -- and LINT took 12m45s (12:35:14 -> 12:47:59).
+      #   run 30990423636 (2026-08-05) restored a 1-day-old entry: LINT took 14s.
+      # 55x, entirely from which store got restored. Adding more bare-prefix
+      # fallbacks cannot fix it -- the own-ref scope is consulted before them.
+      # The fix is to make the stale entry UNMATCHABLE by the first-choice key:
+      # a date stamp ahead of the bare prefix, so today's runs agree on a key that
+      # an older branch entry cannot satisfy, falling through to the undated prefix
+      # only when no recent store exists. ctcache is content-addressed per TU, so
+      # restoring an older store is always CORRECT, just slower -- this changes
+      # which store is preferred, never the findings.
       - name: Restore clang-tidy cache (ctcache)
         id: ctcache_restore
         uses: actions/cache/restore@v6
@@ -135,6 +188,7 @@ jobs:
           path: ~/.cache/ctcache
           key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
+            ctcache-cpp-${{ runner.os }}-d${{ steps.cachedate.outputs.date }}-
             ctcache-cpp-${{ runner.os }}-
 
       # The FMT (clang-format) + LINT (clang-tidy) gates need the gate tools
@@ -223,17 +277,35 @@ jobs:
           # here (not in env:) so $HOME expands to an ABSOLUTE path — ctcache does
           # NOT expanduser CTCACHE_DIR, so a literal "~" would create a bogus dir.
           export CTCACHE_DIR="$HOME/.cache/ctcache"
+          # ccache's compiler cache. ~/.cache/ccache is already ccache's default,
+          # but set it EXPLICITLY so the dir the restore/save steps name can never
+          # drift from the dir ccache actually uses (e.g. if a future runner image
+          # ships an XDG_CACHE_HOME or a /etc/ccache.conf that relocates it — then
+          # we would be caching an empty dir and silently getting cold builds while
+          # the workflow still looked correct). Same absolute-path reason as above.
+          export CCACHE_DIR="$HOME/.cache/ccache"
           bash scripts/run-ci.sh
 
       # Save the ctcache store even if the gate failed (the LINT gate still ran +
-      # populated it). Unique run_id key so every run persists an updated cache;
-      # the next run's restore-keys prefix picks up the most recent.
+      # populated it). The saved key carries the SAME date stamp the restore-keys
+      # look for, so a later run today prefers a store written today over an older
+      # branch entry; run_id keeps every save unique so concurrent runs never
+      # collide on one key.
       - name: Save clang-tidy cache (ctcache)
         if: always()
         uses: actions/cache/save@v6
         with:
           path: ~/.cache/ctcache
-          key: ctcache-cpp-${{ runner.os }}-${{ github.run_id }}
+          key: ctcache-cpp-${{ runner.os }}-d${{ steps.cachedate.outputs.date }}-${{ github.run_id }}
+
+      # Save the compiler cache on the same if: always() terms and for the same
+      # reason — the builds ran and populated it even when a later gate went red.
+      - name: Save compiler cache (ccache)
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ccache
+          key: ccache-cpp-${{ runner.os }}-d${{ steps.cachedate.outputs.date }}-${{ github.run_id }}
 
       - name: Record green marker for this input triple
         run: 'echo green > .nightly-green-marker'

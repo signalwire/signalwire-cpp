@@ -105,8 +105,12 @@ sw_build_jobs() {
 # compiler launcher (find_program(CCACHE_PROGRAM ccache) — a strict no-op when
 # absent, so the build never fails for a missing ccache). We only HINT here when
 # it isn't installed; we do NOT fail, because its absence must not break a build.
-# Declared so it's present when wanted (CI declares it in porting-sdk's
-# cross-port.yml cpp matrix install step; local devs get this hint).
+# Declared so it's present when wanted, in BOTH CI layers per AGENT_RULES §7:
+# porting-sdk's cross-port.yml cpp matrix install step AND this repo's own
+# .github/workflows/{test,nightly}.yml (which are what actually run PR + nightly
+# CI). Only cross-port.yml declared it until 2026-08-05, so every test.yml and
+# nightly.yml runner printed the hint below and built fully cold — both workflows
+# now apt-install ccache and persist ~/.cache/ccache across runs.
 if ! command -v ccache >/dev/null 2>&1; then
     echo "note: ccache not found — C++ rebuilds will be uncached (optional)." >&2
     echo "      Install it for near-instant warm rebuilds:  brew install ccache" >&2

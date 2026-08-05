@@ -249,6 +249,12 @@ jobs:
           # we would be caching an empty dir and silently getting cold builds while
           # the workflow still looked correct). Same absolute-path reason as above.
           export CCACHE_DIR="$HOME/.cache/ccache"
+          # NOTE: CCACHE_BASEDIR/CCACHE_NOHASHDIR (which make ccache path-insensitive
+          # so PACKAGE-SMOKE's PID-unique sandbox can still hit direct mode) are set in
+          # scripts/_env.sh, NOT here — deliberately, so a local run and a CI run get
+          # the SAME cache behaviour. Setting them here off $GITHUB_WORKSPACE would
+          # apply on a runner only, and local devs would silently get preprocessed-only
+          # hits. _env.sh keys off $REPO, which it resolves CWD-independently.
           bash scripts/run-ci.sh
 
       # Save the ctcache store even if the gate failed (the LINT gate still ran +

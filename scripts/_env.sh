@@ -116,6 +116,88 @@ if ! command -v ccache >/dev/null 2>&1; then
     echo "      Install it for near-instant warm rebuilds:  brew install ccache" >&2
 fi
 
+# Make ccache PATH-INSENSITIVE, for LOCAL runs and CI alike.
+#
+# ccache's fast "direct" mode keys on the absolute path of the translation unit,
+# so a build at a new path misses direct and falls back to the slower
+# preprocessed mode. PACKAGE-SMOKE builds in a PID-UNIQUE sandbox
+# (porting-sdk package_smoke.py: .sw-tmp/package-smoke-cpp-<pid>), so its path
+# differs on EVERY run BY CONSTRUCTION and direct mode could otherwise never hit.
+# base_dir rewrites absolute paths beneath it to relative BEFORE hashing, and
+# hash_dir=false keeps the cwd out of the hash — together they take the PID out of
+# the cache SIGNATURE while leaving the sandbox's isolation untouched (that PID is
+# load-bearing: package_smoke.py rm -rf's its own subtree, and a shared name would
+# let concurrent runs delete each other's).
+#
+# Set HERE rather than only in the workflows so local and CI behave IDENTICALLY:
+# this file is CWD-independent, whereas $GITHUB_WORKSPACE exists only on a runner —
+# keying off that alone would silently give local devs preprocessed-only hits while
+# CI got direct hits, i.e. the two environments would disagree about the cache.
+#
+# CHOOSING THE BASEDIR — DETECTED, NOT ASSUMED. base_dir only rewrites paths that
+# live BENEATH it; anything outside stays absolute and misses direct mode. Using
+# $REPO would bake in "every build dir is inside the port repo", which is an
+# assumption about layout rather than a fact: gates scatter their scratch around
+# (package_smoke.py builds in <repo>/.sw-tmp/package-smoke-cpp-<pid>, but
+# ca_var_parity.py roots its scratch under the PORTING-SDK checkout instead), and
+# the two checkouts sit side by side in both environments (~/src/{signalwire-cpp,
+# porting-sdk} locally, $GITHUB_WORKSPACE/{signalwire-cpp,porting-sdk} on a runner).
+# So derive the basedir as the deepest COMMON ANCESTOR of this repo and the
+# porting-sdk checkout when we can see both, which covers scratch under either one,
+# and fall back to $REPO when we cannot. Nothing here hardcodes a directory name or
+# a nesting depth.
+#
+# Existing values always win, so a caller can override.
+if [ -z "${CCACHE_BASEDIR:-}" ]; then
+    _cc_base="$REPO"
+    # Locate the porting-sdk checkout without assuming where it is: honour an
+    # explicit $PORTING_SDK, else look for a sibling of the repo.
+    _cc_psdk="${PORTING_SDK:-}"
+    if [ -z "$_cc_psdk" ] && [ -d "$(dirname "$REPO")/porting-sdk" ]; then
+        _cc_psdk="$(dirname "$REPO")/porting-sdk"
+    fi
+    if [ -n "$_cc_psdk" ] && [ -d "$_cc_psdk" ]; then
+        # Deepest common ancestor of $REPO and $_cc_psdk, computed by walking up.
+        _cc_a="$(cd "$REPO" && pwd -P)"
+        _cc_b="$(cd "$_cc_psdk" && pwd -P)"
+        while [ -n "$_cc_a" ] && [ "$_cc_a" != "/" ]; do
+            case "$_cc_b/" in
+                "$_cc_a"/*) _cc_base="$_cc_a"; break ;;
+            esac
+            _cc_a="$(dirname "$_cc_a")"
+        done
+        unset _cc_a _cc_b
+    fi
+    export CCACHE_BASEDIR="$_cc_base"
+    unset _cc_base _cc_psdk
+fi
+export CCACHE_NOHASHDIR="${CCACHE_NOHASHDIR:-1}"
+
+# Measured (full Release build of the library, 130 TUs):
+#   cold at path A                   158.4s
+#   rebuild at a DIFFERENT path B      1.5s   130/130 DIRECT hits
+# versus 32.0s / 89-of-260 preprocessed-only hits without these.
+#
+# Correctness negative-controlled in all three directions: a changed source
+# recompiles, a changed HEADER recompiles, and a build from a different cwd
+# reuses the right object with __FILE__ intact — no false hits.
+
+# --- ctcache (clang-tidy result cache) ---------------------------------------
+# run-lint.sh routes clang-tidy through scripts/clang_tidy_cache.py ONLY when
+# $CTCACHE_DIR is set (else: plain clang-tidy, exact prior behaviour). That var
+# was exported by the CI workflows and nowhere else, so CI got the cache and a
+# LOCAL `run-lint.sh` / `run-ci.sh` always re-ran clang-tidy from scratch — the
+# same local-vs-CI asymmetry the ccache block above exists to prevent. Measured on
+# this machine: a full local LINT is ~378s uncached, while CI's cached LINT is
+# 14-27s. Default it here so the two environments cache alike; the CI workflows
+# still export their own value (pointing at the dir actions/cache persists), and
+# an explicit value always wins.
+#
+# XDG_CACHE_HOME is honoured when set, else ~/.cache — matching where the CI
+# workflow puts it and where ccache defaults, rather than inventing a new dir.
+# ctcache does NOT expanduser its value, so this must be an ABSOLUTE path.
+export CTCACHE_DIR="${CTCACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ctcache}"
+
 # ruff — the PY-LINT gate's linter/formatter for the hand-written Python under
 # scripts/. A HINT here rather than a hard failure, because the C++ build/test
 # path does not need it; the gate itself (scripts/run-pylint.sh) fails loud with

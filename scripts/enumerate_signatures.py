@@ -3216,15 +3216,44 @@ def _project_gen_payload_getters(out_modules: dict) -> None:
     enumerator force-registering these as method-less types (empty member list
     on both sides → SURFACE-DIFF green).
 
-    Only project a field whose wire-key name the oracle records as a getter for
-    that class. Port-only data members the reference does not expose as a
-    property (e.g. the open ``extras`` member, and the wire keys Python's
-    payload class simply doesn't surface) are NOT projected — projecting them
-    would invent method surface the reference lacks. Each getter is emitted with
-    the oracle's zero-arg shape and an ``any`` return (``types_compatible``
-    treats ``any`` as compatible with the oracle's typed ``union<…>`` /
-    ``class:…`` getter returns), matching the container-accessor projection in
-    ``_apply_rest_sidecar``.
+    Project EVERY field these structs declare — deliberately NOT only the ones
+    the oracle happens to record. The field set is derived from the SPEC, not
+    mirrored from the reference: each of these headers is emitted by a
+    generator from its authoritative spec (``schema.json`` ``$defs`` for
+    swml_verbs, the swaig/post-prompt component schemas, the RELAY protocol
+    spec), every file is marked ``DO NOT EDIT``, and the GEN-FRESH/-SWML/
+    -RELAY/-SWAIG gates byte-compare the committed tree to a fresh regen. So a
+    field is present here IF AND ONLY IF the spec declares it — which is a
+    STRONGER guarantee than "the oracle also lists it", and it is what makes
+    projecting the full set safe under RULES §3 (no invented surface).
+
+    Intersecting with the oracle instead — ``[f for f in fields if f in
+    oracle_getters]`` — is what this function used to do, and it is a permanent
+    blind spot: it DEFINES the port's projected surface as a subset of the
+    reference's, so a field the port implements and the reference lacks can
+    never drift. Measured 2026-08-05 by negative control: adding a bogus
+    ``totally_invented_field`` to ``ai_params.hpp`` left the enumerated surface
+    completely unchanged, because the oracle does not record that name. It also
+    made the projection track the oracle silently — when the oracle widened
+    AIParams 60 → 87, this function's output followed it with no change to the
+    port and no gate ever verifying the port. Deleting a real field IS still
+    caught (it disappears from the port side and DRIFT reports it missing), so
+    the old rule failed in exactly one direction: the additive one.
+
+    Keeping the per-CLASS oracle gate (``ref_cls`` below) is a different
+    question and is retained: a payload class the reference has no counterpart
+    for at all (the 123 ``relay.protocol_types_generated`` structs, whose
+    Python module does not exist) is left unprojected rather than emitted as
+    123 classes of unmatchable surface. That is a module-scope decision, not a
+    field-level filter, and it does not hide drift WITHIN a class both sides
+    have.
+
+    The open ``extras`` member is not a wire key and is excluded upstream by
+    the parser (it carries an initializer, not an ``std::optional`` wire
+    field). Each getter is emitted with the oracle's zero-arg shape and an
+    ``any`` return (``types_compatible`` treats ``any`` as compatible with the
+    oracle's typed ``union<…>`` / ``class:…`` getter returns), matching the
+    container-accessor projection in ``_apply_rest_sidecar``.
     """
     ref = _load_python_signatures()
     if not ref:
@@ -3245,12 +3274,10 @@ def _project_gen_payload_getters(out_modules: dict) -> None:
             ref_cls = ref_classes.get(cls)
             if not ref_cls:
                 continue
-            oracle_getters = {m for m in ref_cls.get("methods", {}) if m != "__init__"}
-            present = [f for f in fields if f in oracle_getters]
-            if not present:
+            if not fields:
                 continue
             cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
-            for field in present:
+            for field in fields:
                 cls_entry["methods"].setdefault(
                     field,
                     {

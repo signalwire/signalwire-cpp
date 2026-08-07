@@ -27,6 +27,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SwaigAction {
+  std::optional<json> SWML;
   std::optional<json> add_dynamic_hints;
   std::optional<json> back_to_back_functions;
   std::optional<std::string> change_context;

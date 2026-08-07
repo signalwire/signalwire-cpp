@@ -9351,6 +9351,15 @@
         },
         "SwaigAction": {
           "methods": {
+            "SWML": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "__init__": {
               "params": [
                 {
@@ -10039,6 +10048,24 @@
         },
         "SwaigRequest": {
           "methods": {
+            "SWMLCall": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
+            "SWMLVars": {
+              "params": [
+                {
+                  "name": "self",
+                  "kind": "self"
+                }
+              ],
+              "returns": "any"
+            },
             "__init__": {
               "params": [
                 {

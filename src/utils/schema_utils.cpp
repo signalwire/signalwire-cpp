@@ -474,16 +474,74 @@ bool body_closes(const json& body) {
   return false;
 }
 
-}  // namespace
+// Bounds $ref / union following so a schema with a self-referential $ref cannot
+// spin the resolver. Eight levels is well past anything the SWML schema needs
+// (verb body -> $ref -> union branch -> $ref).
+constexpr int kMaxSchemaResolveDepth = 8;
 
-std::optional<std::set<std::string>> SchemaUtils::verb_top_level_property_names(
-    const std::string& verb_name) const {
-  auto it = verbs_.find(verb_name);
-  if (it == verbs_.end()) {
+// Resolve ONE schema node to the set of top-level property names it closes over,
+// returning std::nullopt when the node has no such enumerable closed key-set.
+//
+// Three node shapes are handled, and the union case is the one that matters:
+//
+//   - ``$ref`` — followed into $defs and resolved recursively (ai -> AIObject).
+//   - ``anyOf`` / ``oneOf`` — resolved BRANCH BY BRANCH and UNIONED. Without this
+//     the resolver bailed on the first ``type != "object"`` test, because a union
+//     node carries no ``type`` of its own. That bail silently DISENGAGED the
+//     closed-key check: validate_verb_top_level_keys reads std::nullopt as
+//     "nothing to enforce" and reports valid for any key whatsoever. Five verbs
+//     in the shipped schema are union-shaped — connect, play, send_sms, sleep,
+//     unset — so the check would do nothing for all of them. A union's known-key
+//     set is the union of its object branches' keys: a config satisfying the
+//     union satisfies SOME branch, so a key belonging to no branch belongs to no
+//     valid document. Non-object branches (sleep's bare ``integer``, SWMLVar)
+//     contribute no keys and are skipped — they constrain the config to not be an
+//     object at all, a different question from which keys an object config may
+//     carry.
+//   - a plain closed object — its own ``properties``.
+std::optional<std::set<std::string>> closed_key_set(const json& schema, const json& body,
+                                                    int depth) {
+  if (!body.is_object() || depth > kMaxSchemaResolveDepth) {
     return std::nullopt;
   }
-  json body = resolve_verb_body(schema_, it->second.definition, verb_name);
-  if (!body.is_object() || body.value("type", "") != "object") {
+
+  // Follow a $ref (ai -> AIObject) to the node that declares the properties.
+  auto rit = body.find("$ref");
+  if (rit != body.end() && rit->is_string()) {
+    const std::string ref = rit->get<std::string>();
+    const std::string name = ref.substr(ref.find_last_of('/') + 1);
+    auto dit = schema.find("$defs");
+    if (dit == schema.end() || !dit->is_object() || !dit->contains(name)) {
+      return std::nullopt;
+    }
+    return closed_key_set(schema, (*dit)[name], depth + 1);
+  }
+
+  // A union node: resolve every branch and union the ones that yield a set.
+  auto bit = body.find("anyOf");
+  if (bit == body.end() || !bit->is_array()) {
+    bit = body.find("oneOf");
+  }
+  if (bit != body.end() && bit->is_array()) {
+    std::set<std::string> merged;
+    bool found = false;
+    for (const auto& branch : *bit) {
+      auto keys = closed_key_set(schema, branch, depth + 1);
+      if (!keys.has_value()) {
+        continue;
+      }
+      found = true;
+      merged.insert(keys->begin(), keys->end());
+    }
+    // No branch is a closed object (e.g. unset: string | array-of-string). There
+    // is no key-set to enforce; the deep validator owns this shape.
+    if (!found) {
+      return std::nullopt;
+    }
+    return merged;
+  }
+
+  if (body.value("type", "") != "object") {
     return std::nullopt;
   }
   auto pit = body.find("properties");
@@ -502,6 +560,18 @@ std::optional<std::set<std::string>> SchemaUtils::verb_top_level_property_names(
   return keys;
 }
 
+}  // namespace
+
+std::optional<std::set<std::string>> SchemaUtils::verb_top_level_property_names(
+    const std::string& verb_name) const {
+  auto it = verbs_.find(verb_name);
+  if (it == verbs_.end()) {
+    return std::nullopt;
+  }
+  json body = resolve_verb_body(schema_, it->second.definition, verb_name);
+  return closed_key_set(schema_, body, 0);
+}
+
 std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_top_level_keys(
     const std::string& verb_name, const json& verb_config) const {
   if (!validation_enabled_) {
@@ -512,7 +582,8 @@ std::pair<bool, std::vector<std::string>> SchemaUtils::validate_verb_top_level_k
   }
   auto known = verb_top_level_property_names(verb_name);
   if (!known.has_value()) {
-    // No enumerable closed key-set — nothing shallow to enforce.
+    // Genuinely no enumerable closed key-set (an open object such as `set`, or a
+    // union with no object branch such as `unset`) — nothing shallow to enforce.
     return {true, {}};
   }
   if (!verb_config.is_object()) {

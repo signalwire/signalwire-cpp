@@ -102,6 +102,7 @@ static std::vector<TestCase>& get_tests() {
 #include "test_url_validator.cpp"
 #include "test_execution_mode.cpp"
 #include "test_schema_utils_parity.cpp"
+#include "test_schema_anyof.cpp"
 
 // Mixin-equivalent test files
 #include "test_pom.cpp"

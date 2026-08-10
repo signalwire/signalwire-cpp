@@ -111,7 +111,9 @@ class SchemaUtils {
   /// full deep schema (which would false-reject legitimate deep emissions such
   /// as the ai verb's empty prompt.pom or SWAIG defaults). Used for handler
   /// verbs (the ai verb) whose deep shapes the handler owns. A no-op when
-  /// validation is disabled or when the verb has no enumerable closed key-set.
+  /// validation is disabled or when the verb genuinely has no enumerable closed
+  /// key-set (an open object such as ``set``, or a union with no object branch
+  /// such as ``unset``).
   /// Mirrors Python's SchemaUtils.validate_verb_top_level_keys.
   [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_verb_top_level_keys(
       const std::string& verb_name, const json& verb_config) const;
@@ -133,9 +135,9 @@ class SchemaUtils {
       const std::string& verb_name, const json& verb_config) const;
 
   /// Resolve the set of KNOWN top-level property names for a verb's config
-  /// object, following a single ``$ref`` (e.g. AI -> AIObject). Returns
-  /// std::nullopt when the verb's config schema is not a closed
-  /// object-with-properties (so no shallow key check applies). Mirrors
+  /// object, following a ``$ref`` (e.g. AI -> AIObject) and UNIONING the branches
+  /// of an ``anyOf``/``oneOf`` union. Returns std::nullopt only when there is
+  /// genuinely no enumerable closed key-set (so no shallow key check applies). Mirrors
   /// Python's _verb_top_level_property_names.
   [[nodiscard]] std::optional<std::set<std::string>> verb_top_level_property_names(
       const std::string& verb_name) const;

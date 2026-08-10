@@ -40,20 +40,16 @@ class Service {
  public:
   /// Construct a SWML service.
   ///
-  /// Mirrors the reference ``SWMLService.__init__(name, route, host, port,
-  /// basic_auth, schema_path, config_file, schema_validation)`` — every
-  /// parameter is forwarded to the same collaborator the reference forwards
-  /// it to:
+  /// Each parameter is forwarded to its collaborator:
   ///   * ``schema_path`` + ``schema_validation`` → ``SchemaUtils``
-  ///     (``self.schema_utils``),
-  ///   * ``config_file`` → ``SecurityConfig`` (``self.security``) and the
-  ///     ``service`` section that supplies name/route/host/port defaults,
-  ///   * ``basic_auth`` → the auth credentials (``set_auth``).
+  ///     (see ``schema_utils()``),
+  ///   * ``config_file`` → ``SecurityConfig`` and the ``service`` section that
+  ///     supplies name/route/host/port defaults,
+  ///   * ``basic_auth`` → the auth credentials (see ``set_auth``).
   ///
-  /// ``port``/``basic_auth``/``schema_path``/``config_file`` are optional in
-  /// the reference; an empty ``std::optional`` here means "not supplied",
-  /// which is what lets the PORT env var (port) and the config-file /
-  /// environment fallbacks (auth) still apply.
+  /// For ``port``/``basic_auth``/``schema_path``/``config_file``, an empty
+  /// ``std::optional`` means "not supplied", which is what lets the PORT env
+  /// var (port) and the config-file / environment fallbacks (auth) still apply.
   explicit Service(
       const std::string& name = "service", const std::string& route = "/",
       const std::string& host = "0.0.0.0", const std::optional<int>& port = std::nullopt,
@@ -76,8 +72,7 @@ class Service {
 
   /// Set the host to bind to
   Service& set_host(const std::string& host);
-  /// The host this service binds to (reference: ``self.host``) — the twin of
-  /// the existing ``port()`` accessor.
+  /// The host this service binds to — the twin of the ``port()`` accessor.
   const std::string& host() const { return host_; }
 
   /// Set the port to listen on
@@ -93,22 +88,19 @@ class Service {
   const std::string& auth_password() const { return auth_pass_; }
 
   // ========================================================================
-  // AuthMixin (mirrors Python: signalwire.core.mixins.auth_mixin)
+  // Basic authentication
   // ========================================================================
 
   /// Validate provided basic-auth credentials against the configured ones
   /// using a constant-time comparison.
-  /// Corresponds to ``AuthMixin.validate_basic_auth(username, password)``.
   [[nodiscard]] bool validate_basic_auth(const std::string& username,
                                          const std::string& password) const;
 
-  /// Get (user, password) — Python-canonical name.
-  /// Corresponds to ``AuthMixin.get_basic_auth_credentials``.
+  /// Get the configured (user, password) pair.
   [[nodiscard]] std::pair<std::string, std::string> get_basic_auth_credentials() const;
 
   /// Get (user, password, source) where source is one of "provided",
-  /// "environment", or "generated". Corresponds to
-  /// ``AuthMixin.get_basic_auth_credentials(include_source=True)``.
+  /// "environment", or "generated".
   [[nodiscard]] std::tuple<std::string, std::string, std::string>
   get_basic_auth_credentials_with_source() const;
 
@@ -161,8 +153,8 @@ class Service {
 
   Service& add_verb(const std::string& section, const std::string& verb_name, const json& params);
 
-  /// Add a verb to the main section with strict schema validation (Python:
-  /// ``SWMLService.add_verb(verb_name, config)``). Validates the config before
+  /// Add a verb to the main section with strict schema validation.
+  /// Validates the config before
   /// appending: an unknown verb, a misspelled/unknown config key, or a
   /// wrong-typed value throws ``signalwire::utils::SchemaValidationError``. The
   /// ai (handler) verb is validated by its handler plus a shallow
@@ -179,10 +171,9 @@ class Service {
   Document& document() { return document_; }
   const Document& document() const { return document_; }
 
-  /// SchemaUtils helper bound to this Service.  Mirrors Python's
-  /// `self.schema_utils` instance attribute on `SWMLService`.  Built
-  /// lazily on first access; the underlying schema is cached so the
-  /// helper is cheap to build.
+  /// SchemaUtils helper bound to this Service.  Built lazily on first
+  /// access; the underlying schema is cached so the helper is cheap to
+  /// build.
   signalwire::utils::SchemaUtils& schema_utils();
   const signalwire::utils::SchemaUtils& schema_utils() const;
 
@@ -190,32 +181,26 @@ class Service {
   [[nodiscard]] json render_swml() const;
 
   // ========================================================================
-  // Document-lifecycle helpers (Corresponds to SWMLService.*)
+  // Document-lifecycle helpers
   // ========================================================================
 
-  /// Add a named section to the document (Python:
-  /// ``SWMLService.add_section``). Returns ``false`` if the section already
-  /// exists, ``true`` when a new one is created.
+  /// Add a named section to the document. Returns ``false`` if the section
+  /// already exists, ``true`` when a new one is created.
   bool add_section(const std::string& section_name);
 
-  /// Add a verb to a named section (Python:
-  /// ``SWMLService.add_verb_to_section``). ``config`` is the verb's params
-  /// object. Returns ``*this`` for fluent chaining.
+  /// Add a verb to a named section. ``config`` is the verb's params object.
+  /// Returns ``*this`` for fluent chaining.
   Service& add_verb_to_section(const std::string& section_name, const std::string& verb_name,
                                const json& config);
 
-  /// Return the SWML document as a JSON object (Python:
-  /// ``SWMLService.get_document`` — a dict). Alias of ``render_swml`` under
-  /// the Python-canonical name.
+  /// Return the SWML document as a JSON object. Alias of ``render_swml``.
   [[nodiscard]] json get_document() const { return render_swml(); }
 
-  /// Render the SWML document to a JSON string (Python:
-  /// ``SWMLService.render_document``).
+  /// Render the SWML document to a JSON string.
   [[nodiscard]] std::string render_document() const;
 
-  /// Framework-free request-dispatch core (Python:
-  /// ``SWMLService.handle_request``). The primitive dispatch surface the SDK
-  /// ports share: over plain ``(method, url, headers, body)`` primitives it
+  /// Framework-free request-dispatch core. Over plain
+  /// ``(method, url, headers, body)`` primitives it
   /// performs proxy detection, basic-auth over the header map, the
   /// routing-callback check, then renders the SWML document — returning a
   /// ``(status, response_headers, body_string)`` triple. On auth failure it
@@ -227,48 +212,40 @@ class Service {
       const std::map<std::string, std::string>& headers,
       const std::optional<json>& body = std::nullopt);
 
-  /// Reset the document to an empty state (Python:
-  /// ``SWMLService.reset_document``).
+  /// Reset the document to an empty state.
   void reset_document();
 
-  /// Manually override the proxy URL used to build absolute webhook URLs
-  /// (Python: ``SWMLService.manual_set_proxy_url``).
+  /// Manually override the proxy URL used to build absolute webhook URLs.
   void manual_set_proxy_url(const std::string& proxy_url);
 
-  /// Register a routing callback for a request path (Python:
-  /// ``SWMLService.register_routing_callback``). The callback receives the
+  /// Register a routing callback for a request path. The callback receives the
   /// parsed request ``body`` and the request ``headers`` and returns the route
-  /// to dispatch to (empty string = no override), matching Python's
-  /// ``callback_fn(body, headers) -> route | None``.
+  /// to dispatch to (empty string = no override).
   using RoutingCallback = std::function<std::string(
       const json& body, const std::map<std::string, std::string>& headers)>;
-  void register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+  void register_routing_callback(RoutingCallback callback, const std::string& path = "/sip");
 
-  /// The registered (normalized) routing-callback paths, sorted (Python:
-  /// ``sorted(SWMLService._routing_callbacks.keys())``).
+  /// The registered (normalized) routing-callback paths, sorted.
   [[nodiscard]] std::vector<std::string> get_routing_callback_paths() const;
 
-  /// Register a SWML verb handler (Python:
-  /// ``SWMLService.register_verb_handler``). Delegates to the service's verb
-  /// handler registry so custom verbs validate + build through the handler.
+  /// Register a SWML verb handler. Delegates to the service's verb handler
+  /// registry so custom verbs validate + build through the handler.
   void register_verb_handler(std::shared_ptr<signalwire::core::SWMLVerbHandler> handler);
 
-  /// Whether full schema validation of the rendered document is enabled
-  /// (Python: ``SWMLService.full_validation_enabled``).
+  /// Whether full schema validation of the rendered document is enabled.
   [[nodiscard]] bool full_validation_enabled() const { return full_validation_; }
 
-  /// Extract the SIP username from a request body's ``call.to`` SIP URI
-  /// (Python: static ``SWMLService.extract_sip_username``). Returns an empty
-  /// string when no SIP username can be extracted.
+  /// Extract the SIP username from a request body's ``call.to`` SIP URI.
+  /// Returns an empty string when no SIP username can be extracted.
   [[nodiscard]] static std::string extract_sip_username(const json& request_body);
 
   // ========================================================================
   // SWAIG tool registry (lifted from AgentBase)
   // ========================================================================
 
-  /// Define a SWAIG function the AI can call. ``secure`` defaults to TRUE
-  /// (reference: ``tool_mixin.define_tool(secure=True)``) — a tool defined
-  /// without an explicit ``secure`` requires SWAIG token validation.
+  /// Define a SWAIG function the AI can call. ``secure`` defaults to TRUE — a
+  /// tool defined without an explicit ``secure`` requires SWAIG token
+  /// validation.
   Service& define_tool(const std::string& name, const std::string& description,
                        const json& parameters, swaig::ToolHandler handler, bool secure = true);
   Service& define_tool(const swaig::ToolDefinition& tool);
@@ -279,41 +256,39 @@ class Service {
   /// Dispatch a function call to the registered handler.
   /// Returns a FunctionResult; if the function isn't registered, returns
   /// a FunctionResult with a "Function not found" response.
+  /// ``raw_data`` is OPTIONAL; a JSON null is the absent spelling.
   [[nodiscard]] virtual swaig::FunctionResult on_function_call(const std::string& name,
                                                                const json& args,
-                                                               const json& raw_data);
+                                                               const json& raw_data = nullptr);
 
   [[nodiscard]] bool has_tool(const std::string& name) const;
   [[nodiscard]] std::vector<std::string> list_tool_names() const;
 
   // ========================================================================
-  // ToolRegistry (mirrors Python: signalwire.core.agent.tools.registry)
+  // Tool registry
   // ========================================================================
 
   /// Whether a SWAIG function with the given name is registered.
-  /// Corresponds to ``ToolRegistry.has_function``.
   [[nodiscard]] bool has_function(const std::string& name) const;
 
   /// Get a registered SWAIG function definition by name.
   /// Returns nullptr when no such function is registered.
-  /// Corresponds to ``ToolRegistry.get_function``.
   [[nodiscard]] const swaig::ToolDefinition* get_function(const std::string& name) const;
 
   /// Snapshot of all registered SWAIG functions keyed by name.
   /// Returned by value so subsequent registrations don't mutate the
-  /// snapshot. Corresponds to ``ToolRegistry.get_all_functions``.
+  /// snapshot.
   [[nodiscard]] std::map<std::string, swaig::ToolDefinition> get_all_functions() const;
 
   /// Remove a registered SWAIG function. Returns true when the
   /// function was found and removed; false when it wasn't registered.
-  /// Corresponds to ``ToolRegistry.remove_function``.
   [[nodiscard]] bool remove_function(const std::string& name);
 
   /// Build the introspect payload for the registered tools as a JSON string
   /// shaped like `{"tools":[<each tool's SWAIG definition>]}`. Iterates
   /// `tool_order_` first, falling back to map order for entries registered
-  /// only via `register_swaig_function`. Stable across SDKs so the
-  /// `swaig-test --example` CLI can parse output uniformly. Used by the
+  /// only via `register_swaig_function`. The payload shape is stable so the
+  /// `swaig-test --example` CLI can parse it. Used by the
   /// SWAIG_LIST_TOOLS env-var path; pulled out as a separate helper so
   /// tests can assert content without invoking exit().
   [[nodiscard]] std::string build_tool_registry_json() const;
@@ -342,11 +317,6 @@ class Service {
   /// the idiomatic "give me this agent's routes to embed" capability. The
   /// caller owns the returned Server and can `listen()` on it directly, front
   /// it behind its own TLS/proxy, or copy its handlers into a parent server.
-  ///
-  /// Corresponds to WebMixin.as_router / SWMLService.as_router — the
-  /// cross-port "embed my routes in a host app" unit (Python returns a FastAPI
-  /// APIRouter, Go returns an http.Handler; C++ returns a populated
-  /// httplib::Server).
   [[nodiscard]] std::shared_ptr<httplib::Server> as_router();
 
   /// Stop the HTTP server
@@ -354,6 +324,36 @@ class Service {
 
   /// Get the effective port
   int port() const { return port_; }
+
+  // ========================================================================
+  // TLS / serving-domain configuration
+  //
+  // These four are seeded from the service's SecurityConfig at construction and
+  // stay independently settable afterwards. They are caller-observable VALUES,
+  // so they are contract surface on the service itself — not just on the
+  // SecurityConfig collaborator. Hence an accessor pair per value, backed by a
+  // field.
+  // ========================================================================
+
+  /// Whether TLS is enabled for this service.
+  [[nodiscard]] bool ssl_enabled() const { return ssl_enabled_; }
+  /// Enable/disable TLS, overriding the value seeded from SecurityConfig.
+  Service& set_ssl_enabled(bool enabled);
+
+  /// The serving domain used to build public URLs.
+  [[nodiscard]] const std::optional<std::string>& domain() const { return domain_; }
+  /// Set the serving domain.
+  Service& set_domain(const std::string& domain);
+
+  /// TLS certificate path.
+  [[nodiscard]] const std::optional<std::string>& ssl_cert_path() const { return ssl_cert_path_; }
+  /// Set the TLS certificate path.
+  Service& set_ssl_cert_path(const std::string& path);
+
+  /// TLS private-key path.
+  [[nodiscard]] const std::optional<std::string>& ssl_key_path() const { return ssl_key_path_; }
+  /// Set the TLS private-key path.
+  Service& set_ssl_key_path(const std::string& path);
 
   /// Timing-safe string comparison using CRYPTO_memcmp
   [[nodiscard]] static bool timing_safe_compare(const std::string& a, const std::string& b);
@@ -368,10 +368,6 @@ class Service {
   /// Returns std::nullopt to use the default SWML rendering, or a
   /// non-null JSON with modifications to merge into the rendered
   /// document.
-  ///
-  /// Corresponds to WebMixin.on_request(request_data, callback_path).
-  /// The Python third `request` argument is FastAPI-specific and
-  /// intentionally not mirrored on the cross-language API.
   virtual std::optional<json> on_request(
       const std::optional<json>& request_data = std::nullopt,
       const std::optional<std::string>& callback_path = std::nullopt);
@@ -379,10 +375,23 @@ class Service {
   /// Customization point for subclasses to modify SWML based on
   /// request data. Default returns std::nullopt (no modification).
   ///
-  /// Corresponds to WebMixin.on_swml_request(request_data, callback_path).
+  /// @param request_data The parsed POST body, or std::nullopt when absent.
+  /// @param callback_path Optional callback path.
+  /// @param request The inbound request, modelled as a JSON object carrying
+  ///   `query_params` and `headers` — the reference passes its framework
+  ///   Request object and reads those same two attributes off it. std::nullopt
+  ///   when the call did not originate from a live request: `on_request` passes
+  ///   nothing here, exactly as the reference passes `None` from that path.
+  ///
+  /// The third parameter was added 2026-07-30. Without it a C++ subclass
+  /// overriding this hook could not reach the inbound request AT ALL, so query
+  /// params and headers were invisible to the dispatch hook — a capability gap
+  /// against the reference, which keeps its DISPATCH hook request-aware and
+  /// made only the SECURITY half request-agnostic.
   virtual std::optional<json> on_swml_request(
       const std::optional<json>& request_data = std::nullopt,
-      const std::optional<std::string>& callback_path = std::nullopt);
+      const std::optional<std::string>& callback_path = std::nullopt,
+      const std::optional<json>& request = std::nullopt);
 
  protected:
   /// Override to customize SWML rendering
@@ -422,8 +431,8 @@ class Service {
 
   // Mutable so credentials can be lazily resolved from the environment on the
   // first auth check regardless of entry point (init_auth() is const and called
-  // by the const validate_basic_auth). Mirrors the reference's lazy auth
-  // resolution: a serverless dispatch validates auth without a prior serve().
+  // by the const validate_basic_auth). Auth resolution must be lazy because a
+  // serverless dispatch validates auth without a prior serve().
   mutable std::string auth_user_;
   mutable std::string auth_pass_;
   mutable bool auth_initialized_ = false;
@@ -435,20 +444,25 @@ class Service {
 
   std::optional<std::string> manual_proxy_url_;
   bool full_validation_ = false;
-  /// Strict schema validation for the 2-arg add_verb (Python: SWMLService
-  /// schema_validation, default True).
+  /// Strict schema validation for the 2-arg add_verb. Defaults to true.
   bool schema_validation_ = true;
   /// Explicit schema path from the constructor, forwarded to SchemaUtils.
-  /// Empty optional = let SchemaUtils run its own discovery (the reference's
-  /// ``_find_schema_path``).
+  /// Empty optional = let SchemaUtils run its own schema discovery.
   std::optional<std::string> schema_path_;
   /// Config file from the constructor (or auto-discovered for this service
   /// name), forwarded to SecurityConfig.
   std::optional<std::string> config_file_;
 
-  // Protected accessors for the three above — the reference's counterparts
-  // are private (``self._schema_validation``) or not stored at all, so these
-  // are NOT public surface.
+  /// The four TLS / domain values, seeded in the ctor from a
+  /// ``SecurityConfig`` built out of ``config_file_`` + the service name.
+  /// They stay independently settable afterwards.
+  bool ssl_enabled_ = false;
+  std::optional<std::string> domain_;
+  std::optional<std::string> ssl_cert_path_;
+  std::optional<std::string> ssl_key_path_;
+
+  // Protected accessors for the three above — deliberately not public surface;
+  // they exist for subclasses only.
   [[nodiscard]] bool schema_validation() const { return schema_validation_; }
   [[nodiscard]] const std::optional<std::string>& schema_path() const { return schema_path_; }
   [[nodiscard]] const std::optional<std::string>& config_file() const { return config_file_; }
@@ -466,6 +480,32 @@ class Service {
   /// AgentBase overrides this to add /post_prompt, /mcp, and /debug on top of
   /// the SWML + /swaig base routes.
   virtual void setup_routes(httplib::Server& server);
+
+ protected:
+  /// The single schema check behind EVERY Service-level verb entry point.
+  ///
+  /// Before this existed the Service had three ways in and only one of them
+  /// consulted the schema: the 2-arg ``add_verb(verb, config)`` validated, while
+  /// the 3-arg ``add_verb(section, verb, params)`` and
+  /// ``add_verb_to_section(...)`` — and all 37 of the per-verb convenience
+  /// methods — delegated straight to the Document. Two of those SHARE the name
+  /// ``add_verb``, so whether a caller got validation depended purely on arity;
+  /// nothing at the call site said so. That is how an invalid
+  /// ``play {"text": ...}`` shipped: the validating path rejects the key, and
+  /// nothing ever went through the validating path.
+  ///
+  /// Throws ``signalwire::utils::SchemaValidationError`` on an unknown verb, a
+  /// misspelled/unknown top-level key, or a wrong-typed value. A no-op when
+  /// schema validation is disabled.
+  ///
+  /// Protected rather than private so AgentBase — which derives from Service but
+  /// assembles its rendered document in a LOCAL ``swml::Document`` rather than
+  /// the Service's own ``document_`` — can validate the verbs it emits through
+  /// the same check.
+  ///
+  /// ``const``: it only reads the schema (the SchemaUtils cache is ``mutable``),
+  /// so ``AgentBase::render_swml_internal`` — which is const — can call it.
+  void validate_verb_or_throw(const std::string& verb_name, const json& config) const;
 
  private:
   void init_auth() const;

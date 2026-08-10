@@ -28,27 +28,35 @@
 //     bin/swaig-test http://user:pass@localhost:3000/standalone
 //         --exec lookup_competitor --param competitor=ACME
 
-#include <signalwire/swml/service.hpp>
-#include <signalwire/swaig/function_result.hpp>
-
 #include <cstdlib>
 #include <iostream>
+#include <signalwire/swaig/function_result.hpp>
+#include <signalwire/swml/service.hpp>
+#include <stdexcept>
 #include <string>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 int main(int argc, char** argv) {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     int port = 3000;
     if (argc > 1) {
-        port = std::atoi(argv[1]);
-        if (port <= 0) port = 3000;
+      try {
+        port = std::stoi(argv[1]);
+      } catch (const std::exception&) {
+        port = 0;  // fall through to the range check below
+      }
+      if (port <= 0) {
+        std::cerr << "port argument \"" << argv[1] << "\" is not usable; using 3000\n";
+        port = 3000;
+      }
     }
 
     swml::Service svc;
-    svc.set_name("standalone-swaig")
-       .set_route("/standalone")
-       .set_port(port);
+    svc.set_name("standalone-swaig").set_route("/standalone").set_port(port);
 
     // 1. Build a minimal SWML document. Any verbs are fine — the SWAIG
     //    HTTP surface is independent of what the document contains.
@@ -63,22 +71,22 @@ int main(int argc, char** argv) {
         /*description=*/
         "Look up competitor pricing by company name. Use this when the user "
         "asks how a competitor's price compares to ours.",
-        /*parameters=*/json::object({
+        /*parameters=*/
+        json::object({
             {"type", "object"},
-            {"properties", json::object({
-                {"competitor", json::object({
-                    {"type", "string"},
-                    {"description", "The competitor's company name, e.g. 'ACME'."},
-                })},
-            })},
+            {"properties",
+             json::object({
+                 {"competitor", json::object({
+                                    {"type", "string"},
+                                    {"description", "The competitor's company name, e.g. 'ACME'."},
+                                })},
+             })},
             {"required", json::array({"competitor"})},
         }),
-        /*handler=*/[](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
-            const std::string competitor =
-                args.value("competitor", std::string{"<unknown>"});
-            return swaig::FunctionResult(
-                competitor + " pricing is $99/seat; we're $79/seat."
-            );
+        /*handler=*/
+        [](const json& args, const json& /*raw*/) -> swaig::FunctionResult {
+          const std::string competitor = args.value("competitor", std::string{"<unknown>"});
+          return swaig::FunctionResult(competitor + " pricing is $99/seat; we're $79/seat.");
         },
         /*secure=*/false,
     });
@@ -89,10 +97,17 @@ int main(int argc, char** argv) {
               << "         or watch the [INFO] log line printed by serve() for\n"
               << "         the auto-generated user / password.\n"
               << "  Tools: ";
-    for (const auto& n : svc.list_tool_names()) std::cout << n << " ";
+    for (const auto& n : svc.list_tool_names()) {
+      std::cout << n << " ";
+    }
     std::cout << "\n\n"
-              << "SWML document:\n" << svc.render_swml().dump(2) << "\n";
+              << "SWML document:\n"
+              << svc.render_swml().dump(2) << "\n";
 
     svc.serve();
     return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -22,7 +22,99 @@ bool is_serverless_mode() {
   return signalwire::core::logging_config::get_execution_mode() != "server";
 }
 
+// Routes a serverless dispatch's extracted credential through AgentBase's
+// protected `swaig_validate_token` core — the SAME decision the HTTP endpoint
+// makes. Befriended by AgentBase so the enforcement stays in one place instead
+// of being re-implemented per envelope.
+struct ServerlessTokenAccess {
+  static std::optional<swaig::FunctionResult> check(const agent::AgentBase& a,
+                                                    const std::string& function_name,
+                                                    const std::optional<std::string>& token,
+                                                    const std::optional<std::string>& call_id) {
+    return a.swaig_validate_token(function_name, token, call_id);
+  }
+};
+
 namespace {
+
+// Pull the credential out of an already-parsed query mapping. Reads `__token`
+// first and falls back to the bare `token` spelling, matching the HTTP path. An
+// empty value counts as absent.
+std::optional<std::string> token_from_params(const json& params) {
+  if (!params.is_object()) {
+    return std::nullopt;
+  }
+  for (const char* key : {"__token", "token"}) {
+    auto it = params.find(key);
+    if (it != params.end() && it->is_string() && !it->get<std::string>().empty()) {
+      return it->get<std::string>();
+    }
+  }
+  return std::nullopt;
+}
+
+// Percent-decode one query-string value ("%20" -> " ", "+" -> " ").
+std::string percent_decode(const std::string& s) {
+  std::string out;
+  out.reserve(s.size());
+  for (size_t i = 0; i < s.size(); ++i) {
+    if (s[i] == '+') {
+      out.push_back(' ');
+    } else if (s[i] == '%' && i + 2 < s.size() &&
+               std::isxdigit(static_cast<unsigned char>(s[i + 1])) &&
+               std::isxdigit(static_cast<unsigned char>(s[i + 2]))) {
+      out.push_back(static_cast<char>(std::stoi(s.substr(i + 1, 2), nullptr, 16)));
+      i += 2;
+    } else {
+      out.push_back(s[i]);
+    }
+  }
+  return out;
+}
+
+// Pull the credential out of a RAW `a=b&c=d` query string (with or without a
+// leading '?').
+std::optional<std::string> token_from_query_string(const std::string& query_string) {
+  if (query_string.empty()) {
+    return std::nullopt;
+  }
+  std::string qs = query_string;
+  if (qs.front() == '?') {
+    qs.erase(0, 1);
+  }
+  std::optional<std::string> bare;  // the `token` fallback, if we see one
+  size_t pos = 0;
+  while (pos <= qs.size()) {
+    const size_t amp = qs.find('&', pos);
+    const std::string pair =
+        qs.substr(pos, amp == std::string::npos ? std::string::npos : amp - pos);
+    const size_t eq = pair.find('=');
+    if (eq != std::string::npos) {
+      const std::string key = pair.substr(0, eq);
+      // NOT const: `return value` must be able to move rather than copy.
+      std::string value = percent_decode(pair.substr(eq + 1));
+      if (!value.empty()) {
+        if (key == "__token") {
+          return value;  // `__token` wins outright
+        }
+        if (key == "token" && !bare.has_value()) {
+          bare = value;
+        }
+      }
+    }
+    if (amp == std::string::npos) {
+      break;
+    }
+    pos = amp + 1;
+  }
+  return bare;
+}
+
+// The query component of a URL ("...path?a=b" -> "a=b"), or "" when there is none.
+std::string query_of_url(const std::string& url) {
+  const size_t q = url.find('?');
+  return q == std::string::npos ? std::string() : url.substr(q + 1);
+}
 
 // Coerce a JSON value to a string, falling back to `dflt` for absent/non-string.
 std::string as_string(const json& v, const std::string& dflt = "") {
@@ -132,7 +224,8 @@ ServerlessResponse lambda_auth_challenge() {
 // result (Corresponds to ServerlessMixin._execute_swaig_function). Validates the
 // function-name format and existence exactly as the reference does.
 std::string execute_serverless_swaig(agent::AgentBase& agent, const std::string& function_name,
-                                     const json& args, const json& raw_data) {
+                                     const json& args, const json& raw_data,
+                                     const std::optional<std::string>& token) {
   static const std::regex name_re("^[a-zA-Z_][a-zA-Z0-9_]*$");
   if (!function_name.empty() && !std::regex_match(function_name, name_re)) {
     return json{{"error", "Invalid function name format: '" + function_name + "'"}}.dump();
@@ -140,6 +233,19 @@ std::string execute_serverless_swaig(agent::AgentBase& agent, const std::string&
   if (!agent.has_function(function_name)) {
     return json{{"error", "Function '" + function_name + "' not found"}}.dump();
   }
+
+  // Enforce `secure` through the same transport-agnostic core the HTTP endpoint
+  // uses, so a serverless deployment is not a weaker transport. The credential
+  // rides the QUERY STRING (extracted per-envelope by the caller); the call_id
+  // rides the POST BODY.
+  std::optional<std::string> call_id;
+  if (raw_data.is_object() && raw_data.contains("call_id") && raw_data["call_id"].is_string()) {
+    call_id = raw_data["call_id"].get<std::string>();
+  }
+  if (auto refusal = ServerlessTokenAccess::check(agent, function_name, token, call_id)) {
+    return refusal->to_json().dump();
+  }
+
   swaig::FunctionResult result = agent.on_function_call(function_name, args, raw_data);
   return result.to_json().dump();
 }
@@ -219,7 +325,10 @@ ServerlessResponse handle_lambda(agent::AgentBase& agent, const json& event, con
     return lambda_auth_challenge();
   }
 
-  const std::string rel_path = strip_slashes(path);
+  // Strip the query BEFORE deriving the function name: a raw
+  // "say_hello?__token=abc" would otherwise be baked into the function name and
+  // dispatch as "not found". (Same defect class the azure handler had.)
+  const std::string rel_path = strip_slashes(strip_query(path));
 
   // Parse the body once for SWAIG dispatch (function name + args + raw_data).
   json raw_data = json::object();
@@ -236,17 +345,34 @@ ServerlessResponse handle_lambda(agent::AgentBase& agent, const json& event, con
 
   const std::map<std::string, std::string> swaig_headers = {{"Content-Type", "application/json"}};
 
+  // Both lambda payload shapes are reachable here and carry the query string
+  // differently: REST API v1 (and HTTP API v2) provide the PARSED
+  // `queryStringParameters` mapping, while HTTP API v2 may instead provide the
+  // raw `rawQueryString`. Read the parsed mapping first, then fall back.
+  std::optional<std::string> token;
+  if (event.contains("queryStringParameters")) {
+    token = token_from_params(event["queryStringParameters"]);
+  }
+  if (!token.has_value() && event.contains("rawQueryString") &&
+      event["rawQueryString"].is_string()) {
+    token = token_from_query_string(event["rawQueryString"].get<std::string>());
+  }
+  if (!token.has_value()) {
+    // Some shapes carry the query only on the path itself.
+    token = token_from_query_string(query_of_url(path));
+  }
+
   // Case 1: /swaig endpoint with a function name in the body.
   if ((rel_path == "swaig") && !function_name.empty()) {
     json args = extract_swaig_args(raw_data);
-    return ServerlessResponse{200, swaig_headers,
-                              execute_serverless_swaig(agent, function_name, args, raw_data)};
+    return ServerlessResponse{
+        200, swaig_headers, execute_serverless_swaig(agent, function_name, args, raw_data, token)};
   }
   // Case 2: path-based function routing (e.g. "/say_hello").
   if (!rel_path.empty() && rel_path != "swaig") {
     json args = extract_swaig_args(raw_data);
     return ServerlessResponse{200, swaig_headers,
-                              execute_serverless_swaig(agent, rel_path, args, raw_data)};
+                              execute_serverless_swaig(agent, rel_path, args, raw_data, token)};
   }
 
   // Case 3: root path (or /swaig without a function) — render SWML.

@@ -32,15 +32,19 @@ class SwmlTransferSkill : public SkillBase {
     std::string desc =
         get_param<std::string>(params_, "description", "Transfer call based on pattern matching");
     std::string param_name = get_param<std::string>(params_, "parameter_name", "transfer_type");
+    // Reference: ``parameter_description`` param, default "The type of transfer
+    // to perform" (signalwire/skills/swml_transfer/skill.py).
+    std::string param_desc =
+        get_param<std::string>(params_, "parameter_description", "The type of transfer to perform");
 
-    // Build enum values from transfer keys
-    std::vector<std::string> enum_vals;
-    for (auto& [key, _] : transfers.items()) {
-      enum_vals.push_back(key);
-    }
-
+    // NO enum: the reference declares this parameter as a plain required string
+    // (``.parameter(self.parameter_name, "string", self.parameter_description,
+    // required=True)``) and constrains the value through the DataMap
+    // EXPRESSIONS below, not through a JSON-schema enum. Emitting an enum of
+    // the transfer keys here would be invented surface — and would reject any
+    // destination the fallback expression is meant to catch.
     datamap::DataMap dm(tool_name_);
-    dm.purpose(desc).parameter(param_name, "string", "Transfer destination", true, enum_vals);
+    dm.purpose(desc).parameter(param_name, "string", param_desc, true);
 
     // Add expressions for each transfer pattern
     for (auto& [pattern, config] : transfers.items()) {

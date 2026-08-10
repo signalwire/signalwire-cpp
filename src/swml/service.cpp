@@ -15,6 +15,7 @@
 #include "httplib.h"
 #include "server/tls_server.hpp"
 #include "signalwire/common.hpp"
+#include "signalwire/core/security_config.hpp"
 #include "signalwire/core/swml_handler.hpp"
 
 namespace signalwire {
@@ -75,6 +76,39 @@ Service::Service(const std::string& name, const std::string& route, const std::s
     schema_utils_ =
         std::make_unique<signalwire::utils::SchemaUtils>(*schema_path_, schema_validation_);
   }
+
+  // ``config_file`` → SecurityConfig, then seed the four TLS/domain values off
+  // it — the reference's:
+  //     self.security = SecurityConfig(config_file=config_file, service_name=name)
+  //     self.ssl_enabled   = self.security.ssl_enabled
+  //     self.domain        = self.security.domain
+  //     self.ssl_cert_path = self.security.ssl_cert_path
+  //     self.ssl_key_path  = self.security.ssl_key_path
+  const signalwire::core::SecurityConfig security(config_file_, name_);
+  ssl_enabled_ = security.ssl_enabled();
+  domain_ = security.domain();
+  ssl_cert_path_ = security.ssl_cert_path();
+  ssl_key_path_ = security.ssl_key_path();
+}
+
+Service& Service::set_ssl_enabled(bool enabled) {
+  ssl_enabled_ = enabled;
+  return *this;
+}
+
+Service& Service::set_domain(const std::string& domain) {
+  domain_ = domain;
+  return *this;
+}
+
+Service& Service::set_ssl_cert_path(const std::string& path) {
+  ssl_cert_path_ = path;
+  return *this;
+}
+
+Service& Service::set_ssl_key_path(const std::string& path) {
+  ssl_key_path_ = path;
+  return *this;
 }
 
 signalwire::utils::SchemaUtils& Service::schema_utils() {
@@ -248,17 +282,22 @@ bool Service::validate_auth(const httplib::Request& req, httplib::Response& res)
 
 Service& Service::add_verb(const std::string& section, const std::string& verb_name,
                            const json& params) {
+  // Was RAW: this delegated straight to document_.add_verb_to_section with no
+  // schema check, despite living on the Service and sharing its name with the
+  // validating 2-arg form. A caller writing `service.add_verb(...)` got
+  // validation or not depending purely on arity.
+  validate_verb_or_throw(verb_name, params);
   document_.add_verb_to_section(section, verb_name, params);
   return *this;
 }
 
-Service& Service::add_verb(const std::string& verb_name, const json& config) {
-  // Strict-render add_verb (Python: SWMLService.add_verb(verb_name, config)).
-  // Validate before appending: unknown verb / misspelled+unknown key /
-  // wrong-typed value raises SchemaValidationError. Handler verbs (ai) are
-  // validated by their handler + a shallow unknown-top-level-key check; their
-  // legitimate DEEP shapes are NOT deep-validated (empty prompt.pom, SWAIG
-  // defaults). No-op checks when schema validation is disabled.
+void Service::validate_verb_or_throw(const std::string& verb_name, const json& config) const {
+  // Strict-render validation (Python: SWMLService.add_verb(verb_name, config)).
+  // Unknown verb / misspelled+unknown key / wrong-typed value raises
+  // SchemaValidationError. Handler verbs (ai) are validated by their handler +
+  // a shallow unknown-top-level-key check; their legitimate DEEP shapes are NOT
+  // deep-validated (empty prompt.pom, SWAIG defaults). No-op checks when schema
+  // validation is disabled.
   auto& su = schema_utils();
 
   bool is_valid = true;
@@ -291,7 +330,10 @@ Service& Service::add_verb(const std::string& verb_name, const json& config) {
   if (!is_valid) {
     throw signalwire::utils::SchemaValidationError(verb_name, errors);
   }
+}
 
+Service& Service::add_verb(const std::string& verb_name, const json& config) {
+  validate_verb_or_throw(verb_name, config);
   document_.add_verb(verb_name, config);
   return *this;
 }
@@ -362,6 +404,8 @@ bool Service::add_section(const std::string& section_name) {
 
 Service& Service::add_verb_to_section(const std::string& section_name, const std::string& verb_name,
                                       const json& config) {
+  // Was RAW, like the 3-arg add_verb it aliases.
+  validate_verb_or_throw(verb_name, config);
   document_.add_verb_to_section(section_name, verb_name, config);
   return *this;
 }
@@ -549,11 +593,14 @@ json Service::render_main_swml(const httplib::Request&) const { return on_render
 
 std::optional<json> Service::on_request(const std::optional<json>& request_data,
                                         const std::optional<std::string>& callback_path) {
-  return on_swml_request(request_data, callback_path);
+  // No request object on this path — the reference passes None here too
+  // (web_mixin.py:1342), so std::nullopt is the faithful mapping.
+  return on_swml_request(request_data, callback_path, std::nullopt);
 }
 
 std::optional<json> Service::on_swml_request(const std::optional<json>& /*request_data*/,
-                                             const std::optional<std::string>& /*callback_path*/) {
+                                             const std::optional<std::string>& /*callback_path*/,
+                                             const std::optional<json>& /*request*/) {
   return std::nullopt;
 }
 
@@ -840,10 +887,17 @@ void Service::serve() {
     }
   }
 
-  // TLS termination in-process when SWML_SSL_ENABLED + cert/key are set
-  // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
-  // unique_ptr<Server>; setup_routes() is unchanged.
-  auto tls = server::resolve_tls_config_from_env();
+  // TLS termination in-process, driven by this service's own ssl_enabled /
+  // ssl_cert_path / ssl_key_path values. Those are seeded in the ctor from
+  // SecurityConfig (which itself reads SWML_SSL_ENABLED / SWML_SSL_CERT_PATH /
+  // SWML_SSL_KEY_PATH plus any config file), so the env path still works —
+  // but an explicit set_ssl_*() now wins, mirroring the reference's
+  // ``run(ssl_enabled=…, ssl_cert=…, ssl_key=…)`` override. SSLServer upcasts
+  // into the existing shared_ptr<Server>; setup_routes() is unchanged.
+  server::TlsServerConfig tls;
+  tls.enabled = ssl_enabled_;
+  tls.cert_path = ssl_cert_path_.value_or("");
+  tls.key_path = ssl_key_path_.value_or("");
 
   // Build + configure the server under the lock: stop() may fire from another
   // thread at any moment (the usual shape is serve() on a server thread and

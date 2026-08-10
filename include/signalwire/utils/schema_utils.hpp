@@ -1,4 +1,4 @@
-// schema_utils.hpp — C++ port of signalwire.utils.schema_utils.SchemaUtils.
+// schema_utils.hpp — SWML schema loading, verb metadata, and validation.
 //
 // Loads the SWML JSON Schema, extracts verb metadata, and validates
 // either a single verb config or a complete SWML document.  Validation
@@ -6,7 +6,7 @@
 // full JSON Schema validation can be wired in via
 // nlohmann/json-schema-validator by extending init_full_validator.
 //
-// Construction rules mirror Python:
+// Construction rules:
 //
 //   - Pass schema_path = "" to use the embedded schema.json.
 //   - schema_validation = false disables validation
@@ -30,8 +30,8 @@ namespace utils {
 
 using json = nlohmann::json;
 
-/// SchemaValidationError — C++ port of
-/// signalwire.utils.schema_utils.SchemaValidationError.
+/// Thrown when a verb config fails schema validation. Carries the verb name and
+/// the list of validation errors.
 class SchemaValidationError : public std::runtime_error {
  public:
   SchemaValidationError(std::string verb_name, std::vector<std::string> errors)
@@ -55,52 +55,46 @@ struct VerbInfo {
   json definition;
 };
 
-/// SchemaUtils — C++ port of
-/// signalwire.utils.schema_utils.SchemaUtils.
+/// Loads the SWML JSON Schema and answers verb-metadata / validation queries
+/// against it.
 class SchemaUtils {
  public:
-  /// Construct a SchemaUtils.  Mirrors Python's
-  /// `SchemaUtils(schema_path=None, schema_validation=True)`.
-  /// Pass schema_path = "" to use the embedded schema.
+  /// Construct a SchemaUtils. ``schema_path`` defaults to "" — pass "" to use
+  /// the embedded schema. ``schema_validation`` defaults to true.
   SchemaUtils(const std::string& schema_path = "", bool schema_validation = true);
 
-  /// The schema file path in use (reference: ``self.schema_path``) — the
-  /// caller-supplied path, or the resolved default when none was given.
+  /// The schema file path in use — the caller-supplied path, or the resolved
+  /// default when none was given.
   /// Empty means the embedded schema is used.
   [[nodiscard]] const std::string& schema_path() const { return schema_path_; }
 
   /// Whether full JSON Schema validation is wired up.
-  /// Mirrors Python's full_validation_available property.
   [[nodiscard]] bool full_validation_available() const;
 
-  /// Read and parse the JSON Schema. Mirrors Python's load_schema().
+  /// Read and parse the JSON Schema.
   [[nodiscard]] json load_schema();
 
   /// Sorted list of all known verb names.
-  /// Mirrors Python's get_all_verb_names().
   [[nodiscard]] std::vector<std::string> get_all_verb_names() const;
 
   /// The properties[verb_name] block for a verb, or empty when
-  /// unknown. Mirrors Python's get_verb_properties(verb_name).
+  /// unknown.
   [[nodiscard]] json get_verb_properties(const std::string& verb_name) const;
 
   /// The required list for a verb, or empty when unknown / not
-  /// specified. Mirrors Python's get_verb_required_properties(verb_name).
+  /// specified.
   [[nodiscard]] std::vector<std::string> get_verb_required_properties(
       const std::string& verb_name) const;
 
   /// Parameter-definition block used by code-gen tooling.
-  /// Mirrors Python's get_verb_parameters(verb_name).
   [[nodiscard]] json get_verb_parameters(const std::string& verb_name) const;
 
   /// Validate a verb config against the schema.
-  /// Mirrors Python's validate_verb(verb_name, verb_config).
-  /// Returns (valid, errors) — Python's Tuple[bool, List[str]].
+  /// Returns (valid, errors).
   [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_verb(
       const std::string& verb_name, const json& verb_config) const;
 
-  /// Validate a complete SWML document.
-  /// Mirrors Python's validate_document(document). Returns
+  /// Validate a complete SWML document. Returns
   /// (false, ["Schema validator not initialized"]) when no full
   /// validator is wired in.
   [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_document(
@@ -111,17 +105,18 @@ class SchemaUtils {
   /// full deep schema (which would false-reject legitimate deep emissions such
   /// as the ai verb's empty prompt.pom or SWAIG defaults). Used for handler
   /// verbs (the ai verb) whose deep shapes the handler owns. A no-op when
-  /// validation is disabled or when the verb has no enumerable closed key-set.
-  /// Mirrors Python's SchemaUtils.validate_verb_top_level_keys.
+  /// validation is disabled or when the verb genuinely has no enumerable closed
+  /// key-set (an open object such as ``set``, or a union with no object branch
+  /// such as ``unset``).
   [[nodiscard]] std::pair<bool, std::vector<std::string>> validate_verb_top_level_keys(
       const std::string& verb_name, const json& verb_config) const;
 
-  /// Generate a Python-style method signature string for a verb.
-  /// Mirrors Python's generate_method_signature(verb_name).
+  /// Generate a method signature string for a verb, in Python source syntax:
+  /// a ``self`` receiver, then the verb's parameters sorted by name (optional
+  /// ones typed ``Optional[...] = None``), then ``**kwargs``.
   [[nodiscard]] std::string generate_method_signature(const std::string& verb_name) const;
 
-  /// Generate a Python-style method body string for a verb.
-  /// Mirrors Python's generate_method_body(verb_name).
+  /// Generate a method body string for a verb, in Python source syntax.
   [[nodiscard]] std::string generate_method_body(const std::string& verb_name) const;
 
  private:
@@ -133,10 +128,9 @@ class SchemaUtils {
       const std::string& verb_name, const json& verb_config) const;
 
   /// Resolve the set of KNOWN top-level property names for a verb's config
-  /// object, following a single ``$ref`` (e.g. AI -> AIObject). Returns
-  /// std::nullopt when the verb's config schema is not a closed
-  /// object-with-properties (so no shallow key check applies). Mirrors
-  /// Python's _verb_top_level_property_names.
+  /// object, following a ``$ref`` (e.g. AI -> AIObject) and UNIONING the branches
+  /// of an ``anyOf``/``oneOf`` union. Returns std::nullopt only when there is
+  /// genuinely no enumerable closed key-set (so no shallow key check applies).
   [[nodiscard]] std::optional<std::set<std::string>> verb_top_level_property_names(
       const std::string& verb_name) const;
 

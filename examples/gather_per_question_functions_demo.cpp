@@ -27,61 +27,53 @@
 //
 // Run this file to see the resulting SWML.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 #include <signalwire/swaig/function_result.hpp>
-#include <iostream>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("gather_per_question_functions_demo", "/");
 
     // Tools that the step would normally have available — but during
     // gather questioning, they're all locked out unless they appear
     // in a question's `functions` whitelist.
     agent.define_tool(
-        "validate_email",
-        "Validate that an email address is well-formed and deliverable",
-        {{"email", {{"type", "string"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("valid");
+        "validate_email", "Validate that an email address is well-formed and deliverable",
+        {{"email", {{"type", "string"}}}}, [](const nlohmann::json&, const nlohmann::json&) {
+          return swaig::FunctionResult("valid");
         });
 
-    agent.define_tool(
-        "geocode_zip",
-        "Look up the city/state for a US ZIP code",
-        {{"zip", {{"type", "string"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult(R"({"city":"...","state":"..."})");
-        });
+    agent.define_tool("geocode_zip", "Look up the city/state for a US ZIP code",
+                      {{"zip", {{"type", "string"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult(R"({"city":"...","state":"..."})");
+                      });
 
-    agent.define_tool(
-        "check_age_eligibility",
-        "Verify the customer is old enough for the product",
-        {{"age", {{"type", "integer"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("eligible");
-        });
+    agent.define_tool("check_age_eligibility", "Verify the customer is old enough for the product",
+                      {{"age", {{"type", "integer"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("eligible");
+                      });
 
     // These tools are NOT whitelisted on any gather question. They
     // are registered on the agent and active outside the gather, but
     // during the gather they cannot be called — gather mode locks
     // them out.
-    agent.define_tool(
-        "escalate_to_human",
-        "Transfer the conversation to a live agent",
-        nlohmann::json::object(),
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("transferred");
-        });
+    agent.define_tool("escalate_to_human", "Transfer the conversation to a live agent",
+                      nlohmann::json::object(), [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("transferred");
+                      });
 
-    agent.define_tool(
-        "lookup_existing_account",
-        "Search for an existing account by email",
-        {{"email", {{"type", "string"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("not found");
-        });
+    agent.define_tool("lookup_existing_account", "Search for an existing account by email",
+                      {{"email", {{"type", "string"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("not found");
+                      });
 
     // Build a single-context agent with one onboarding step.
     auto& cb = agent.define_contexts();
@@ -102,43 +94,37 @@ int main() {
             "escalate_to_human",
             "lookup_existing_account",
         })
-        .set_gather_info(
-            "customer",
-            "next_step",
-            "I'll need to collect a few details to set up your "
-            "account. I'll ask one question at a time.");
+        .set_gather_info("customer", "next_step",
+                         "I'll need to collect a few details to set up your "
+                         "account. I'll ask one question at a time.");
 
     // Question 1: email — only validate_email + gather_submit callable.
-    onboard.add_gather_question(
-        "email", "What's your email address?",
-        /*type*/ "string",
-        /*confirm*/ true,
-        /*prompt*/ "",
-        /*functions*/ {"validate_email"});
+    onboard.add_gather_question("email", "What's your email address?",
+                                /*type*/ "string",
+                                /*confirm*/ true,
+                                /*prompt*/ "",
+                                /*functions*/ {"validate_email"});
 
     // Question 2: zip — only geocode_zip + gather_submit callable.
-    onboard.add_gather_question(
-        "zip", "What's your ZIP code?",
-        /*type*/ "string",
-        /*confirm*/ false,
-        /*prompt*/ "",
-        /*functions*/ {"geocode_zip"});
+    onboard.add_gather_question("zip", "What's your ZIP code?",
+                                /*type*/ "string",
+                                /*confirm*/ false,
+                                /*prompt*/ "",
+                                /*functions*/ {"geocode_zip"});
 
     // Question 3: age — only check_age_eligibility + gather_submit
     // callable.
-    onboard.add_gather_question(
-        "age", "How old are you?",
-        /*type*/ "integer",
-        /*confirm*/ false,
-        /*prompt*/ "",
-        /*functions*/ {"check_age_eligibility"});
+    onboard.add_gather_question("age", "How old are you?",
+                                /*type*/ "integer",
+                                /*confirm*/ false,
+                                /*prompt*/ "",
+                                /*functions*/ {"check_age_eligibility"});
 
     // Question 4: referral_source — no functions → only gather_submit
     // is callable. The model cannot validate, lookup, escalate —
     // nothing. This is the right pattern when a question needs no
     // tools.
-    onboard.add_gather_question(
-        "referral_source", "How did you hear about us?");
+    onboard.add_gather_question("referral_source", "How did you hear about us?");
 
     // A simple confirmation step the gather auto-advances into.
     ctx.add_step("confirm")
@@ -149,6 +135,10 @@ int main() {
         .set_end(true);
 
     auto swml = agent.render_swml();
-    std::cout << swml.dump(2) << std::endl;
+    std::cout << swml.dump(2) << '\n';
     return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

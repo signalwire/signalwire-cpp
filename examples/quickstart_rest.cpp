@@ -8,22 +8,31 @@
 // initializers), not JSON maps — the region is the real, compiled call shape.
 
 // region: rest
+#include <iostream>
 #include <signalwire/rest/rest_client.hpp>
 
 using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     auto client = RestClient::from_env();
 
     auto agents = client.fabric().ai_agents.list();
-    auto call   = client.calling().dial({
-        .from = "+15559876543", .to = "+15551234567",
+    auto call = client.calling().dial({
+        .from = "+15559876543",
+        .to = "+15551234567",
         .url = "https://example.com/handler",
     });
     auto numbers = client.phone_numbers().search({{"areacode", "512"}});
     auto results = client.datasphere().documents.search({
         .query_string = "billing policy",
     });
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 // endregion: rest

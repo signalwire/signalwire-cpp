@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace signalwire {
@@ -96,22 +97,22 @@ enum class CallbackMethod { Get, Post };
 // ===========================================================================
 
 /// Recording container format for `FunctionResult::record_call`.
-/// Mirrors the reference's `format in {"wav","mp3","mp4"}` validation.
+/// The validated set is `format in {"wav","mp3","mp4"}`.
 enum class RecordFormat { Wav, Mp3, Mp4 };
 
 /// Audio direction for `FunctionResult::record_call`.
-/// Mirrors the reference's `direction in {"speak","listen","both"}` validation.
+/// The validated set is `direction in {"speak","listen","both"}`.
 /// NOTE: differs from `TapDirection` — record_call uses `listen`, tap uses `hear`.
 enum class RecordDirection { Speak, Listen, Both };
 
 /// Audio direction for `FunctionResult::tap`.
-/// Mirrors the reference's `direction in {"speak","hear","both"}` validation.
+/// The validated set is `direction in {"speak","hear","both"}`.
 /// NOTE: differs from `RecordDirection` — tap uses `hear`, record_call uses `listen`.
 enum class TapDirection { Speak, Hear, Both };
 
 /// Media codec for `FunctionResult::tap` (SWAIG tap only).
-/// Mirrors the reference's `codec in {"PCMU","PCMA"}` validation. The wire
-/// strings are upper-case. Distinct from the wider RELAY codec set — do not unify.
+/// The validated set is `codec in {"PCMU","PCMA"}`. The wire strings are
+/// upper-case. Distinct from the wider RELAY codec set — do not unify.
 enum class Codec { Pcmu, Pcma };
 
 [[nodiscard]] inline std::string record_format_value(RecordFormat v) {
@@ -168,16 +169,26 @@ enum class Codec { Pcmu, Pcma };
 ///
 /// `JoinConferenceOptions::beep = ConferenceBeep::OnEnter;` and
 /// `... = "onEnter";` both compile and resolve to the same wire string; the
-/// open-string path matches Python's bare `str` (the validation in
-/// `join_conference` then rejects out-of-set strings exactly as Python does).
+/// open-string path keeps out-of-set values expressible, and the validation in
+/// `join_conference` then rejects out-of-set strings.
 /// Templated on the enum type plus its `*_value()` mapper so one definition
 /// covers all four sets.
 template <typename E, std::string (*Map)(E)>
+/// @tparam E   the closed-set enum this field accepts.
+/// @tparam Map the enum's `*_value()` mapper — the single point where an
+///   enumerator becomes its wire string, so the typed and the string path can
+///   never disagree.
 struct EnumOrString {
+  /// The resolved wire string. Normalized at construction: an enum operand is
+  /// mapped through `Map`, a string operand is stored verbatim.
   std::string value;
-  EnumOrString(E e) : value(Map(e)) {}              // NOLINT(google-explicit-constructor)
+  /// Implicit from the enum — mapped to its wire string.
+  EnumOrString(E e) : value(Map(e)) {}  // NOLINT(google-explicit-constructor)
+  /// Implicit from a string — stored as-is, unvalidated.
   EnumOrString(const std::string& s) : value(s) {}  // NOLINT
-  EnumOrString(const char* s) : value(s) {}         // NOLINT
+  /// Implicit from a string literal, so `= "onEnter"` needs no cast.
+  EnumOrString(const char* s) : value(s) {}  // NOLINT
+  /// The wire string this field serializes to.
   [[nodiscard]] const std::string& str() const { return value; }
 };
 
@@ -188,11 +199,10 @@ using MethodField = EnumOrString<CallbackMethod, &callback_method_value>;
 
 /// Options bag for `FunctionResult::join_conference`.
 ///
-/// Every field is `std::optional` and unset means "Python default" — so a
+/// Every field is `std::optional` and unset means "omit from the wire" — so a
 /// default-constructed `JoinConferenceOptions` collapses to the bare
-/// conference-name string form, matching the reference's simple case. Closed
-/// sets use the enum-or-string wrapper above; open fields are plain
-/// `std::optional`. `result` is a free-form `json` (Python's `Optional[Any]`).
+/// conference-name string form. Closed sets use the enum-or-string wrapper
+/// above; open fields are plain `std::optional`. `result` is a free-form `json`.
 struct JoinConferenceOptions {
   std::optional<bool> muted;
   std::optional<BeepField> beep;
@@ -223,12 +233,11 @@ class FunctionResult {
   // Core
   // ========================================================================
 
-  /// The spoken/returned text (reference: ``self.response``) — emitted as the
-  /// ``response`` key when non-empty. Readable back after construction or a
-  /// ``set_response`` call.
+  /// The spoken/returned text — emitted as the ``response`` key when non-empty.
+  /// Readable back after construction or a ``set_response`` call.
   [[nodiscard]] const std::string& response() const { return response_; }
-  /// Whether the AI processes the result before speaking (reference:
-  /// ``self.post_process``) — emitted only alongside an action.
+  /// Whether the AI processes the result before speaking — emitted only
+  /// alongside an action.
   [[nodiscard]] bool post_process() const { return post_process_; }
 
   FunctionResult& set_response(const std::string& response);
@@ -265,7 +274,11 @@ class FunctionResult {
   FunctionResult& switch_context(const std::string& system_prompt = "",
                                  const std::string& user_prompt = "", bool consolidate = false,
                                  bool full_reset = false);
-  FunctionResult& replace_in_history(const json& text);
+  /// After first send, replace the tool_call+result pair in conversation
+  /// history. ``text`` is a STRING (replace the tool_call with an assistant
+  /// message carrying this text) or ``true`` (remove the pair entirely).
+  /// Defaults to ``true``.
+  FunctionResult& replace_in_history(const json& text = true);
 
   // ========================================================================
   // Media
@@ -316,14 +329,13 @@ class FunctionResult {
 
   FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
 
-  /// Join an ad-hoc audio conference (SWML `join_conference`). Full support
-  /// with Python `core/function_result.py`: 18 optional params past `name`,
-  /// 7 validations, and simple (bare-name) vs full-object emission.
+  /// Join an ad-hoc audio conference (SWML `join_conference`). 18 optional
+  /// params past `name`, 7 validations, and simple (bare-name) vs full-object
+  /// emission.
   ///
-  /// Flat positional overload — mirrors the Python signature 1:1 so the
-  /// cross-language audit lines up on parameter count/types. The closed-set
-  /// params are bare `std::string` (Python uses bare `str`); the
-  /// options-struct overload below adds the typed `enum class` affordance.
+  /// Flat positional overload. The closed-set params are bare `std::string`
+  /// here; the options-struct overload below adds the typed `enum class`
+  /// affordance.
   FunctionResult& join_conference(
       const std::string& name, bool muted = false, const std::string& beep = "true",
       bool start_on_enter = true, bool end_on_exit = false,
@@ -366,8 +378,8 @@ class FunctionResult {
                       const std::string& input_method = "dtmf", const std::string& status_url = "",
                       const std::string& payment_method = "credit-card", int timeout = 5,
                       int max_attempts = 1, bool security_code = true,
-                      const std::string& postal_code = "true", int min_postal_code_length = 0,
-                      const std::string& token_type = "reusable",
+                      const std::variant<bool, std::string>& postal_code = true,
+                      int min_postal_code_length = 0, const std::string& token_type = "reusable",
                       const std::string& charge_amount = "", const std::string& currency = "usd",
                       const std::string& language = "en-US", const std::string& voice = "woman",
                       const std::string& description = "",

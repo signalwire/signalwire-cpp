@@ -1,7 +1,12 @@
 // ConfigLoader tests (signalwire::core::ConfigLoader)
 
+#include <sys/stat.h>
+
+#include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
+#include <iostream>
 #include <string>
 
 #include "signalwire/core/config_loader.hpp"
@@ -18,8 +23,11 @@ std::string write_temp_config(const std::string& name, const std::string& conten
   std::string path = dir + "/" + name;
   // Best-effort mkdir via std::ofstream failing is caught by the caller's
   // assertions; use system-independent creation.
-  std::string mkdir_cmd = "mkdir -p " + dir;
-  (void)std::system(mkdir_cmd.c_str());
+  // ::mkdir instead of system("mkdir -p " + dir): no shell is spawned, so
+  // nothing in `dir` can be interpreted, and EEXIST is the expected state.
+  if (::mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
+    std::cerr << "could not create " << dir << ": " << std::strerror(errno) << "\n";
+  }
   std::ofstream f(path);
   f << contents;
   f.close();

@@ -91,8 +91,9 @@ TEST(pom_builder_add_subsection_autovivifies_parent) {
   auto* parent = b.get_section("Parent");
   ASSERT_NE(parent, nullptr);
   ASSERT_EQ(parent->subsections.size(), 1u);
-  ASSERT_TRUE(parent->subsections[0].title.has_value());
-  ASSERT_EQ(*parent->subsections[0].title, std::string("Child"));
+  auto& t = parent->subsections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Child"));
   // Subsection renders at a deeper heading level (### ).
   std::string md = b.render_markdown();
   ASSERT_TRUE(contains(md, "### Child"));
@@ -154,7 +155,9 @@ TEST(pom_builder_add_section_with_subsections_arg) {
   auto* main = b.get_section("Main");
   ASSERT_NE(main, nullptr);
   ASSERT_EQ(main->subsections.size(), 1u);
-  ASSERT_EQ(*main->subsections[0].title, std::string("Sub"));
+  auto& t = main->subsections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("Sub"));
   ASSERT_EQ(main->subsections[0].body, std::string("subbody"));
   ASSERT_EQ(main->subsections[0].bullets[0], std::string("sb1"));
   return true;
@@ -179,6 +182,8 @@ TEST(pom_builder_pom_accessor) {
   b.add_section("X", "xbody");
   // The underlying PromptObjectModel is accessible and consistent.
   ASSERT_EQ(b.pom().sections.size(), 1u);
-  ASSERT_EQ(*b.pom().sections[0].title, std::string("X"));
+  auto& t = b.pom().sections[0].title;
+  ASSERT_TRUE(t.has_value());
+  ASSERT_EQ(*t, std::string("X"));
   return true;
 }

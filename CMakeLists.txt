@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(signalwire VERSION 3.2.1
+project(signalwire VERSION 3.0.0
         HOMEPAGE_URL "https://github.com/signalwire/signalwire-cpp"
         LANGUAGES CXX)
 # C++20: the SDK's documented, idiomatic construction of the generated *Params
@@ -53,8 +53,15 @@ if(SIGNALWIRE_SANITIZE)
     message(STATUS "Sanitizer enabled: ${SIGNALWIRE_SANITIZE}")
 endif()
 
-# Header-only deps
-include_directories(${CMAKE_SOURCE_DIR}/deps)
+# Header-only deps. SYSTEM, because deps/ is VENDORED THIRD-PARTY code we do not
+# own (httplib.h, json.hpp, nlohmann/) -- marking it system tells the compiler to
+# suppress warnings originating inside those headers, which is the correct
+# mechanism for "not our code to fix". Without it, -Wall on the example targets
+# surfaces httplib.h's own -Wmismatched-tags as findings against this repo, and
+# clang-tidy's --header-filter cannot exclude them (clang-diagnostic-* are
+# compiler warnings, not clang-tidy checks, so the filter does not apply).
+# Our own include/ deliberately stays non-SYSTEM: we DO want its warnings.
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # OpenSSL
@@ -92,6 +99,17 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 # `g++ … -lsignalwire` against a static build fails to resolve OpenSSL/ixwebsocket
 # symbols (PACKAGE-SMOKE #92). The internal tools/tests below link it the same way.
 add_library(signalwire SHARED ${SOURCES})
+
+# -Wall on the SHIPPED LIBRARY. Until 2026-07-30 -Wall was applied only to the
+# example targets (the sole occurrence in this file), so the shipped code was
+# held to a LOWER compiler-warning bar than its own demos -- backwards. It is
+# PRIVATE so consumers of the installed target do not inherit it.
+#
+# Free to enable: the only two warnings left under -Wall are inside the vendored
+# FetchContent IXWebSocket tree, not our code (first-party src/ + include/ is
+# clean). The five -Woverloaded-virtual it used to report were the
+# on_swml_request hiding, fixed by giving that hook its third parameter.
+target_compile_options(signalwire PRIVATE -Wall)
 # cpp-httplib TLS enabled — requires OpenSSL 3.0+ (build with a 3.0+ toolchain;
 # OpenSSL 1.1.1 is EOL). Gives httplib::Client https:// for REST and
 # httplib::SSLServer for the webhook server (in-process TLS termination).
@@ -133,9 +151,12 @@ endif()
 # place signalwire/ + nlohmann/json.hpp.
 target_include_directories(signalwire PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+# deps/ is vendored third-party; SYSTEM so consumers do not inherit warnings
+# from httplib.h / json.hpp as if they were ours (same reasoning as above).
+target_include_directories(signalwire SYSTEM PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>)
 # Namespaced alias so add_subdirectory/FetchContent consumers can use the SAME
 # `signalwire::signalwire` name the installed package exports.
 add_library(signalwire::signalwire ALIAS signalwire)
@@ -385,6 +406,15 @@ target_include_directories(relay_liveness_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests
 add_executable(secure_default_dump tools/secure_default_dump.cpp)
 target_link_libraries(secure_default_dump signalwire)
 
+# token_interop_mint is the TOKEN-INTEROP fixture: it mints ONE SWAIG tool token
+# with the FIXED inputs the checker supplies in the environment and prints just
+# that token, so porting-sdk/scripts/diff_port_token_interop.py can validate it
+# under the REFERENCE's own decoder. That is property 3 of the token contract —
+# a correct key and a correct HMAC still leave the base64 ENVELOPE able to be
+# wrong, and an unpadded token is unusable to every other implementation.
+add_executable(token_interop_mint tools/token_interop_mint.cpp)
+target_link_libraries(token_interop_mint signalwire)
+
 # secret_scrub_dump is the SECRET-SCRUB-LIVE (PSDK-5, nightly) runner: it drives
 # the RELAY client through a real connect + an inbound authorization.state
 # re-auth frame at debug level with the fixture sentinels, captures fd 1 + fd 2
@@ -418,6 +448,15 @@ foreach(example_src ${EXAMPLE_SOURCES})
 
     add_executable(${target_name} EXCLUDE_FROM_ALL ${example_src})
     target_link_libraries(${target_name} signalwire)
+    # -Wno-unused-variable only: an example may legitimately declare a value to
+    # SHOW the API returns one without going on to use it.
+    #
+    # The -Wno-overloaded-virtual that briefly lived here is GONE, because the
+    # thing it was hiding is fixed: InfoGathererAgent::on_swml_request used to
+    # take 3 params and return json against a 2-param optional<json> base, so it
+    # hid rather than overrode. The base now takes the reference's third
+    # `request` parameter and the prefab is a real override, so the warning has
+    # no site left to fire from.
     target_compile_options(${target_name} PRIVATE -Wall -Wno-unused-variable)
     add_dependencies(examples ${target_name})
 endforeach()

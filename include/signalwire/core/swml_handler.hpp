@@ -3,10 +3,8 @@
 //
 // SWML verb handlers — the pluggable verb-handler registry.
 //
-// Mirrors the Python reference signalwire.core.swml_handler (SWMLVerbHandler
-// abstract base, AIVerbHandler concrete handler for the complex "ai" verb, and
-// VerbHandlerRegistry mapping verb-name -> handler) and the Java port
-// (com.signalwire.sdk.swml.{SWMLVerbHandler,AIVerbHandler,VerbHandlerRegistry}).
+// SWMLVerbHandler is the abstract base, AIVerbHandler the concrete handler for
+// the complex "ai" verb, and VerbHandlerRegistry maps verb-name -> handler.
 //
 // A verb handler provides specialized logic for complex SWML verbs that cannot
 // be handled generically: it names its verb, validates a config, and builds a
@@ -29,9 +27,8 @@ using json = nlohmann::json;
 
 /// Result of validate_config: (is_valid, error_messages).
 ///
-/// C++ analog of the reference's Python `tuple[bool, list[str]]` / Java
-/// ValidationResult. `valid` is redundant with `errors.empty()` but kept as an
-/// explicit field so the (bool, list) tuple shape is preserved 1:1.
+/// `valid` is redundant with `errors.empty()` but kept as an explicit field so
+/// the (bool, list) pair shape is available directly.
 struct VerbValidationResult {
   bool valid = false;
   std::vector<std::string> errors;
@@ -39,9 +36,8 @@ struct VerbValidationResult {
 
 /// Base interface for SWML verb handlers.
 ///
-/// Abstract (pure-virtual) — the C++ analog of Python's @abstractmethod and
-/// Java's UnsupportedOperationException stubs: a subclass that forgets to
-/// override fails to compile/link.
+/// Every method is pure-virtual, so a subclass that forgets to override one
+/// fails to compile.
 class SWMLVerbHandler {
  public:
   virtual ~SWMLVerbHandler() = default;
@@ -52,10 +48,8 @@ class SWMLVerbHandler {
   /// Validate the configuration for this verb.
   [[nodiscard]] virtual VerbValidationResult validate_config(const json& config) const = 0;
 
-  /// Build a configuration for this verb from the provided keyword arguments.
-  ///
-  /// The reference takes `**kwargs`; in C++ that lands as a JSON object of
-  /// named arguments (the kwargs idiom). Returns the verb config object.
+  /// Build a configuration for this verb from the provided named arguments,
+  /// passed as a JSON object. Returns the verb config object.
   [[nodiscard]] virtual json build_config(const json& kwargs = json::object()) const = 0;
 };
 
@@ -74,11 +68,11 @@ class AIVerbHandler : public SWMLVerbHandler {
 
   /// Catch-all kwargs form — extracts the recognized keys (prompt_text,
   /// prompt_pom, contexts, post_prompt, post_prompt_url, swaig) from the JSON
-  /// object and treats the rest as extra AI params. Mirrors the Java map-based
-  /// buildConfig(kwargs). Prefer the typed overload below.
+  /// object and treats the rest as extra AI params. Prefer the typed overload
+  /// below.
   [[nodiscard]] json build_config(const json& kwargs = json::object()) const override;
 
-  /// Typed overload mirroring the Python signature 1:1. Requires exactly one of
+  /// Typed overload. Requires exactly one of
   /// prompt_text / prompt_pom (mutually exclusive, else throws
   /// std::invalid_argument). `languages`, `hints`, `pronounce`, `global_data`
   /// go at the top level; every other extra kwarg lands in config["params"].
@@ -109,8 +103,7 @@ class VerbHandlerRegistry {
   /// Whether a handler exists for a verb.
   [[nodiscard]] bool has_handler(const std::string& verb_name) const;
 
-  /// The registered verb names, sorted (Python:
-  /// ``sorted(VerbHandlerRegistry._handlers.keys())``).
+  /// The registered verb names, sorted.
   [[nodiscard]] std::vector<std::string> get_verb_names() const {
     std::vector<std::string> names;
     names.reserve(handlers_.size());

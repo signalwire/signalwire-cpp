@@ -23,12 +23,11 @@
 //   - 0  on a clean handshake + subscribe + event dispatch
 //   - 1  on any error (socket failure, handshake timeout, no event in 5s)
 
-#include <signalwire/relay/client.hpp>
-
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <signalwire/relay/client.hpp>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -40,30 +39,35 @@ using json = nlohmann::json;
 namespace {
 
 std::string env_or(const char* name, const std::string& fallback) {
-    const char* v = std::getenv(name);
-    return (v && *v) ? std::string(v) : fallback;
+  const char* v = std::getenv(name);
+  return (v && *v) ? std::string(v) : fallback;
 }
 
 std::vector<std::string> split_csv(const std::string& s) {
-    std::vector<std::string> out;
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, ',')) {
-        // trim whitespace
-        size_t a = item.find_first_not_of(" \t");
-        size_t b = item.find_last_not_of(" \t");
-        if (a == std::string::npos) continue;
-        out.push_back(item.substr(a, b - a + 1));
+  std::vector<std::string> out;
+  std::stringstream ss(s);
+  std::string item;
+  while (std::getline(ss, item, ',')) {
+    // trim whitespace
+    size_t a = item.find_first_not_of(" \t");
+    size_t b = item.find_last_not_of(" \t");
+    if (a == std::string::npos) {
+      continue;
     }
-    return out;
+    out.push_back(item.substr(a, b - a + 1));
+  }
+  return out;
 }
 
 }  // namespace
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     // Quiet logging so the audit's stdout/stderr capture stays small.
     if (!std::getenv("SIGNALWIRE_LOG_MODE")) {
-        ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
+      ::setenv("SIGNALWIRE_LOG_MODE", "off", 1);
     }
 
     const std::string project = env_or("SIGNALWIRE_PROJECT_ID", "audit");
@@ -86,41 +90,43 @@ int main() {
     // audit_relay_handshake.py: `state.event_dispatched = True` branch).
     std::atomic<bool> saw_event{false};
     client.on_event([&](const relay::RelayEvent& ev) {
-        saw_event.store(true);
-        try {
-            client.send_raw_request("signalwire.event", json{
-                {"dispatched", true},
-                {"event_type", ev.event_type},
-                {"echoed", ev.params},
-            });
-        } catch (...) {
-            // Audit only needs the saw_event flag; failure to ack is fine.
-        }
+      saw_event.store(true);
+      try {
+        client.send_raw_request("signalwire.event", json{
+                                                        {"dispatched", true},
+                                                        {"event_type", ev.event_type},
+                                                        {"echoed", ev.params},
+                                                    });
+        // The ack is best-effort: this harness only reports whether an event was
+        // OBSERVED (the saw_event flag above), so a failed echo must not change
+        // the audit result or abort the callback. Deliberately empty.
+        // NOLINTNEXTLINE(bugprone-empty-catch)
+      } catch (...) {
+      }
     });
 
     if (!client.connect()) {
-        std::cerr << "relay_audit_harness: connect failed\n";
-        return 1;
+      std::cerr << "relay_audit_harness: connect failed\n";
+      return 1;
     }
 
     // Explicit signalwire.subscribe so the audit fixture sees the method
     // name (its watcher only marks subscribe_seen on a literal
     // `signalwire.subscribe` frame).
     try {
-        client.send_raw_request(
-            "signalwire.subscribe",
-            json{{"contexts", cfg.contexts}}
-        );
+      client.send_raw_request("signalwire.subscribe", json{{"contexts", cfg.contexts}});
     } catch (const std::exception& e) {
-        std::cerr << "relay_audit_harness: subscribe failed: " << e.what() << "\n";
-        return 1;
+      std::cerr << "relay_audit_harness: subscribe failed: " << e.what() << "\n";
+      return 1;
     }
 
     // Wait up to 5 seconds for an inbound event.
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (std::chrono::steady_clock::now() < deadline) {
-        if (saw_event.load()) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      if (saw_event.load()) {
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     bool got = saw_event.load();
@@ -130,10 +136,14 @@ int main() {
     client.disconnect();
 
     if (!got) {
-        std::cerr << "relay_audit_harness: no event arrived within 5s\n";
-        return 1;
+      std::cerr << "relay_audit_harness: no event arrived within 5s\n";
+      return 1;
     }
 
     std::cout << "relay_audit_harness: event dispatched\n";
     return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

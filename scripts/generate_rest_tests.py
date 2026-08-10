@@ -27,6 +27,7 @@ Usage:
   --check            regenerate to a temp dir and diff against the checked-in
                      files; non-zero exit if they differ (GEN-FRESH-TESTS)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -35,7 +36,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -58,12 +58,23 @@ PSDK = _resolve_psdk()
 if not PSDK.is_dir():
     raise SystemExit(
         f"porting-sdk not found at {PSDK}; clone it adjacent to this repo "
-        "(../porting-sdk) or set PORTING_SDK_DIR")
+        "(../porting-sdk) or set PORTING_SDK_DIR"
+    )
 
 # Import the mock's own spec loader so our matched_route resolution is identical
 # to what the mock journals at runtime.
 sys.path.insert(0, str(PSDK / "test_harness" / "mock_signalwire"))
 from mock_signalwire.specs import SpecLoader  # type: ignore  # noqa: E402
+
+# The generated tests must be clang-format-clean AT EMIT. Otherwise GEN-FRESH-TESTS
+# (byte-compares a fresh regen against the tree) and the FMT gate (--check) are
+# MUTUALLY EXCLUSIVE and one of them is always red -- AGENT_RULES §5. We use the
+# real clang-format rather than the pure-python subset in format_generated_cpp:
+# that subset targets DECLARATIONS and mis-wraps the `(void)(...)` cast these
+# templates emit (it breaks the line after the opening paren). Shelling out to the
+# same binary the FMT gate runs makes agreement true by construction.
+sys.path.insert(0, str(HERE))
+from _cpp_fmt import clang_format_source  # type: ignore  # noqa: E402
 
 TESTS_DIR = PORT_ROOT / "tests"
 GEN_PREFIX = "test_rest_generated_"
@@ -78,7 +89,8 @@ def build_and_run_registry() -> dict:
     build = PORT_ROOT / "build"
     subprocess.run(
         ["cmake", "--build", str(build), "--target", "route_registry", "-j", "8"],
-        check=True, stdout=subprocess.DEVNULL,
+        check=True,
+        stdout=subprocess.DEVNULL,
     )
     out = subprocess.run(
         [str(build / "route_registry")], check=True, capture_output=True, text=True
@@ -91,7 +103,9 @@ def load_spec_routes() -> list:
     return SpecLoader(spec_root=PSDK / "rest-apis").load_all().routes
 
 
-def resolve_matched_route(method: str, path_template: str, routes: list) -> tuple[str, str] | None:
+def resolve_matched_route(
+    method: str, path_template: str, routes: list
+) -> tuple[str, str] | None:
     """Return (spec_name, endpoint_id) the mock would journal for this dispatch.
 
     Mirrors the mock: substitute {id}->CONCRETE, match against every spec route
@@ -99,7 +113,8 @@ def resolve_matched_route(method: str, path_template: str, routes: list) -> tupl
     """
     concrete = path_template.replace("{id}", CONCRETE)
     candidates = [
-        r for r in routes
+        r
+        for r in routes
         if r.method == method.upper() and r.match(concrete) is not None
     ]
     if not candidates:
@@ -194,8 +209,7 @@ def rewrite_call(call: str) -> str:
     s = re.sub(r"\bSENTINEL\b", '"X"', s)
     s = re.sub(r"(?<!\.)\bid\b", '"X"', s)
     s = re.sub(r"(?<!\.)\bbody\b", "json::object()", s)
-    s = re.sub(r"(?<!\.)\bq\b", "std::map<std::string, std::string>{}", s)
-    return s
+    return re.sub(r"(?<!\.)\bq\b", "std::map<std::string, std::string>{}", s)
 
 
 def generate(plan: dict, routes: list) -> dict[str, str]:
@@ -213,13 +227,21 @@ def generate(plan: dict, routes: list) -> dict[str, str]:
 
     if unmapped:
         for r in unmapped:
-            print(f"UNMAPPED {r['method']} {r['path_template']} (via {r['via']})", file=sys.stderr)
-        raise SystemExit(f"generate_rest_tests: {len(unmapped)} route(s) matched no spec operationId")
+            print(
+                f"UNMAPPED {r['method']} {r['path_template']} (via {r['via']})",
+                file=sys.stderr,
+            )
+        raise SystemExit(
+            f"generate_rest_tests: {len(unmapped)} route(s) matched no spec operationId"
+        )
 
     out: dict[str, str] = {}
     for ns in sorted(by_ns):
         # deterministic order: by (method, path, via)
-        entries = sorted(by_ns[ns], key=lambda e: (e[0]["method"], e[0]["path_template"], e[0]["via"]))
+        entries = sorted(
+            by_ns[ns],
+            key=lambda e: (e[0]["method"], e[0]["path_template"], e[0]["via"]),
+        )
         parts = [HEADER.format(ns=ns)]
         for r, endpoint in entries:
             call = rewrite_call(r["call"])
@@ -228,20 +250,32 @@ def generate(plan: dict, routes: list) -> dict[str, str]:
             # that prefix as session-isolated (make_client's random-project auth
             # scope). Keep it.
             base = f"rest_mock_gen_{slug(r['via'])}"
-            parts.append(SUCCESS_TMPL.format(
-                test_name=f"{base}_ok", endpoint=endpoint, call=call, method=r["method"]))
-            parts.append(ERROR_TMPL.format(
-                test_name=f"{base}_err", endpoint=endpoint, call=call))
+            parts.append(
+                SUCCESS_TMPL.format(
+                    test_name=f"{base}_ok",
+                    endpoint=endpoint,
+                    call=call,
+                    method=r["method"],
+                )
+            )
+            parts.append(
+                ERROR_TMPL.format(test_name=f"{base}_err", endpoint=endpoint, call=call)
+            )
         fname = f"{GEN_PREFIX}{ns.replace('-', '_')}.cpp"
-        out[fname] = "".join(parts)
+        out[fname] = clang_format_source(
+            "".join(parts), assume_filename=f"tests/{fname}"
+        )
     return out
 
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--registry-json", type=Path, default=None)
-    ap.add_argument("--check", action="store_true",
-                    help="regenerate + diff vs checked-in files (GEN-FRESH-TESTS)")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="regenerate + diff vs checked-in files (GEN-FRESH-TESTS)",
+    )
     args = ap.parse_args(argv)
 
     if args.registry_json:
@@ -255,15 +289,23 @@ def main(argv: list[str]) -> int:
     if args.check:
         stale = []
         for fname, content in files.items():
-            existing = (TESTS_DIR / fname).read_text() if (TESTS_DIR / fname).exists() else None
+            existing = (
+                (TESTS_DIR / fname).read_text()
+                if (TESTS_DIR / fname).exists()
+                else None
+            )
             if existing != content:
                 stale.append(fname)
         # also flag any checked-in generated file the generator no longer emits
-        for p in TESTS_DIR.glob(f"{GEN_PREFIX}*.cpp"):
-            if p.name not in files:
-                stale.append(p.name + " (orphan)")
+        stale.extend(
+            p.name + " (orphan)"
+            for p in TESTS_DIR.glob(f"{GEN_PREFIX}*.cpp")
+            if p.name not in files
+        )
         if stale:
-            print("GEN-FRESH-TESTS: generated REST test files are STALE:", file=sys.stderr)
+            print(
+                "GEN-FRESH-TESTS: generated REST test files are STALE:", file=sys.stderr
+            )
             for s in stale:
                 print(f"  {s}", file=sys.stderr)
             print("  run: python3 scripts/generate_rest_tests.py", file=sys.stderr)
@@ -273,7 +315,9 @@ def main(argv: list[str]) -> int:
 
     for fname, content in files.items():
         (TESTS_DIR / fname).write_text(content)
-    print(f"generate_rest_tests: wrote {len(files)} file(s), {len(plan['routes'])} routes.")
+    print(
+        f"generate_rest_tests: wrote {len(files)} file(s), {len(plan['routes'])} routes."
+    )
     return 0
 
 

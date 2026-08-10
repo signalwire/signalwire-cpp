@@ -80,166 +80,193 @@ json submit_answer_delta(const json& args, const json& raw_data) {
 }  // namespace
 
 int main() {
-  // Keep stdout pure JSON — suppress the SDK's INFO logs (which otherwise go to
-  // stdout) so the differ reads only the JSON object.
-  signalwire::Logger::instance().suppress();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    // Keep stdout pure JSON — suppress the SDK's INFO logs (which otherwise go to
+    // stdout) so the differ reads only the JSON object.
+    signalwire::Logger::instance().suppress();
 
-  json out = json::object();
+    json out = json::object();
 
-  // ---- global_data: set MERGES into the accumulated global data ----
-  {
-    AgentBase a = demo_agent();
-    a.set_global_data(json{{"company", "SignalWire"}, {"tier", "gold"}});
-    out["state_set_global_data"] = a.get_global_data();
-  }
-  {
-    AgentBase a = demo_agent();
-    a.update_global_data(json{{"k1", "v1"}});
-    a.update_global_data(json{{"k2", "v2"}});
-    out["state_update_global_data"] = a.get_global_data();
-  }
-  {
-    // MERGE semantics: overlapping key wins, sibling survives.
-    AgentBase a = demo_agent();
-    a.set_global_data(json{{"a", 1}, {"b", 2}});
-    a.set_global_data(json{{"b", 99}, {"c", 3}});
-    out["state_global_data_merge"] = a.get_global_data();
-  }
-
-  // ---- sip-username registration on AgentBase (lowercased set) ----
-  {
-    AgentBase a = demo_agent();
-    a.register_sip_username("Bob");
-    a.register_sip_username("alice");
-    // The oracle observes sorted(_sip_usernames), so sort the set.
-    std::vector<std::string> u = a.get_sip_usernames();
-    std::sort(u.begin(), u.end());
-    out["state_register_sip_username"] = u;
-  }
-  {
-    // dedup + case-fold: "Bob","BOB","bob" collapse to one.
-    AgentBase a = demo_agent();
-    a.register_sip_username("Bob");
-    a.register_sip_username("BOB");
-    a.register_sip_username("bob");
-    std::vector<std::string> u = a.get_sip_usernames();
-    std::sort(u.begin(), u.end());
-    out["state_register_sip_username_dedup"] = u;
-  }
-
-  // ---- AgentServer sip-username mapping (username -> route) + lookup ----
-  {
-    signalwire::server::AgentServer s;
-    s.setup_sip_routing("/sip", false);
-    s.register_sip_username("Bob", "/agent");
-    s.register_sip_username("sales", "/sales");
-    json lookup_missing = json(nullptr);
-    std::string missing = s.lookup_sip_route("nope");
-    if (!missing.empty()) lookup_missing = missing;
-    json mapping = json::object();
-    for (const auto& [k, v] : s.get_sip_username_mapping()) mapping[k] = v;
-    out["server_sip_username_mapping"] = json{{"mapping", mapping},
-                                              {"lookup_bob", s.lookup_sip_route("bob")},
-                                              {"lookup_BOB", s.lookup_sip_route("BOB")},
-                                              {"lookup_missing", lookup_missing}};
-  }
-  {
-    // unregister removes the agent route from the registry.
-    signalwire::server::AgentServer s;
-    s.register_(std::make_shared<AgentBase>("agent", "/agent"), "/agent");
-    s.register_(std::make_shared<AgentBase>("other", "/other"), "/other");
-    s.unregister("/agent");
-    std::vector<std::string> routes = s.list_routes();
-    std::sort(routes.begin(), routes.end());
-    out["server_unregister"] = routes;
-  }
-
-  // ---- routing-callback registration on SWMLService (path-normalized) ----
-  {
-    signalwire::swml::Service svc;
-    svc.set_name("svc");
-    svc.set_route("/svc");
-    auto noop = [](const json&, const std::map<std::string, std::string>&) -> std::string {
-      return "";
-    };
-    svc.register_routing_callback(noop, "/sip/");
-    svc.register_routing_callback(noop, "voice");
-    out["state_register_routing_callback"] = svc.get_routing_callback_paths();
-  }
-
-  // ---- verb-handler registration (VerbHandlerRegistry: ai preloaded) ----
-  {
-    signalwire::core::VerbHandlerRegistry reg;
-    reg.register_handler(std::make_shared<GreetVerbHandler>("greet"));
-    out["state_register_verb_handler"] = json{{"verbs", reg.get_verb_names()},
-                                              {"has_greet", reg.has_handler("greet")},
-                                              {"has_ai", reg.has_handler("ai")},
-                                              {"has_missing", reg.has_handler("nope")}};
-  }
-
-  // ---- skill registration (SkillRegistry: name -> factory, idempotent) ----
-  {
-    // The C++ SkillRegistry is a global singleton pre-populated with the
-    // built-in skills, so observe the DELTA: the names this chain adds over the
-    // pre-existing set (mirrors the oracle's fresh-registry ["custom_alpha",
-    // "custom_beta"]). Registration is idempotent (a duplicate name is a no-op).
-    auto& reg = signalwire::skills::SkillRegistry::instance();
-    std::set<std::string> before;
-    for (const auto& n : reg.list_skills()) before.insert(n);
-    auto noop_factory = []() -> std::unique_ptr<signalwire::skills::SkillBase> { return nullptr; };
-    reg.register_skill("custom_alpha", noop_factory);
-    reg.register_skill("custom_beta", noop_factory);
-    reg.register_skill("custom_alpha", noop_factory);  // idempotent
-    std::vector<std::string> added;
-    for (const auto& n : reg.list_skills()) {
-      if (before.find(n) == before.end()) added.push_back(n);
+    // ---- global_data: set MERGES into the accumulated global data ----
+    {
+      AgentBase a = demo_agent();
+      a.set_global_data(json{{"company", "SignalWire"}, {"tier", "gold"}});
+      out["state_set_global_data"] = a.get_global_data();
     }
-    std::sort(added.begin(), added.end());
-    out["state_register_skill"] = added;
-  }
+    {
+      AgentBase a = demo_agent();
+      a.update_global_data(json{{"k1", "v1"}});
+      a.update_global_data(json{{"k2", "v2"}});
+      out["state_update_global_data"] = a.get_global_data();
+    }
+    {
+      // MERGE semantics: overlapping key wins, sibling survives.
+      AgentBase a = demo_agent();
+      a.set_global_data(json{{"a", 1}, {"b", 2}});
+      a.set_global_data(json{{"b", 99}, {"c", 3}});
+      out["state_global_data_merge"] = a.get_global_data();
+    }
 
-  // ---- InfoGatherer.submit_answer: records answer + advances index ----
-  out["infogatherer_submit_answer_first"] = submit_answer_delta(
-      json{{"answer", "Alice"}},
-      json{{"global_data",
-            {{"questions",
-              json::array({json{{"key_name", "name"}, {"question_text", "What is your name?"}},
-                           json{{"key_name", "email"}, {"question_text", "What is your email?"}}})},
-             {"question_index", 0},
-             {"answers", json::array()}}}});
-  out["infogatherer_submit_answer_last"] = submit_answer_delta(
-      json{{"answer", "a@b.com"}},
-      json{{"global_data",
-            {{"questions",
-              json::array({json{{"key_name", "name"}, {"question_text", "What is your name?"}},
-                           json{{"key_name", "email"}, {"question_text", "What is your email?"}}})},
-             {"question_index", 1},
-             {"answers", json::array({json{{"key_name", "name"}, {"answer", "Alice"}}})}}}});
+    // ---- sip-username registration on AgentBase (lowercased set) ----
+    {
+      AgentBase a = demo_agent();
+      a.register_sip_username("Bob");
+      a.register_sip_username("alice");
+      // The oracle observes sorted(_sip_usernames), so sort the set.
+      std::vector<std::string> u = a.get_sip_usernames();
+      std::sort(u.begin(), u.end());
+      out["state_register_sip_username"] = u;
+    }
+    {
+      // dedup + case-fold: "Bob","BOB","bob" collapse to one.
+      AgentBase a = demo_agent();
+      a.register_sip_username("Bob");
+      a.register_sip_username("BOB");
+      a.register_sip_username("bob");
+      std::vector<std::string> u = a.get_sip_usernames();
+      std::sort(u.begin(), u.end());
+      out["state_register_sip_username_dedup"] = u;
+    }
 
-  // ---- contexts/steps navigation (valid_steps rendered per step) ----
-  {
-    AgentBase a = demo_agent();
-    auto& cb = a.define_contexts();
-    auto& ctx = cb.add_context("default");
-    ctx.add_step("greet", "Greet the caller.", {}, "", std::nullopt, {"collect"});
-    ctx.add_step("collect", "Collect their info.", {}, "", std::nullopt, {"greet"});
-    json rendered = cb.to_json();
-    json nav = json::object();
-    for (auto it = rendered.begin(); it != rendered.end(); ++it) {
-      json steps = json::array();
-      if (it.value().contains("steps") && it.value()["steps"].is_array()) {
-        for (const auto& s : it.value()["steps"]) {
-          json reduced = json::object();
-          reduced["name"] = s.contains("name") ? s["name"] : json(nullptr);
-          reduced["valid_steps"] = s.contains("valid_steps") ? s["valid_steps"] : json(nullptr);
-          steps.push_back(reduced);
+    // ---- AgentServer sip-username mapping (username -> route) + lookup ----
+    {
+      signalwire::server::AgentServer s;
+      s.setup_sip_routing("/sip", false);
+      s.register_sip_username("Bob", "/agent");
+      s.register_sip_username("sales", "/sales");
+      json lookup_missing = json(nullptr);
+      std::string missing = s.lookup_sip_route("nope");
+      if (!missing.empty()) {
+        lookup_missing = missing;
+      }
+      json mapping = json::object();
+      for (const auto& [k, v] : s.get_sip_username_mapping()) {
+        mapping[k] = v;
+      }
+      out["server_sip_username_mapping"] = json{{"mapping", mapping},
+                                                {"lookup_bob", s.lookup_sip_route("bob")},
+                                                {"lookup_BOB", s.lookup_sip_route("BOB")},
+                                                {"lookup_missing", lookup_missing}};
+    }
+    {
+      // unregister removes the agent route from the registry.
+      signalwire::server::AgentServer s;
+      s.register_(std::make_shared<AgentBase>("agent", "/agent"), "/agent");
+      s.register_(std::make_shared<AgentBase>("other", "/other"), "/other");
+      s.unregister("/agent");
+      std::vector<std::string> routes = s.list_routes();
+      std::sort(routes.begin(), routes.end());
+      out["server_unregister"] = routes;
+    }
+
+    // ---- routing-callback registration on SWMLService (path-normalized) ----
+    {
+      signalwire::swml::Service svc;
+      svc.set_name("svc");
+      svc.set_route("/svc");
+      auto noop = [](const json&, const std::map<std::string, std::string>&) -> std::string {
+        return "";
+      };
+      svc.register_routing_callback(noop, "/sip/");
+      svc.register_routing_callback(noop, "voice");
+      out["state_register_routing_callback"] = svc.get_routing_callback_paths();
+    }
+
+    // ---- verb-handler registration (VerbHandlerRegistry: ai preloaded) ----
+    {
+      signalwire::core::VerbHandlerRegistry reg;
+      reg.register_handler(std::make_shared<GreetVerbHandler>("greet"));
+      out["state_register_verb_handler"] = json{{"verbs", reg.get_verb_names()},
+                                                {"has_greet", reg.has_handler("greet")},
+                                                {"has_ai", reg.has_handler("ai")},
+                                                {"has_missing", reg.has_handler("nope")}};
+    }
+
+    // ---- skill registration (SkillRegistry: name -> factory, idempotent) ----
+    {
+      // The C++ SkillRegistry is a global singleton pre-populated with the
+      // built-in skills, so observe the DELTA: the names this chain adds over the
+      // pre-existing set (mirrors the oracle's fresh-registry ["custom_alpha",
+      // "custom_beta"]).
+      //
+      // NOTE: this used to re-register "custom_alpha" a second time to assert that
+      // registration was idempotent. It is NOT idempotent any more: f0b5df5 made
+      // register_skill THROW on a duplicate name, because silent overwriting is what
+      // let two different classes both claim "spider" and hid which one was live.
+      // The duplicate call therefore aborted this tool (exit 134), the differ saw
+      // empty stdout, and BEHAVIORAL-STATE went red. The delta computed below already
+      // proves the registry does not grow spuriously, so the duplicate call bought
+      // nothing the rest of this block does not.
+      auto& reg = signalwire::skills::SkillRegistry::instance();
+      std::set<std::string> before;
+      for (const auto& n : reg.list_skills()) {
+        before.insert(n);
+      }
+      auto noop_factory = []() -> std::unique_ptr<signalwire::skills::SkillBase> {
+        return nullptr;
+      };
+      reg.register_skill("custom_alpha", noop_factory);
+      reg.register_skill("custom_beta", noop_factory);
+      std::vector<std::string> added;
+      for (const auto& n : reg.list_skills()) {
+        if (before.find(n) == before.end()) {
+          added.push_back(n);
         }
       }
-      nav[it.key()] = steps;
+      std::sort(added.begin(), added.end());
+      out["state_register_skill"] = added;
     }
-    out["state_contexts_navigation"] = nav;
-  }
 
-  std::cout << out.dump() << "\n";
-  return 0;
+    // ---- InfoGatherer.submit_answer: records answer + advances index ----
+    out["infogatherer_submit_answer_first"] = submit_answer_delta(
+        json{{"answer", "Alice"}},
+        json{{"global_data",
+              {{"questions",
+                json::array(
+                    {json{{"key_name", "name"}, {"question_text", "What is your name?"}},
+                     json{{"key_name", "email"}, {"question_text", "What is your email?"}}})},
+               {"question_index", 0},
+               {"answers", json::array()}}}});
+    out["infogatherer_submit_answer_last"] = submit_answer_delta(
+        json{{"answer", "a@b.com"}},
+        json{{"global_data",
+              {{"questions",
+                json::array(
+                    {json{{"key_name", "name"}, {"question_text", "What is your name?"}},
+                     json{{"key_name", "email"}, {"question_text", "What is your email?"}}})},
+               {"question_index", 1},
+               {"answers", json::array({json{{"key_name", "name"}, {"answer", "Alice"}}})}}}});
+
+    // ---- contexts/steps navigation (valid_steps rendered per step) ----
+    {
+      AgentBase a = demo_agent();
+      auto& cb = a.define_contexts();
+      auto& ctx = cb.add_context("default");
+      ctx.add_step("greet", "Greet the caller.", {}, "", std::nullopt, {"collect"});
+      ctx.add_step("collect", "Collect their info.", {}, "", std::nullopt, {"greet"});
+      json rendered = cb.to_json();
+      json nav = json::object();
+      for (auto it = rendered.begin(); it != rendered.end(); ++it) {
+        json steps = json::array();
+        if (it.value().contains("steps") && it.value()["steps"].is_array()) {
+          for (const auto& s : it.value()["steps"]) {
+            json reduced = json::object();
+            reduced["name"] = s.contains("name") ? s["name"] : json(nullptr);
+            reduced["valid_steps"] = s.contains("valid_steps") ? s["valid_steps"] : json(nullptr);
+            steps.push_back(reduced);
+          }
+        }
+        nav[it.key()] = steps;
+      }
+      out["state_contexts_navigation"] = nav;
+    }
+
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

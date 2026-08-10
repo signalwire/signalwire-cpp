@@ -13,11 +13,15 @@ Source: the vendored porting-sdk ``swaig-specs/*.yaml`` (from mod_openai):
   * ``post-prompt.yaml``    -> signalwire.core.post_prompt_generated    (14 structs)
         one struct per components/schemas OBJECT schema; the oneOf alias
         ``PostPromptCallLogEntry`` is NOT surfaced (15 schemas - 1 alias = 14).
-  * ``swaig-response.yaml`` -> signalwire.core.swaig_actions_generated  (4 structs)
+  * ``swaig-response.yaml`` -> signalwire.core.swaig_actions_generated  (6 structs)
         one ``<Verb>Action`` struct per action key whose value is an object-with-
-        properties (a bare object OR the object variant of a oneOf).
+        properties (a bare object OR the object variant of a oneOf), PLUS the two
+        envelope schemas the file itself declares — ``SwaigAction`` (the action
+        object) and ``SwaigResponse`` (the handler's response body). The envelopes
+        live in THIS module because it owns swaig-response.yaml, which is what makes
+        post-prompt.yaml's cross-file refs into it resolvable.
 
-  2 + 14 + 4 = 20 structs == the surface oracle EXACTLY (0 missing / 0 extra).
+  2 + 14 + 6 = 22 structs == the surface oracle EXACTLY (0 missing / 0 extra).
 
 All are METHOD-LESS DTOs (the SURFACE oracle records the bare struct name). Output:
 one struct per file under a per-module subdir
@@ -33,6 +37,7 @@ Usage:
     python3 scripts/generate_swaig_payloads.py --check    # GEN-FRESH: fail if stale
     python3 scripts/generate_swaig_payloads.py --out DIR  # scratch: emit into DIR
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,7 +49,9 @@ from pathlib import Path
 
 def _load_rest_generator():
     here = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location("generate_rest", here / "generate_rest.py")
+    spec = importlib.util.spec_from_file_location(
+        "generate_rest", here / "generate_rest.py"
+    )
     if spec is None or spec.loader is None:  # pragma: no cover
         raise SystemExit("generate_swaig_payloads.py: cannot load generate_rest.py")
     mod = importlib.util.module_from_spec(spec)
@@ -81,7 +88,9 @@ def _load_yaml(path: Path) -> dict:
 
 def _emit(ns_segs, subdir, name, props, desc):
     fn = "/".join(subdir) + f"/{GR.snake(name)}.hpp"
-    src = GR.emit_methodless_struct(ns_segs, name, props, desc, "generate_swaig_payloads.py")
+    src = GR.emit_methodless_struct(
+        ns_segs, name, props, desc, "generate_swaig_payloads.py"
+    )
     return fn, src
 
 
@@ -97,11 +106,17 @@ def _build_swaig_request(psdk: Path) -> dict:
     outs: dict = {}
     arg = props.get("argument")
     if isinstance(arg, dict) and arg.get("properties"):
-        fn, src = _emit(SR_NS, SR_SUBDIR, "SwaigArgument", arg["properties"],
-                        "inline swaig-request `argument` object.")
+        fn, src = _emit(
+            SR_NS,
+            SR_SUBDIR,
+            "SwaigArgument",
+            arg["properties"],
+            "inline swaig-request `argument` object.",
+        )
         outs[fn] = src
-    fn, src = _emit(SR_NS, SR_SUBDIR, "SwaigRequest", props,
-                    "swaig-request `SwaigRequest` schema.")
+    fn, src = _emit(
+        SR_NS, SR_SUBDIR, "SwaigRequest", props, "swaig-request `SwaigRequest` schema."
+    )
     outs[fn] = src
     return outs
 
@@ -118,18 +133,29 @@ def _build_post_prompt(psdk: Path) -> dict:
         if name in emitted:
             continue
         emitted.add(name)
-        fn, src = _emit(PP_NS, PP_SUBDIR, name, node.get("properties") or {},
-                        f"post-prompt components/schemas {raw_name!r}.")
+        fn, src = _emit(
+            PP_NS,
+            PP_SUBDIR,
+            name,
+            node.get("properties") or {},
+            f"post-prompt components/schemas {raw_name!r}.",
+        )
         outs[fn] = src
     return outs
 
 
 def _build_swaig_actions(psdk: Path) -> dict:
     spec = _load_yaml(psdk / "swaig-specs" / "swaig-response.yaml")
-    actions = spec["components"]["schemas"]["SwaigAction"]["properties"]
+    schemas = spec["components"]["schemas"]
+    action_schema = schemas["SwaigAction"]
+    actions = action_schema["properties"]
 
     def _is_obj(s) -> bool:
-        return isinstance(s, dict) and s.get("type") == "object" and bool(s.get("properties"))
+        return (
+            isinstance(s, dict)
+            and s.get("type") == "object"
+            and bool(s.get("properties"))
+        )
 
     outs: dict = {}
     emitted: set = set()
@@ -143,13 +169,46 @@ def _build_swaig_actions(psdk: Path) -> dict:
             if not _is_obj(b):
                 continue
             obj_i += 1
-            name = GR.type_name(_pascal_verb(verb) + "Action" + ("" if obj_i == 1 else str(obj_i)))
+            name = GR.type_name(
+                _pascal_verb(verb) + "Action" + ("" if obj_i == 1 else str(obj_i))
+            )
             if name in emitted:
                 continue
             emitted.add(name)
-            fn, src = _emit(SA_NS, SA_SUBDIR, name, b.get("properties") or {},
-                            f"swaig-response action {verb!r} value object.")
+            fn, src = _emit(
+                SA_NS,
+                SA_SUBDIR,
+                name,
+                b.get("properties") or {},
+                f"swaig-response action {verb!r} value object.",
+            )
             outs[fn] = src
+
+    # The response ENVELOPE types. The loop above lifts each action verb's inline
+    # object into a named <Verb>Action struct, but the two schemas swaig-response.yaml
+    # ACTUALLY DECLARES — SwaigAction (the action object, one or more verb keys set at
+    # once) and SwaigResponse (the {response, action, post_process} body a handler
+    # returns) — were never emitted at all: the generator reached THROUGH SwaigAction
+    # into its .properties and dropped the envelope on the floor. They must exist here
+    # because this is the module that owns swaig-response.yaml, which is what makes
+    # post-prompt.yaml's cross-file
+    # ``swaig-response.yaml#/components/schemas/SwaigResponse`` refs
+    # (PostPromptSwaigLogEntry.post_response / .delayed_post_response) resolvable —
+    # the same reason the reference hosts them in this module (CROSS_FILE_MODULES in
+    # porting-sdk generate_python_rest_types.py). Emitted from the spec's own schemas,
+    # so the envelope and the per-verb structs cannot drift.
+    for name in ("SwaigAction", "SwaigResponse"):
+        node = schemas[name]
+        desc = (node.get("description") or "").split("\n")[0].strip()
+        fn, src = _emit(
+            SA_NS,
+            SA_SUBDIR,
+            name,
+            node.get("properties") or {},
+            f"swaig-response components/schemas {name!r}."
+            + (f" {desc}" if desc else ""),
+        )
+        outs[fn] = src
     return outs
 
 
@@ -168,15 +227,19 @@ def build_outputs(psdk: Path) -> dict:
 
 def main(argv: list) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--check", action="store_true", help="GEN-FRESH: exit non-zero if stale")
+    ap.add_argument(
+        "--check", action="store_true", help="GEN-FRESH: exit non-zero if stale"
+    )
     ap.add_argument("--out", default="", help="scratch: emit into this dir")
     args = ap.parse_args(argv)
 
     psdk = resolve_porting_sdk()
     outs = build_outputs(psdk)
     # Only C++ headers are formatted; any .json sidecars are emitted verbatim.
-    outs = {fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
-            for fn, src in outs.items()}
+    outs = {
+        fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
+        for fn, src in outs.items()
+    }
 
     out_dir = Path(args.out) if args.out else repo_root() / "include" / "signalwire"
 
@@ -196,11 +259,15 @@ def main(argv: list) -> int:
                         if rel not in expected:
                             stale.append(f"{p} (leftover — not in generator output)")
         if stale:
-            sys.stderr.write("GEN-FRESH FAIL: %d generated SWAIG-payload file(s) stale:\n" % len(stale))
+            sys.stderr.write(
+                f"GEN-FRESH FAIL: {len(stale)} generated SWAIG-payload file(s) stale:\n"
+            )
             for s in stale:
-                sys.stderr.write("  - %s\n" % s)
+                sys.stderr.write(f"  - {s}\n")
             return 1
-        print("GEN-FRESH: generated SWAIG-payload files match porting-sdk/swaig-specs/.")
+        print(
+            "GEN-FRESH: generated SWAIG-payload files match porting-sdk/swaig-specs/."
+        )
         return 0
 
     for fn, src in outs.items():

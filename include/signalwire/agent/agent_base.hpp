@@ -57,22 +57,19 @@ struct LanguageConfig {
   std::string voice;
   std::string engine;
   /// Explicit model name (e.g. "eleven_turbo_v2_5", "arcana"). Emitted as
-  /// the language object's ``model`` key only when non-empty — matches the
-  /// Python reference (add_language ``model=`` kwarg).
+  /// the language object's ``model`` key only when non-empty.
   std::string model;
   /// Speech fillers spoken for natural pacing. Emitted as
   /// ``speech_fillers`` when both speech+function fillers are set, or as
-  /// the deprecated ``fillers`` key when only one kind is present, matching
-  /// the reference add_language filler handling.
+  /// the deprecated ``fillers`` key when only one kind is present.
   std::vector<std::string> speech_fillers;
   /// Filler phrases spoken while a function call is in flight. Emitted as
   /// ``function_fillers`` when paired with speech_fillers.
   std::vector<std::string> function_fillers;
   /// Per-language params dict (engine-specific tuning, voice
   /// settings, etc.). Emitted as the language object's ``params``
-  /// key in SWML only when non-empty — matches Python reference
-  /// commit 029ca6f. Treated as "unset" when null OR when an empty
-  /// object.
+  /// key in SWML only when non-empty. Treated as "unset" when null
+  /// OR when an empty object.
   json params;
 
   [[nodiscard]] json to_json() const {
@@ -86,7 +83,7 @@ struct LanguageConfig {
     if (!model.empty()) {
       j["model"] = model;
     }
-    // Filler emission mirrors Python: both kinds -> the two explicit keys;
+    // Filler emission: both kinds -> the two explicit keys;
     // only one kind -> the deprecated combined ``fillers`` key.
     if (!speech_fillers.empty() && !function_fillers.empty()) {
       j["speech_fillers"] = speech_fillers;
@@ -97,8 +94,7 @@ struct LanguageConfig {
       j["fillers"] = function_fillers;
     }
     // Only emit the params key when non-empty so we don't pollute
-    // SWML with empty objects (matches Python's
-    // ``if params:`` check).
+    // SWML with empty objects.
     if (params.is_object() && !params.empty()) {
       j["params"] = params;
     }
@@ -144,25 +140,73 @@ struct SwaigQueryParam {
 // AgentBase
 // ============================================================================
 
+/// The AI-agent host: an HTTP endpoint that renders SWML and services SWAIG
+/// function calls for a single agent.
+///
+/// AgentBase extends ``swml::Service`` (the framework-free SWML endpoint) with
+/// everything an AI agent adds on top of a plain SWML document: a prompt (raw
+/// text or a POM section tree), SWAIG tool definitions, contexts/steps,
+/// languages/hints/pronunciations, skills, and a post-prompt summary hook. A
+/// GET/POST on the agent's ``route`` renders the ``ai`` verb via
+/// ``render_swml_for_request``; POSTs to ``/swaig`` dispatch to the registered
+/// tool handlers through ``on_function_call``; ``/post_prompt`` receives the
+/// conversation summary; ``/debug_events`` receives the AI module's debug
+/// webhook when ``enable_debug_routes`` is on. The same object can also run
+/// without a server via ``handle_request`` (raw method/url/headers/body) or
+/// ``handle_serverless_request`` (Lambda / GCF / Azure / CGI).
+///
+/// ## Security — three independent mechanisms, all off-by-default-safe
+///
+/// 1. **HTTP basic auth.** ``basic_auth`` (ctor) or ``set_auth`` gates every
+///    mounted route; ``handle_request`` returns 401 for a bad or missing
+///    credential. When no credentials are supplied the ``swml::Service`` base
+///    generates a random pair rather than leaving the endpoint open.
+/// 2. **Webhook signature validation.** When a signing key is resolved —
+///    ``set_signing_key`` first, then the ``SIGNALWIRE_SIGNING_KEY`` env var —
+///    the agent server auto-mounts the signature validator on POST ``/``,
+///    ``/swaig``, and ``/post_prompt``: an unsigned or wrongly-signed request
+///    gets a 403 and never reaches a handler. With no key resolved the agent
+///    logs a startup warning and accepts unsigned POSTs. The URL the signature
+///    is computed over honors ``X-Forwarded-Proto``/``X-Forwarded-Host`` only
+///    when ``trust_proxy_for_signature(true)`` is set, because those headers
+///    are caller-spoofable.
+/// 3. **Per-call SWAIG tool tokens.** ``define_tool`` defaults ``secure`` to
+///    TRUE. A secure tool's rendered ``web_hook_url``
+///    carries a ``__token=`` minted by this agent's ``SessionManager`` for the
+///    (tool, call_id) pair (``create_tool_token``). The ``/swaig`` dispatcher
+///    validates that token against the SWAIG body's ``call_id`` BEFORE
+///    ``on_function_call`` is reached, so a replayed or cross-call token is
+///    rejected and ``on_function_call`` is a post-validation hook — an override
+///    must preserve that contract. This is why the protected
+///    ``build_ai_verb``/``build_swaig_functions`` take ``call_id`` with NO
+///    default — an omitted call_id would silently render every secure tool
+///    without its token.
+///
+/// Copy construction is supported (and used by ``clone()`` for the
+/// per-request dynamic-config path); copy ASSIGNMENT is deleted.
 class AgentBase : public swml::Service {
   friend class signalwire::server::AgentServer;
+  // The serverless dispatchers extract the credential from their own envelope
+  // and then hand it to the SAME `swaig_validate_token` core the HTTP endpoint
+  // uses. They need reach into that protected core; granting it here keeps the
+  // decision in ONE place rather than duplicating it per transport.
+  friend struct signalwire::utils::ServerlessTokenAccess;
 
  public:
   /// Construct an agent.
   ///
-  /// Mirrors the reference ``AgentBase.__init__`` parameter-for-parameter.
-  /// Every parameter is FORWARDED to the same collaborator the reference
-  /// forwards it to, rather than merely stored:
+  /// Every parameter is FORWARDED to its collaborator, rather than merely
+  /// stored:
   ///   * ``name`` / ``route`` / ``host`` / ``port`` / ``basic_auth`` /
   ///     ``schema_path`` / ``config_file`` / ``schema_validation``
-  ///     → the ``swml::Service`` base (the reference's ``super().__init__``),
+  ///     → the ``swml::Service`` base,
   ///   * ``token_expiry_secs`` → the agent's ``SessionManager``,
   ///   * ``config_file`` additionally seeds the ``service`` section that
   ///     supplies name/route/host/port defaults (constructor arguments win).
   ///
   /// ``port`` is an optional so "not supplied" stays distinguishable from an
   /// explicit value — that is what lets the config file and the ``PORT`` env
-  /// var still apply, exactly as in the reference.
+  /// var still apply.
   explicit AgentBase(
       const std::string& name = "agent", const std::string& route = "/",
       const std::string& host = "0.0.0.0", const std::optional<int>& port = std::nullopt,
@@ -202,9 +246,10 @@ class AgentBase : public swml::Service {
   AgentBase& set_post_prompt_url(const std::string& url);
   AgentBase& prompt_add_section(const std::string& title, const std::string& body = "",
                                 const std::vector<std::string>& bullets = {});
-  AgentBase& prompt_add_subsection(const std::string& parent_title, const std::string& title,
-                                   const std::string& body = "",
-                                   const std::vector<std::string>& bullets = {});
+  /// ``bullets`` is ``nullopt`` when absent, which is treated as an empty list.
+  AgentBase& prompt_add_subsection(
+      const std::string& parent_title, const std::string& title, const std::string& body = "",
+      const std::optional<std::vector<std::string>>& bullets = std::nullopt);
   AgentBase& prompt_add_to_section(const std::string& title, const std::string& body = "",
                                    const std::vector<std::string>& bullets = {});
   [[nodiscard]] bool prompt_has_section(const std::string& title) const;
@@ -213,43 +258,31 @@ class AgentBase : public swml::Service {
 
   /// Read-only snapshot of the agent's POM as a ``PromptObjectModel``.
   ///
-  /// Corresponds to ``agent.pom`` instance attribute (agent_base.py
-  /// line 209). Returns ``std::nullopt`` when ``use_pom`` is false
-  /// (mirroring Python's ``self.pom = None``); otherwise returns a
-  /// freshly built ``signalwire::pom::PromptObjectModel`` whose
+  /// Returns ``std::nullopt`` when ``use_pom`` is false; otherwise
+  /// returns a freshly built ``signalwire::pom::PromptObjectModel`` whose
   /// sections are deep-copied from the agent's internal section/
   /// subsection structures so callers cannot mutate them in-place.
   [[nodiscard]] std::optional<signalwire::pom::PromptObjectModel> pom() const;
 
   /// Returns the post-prompt text whatever ``set_post_prompt`` stored, or
-  /// ``std::nullopt`` when no post-prompt has been set.
-  ///
-  /// Mirrors Python's ``PromptManager.get_post_prompt`` /
-  /// ``PromptMixin.get_post_prompt`` — used by SWML rendering when a
-  /// post-prompt is configured.
+  /// ``std::nullopt`` when no post-prompt has been set. Used by SWML
+  /// rendering when a post-prompt is configured.
   [[nodiscard]] std::optional<std::string> get_post_prompt() const;
 
   /// Returns the raw prompt text whatever ``set_prompt_text`` stored, or
   /// ``std::nullopt`` when no raw prompt has been set. Distinct from
   /// ``get_prompt`` which renders the POM array when ``use_pom`` is
   /// true.
-  ///
-  /// Mirrors Python's ``PromptManager.get_raw_prompt``.
   [[nodiscard]] std::optional<std::string> get_raw_prompt() const;
 
   /// Sets the prompt as a list of POM section JSON objects. Each
   /// section supports keys "title", "body", "bullets", "numbered",
   /// "numbered_bullets", and "subsections". Switches the agent to POM
   /// mode.
-  ///
-  /// Mirrors Python's ``PromptManager.set_prompt_pom``.
   AgentBase& set_prompt_pom(const std::vector<json>& pom);
 
   /// Returns the contexts dictionary as a serialised JSON object, or
   /// ``std::nullopt`` when no contexts have been defined yet.
-  ///
-  /// Mirrors Python's ``PromptManager.get_contexts`` which returns the
-  /// contexts dict or ``None``.
   [[nodiscard]] std::optional<json> get_contexts() const;
 
   // ========================================================================
@@ -313,52 +346,46 @@ class AgentBase : public swml::Service {
   // reference. on_function_call is overridden to add session-token
   // validation.
   AgentBase& define_tool(const swaig::ToolDefinition& tool);
-  /// ``secure`` defaults to TRUE (reference: ``tool_mixin.define_tool(
-  /// secure=True)``) — a tool defined without an explicit ``secure`` requires
-  /// SWAIG token validation.
+  /// ``secure`` defaults to TRUE — a tool defined without an explicit
+  /// ``secure`` requires SWAIG token validation.
   AgentBase& define_tool(const std::string& name, const std::string& description,
                          const json& parameters, swaig::ToolHandler handler, bool secure = true);
   AgentBase& register_swaig_function(const json& func_def);
+  /// ``raw_data`` is OPTIONAL. Defaulted on the override too, so a call
+  /// through AgentBase& can omit it.
   [[nodiscard]] swaig::FunctionResult on_function_call(const std::string& name, const json& args,
-                                                       const json& raw_data) override;
+                                                       const json& raw_data = nullptr) override;
   [[nodiscard]] std::vector<std::string> list_tools() const;
 
-  /// Register several SWAIG tools at once (Python: ``ToolMixin.define_tools``).
+  /// Register several SWAIG tools at once.
   /// Each entry is a full tool descriptor (name/description/parameters);
   /// delegates to ``register_swaig_function`` per entry. Returns ``*this`` for
   /// fluent chaining.
   AgentBase& define_tools(const std::vector<swaig::ToolDefinition>& tools);
 
-  /// Register a routing callback for a request path (Python:
-  /// ``WebMixin.register_routing_callback``). The callback receives the parsed
-  /// request ``body`` and the request ``headers`` and returns the route to
-  /// dispatch to (empty string = no override), matching Python's
-  /// ``callback_fn(body, headers) -> route | None``. Used to steer inbound
+  /// Register a routing callback for a request path. The callback receives the
+  /// parsed request ``body`` and the request ``headers`` and returns the route
+  /// to dispatch to (empty string = no override). Used to steer inbound
   /// requests to per-path handlers.
   using RoutingCallback = std::function<std::string(
       const json& body, const std::map<std::string, std::string>& headers)>;
-  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/");
+  AgentBase& register_routing_callback(RoutingCallback callback, const std::string& path = "/sip");
 
   /// Install signal handlers so the agent's HTTP server drains + stops cleanly
-  /// on SIGINT/SIGTERM (Python: ``WebMixin.setup_graceful_shutdown``). Real
-  /// C++ implementation over the running httplib server.
+  /// on SIGINT/SIGTERM, over the running httplib server.
   void setup_graceful_shutdown();
 
   /// Mint a per-call SWAIG-function token via the agent's SessionManager.
   ///
-  /// Corresponds to ``state_mixin.StateMixin._create_tool_token`` —
-  /// delegates to ``SessionManager::create_token`` and returns an empty
-  /// string on any thrown exception (Python catches all exceptions and
-  /// returns "" on error).
+  /// Delegates to ``SessionManager::create_token``. Returns an empty
+  /// string if token creation throws.
   [[nodiscard]] std::string create_tool_token(const std::string& tool_name,
                                               const std::string& call_id) const;
 
   /// Validate a per-call SWAIG-function token. Returns ``false`` when
   /// the function is not registered, when the SessionManager rejects the
-  /// token, or on any underlying exception.
-  ///
-  /// Corresponds to ``state_mixin.StateMixin.validate_tool_token`` —
-  /// rejects unknown function names up-front and swallows exceptions.
+  /// token, or on any underlying exception. Unknown function names are
+  /// rejected up-front, before the token is examined.
   [[nodiscard]] bool validate_tool_token(const std::string& function_name, const std::string& token,
                                          const std::string& call_id) const;
 
@@ -368,11 +395,11 @@ class AgentBase : public swml::Service {
 
   AgentBase& add_hint(const std::string& hint);
   AgentBase& add_hints(const std::vector<std::string>& hints);
-  /// Add a STRUCTURED pattern hint. Mirrors Python's
-  /// ``add_pattern_hint(hint, pattern, replace, ignore_case=False)``: appends
-  /// a ``{hint, pattern, replace, ignore_case}`` object to the hints list
+  /// Add a STRUCTURED pattern hint: appends a
+  /// ``{hint, pattern, replace, ignore_case}`` object to the hints list
   /// (not a bare string), which renders into the SWML ``ai.hints`` array.
-  /// No-op unless hint, pattern, and replace are all non-empty.
+  /// ``ignore_case`` defaults to false. No-op unless hint, pattern, and
+  /// replace are all non-empty.
   AgentBase& add_pattern_hint(const std::string& hint, const std::string& pattern,
                               const std::string& replace, bool ignore_case = false);
   AgentBase& add_language(const LanguageConfig& lang);
@@ -384,16 +411,12 @@ class AgentBase : public swml::Service {
   /// later (e.g. from a config loader). Passing an empty object
   /// removes the params key (treated as unset). No-op if ``code``
   /// isn't found among previously-added languages.
-  ///
-  /// Corresponds to ``AIConfigMixin.set_language_params`` (029ca6f).
   AgentBase& set_language_params(const std::string& code, const json& params);
 
   /// Read the per-language ``params`` dict for a previously-added
   /// language. Returns ``std::nullopt`` when the code is unknown or
-  /// when params were never set on that language — no exception
-  /// path, mirroring Python's ``None`` return.
-  ///
-  /// Corresponds to ``AIConfigMixin.get_language_params`` (029ca6f).
+  /// when params were never set on that language — there is no
+  /// exception path.
   [[nodiscard]] std::optional<json> get_language_params(const std::string& code) const;
 
   /// Configure ASR-driven multilingual mode (Mode B). Emits a top-level
@@ -401,10 +424,7 @@ class AgentBase : public swml::Service {
   /// code-switching mode and the agent answers in whatever language the
   /// caller actually spoke. Mutually exclusive with set_languages() — if
   /// both are set the server uses ``multilingual`` and ignores ``languages``.
-  /// A non-object / empty config is ignored (leaves the mode unset),
-  /// mirroring Python's ``if config and isinstance(config, dict)``.
-  ///
-  /// Corresponds to ``AIConfigMixin.set_multilingual``.
+  /// A non-object / empty config is ignored (leaves the mode unset).
   AgentBase& set_multilingual(const json& config);
 
   AgentBase& add_pronunciation(const std::string& replace_val, const std::string& with_val,
@@ -414,19 +434,19 @@ class AgentBase : public swml::Service {
   AgentBase& set_params(const json& params);
   AgentBase& set_global_data(const json& data);
   AgentBase& update_global_data(const json& data);
-  /// The accumulated global-data object (Python: ``AgentBase._global_data``).
-  /// Returns a copy; an empty object when nothing has been set.
+  /// The accumulated global-data object. Returns a copy; an empty object when
+  /// nothing has been set.
   [[nodiscard]] json get_global_data() const;
   AgentBase& set_native_functions(const std::vector<std::string>& funcs);
-  /// The native SWAIG functions this agent declares (reference:
-  /// ``self.native_functions``) — rendered into the SWML ``ai.SWAIG
-  /// .native_functions`` array when non-empty. A caller supplies these at
-  /// construction or via ``set_native_functions``, so a caller reads them back.
+  /// The native SWAIG functions this agent declares — rendered into the SWML
+  /// ``ai.SWAIG.native_functions`` array when non-empty. A caller supplies
+  /// these at construction or via ``set_native_functions``, so a caller reads
+  /// them back.
   [[nodiscard]] const std::vector<std::string>& native_functions() const {
     return native_functions_;
   }
-  /// This agent's id (reference: ``self.agent_id``) — the id supplied at
-  /// construction, or a generated UUID when none was given.
+  /// This agent's id — the id supplied at construction, or a generated UUID
+  /// when none was given.
   [[nodiscard]] const std::string& agent_id() const { return agent_id_; }
   /// The complete set of internal SWAIG function names that accept
   /// fillers, matching the SWAIGInternalFiller schema definition.
@@ -472,7 +492,19 @@ class AgentBase : public swml::Service {
   /// what fillers do. Names outside the supported set log a warning.
   AgentBase& add_internal_filler(const std::string& function_name, const std::string& language_code,
                                  const std::vector<std::string>& fillers);
-  AgentBase& enable_debug_events(bool enable = true);
+  /// Enable the debug-event webhook for this agent.
+  ///
+  /// @param level Debug event verbosity level. Defaults to 1.
+  ///   1  = high-level events (barge, errors, session start/end, step changes)
+  ///   2+ = adds high-volume events (every LLM request/response,
+  ///        conversation_add)
+  ///
+  /// When enabled, the rendered ``ai`` verb carries
+  /// ``params.debug_webhook_url`` (this agent's ``/debug_events`` endpoint)
+  /// and ``params.debug_webhook_level`` — the two keys the SWML schema
+  /// defines. A verbosity LEVEL is not expressible as a bool, which is why
+  /// this takes an ``int``.
+  AgentBase& enable_debug_events(int level = 1);
   AgentBase& add_function_include(const json& include);
   AgentBase& set_function_includes(const std::vector<json>& includes);
   AgentBase& set_prompt_llm_params(const json& params = json::object());
@@ -499,9 +531,8 @@ class AgentBase : public swml::Service {
   [[nodiscard]] bool has_contexts() const;
 
   /// Return the defined contexts as a serialised JSON object, or
-  /// ``std::nullopt`` when no contexts exist. Mirrors Python's
-  /// ``PromptMixin.contexts`` property (the read side of the contexts POM).
-  /// Alias of ``get_contexts`` under the Python-canonical name.
+  /// ``std::nullopt`` when no contexts exist — the read side of the contexts
+  /// POM. Alias of ``get_contexts``.
   [[nodiscard]] std::optional<json> contexts() const { return get_contexts(); }
 
   /// Remove all contexts, returning the agent to a no-contexts state.
@@ -521,8 +552,7 @@ class AgentBase : public swml::Service {
   // to the string overloads above via skills::skill_name_value(), so the
   // enum and the bare string load the IDENTICAL skill — the enum just adds
   // call-site typo checking + autocompletion. The string overloads stay the
-  // canonical surface (matches Python's bare str + custom skills); these
-  // are an idiomatic C++ addition (see PORT_ADDITIONS.md).
+  // canonical surface, since custom skills are named by string.
   AgentBase& add_skill(skills::SkillName skill_name, const json& params = json::object());
   AgentBase& remove_skill(skills::SkillName skill_name);
   [[nodiscard]] bool has_skill(skills::SkillName skill_name) const;
@@ -555,14 +585,13 @@ class AgentBase : public swml::Service {
 
   // ---- Public surface ----------------------------------------------
 
-  /// Agent name (Python: ``get_name``). Alias of the inherited ``name()``.
+  /// Agent name. Alias of the inherited ``name()``.
   [[nodiscard]] std::string get_name() const { return name(); }
 
-  /// Override the SWAIG-webhook URL (Python: ``set_web_hook_url``). Alias of
-  /// set_webhook_url (the Python spelling splits ``web_hook``).
+  /// Override the SWAIG-webhook URL. Alias of ``set_webhook_url``.
   AgentBase& set_web_hook_url(const std::string& url) { return set_webhook_url(url); }
 
-  /// Add multiple SWAIG query params at once (Python: ``add_swaig_query_params``).
+  /// Add multiple SWAIG query params at once.
   AgentBase& add_swaig_query_params(const json& params) {
     for (auto it = params.begin(); it != params.end(); ++it) {
       if (it.value().is_string()) {
@@ -572,8 +601,8 @@ class AgentBase : public swml::Service {
     return *this;
   }
 
-  /// Full URL for this agent's endpoint — host, port, route (Python:
-  /// ``get_full_url``). ``include_auth`` embeds basic-auth credentials.
+  /// Full URL for this agent's endpoint — host, port, route.
+  /// ``include_auth`` embeds basic-auth credentials.
   [[nodiscard]] std::string get_full_url(bool include_auth = false) const;
 
   // ========================================================================
@@ -583,8 +612,8 @@ class AgentBase : public swml::Service {
   AgentBase& enable_sip_routing(bool enable = true);
   AgentBase& register_sip_username(const std::string& username);
   AgentBase& auto_map_sip_usernames(bool enable = true);
-  /// The registered SIP usernames (lowercased set — Python:
-  /// ``AgentBase._sip_usernames``). Returned in registration order.
+  /// The registered SIP usernames (lowercased). Returned in registration
+  /// order.
   [[nodiscard]] std::vector<std::string> get_sip_usernames() const;
 
   // ========================================================================
@@ -605,8 +634,8 @@ class AgentBase : public swml::Service {
   // Resolution order at runtime:
   //   1. ``set_signing_key(...)`` (explicit)
   //   2. ``SIGNALWIRE_SIGNING_KEY`` env var (fallback)
-  // When neither is set, AgentBase logs a startup warning matching the
-  // Python reference and accepts unsigned POSTs.
+  // When neither is set, AgentBase logs a startup warning and accepts
+  // unsigned POSTs.
   // ========================================================================
 
   /// Set the SignalWire Signing Key (Dashboard → API Credentials).
@@ -640,12 +669,12 @@ class AgentBase : public swml::Service {
       const std::map<std::string, std::string>& query_params, const json& body_params,
       const std::map<std::string, std::string>& headers) const;
 
-  /// Framework-free request-dispatch core (Python:
-  /// ``AgentBase.handle_request``). Overrides ``SWMLService::handle_request`` so
-  /// the primitive dispatch surface renders SWML via AgentBase's request-aware
-  /// render path (``render_swml_for_request``) instead of the base
-  /// ``render_document``. Over plain ``(method, url, headers, body)`` primitives
-  /// it performs proxy detection, basic-auth over the header map, and the
+  /// Framework-free request-dispatch core. Overrides
+  /// ``swml::Service::handle_request`` so dispatch renders SWML via AgentBase's
+  /// request-aware render path (``render_swml_for_request``) instead of the
+  /// base ``render_document``. Over plain ``(method, url, headers, body)``
+  /// primitives it performs proxy detection, basic-auth over the header map,
+  /// and the
   /// routing-callback check, returning a ``(status, response_headers,
   /// body_string)`` triple with the 401-auth and 307-redirect behavior
   /// preserved.
@@ -656,10 +685,9 @@ class AgentBase : public swml::Service {
 
   /// Auto-detect (or force via ``mode``) the serverless platform and dispatch
   /// the request to the matching handler, returning the ``(status, headers,
-  /// body)`` response. Canonical entry point for Python
-  /// ``ServerlessMixin.handle_serverless_request(event, context, mode)``:
-  /// ``mode`` empty = auto-detect via get_execution_mode, selecting
-  /// lambda / google_cloud_function / azure_function / cgi. Delegates to the
+  /// body)`` response. ``mode`` empty = auto-detect via get_execution_mode,
+  /// selecting lambda / google_cloud_function / azure_function / cgi.
+  /// Delegates to the
   /// per-platform dispatchers in ``signalwire::utils`` (handle_lambda / _gcf /
   /// _azure / _cgi); an unknown/``"server"`` mode renders SWML via a plain GET
   /// so a dispatch always produces a real response.
@@ -693,14 +721,13 @@ class AgentBase : public swml::Service {
   // security ``__token`` on each SECURE tool's webhook (see
   // build_swaig_functions). NOT defaulted on purpose: a defaulted call_id
   // silently renders every secure tool WITHOUT its token at any call site that
-  // forgets to thread it, which is exactly the security regression the
-  // SECURE-DEFAULT gate exists to catch. Make omission a compile error.
+  // forgets to thread it. Make omission a compile error instead.
   [[nodiscard]] json build_ai_verb(const std::string& webhook_url,
                                    const std::string& call_id) const;
 
   // Build SWAIG functions array. A SECURE tool rendered with a non-empty
   // ``call_id`` carries a per-tool ``__token=`` on its ``web_hook_url`` — the
-  // wire manifestation of ``secure`` (reference agent_base.py:1040/1096-1100).
+  // wire manifestation of ``secure``.
   // ``call_id`` is not defaulted; see build_ai_verb.
   [[nodiscard]] json build_swaig_functions(const std::string& webhook_url,
                                            const std::string& call_id) const;
@@ -721,8 +748,41 @@ class AgentBase : public swml::Service {
   // Handle SWAIG request
   void handle_swaig_request(const httplib::Request& req, httplib::Response& res);
 
+  /// The SOLE `secure` enforcement decision for one SWAIG call, deliberately
+  /// free of any request/transport type so that EVERY transport — the HTTP
+  /// `/swaig` endpoint and all four serverless envelopes (lambda, cgi,
+  /// google_cloud_function, azure_function) — reaches the identical check with
+  /// identical semantics. Each transport is responsible only for EXTRACTING the
+  /// credential from its own payload shape; none of them re-implements the
+  /// decision, so serverless cannot drift away from HTTP.
+  ///
+  /// A tool registered with `secure = true` REQUIRES a valid token. An ABSENT
+  /// token is refused exactly like a forged one — omitting the credential must
+  /// never be weaker than presenting a wrong one, or `secure` would be a flag
+  /// that permits anonymous calls. A token can only be checked against a
+  /// `call_id`, so an absent `call_id` counts as UNVALIDATED, never a bypass.
+  /// A tool with `secure = false` is never refused.
+  ///
+  /// @param function_name The SWAIG function being invoked.
+  /// @param token The credential from the caller's query string, or
+  ///        `std::nullopt` when absent.
+  /// @param call_id The call the token must be bound to, or `std::nullopt`
+  ///        when absent.
+  /// @return `std::nullopt` to proceed with dispatch, or the refusal to return
+  ///         INSTEAD of dispatching. The refusal is always delivered as a
+  ///         200 + FunctionResult body, never an HTTP error status: the engine
+  ///         has no handling for a refusal status, so a non-200 would be
+  ///         dropped rather than relayed to the caller.
+  [[nodiscard]] std::optional<swaig::FunctionResult> swaig_validate_token(
+      const std::string& function_name, const std::optional<std::string>& token,
+      const std::optional<std::string>& call_id) const;
+
   // Handle post_prompt request
   void handle_post_prompt_request(const httplib::Request& req, httplib::Response& res);
+  /// Receives the AI module's debug-event webhook POSTs. Mounted only when
+  /// ``enable_debug_events()`` has been called, which is also what puts
+  /// ``params.debug_webhook_url`` on the wire.
+  void handle_debug_events_request(const httplib::Request& req, httplib::Response& res);
 
   // Validate basic auth
   bool validate_auth(const httplib::Request& req, httplib::Response& res) const;
@@ -731,9 +791,8 @@ class AgentBase : public swml::Service {
   static void add_security_headers(httplib::Response& res);
 
   // Internal SWML rendering (used by render_swml_for_request). ``call_id`` is
-  // the request's ``call_id`` query parameter (reference
-  // swml_service.py:807 → ``_render_swml(call_id)``); when non-empty every
-  // SECURE tool's rendered webhook carries its per-tool ``__token``.
+  // the request's ``call_id`` query parameter; when non-empty every SECURE
+  // tool's rendered webhook carries its per-tool ``__token``.
   [[nodiscard]] json render_swml_internal(const std::map<std::string, std::string>& headers,
                                           const std::string& call_id) const;
 
@@ -774,7 +833,9 @@ class AgentBase : public swml::Service {
   json global_data_;
   std::vector<std::string> native_functions_;
   json internal_fillers_;
-  bool debug_events_ = false;
+  bool debug_events_enabled_ = false;
+  /// Debug-event verbosity level; defaults to 1.
+  int debug_events_level_ = 1;
   json prompt_llm_params_;
   json post_prompt_llm_params_;
 
@@ -813,55 +874,49 @@ class AgentBase : public swml::Service {
   DebugEventCallback debug_event_callback_;
 
   // ========================================================================
-  // Construction-parameter accessors for the reference's UNDERSCORE-PRIVATE
-  // attributes. Protected (not public) because the reference's counterparts
-  // are private — subclasses and the render pipeline read them, callers do
-  // not.
+  // Construction-parameter accessors. Protected rather than public —
+  // subclasses and the render pipeline read them, callers do not.
   // ========================================================================
 
-  // NOTE: ``agent_id()`` / ``token_expiry_secs()`` are declared PUBLIC (above),
-  // not here — they read configuration that is part of the public API, so
-  // callers may query them directly.
+  // NOTE: ``agent_id()`` is declared PUBLIC (above), not here — it reads
+  // configuration that is part of the public API, so callers may query it
+  // directly.
 
-  /// reference: ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  /// Gates the PHASE-2 ``answer`` verb.
   [[nodiscard]] bool auto_answer() const { return auto_answer_; }
-  /// reference: ``self._record_call`` / ``_record_format`` / ``_record_stereo``.
+  /// Call-recording configuration; see the ``record_call_`` fields below.
   [[nodiscard]] bool record_call_enabled() const { return record_call_; }
   [[nodiscard]] const std::string& record_format() const { return record_format_; }
   [[nodiscard]] bool record_stereo() const { return record_stereo_; }
-  /// reference: ``self._default_webhook_url``.
+  /// The SWAIG default ``web_hook_url``, when one was supplied.
   [[nodiscard]] const std::optional<std::string>& default_webhook_url() const {
     return default_webhook_url_;
   }
-  /// reference: ``self._suppress_logs``.
+  /// Whether agent logging is suppressed.
   [[nodiscard]] bool suppress_logs() const { return suppress_logs_; }
-  /// Accepted and stored by the reference constructor with no consumer.
+  /// Accepted and stored at construction; no consumer on the render path.
   [[nodiscard]] bool enable_post_prompt_override() const { return enable_post_prompt_override_; }
   [[nodiscard]] bool check_for_input_override() const { return check_for_input_override_; }
-  /// Token lifetime forwarded to this agent's ``SessionManager``. PROTECTED,
-  /// unlike ``agent_id()``: the reference's AgentBase does NOT keep a
-  /// ``self.token_expiry_secs`` — it forwards the ctor param straight into
-  /// ``SessionManager(token_expiry_secs=…)``, where it IS public
-  /// (``SessionManager::token_expiry_secs()``). A public accessor here would be
-  /// surface the reference's AgentBase does not have.
+  /// Token lifetime forwarded to this agent's ``SessionManager``, which is
+  /// where it is publicly readable (``SessionManager::token_expiry_secs()``).
+  /// AgentBase does not keep its own copy, so this is a protected convenience
+  /// rather than public surface.
   [[nodiscard]] int token_expiry_secs() const { return session_manager_.token_expiry_secs(); }
 
-  // Construction parameters the reference stores on the instance.
-  /// ``self.agent_id`` — the supplied id, or a generated UUID.
+  // Construction parameters stored on the instance.
+  /// The supplied agent id, or a generated UUID.
   std::string agent_id_;
-  /// ``self._auto_answer`` — gates the PHASE-2 ``answer`` verb.
+  /// Gates the PHASE-2 ``answer`` verb.
   bool auto_answer_ = true;
-  /// ``self._record_call`` / ``_record_format`` / ``_record_stereo`` — gate
-  /// and shape the PHASE-3 ``record_call`` verb.
+  /// Gate and shape the PHASE-3 ``record_call`` verb.
   bool record_call_ = false;
   std::string record_format_ = "mp4";
   bool record_stereo_ = true;
-  /// ``self._default_webhook_url`` — SWAIG default ``web_hook_url``.
+  /// The SWAIG default ``web_hook_url``.
   std::optional<std::string> default_webhook_url_;
-  /// ``self._suppress_logs``.
+  /// Whether agent logging is suppressed.
   bool suppress_logs_ = false;
-  /// Accepted and stored by the reference constructor; no render-path
-  /// consumer in the reference either.
+  /// Accepted and stored at construction; no render-path consumer.
   bool enable_post_prompt_override_ = false;
   bool check_for_input_override_ = false;
 

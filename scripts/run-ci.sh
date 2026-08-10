@@ -255,15 +255,15 @@ test_gate() {
             # "dump did not emit valid JSON".
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump \
-                pagination_dump relay_liveness_dump ai_chat_dump \
-                secure_default_dump secret_scrub_dump -j"$(sw_build_jobs)" || return 1
+                pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump \
+                secure_default_dump secret_scrub_dump token_interop_mint -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -272,7 +272,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -398,8 +398,11 @@ _fresh_surface_cache_path() { echo "$PORT_ROOT/.sw-tmp/fresh_port_surface.json";
 #     place so you never hand-run it; notes if it changed files, then re-checks.
 #   * CI ($CI=true)      -> `clang-format --dry-run -Werror` (read-only): FAILS
 #     if any unformatted source reached CI.
-# Scope is first-party src/ + include/ ONLY — vendored deps/ (httplib.h,
-# json.hpp, nlohmann/) and the FetchContent IXWebSocket tree are never touched.
+# Scope is EVERY first-party C++ tree — src/ include/ tools/ tests/ examples/
+# rest/examples/ relay/examples/ (widened 2026-07-30; this comment previously
+# said "src/ + include/ ONLY" and was already stale, since tools/ was in scope).
+# Only genuinely third-party code is excluded: vendored deps/ (httplib.h,
+# json.hpp, nlohmann/) and the FetchContent IXWebSocket tree.
 # clang-format runs on the host regardless of BUILD_MODE (no compiler/SDK
 # needed — it only parses tokens).
 # The FMT gate now delegates to the CANONICAL scripts/run-format.sh (single
@@ -435,6 +438,15 @@ fmt_gate() {
 # compile-DB generation now live in that script; run-ci just invokes it.
 lint_gate() {
     bash "$PORT_ROOT/scripts/run-lint.sh"
+}
+
+# PY-LINT gate: ruff (lint + format) over the hand-written Python under
+# scripts/. Delegates to the CANONICAL scripts/run-pylint.sh, and follows the
+# same LOCAL-applies / CI-checks contract as fmt_gate above: an unformatted
+# commit must not be green locally and red in CI on the very formatting the
+# local run applied.
+pylint_gate() {
+    bash "$PORT_ROOT/scripts/run-pylint.sh" ${CI:+--check}
 }
 
 # STRICT-MOCKS (§2.2 / Part 1.4): re-run the RELAY mock suite with mock_relay in
@@ -540,8 +552,22 @@ run_gate "SURFACE" "surface parity suite (SIGNATURES/DRIFT/SURFACE-FRESH/SURFACE
 # red. RATCHET, not a hard gate: dynamic languages cannot always express a type, so this
 # banks the current count and fails only on REGRESSION. Drive the number DOWN; never up.
 # Runs after SURFACE because it reads the port_signatures.json that enumeration writes.
-run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 122)" \
-    python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 122
+run_gate "TYPE-EROSION" "port did not erase a reference-declared param type (ratchet 85)" \
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_type_erosion.py" --port cpp --repo "$PORT_ROOT" --max 85
+
+# SIGNATURES-FRESH: the committed port_signatures.json must match a fresh regen.
+# Nothing previously guarded it — SURFACE-FRESH covers only port_surface.json.
+# That artifact is DRIFT's INPUT, so a stale one means the parity gate compares
+# against a fiction and reports clean while real drift hides behind it.
+#
+# STANDALONE, deliberately not a _surface_commands.py table entry: only 8 of the
+# 10 run-ci scripts read that table, so a table entry would be silently skipped
+# in the two that do not. cpp schedules serially via run_gate rather than the DAG
+# scheduler, so this is the run_gate form of the other ports' sched_gate line.
+# Placed after SURFACE because it regenerates the same artifacts that gate reads.
+run_gate "SIGNATURES-FRESH" "committed port_signatures.json matches a fresh regen" \
+    python3 "$PORTING_SDK_DIR/scripts/suites/_signatures_fresh.py" \
+        --port cpp --repo "$PORT_ROOT" --porting-sdk "$PORTING_SDK_DIR"
 
 # GEN (regen-from-specs family): GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS.
 # GEN-FRESH-TESTS reuses cpp's route_registry binary via the suite's cpp branch.
@@ -557,9 +583,9 @@ run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-T
 # build/secure_default_dump and proves define_tool defaults secure=TRUE and that
 # the wire reflects it (the per-tool __token on the rendered webhook). Without it
 # a regression that silently ships every tool unauthenticated goes undetected.
-run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY/SECURE-DEFAULT)" \
+run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKILL-CONTRACT/SWAIG-*/ERROR-ENVELOPE/PAGINATION-WIRED/DOC-WIRE/REST-COVERAGE/SPEC-PARITY/SECURE-DEFAULT/BEHAVIORAL-STRICT-RENDER/CA-VAR/TLS-VERIFY/SECRET-SCRUB)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
-        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE,SECURE-DEFAULT
+        --rules REST-COVERAGE,SPEC-PARITY,EMISSION,BEHAVIORAL-WIRE,BEHAVIORAL-SWML,BEHAVIORAL-STATE,BEHAVIORAL-HTTP,BEHAVIORAL-WIRE-RELAY,SKILL-CONTRACT,SWAIG-COVERAGE,SWAIG-CLI,ERROR-ENVELOPE,PAGINATION-WIRED,PAGINATION-CORPUS,DOC-WIRE,SECURE-DEFAULT,BEHAVIORAL-STRICT-RENDER,CA-VAR,TLS-VERIFY,SECRET-SCRUB
 
 # BEHAVIORAL-NIGHTLY: the timing-sensitive connection-liveness dumps.
 # WAIT-LIVENESS (Action::wait() blocks-until-event) + RELAY-LIVENESS (the broader
@@ -575,6 +601,22 @@ run_gate "BEHAVIORAL" "behavioral suite, per-PR rules (BEHAVIORAL-*/EMISSION/SKI
 run_gate "BEHAVIORAL-NIGHTLY" "behavioral suite, nightly rules (WAIT-LIVENESS/RELAY-LIVENESS/SECRET-SCRUB-LIVE)" --tier=nightly \
     python3 "$PORTING_SDK_DIR/scripts/suites/behavioral.py" --port cpp --repo "$PORT_ROOT" \
         --rules WAIT-LIVENESS,RELAY-LIVENESS,SECRET-SCRUB-LIVE
+
+# TOKEN-INTEROP — property 3 of the SWAIG tool-token contract: a token this port MINTS
+# must validate under the REFERENCE's own decoder. SECURE-DEFAULT proves a token is
+# minted and the fleet keying check proves the HMAC key; NEITHER sees the base64
+# ENVELOPE, so a port can ship correct-key correct-HMAC tokens that no other
+# implementation accepts — in production every secure tool call then fails auth. This
+# port shipped exactly that: base64url_encode popped the '=' padding (while its own
+# header comment claimed it matched the reference's urlsafe_b64encode), and the
+# reference's urlsafe_b64decode RAISES on a stripped '='. Our base64url_decode tolerates
+# missing padding, so round-tripping against ourselves could never catch it. The mint
+# binary (build/token_interop_mint) is built with the other dump binaries above. One
+# mint + a pure-python validation → cheap, per-PR (a security property must not wait
+# for nightly).
+run_gate "TOKEN-INTEROP" "a token this port mints validates under the reference's decoder (padded urlsafe base64, ':'-signed / '.'-enveloped, hex HMAC keyed by the secret_key string)" \
+    python3 "$PORTING_SDK_DIR/scripts/diff_port_token_interop.py" --port cpp \
+        --mint-cmd "$PORT_ROOT/build/token_interop_mint"
 
 # DOC-TRUTH (one markdown walk): DOC-AUDIT/DOC-LINKS/DOC-LANG-PURITY/DOC-ENV/
 # COUNT-CLAIM/ACCESSOR-TRUTH/STATUS-CLAIM/README-INCLUDE.
@@ -609,6 +651,15 @@ run_gate "FMT" "clang-format (.clang-format; local: apply, CI: check)" fmt_gate
 
 # LINT — clang-tidy curated set burned to zero (WarningsAsErrors:'*')
 run_gate "LINT" "clang-tidy curated set, zero findings" lint_gate
+
+# PY-LINT — ruff over the 9 hand-written Python files under scripts/ (~10.4k
+# lines), which no gate covered before 2026-07-30 even though two of them
+# (_cpp_fmt.py, clang_tidy_cache.py) are the lint/format infrastructure the FMT
+# and LINT gates above run THROUGH. Rule selection mirrors the reference
+# implementation's (signalwire-python/pyproject.toml); config in ruff.toml.
+# Dual-mode exactly like FMT: LOCAL applies fixes in place, CI ($CI set) passes
+# --check for the read-only verification.
+run_gate "PY-LINT" "ruff over scripts/*.py (local: apply, CI: check)" pylint_gate
 
 # DEAD-PUBLIC-ERROR — exported error types are raised/caught/user-signalled
 run_gate "DEAD-PUBLIC-ERROR" "exported error types are raised/caught/user-signalled (no dead error surface)" \
@@ -680,19 +731,15 @@ run_gate "WIRED-MODES" "load-bearing run-ci modes present (WIRED_MODES.md merge-
     wired_modes_gate
 
 # DOC-SURFACE (plan §6.3): doxygen-header coverage floor on the public surface. The
-# floor is pinned in .doc_surface_floor (90.2% today) and ratchets up via
-# --write-floor; report-only at graduation, so a doc regression is visible without
-# failing the run yet (never-regress is enforced once the floor flips blocking).
-# GUARDED like WIRED-MODES: doc_surface.py is a porting-sdk plan-branch dep.
-doc_surface_gate() {
-    if [ -f "$PORTING_SDK_DIR/scripts/doc_surface.py" ]; then
-        python3 "$PORTING_SDK_DIR/scripts/doc_surface.py" --port cpp --repo "$PORT_ROOT" --report-only
-    else
-        echo "[doc-surface] doc_surface.py not on porting-sdk main yet — skip-pass (plan-branch dep)"
-    fi
-}
-run_gate "DOC-SURFACE" "public doc-comment coverage floor (.doc_surface_floor ratchet; report-only)" \
-    doc_surface_gate
+# floor is pinned in .doc_surface_floor (100.0% as of the 2026-07-29 burn) and ratchets
+# up via --write-floor. BLOCKING: every public class carries a doxygen header, so any
+# new undocumented one is a real regression and must red the run, not merely be noted.
+# The skip-with-pass guard is GONE. It existed for when doc_surface.py lived only on a
+# porting-sdk plan branch; the script is on the pinned PORTING_SDK_REF now, so the branch is
+# dead — and a MISSING gate script must FAIL, not pass. Guarding it made "BLOCKING" above a
+# lie: a path typo or a bad checkout would have disabled the gate under a green tick.
+run_gate "DOC-SURFACE" "public doc-comment coverage floor (.doc_surface_floor ratchet; 100% — blocking)" \
+    python3 "$PORTING_SDK_DIR/scripts/doc_surface.py" --port cpp --repo "$PORT_ROOT"
 
 # GATE-INVENTORY NOTE (plan §2.16): porting-sdk/GATE_INVENTORY.md is generated by
 # gen_gate_inventory.py from the REFERENCE port's run-ci.sh (typescript — the

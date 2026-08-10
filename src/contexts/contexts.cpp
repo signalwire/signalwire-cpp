@@ -39,7 +39,8 @@ const std::set<std::string>& reserved_native_tool_names() {
 // ============================================================================
 
 GatherQuestion::GatherQuestion(const std::string& key, const std::string& question,
-                               const std::string& type, bool confirm, const std::string& prompt,
+                               const std::string& type, bool confirm,
+                               const std::optional<std::string>& prompt,
                                const std::vector<std::string>& functions,
                                const std::optional<bool>& isolated)
     : key_(key),
@@ -58,8 +59,10 @@ json GatherQuestion::to_json() const {
   if (confirm_) {
     j["confirm"] = true;
   }
-  if (!prompt_.empty()) {
-    j["prompt"] = prompt_;
+  // Reference guard is `if self.prompt:` — truthy, so an unset prompt AND an
+  // explicitly-empty one are both omitted.
+  if (prompt_.has_value() && !prompt_->empty()) {
+    j["prompt"] = *prompt_;
   }
   if (!functions_.empty()) {
     j["functions"] = functions_;
@@ -75,8 +78,9 @@ json GatherQuestion::to_json() const {
 // GatherInfo
 // ============================================================================
 
-GatherInfo::GatherInfo(const std::string& output_key, const std::string& completion_action,
-                       const std::string& prompt, bool isolated)
+GatherInfo::GatherInfo(const std::optional<std::string>& output_key,
+                       const std::optional<std::string>& completion_action,
+                       const std::optional<std::string>& prompt, bool isolated)
     : output_key_(output_key),
       completion_action_(completion_action),
       prompt_(prompt),
@@ -84,7 +88,7 @@ GatherInfo::GatherInfo(const std::string& output_key, const std::string& complet
 
 GatherInfo& GatherInfo::add_question(const std::string& key, const std::string& question,
                                      const std::string& type, bool confirm,
-                                     const std::string& prompt,
+                                     const std::optional<std::string>& prompt,
                                      const std::vector<std::string>& functions,
                                      const std::optional<bool>& isolated) {
   questions_.emplace_back(key, question, type, confirm, prompt, functions, isolated);
@@ -93,14 +97,16 @@ GatherInfo& GatherInfo::add_question(const std::string& key, const std::string& 
 
 json GatherInfo::to_json() const {
   json j;
-  if (!output_key_.empty()) {
-    j["output_key"] = output_key_;
+  // Reference guards are truthy (`if self._output_key:`), so both an unset
+  // value and an explicitly-empty string are omitted.
+  if (output_key_.has_value() && !output_key_->empty()) {
+    j["output_key"] = *output_key_;
   }
-  if (!completion_action_.empty()) {
-    j["completion_action"] = completion_action_;
+  if (completion_action_.has_value() && !completion_action_->empty()) {
+    j["completion_action"] = *completion_action_;
   }
-  if (!prompt_.empty()) {
-    j["prompt"] = prompt_;
+  if (prompt_.has_value() && !prompt_->empty()) {
+    j["prompt"] = *prompt_;
   }
   if (!questions_.empty()) {
     j["questions"] = json::array();
@@ -180,14 +186,16 @@ Step& Step::set_history(const std::string& history) {
   return *this;
 }
 
-Step& Step::set_gather_info(const std::string& output_key, const std::string& completion_action,
-                            const std::string& prompt, bool isolated) {
+Step& Step::set_gather_info(const std::optional<std::string>& output_key,
+                            const std::optional<std::string>& completion_action,
+                            const std::optional<std::string>& prompt, bool isolated) {
   gather_info_ = GatherInfo(output_key, completion_action, prompt, isolated);
   return *this;
 }
 
 Step& Step::add_gather_question(const std::string& key, const std::string& question,
-                                const std::string& type, bool confirm, const std::string& prompt,
+                                const std::string& type, bool confirm,
+                                const std::optional<std::string>& prompt,
                                 const std::vector<std::string>& functions,
                                 const std::optional<bool>& isolated) {
   if (gather_info_) {
@@ -678,10 +686,13 @@ void ContextBuilder::validate() const {
       if (!gi_opt.has_value()) {
         continue;
       }
-      const auto& action = gi_opt->completion_action();
-      if (action.empty()) {
+      const auto& action_opt = gi_opt->completion_action();
+      // Reference guard is `if action is not None:` — an explicitly-set value
+      // is validated even when empty; only absence skips.
+      if (!action_opt.has_value()) {
         continue;
       }
+      const std::string& action = *action_opt;
 
       if (action == "next_step") {
         if (i + 1 >= order.size()) {
@@ -699,7 +710,7 @@ void ContextBuilder::validate() const {
               "', "
               "(2) set completion_action to the name of an "
               "existing step in this context to jump to it, or "
-              "(3) leave completion_action empty (default) to "
+              "(3) set completion_action=nullopt (default) to "
               "stay in '";
           msg += step_name;
           msg +=
@@ -734,7 +745,7 @@ void ContextBuilder::validate() const {
         msg +=
             "' is not a step in this context. "
             "Valid options: 'next_step' (advance to the next "
-            "sequential step), empty string (stay in the current "
+            "sequential step), nullopt (stay in the current "
             "step), or one of ";
         msg += avail_str;
         msg += ".";

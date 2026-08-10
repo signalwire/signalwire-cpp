@@ -1,11 +1,15 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // GatherInfo demo using contexts/steps with question collection.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("gather-info", "/gather-info");
 
     agent.prompt_add_section("Role", "You are a friendly intake assistant.");
@@ -31,4 +35,8 @@ int main() {
 
     std::cout << "GatherInfo demo at http://0.0.0.0:3000/gather-info\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

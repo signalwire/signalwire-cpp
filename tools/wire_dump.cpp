@@ -56,7 +56,7 @@ std::string hmac_hex(const EVP_MD* evp, const std::string& key, const std::strin
        reinterpret_cast<const unsigned char*>(data.data()), data.size(), md.data(), &md_len);
   static const char* kHex = "0123456789abcdef";
   std::string out;
-  out.reserve(md_len * 2);
+  out.reserve(static_cast<size_t>(md_len) * 2);
   for (unsigned int i = 0; i < md_len; ++i) {
     out.push_back(kHex[md[i] >> 4]);
     out.push_back(kHex[md[i] & 0x0F]);
@@ -115,163 +115,202 @@ std::string oracle_sig(const std::string& url, const std::string& body, const st
 }  // namespace
 
 int main() {
-  json out = json::object();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    json out = json::object();
 
-  // Key the manager with the secret STRING, matching the reference's
-  // ``SessionManager(secret_key=SECRET)`` — the HMAC key is the bytes of that
-  // string. The byte-vector constructor is NOT equivalent here: it hex-encodes
-  // its input into ``secret_key_``, so passing kSecret's bytes would sign with
-  // hex(kSecret) while ``oracle_token`` below signs with kSecret itself, and
-  // the cross-port token_interop check would compare two different keys.
-  SessionManager sm(900, kSecret);
+    // Key the manager with the secret STRING, matching the reference's
+    // ``SessionManager(secret_key=SECRET)`` — the HMAC key is the bytes of that
+    // string. The byte-vector constructor is NOT equivalent here: it hex-encodes
+    // its input into ``secret_key_``, so passing kSecret's bytes would sign with
+    // hex(kSecret) while ``oracle_token`` below signs with kSecret itself, and
+    // the cross-port token_interop check would compare two different keys.
+    SessionManager sm(900, kSecret);
 
-  // token_format: generate a token via the SDK, decode its wire-format fields.
-  {
-    std::string token = sm.generate_token("my_func", "call_1");
-    // Decode base64url -> raw dotted string. The SDK produces a padded
-    // base64url token; nlohmann/std don't decode base64url, so decode inline.
-    // Simpler: re-derive fields by regenerating is impossible (random nonce),
-    // so decode the token the SDK emitted.
-    auto b64url_decode = [](const std::string& s) {
-      auto val = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '-') return 62;
-        if (c == '_') return 63;
-        return -1;
-      };
-      std::string decoded;
-      uint32_t buf = 0;
-      int bits = 0;
-      for (char c : s) {
-        if (c == '=') break;
-        int v = val(c);
-        if (v < 0) continue;
-        buf = (buf << 6) | static_cast<uint32_t>(v);
-        bits += 6;
-        if (bits >= 8) {
-          bits -= 8;
-          decoded.push_back(static_cast<char>((buf >> bits) & 0xFF));
-        }
-      }
-      return decoded;
-    };
-    std::string raw = b64url_decode(token);
-    std::vector<std::string> parts;
+    // token_format: generate a token via the SDK, decode its wire-format fields.
     {
-      std::string cur;
-      for (char c : raw) {
-        if (c == '.') {
-          parts.push_back(cur);
-          cur.clear();
-        } else {
-          cur.push_back(c);
+      std::string token = sm.generate_token("my_func", "call_1");
+      // Decode base64url -> raw dotted string. The SDK produces a padded
+      // base64url token; nlohmann/std don't decode base64url, so decode inline.
+      // Simpler: re-derive fields by regenerating is impossible (random nonce),
+      // so decode the token the SDK emitted.
+      auto b64url_decode = [](const std::string& s) {
+        auto val = [](char c) -> int {
+          if (c >= 'A' && c <= 'Z') {
+            return c - 'A';
+          }
+          if (c >= 'a' && c <= 'z') {
+            return c - 'a' + 26;
+          }
+          if (c >= '0' && c <= '9') {
+            return c - '0' + 52;
+          }
+          if (c == '-') {
+            return 62;
+          }
+          if (c == '_') {
+            return 63;
+          }
+          return -1;
+        };
+        std::string decoded;
+        uint32_t buf = 0;
+        int bits = 0;
+        for (char c : s) {
+          if (c == '=') {
+            break;
+          }
+          int v = val(c);
+          if (v < 0) {
+            continue;
+          }
+          buf = (buf << 6) | static_cast<uint32_t>(v);
+          bits += 6;
+          if (bits >= 8) {
+            bits -= 8;
+            decoded.push_back(static_cast<char>((buf >> bits) & 0xFF));
+          }
         }
-      }
-      parts.push_back(cur);
-    }
-    std::string nonce = parts.size() > 3 ? parts[3] : "";
-    bool nonce_is_hex = parts.size() > 3;
-    for (char c : nonce) {
-      if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-        nonce_is_hex = false;
-        break;
-      }
-    }
-    json tf = json::object();
-    tf["n_fields"] = parts.size();
-    tf["call_id"] = parts.size() > 0 ? json(parts[0]) : json(nullptr);
-    tf["function_name"] = parts.size() > 1 ? json(parts[1]) : json(nullptr);
-    tf["nonce_len"] = nonce.size();
-    tf["nonce_is_hex"] = nonce_is_hex;
-    out["token_format"] = tf;
-  }
-
-  // token_nonce_distinct: two generations must differ (random nonce).
-  {
-    std::string n1 = sm.generate_token("f", "c");
-    std::string n2 = sm.generate_token("f", "c");
-    out["token_nonce_distinct"] = json{{"distinct", n1 != n2}};
-  }
-
-  // token_interop: validate an oracle-format token built from SECRET.
-  {
-    std::string tok = oracle_token("oracle_call", "oracle_fn");
-    out["token_interop"] = json{{"valid", sm.validate_token(tok, "oracle_fn", "oracle_call")}};
-  }
-
-  // token_tamper_rejected: a one-byte-flipped signature must fail. Build the
-  // oracle token, decode, flip the first byte of the signature (after the last
-  // '.'), re-encode — the mirror of Go's tamperedToken / _tampered_token.
-  {
-    std::string tok = oracle_token("c", "f");
-    // decode
-    auto b64url_decode = [](const std::string& s) {
-      auto val = [](char c) -> int {
-        if (c >= 'A' && c <= 'Z') return c - 'A';
-        if (c >= 'a' && c <= 'z') return c - 'a' + 26;
-        if (c >= '0' && c <= '9') return c - '0' + 52;
-        if (c == '-') return 62;
-        if (c == '_') return 63;
-        return -1;
+        return decoded;
       };
-      std::string decoded;
-      uint32_t buf = 0;
-      int bits = 0;
-      for (char c : s) {
-        if (c == '=') break;
-        int v = val(c);
-        if (v < 0) continue;
-        buf = (buf << 6) | static_cast<uint32_t>(v);
-        bits += 6;
-        if (bits >= 8) {
-          bits -= 8;
-          decoded.push_back(static_cast<char>((buf >> bits) & 0xFF));
+      std::string raw = b64url_decode(token);
+      std::vector<std::string> parts;
+      {
+        std::string cur;
+        for (char c : raw) {
+          if (c == '.') {
+            parts.push_back(cur);
+            cur.clear();
+          } else {
+            cur.push_back(c);
+          }
+        }
+        parts.push_back(cur);
+      }
+      std::string nonce = parts.size() > 3 ? parts[3] : "";
+      bool nonce_is_hex = parts.size() > 3;
+      for (char c : nonce) {
+        if ((c < '0' || c > '9') && (c < 'a' || c > 'f')) {
+          nonce_is_hex = false;
+          break;
         }
       }
-      return decoded;
-    };
-    std::string raw = b64url_decode(tok);
-    size_t last = raw.rfind('.');
-    if (last != std::string::npos && last + 1 < raw.size()) {
-      char& b = raw[last + 1];
-      b = (b == 'f') ? 'e' : 'f';
+      json tf = json::object();
+      tf["n_fields"] = parts.size();
+      tf["call_id"] = !parts.empty() ? json(parts[0]) : json(nullptr);
+      tf["function_name"] = parts.size() > 1 ? json(parts[1]) : json(nullptr);
+      tf["nonce_len"] = nonce.size();
+      tf["nonce_is_hex"] = nonce_is_hex;
+      out["token_format"] = tf;
     }
-    std::string tampered = base64url_encode(raw);
-    out["token_tamper_rejected"] = json{{"valid", sm.validate_token(tampered, "f", "c")}};
+
+    // token_nonce_distinct: two generations must differ (random nonce).
+    {
+      std::string n1 = sm.generate_token("f", "c");
+      std::string n2 = sm.generate_token("f", "c");
+      out["token_nonce_distinct"] = json{{"distinct", n1 != n2}};
+    }
+
+    // token_interop: validate an oracle-format token built from SECRET.
+    {
+      std::string tok = oracle_token("oracle_call", "oracle_fn");
+      out["token_interop"] = json{{"valid", sm.validate_token(tok, "oracle_fn", "oracle_call")}};
+    }
+
+    // token_tamper_rejected: a one-byte-flipped signature must fail. Build the
+    // oracle token, decode, flip the first byte of the signature (after the last
+    // '.'), re-encode — the mirror of Go's tamperedToken / _tampered_token.
+    {
+      std::string tok = oracle_token("c", "f");
+      // decode
+      auto b64url_decode = [](const std::string& s) {
+        auto val = [](char c) -> int {
+          if (c >= 'A' && c <= 'Z') {
+            return c - 'A';
+          }
+          if (c >= 'a' && c <= 'z') {
+            return c - 'a' + 26;
+          }
+          if (c >= '0' && c <= '9') {
+            return c - '0' + 52;
+          }
+          if (c == '-') {
+            return 62;
+          }
+          if (c == '_') {
+            return 63;
+          }
+          return -1;
+        };
+        std::string decoded;
+        uint32_t buf = 0;
+        int bits = 0;
+        for (char c : s) {
+          if (c == '=') {
+            break;
+          }
+          int v = val(c);
+          if (v < 0) {
+            continue;
+          }
+          buf = (buf << 6) | static_cast<uint32_t>(v);
+          bits += 6;
+          if (bits >= 8) {
+            bits -= 8;
+            decoded.push_back(static_cast<char>((buf >> bits) & 0xFF));
+          }
+        }
+        return decoded;
+      };
+      std::string raw = b64url_decode(tok);
+      size_t last = raw.rfind('.');
+      if (last != std::string::npos && last + 1 < raw.size()) {
+        char& b = raw[last + 1];
+        b = (b == 'f') ? 'e' : 'f';
+      }
+      std::string tampered = base64url_encode(raw);
+      out["token_tamper_rejected"] = json{{"valid", sm.validate_token(tampered, "f", "c")}};
+    }
+
+    // wire_validate_webhook_signature: correct HMAC-SHA1 -> valid.
+    const std::string wh_url = "https://example.com/hook";
+    const std::string wh_body = R"({"event":"call.created"})";
+    out["wire_validate_webhook_signature"] =
+        json{{"valid", ValidateWebhookSignature(kSecret, oracle_sig(wh_url, wh_body, kSecret),
+                                                wh_url, wh_body)}};
+
+    // wire_validate_webhook_signature_bad: wrong sig -> invalid.
+    {
+      std::string bad;
+      for (int i = 0; i < 8; ++i) {
+        bad += "deadbeef";
+      }
+      out["wire_validate_webhook_signature_bad"] =
+          json{{"valid", ValidateWebhookSignature(kSecret, bad, wh_url, wh_body)}};
+    }
+
+    // wire_redact_url: credentials + token redacted, structure preserved.
+    out["wire_redact_url"] =
+        json{{"redacted", RedactUrl("https://user:s3cr3t@api.signalwire.com/path?token=abc")}};
+
+    // wire_filter_sensitive_headers: authorization + x-api-key dropped,
+    // content-type kept.
+    {
+      std::map<std::string, std::string> headers = {
+          {"Authorization", "Bearer x"}, {"X-Api-Key", "y"}, {"Content-Type", "application/json"}};
+      auto filtered = FilterSensitiveHeaders(headers);
+      json fj = json::object();
+      for (const auto& [k, v] : filtered) {
+        fj[k] = v;
+      }
+      out["wire_filter_sensitive_headers"] = json{{"filtered", fj}};
+    }
+
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  // wire_validate_webhook_signature: correct HMAC-SHA1 -> valid.
-  const std::string wh_url = "https://example.com/hook";
-  const std::string wh_body = R"({"event":"call.created"})";
-  out["wire_validate_webhook_signature"] =
-      json{{"valid", ValidateWebhookSignature(kSecret, oracle_sig(wh_url, wh_body, kSecret), wh_url,
-                                              wh_body)}};
-
-  // wire_validate_webhook_signature_bad: wrong sig -> invalid.
-  {
-    std::string bad;
-    for (int i = 0; i < 8; ++i) bad += "deadbeef";
-    out["wire_validate_webhook_signature_bad"] =
-        json{{"valid", ValidateWebhookSignature(kSecret, bad, wh_url, wh_body)}};
-  }
-
-  // wire_redact_url: credentials + token redacted, structure preserved.
-  out["wire_redact_url"] =
-      json{{"redacted", RedactUrl("https://user:s3cr3t@api.signalwire.com/path?token=abc")}};
-
-  // wire_filter_sensitive_headers: authorization + x-api-key dropped,
-  // content-type kept.
-  {
-    std::map<std::string, std::string> headers = {
-        {"Authorization", "Bearer x"}, {"X-Api-Key", "y"}, {"Content-Type", "application/json"}};
-    auto filtered = FilterSensitiveHeaders(headers);
-    json fj = json::object();
-    for (const auto& [k, v] : filtered) fj[k] = v;
-    out["wire_filter_sensitive_headers"] = json{{"filtered", fj}};
-  }
-
-  std::cout << out.dump() << "\n";
-  return 0;
 }

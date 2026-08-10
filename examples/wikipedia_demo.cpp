@@ -1,18 +1,21 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Wikipedia search agent using the wikipedia_search skill.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("wikipedia", "/wikipedia");
 
     agent.prompt_add_section("Role", "You are a knowledge assistant with Wikipedia access.");
-    agent.prompt_add_section("Instructions", "", {
-        "Search Wikipedia when users ask about topics",
-        "Provide concise summaries from Wikipedia articles"
-    });
+    agent.prompt_add_section("Instructions", "",
+                             {"Search Wikipedia when users ask about topics",
+                              "Provide concise summaries from Wikipedia articles"});
 
     agent.add_skill("wikipedia_search");
     agent.add_skill("datetime");
@@ -20,4 +23,8 @@ int main() {
 
     std::cout << "Wikipedia agent at http://0.0.0.0:3000/wikipedia\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

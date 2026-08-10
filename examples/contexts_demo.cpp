@@ -1,18 +1,20 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Demonstrates contexts/steps system with multi-persona workflows.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("Computer Sales", "/contexts-demo");
 
-    agent.prompt_add_section("Instructions",
-        "Follow the structured sales workflow.", {
-            "Complete each step's criteria before advancing",
-            "Be helpful and consultative"
-        });
+    agent.prompt_add_section(
+        "Instructions", "Follow the structured sales workflow.",
+        {"Complete each step's criteria before advancing", "Be helpful and consultative"});
 
     auto& ctx = agent.define_contexts();
 
@@ -22,11 +24,8 @@ int main() {
     sales.add_section("Role", "You are Franklin, a computer sales agent.");
     sales.add_step("determine_use_case")
         .add_section("Task", "Identify the customer's primary use case")
-        .add_bullets("Questions", {
-            "What will they use the computer for?",
-            "Do they play games?",
-            "Do they need it for work?"
-        })
+        .add_bullets("Questions", {"What will they use the computer for?", "Do they play games?",
+                                   "Do they need it for work?"})
         .set_step_criteria("Customer has stated: GAMING, WORK, or BALANCED")
         .set_valid_steps({"determine_form_factor"})
         .set_valid_contexts({"tech_support", "manager"});
@@ -68,4 +67,8 @@ int main() {
 
     std::cout << "Contexts demo at http://0.0.0.0:3000/contexts-demo\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

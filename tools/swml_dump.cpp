@@ -79,10 +79,14 @@ json extract(const json& doc, const std::string& path) {
 
 // pick reduces a map fragment to the listed keys (mirrors the oracle's `pick`).
 json pick(const json& frag, const std::vector<std::string>& keys) {
-  if (!frag.is_object()) return frag;
+  if (!frag.is_object()) {
+    return frag;
+  }
   json out = json::object();
   for (const auto& k : keys) {
-    if (frag.contains(k)) out[k] = frag[k];
+    if (frag.contains(k)) {
+      out[k] = frag[k];
+    }
   }
   return out;
 }
@@ -92,92 +96,100 @@ json render(const AgentBase& a) { return a.render_swml(); }
 }  // namespace
 
 int main() {
-  json out = json::object();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    json out = json::object();
 
-  // swml_set_prompt_llm_params: two set_prompt_llm_params calls MERGE.
-  {
-    AgentBase a = new_agent();
-    a.set_prompt_llm_params(json{{"temperature", 0.5}});
-    a.set_prompt_llm_params(json{{"top_p", 0.9}});
-    out["swml_set_prompt_llm_params"] =
-        pick(extract(render(a), "ai.prompt"), {"temperature", "top_p"});
-  }
+    // swml_set_prompt_llm_params: two set_prompt_llm_params calls MERGE.
+    {
+      AgentBase a = new_agent();
+      a.set_prompt_llm_params(json{{"temperature", 0.5}});
+      a.set_prompt_llm_params(json{{"top_p", 0.9}});
+      out["swml_set_prompt_llm_params"] =
+          pick(extract(render(a), "ai.prompt"), {"temperature", "top_p"});
+    }
 
-  // swml_set_post_prompt_llm_params: establish a post-prompt, then merge params.
-  {
-    AgentBase a = new_agent();
-    a.set_post_prompt("Summarize the call.");
-    a.set_post_prompt_llm_params(json{{"temperature", 0.3}});
-    a.set_post_prompt_llm_params(json{{"top_p", 0.8}});
-    out["swml_set_post_prompt_llm_params"] =
-        pick(extract(render(a), "ai.post_prompt"), {"temperature", "top_p"});
-  }
+    // swml_set_post_prompt_llm_params: establish a post-prompt, then merge params.
+    {
+      AgentBase a = new_agent();
+      a.set_post_prompt("Summarize the call.");
+      a.set_post_prompt_llm_params(json{{"temperature", 0.3}});
+      a.set_post_prompt_llm_params(json{{"top_p", 0.8}});
+      out["swml_set_post_prompt_llm_params"] =
+          pick(extract(render(a), "ai.post_prompt"), {"temperature", "top_p"});
+    }
 
-  // swml_add_language: engine/model/voice carried into ai.languages.
-  {
-    AgentBase a = new_agent();
-    LanguageConfig lang;
-    lang.name = "English";
-    lang.code = "en-US";
-    lang.voice = "rime.spore";
-    lang.engine = "rime";
-    lang.model = "mistv2";
-    a.add_language(lang);
-    out["swml_add_language"] = extract(render(a), "ai.languages");
-  }
+    // swml_add_language: engine/model/voice carried into ai.languages.
+    {
+      AgentBase a = new_agent();
+      LanguageConfig lang;
+      lang.name = "English";
+      lang.code = "en-US";
+      lang.voice = "rime.spore";
+      lang.engine = "rime";
+      lang.model = "mistv2";
+      a.add_language(lang);
+      out["swml_add_language"] = extract(render(a), "ai.languages");
+    }
 
-  // swml_add_pattern_hint: structured hint into ai.hints.
-  {
-    AgentBase a = new_agent();
-    a.add_pattern_hint("SignalWire", "signal wire", "SignalWire", true);
-    out["swml_add_pattern_hint"] = extract(render(a), "ai.hints");
-  }
+    // swml_add_pattern_hint: structured hint into ai.hints.
+    {
+      AgentBase a = new_agent();
+      a.add_pattern_hint("SignalWire", "signal wire", "SignalWire", true);
+      out["swml_add_pattern_hint"] = extract(render(a), "ai.hints");
+    }
 
-  // swml_add_hint: a plain string hint.
-  {
-    AgentBase a = new_agent();
-    a.add_hint("SignalWire");
-    out["swml_add_hint"] = extract(render(a), "ai.hints");
-  }
+    // swml_add_hint: a plain string hint.
+    {
+      AgentBase a = new_agent();
+      a.add_hint("SignalWire");
+      out["swml_add_hint"] = extract(render(a), "ai.hints");
+    }
 
-  // swml_prompt_add_section: POM sections render into ai.prompt.pom.
-  {
-    AgentBase a = new_agent();
-    a.prompt_add_section("Role", "You are a helpful assistant.", {});
-    a.prompt_add_section("Rules", "", {"Be concise", "Be accurate"});
-    out["swml_prompt_add_section"] = extract(render(a), "ai.prompt.pom");
-  }
+    // swml_prompt_add_section: POM sections render into ai.prompt.pom.
+    {
+      AgentBase a = new_agent();
+      a.prompt_add_section("Role", "You are a helpful assistant.", {});
+      a.prompt_add_section("Rules", "", {"Be concise", "Be accurate"});
+      out["swml_prompt_add_section"] = extract(render(a), "ai.prompt.pom");
+    }
 
-  // swml_add_pronunciation: renders into ai.pronounce.
-  {
-    AgentBase a = new_agent();
-    a.add_pronunciation("SW", "SignalWire", true);
-    out["swml_add_pronunciation"] = extract(render(a), "ai.pronounce");
-  }
+    // swml_add_pronunciation: renders into ai.pronounce.
+    {
+      AgentBase a = new_agent();
+      a.add_pronunciation("SW", "SignalWire", true);
+      out["swml_add_pronunciation"] = extract(render(a), "ai.pronounce");
+    }
 
-  // swml_define_tool_complete_schema: define_tool with a COMPLETE
-  // {type,properties,required} schema must render ai.SWAIG.functions[?lookup]
-  // .parameters as that schema FLAT (pass-through), NOT double-wrapped.
-  {
-    AgentBase a = new_agent();
-    json schema = json{{"type", "object"},
-                       {"properties", {{"q", {{"type", "string"}}}}},
-                       {"required", json::array({"q"})}};
-    a.define_tool("lookup", "Look up a thing", schema,
-                  [](const json&, const json&) { return signalwire::swaig::FunctionResult("ok"); });
-    json funcs = extract(render(a), "ai.SWAIG.functions");
-    json params = json(nullptr);
-    if (funcs.is_array()) {
-      for (const auto& f : funcs) {
-        if (f.is_object() && f.value("function", "") == "lookup" && f.contains("parameters")) {
-          params = f["parameters"];
-          break;
+    // swml_define_tool_complete_schema: define_tool with a COMPLETE
+    // {type,properties,required} schema must render ai.SWAIG.functions[?lookup]
+    // .parameters as that schema FLAT (pass-through), NOT double-wrapped.
+    {
+      AgentBase a = new_agent();
+      json schema = json{{"type", "object"},
+                         {"properties", {{"q", {{"type", "string"}}}}},
+                         {"required", json::array({"q"})}};
+      a.define_tool("lookup", "Look up a thing", schema, [](const json&, const json&) {
+        return signalwire::swaig::FunctionResult("ok");
+      });
+      json funcs = extract(render(a), "ai.SWAIG.functions");
+      json params = json(nullptr);
+      if (funcs.is_array()) {
+        for (const auto& f : funcs) {
+          if (f.is_object() && f.value("function", "") == "lookup" && f.contains("parameters")) {
+            params = f["parameters"];
+            break;
+          }
         }
       }
+      out["swml_define_tool_complete_schema"] = params;
     }
-    out["swml_define_tool_complete_schema"] = params;
-  }
 
-  std::cout << out.dump() << "\n";
-  return 0;
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

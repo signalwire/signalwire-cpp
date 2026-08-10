@@ -9,6 +9,12 @@
 namespace signalwire {
 namespace core {
 
+// Every verb below goes through ``service_.add_verb(name, config)`` — the
+// VALIDATING entry point — never ``service_.document().add_verb(...)``, which
+// performs no schema check at all. The builder rode the raw path until task
+// #194; that is why a schema-forbidden config (a `play` `text` key, a `hangup`
+// `reason` outside the closed hangup|busy|decline enum) could be built here and
+// shipped. A caller now gets a ``SchemaValidationError`` at build time.
 SWMLBuilder::SWMLBuilder(swml::Service& service) : service_(service) {}
 
 SWMLBuilder& SWMLBuilder::answer(std::optional<int> max_duration,
@@ -20,7 +26,7 @@ SWMLBuilder& SWMLBuilder::answer(std::optional<int> max_duration,
   if (codecs.has_value()) {
     config["codecs"] = *codecs;
   }
-  service_.document().add_verb("answer", config);
+  service_.add_verb("answer", config);
   return *this;
 }
 
@@ -29,7 +35,7 @@ SWMLBuilder& SWMLBuilder::hangup(std::optional<std::string> reason) {
   if (reason.has_value()) {
     config["reason"] = *reason;
   }
-  service_.document().add_verb("hangup", config);
+  service_.add_verb("hangup", config);
   return *this;
 }
 
@@ -62,7 +68,7 @@ SWMLBuilder& SWMLBuilder::ai(std::optional<std::string> prompt_text, std::option
     }
   }
 
-  service_.document().add_verb("ai", config);
+  service_.add_verb("ai", config);
   return *this;
 }
 
@@ -98,7 +104,7 @@ SWMLBuilder& SWMLBuilder::play(std::optional<std::string> url,
     config["auto_answer"] = *auto_answer;
   }
 
-  service_.document().add_verb("play", config);
+  service_.add_verb("play", config);
   return *this;
 }
 

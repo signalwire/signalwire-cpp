@@ -34,10 +34,9 @@ namespace security {
 /// the raw body string.
 using FormParams = std::vector<std::pair<std::string, std::vector<std::string>>>;
 
-/// Drop-in shape for ``ValidateRequest`` mirroring
-/// ``@signalwire/compatibility-api``'s ``RestClient.validateRequest``:
-/// either a raw body string (delegates to the combined validator) or a
-/// pre-parsed form-params list (runs Scheme B directly).
+/// The request payload accepted by ``ValidateRequest``: either a raw body
+/// string (delegates to the combined validator) or a pre-parsed form-params
+/// list (runs Scheme B directly).
 using ParamsOrBody = std::variant<std::string, FormParams>;
 
 /// Validate a SignalWire webhook signature against both schemes.
@@ -81,18 +80,15 @@ bool ValidateRequest(std::string_view signing_key, std::string_view signature, s
                      const ParamsOrBody& params_or_raw_body);
 
 /// Response triple returned by ``Validate`` when a request must be
-/// rejected: ``(status, headers, body)`` — the framework-free decision
-/// core all ports share (Python ``webhook_middleware.validate``, dotnet
-/// ``WebhookValidationMiddleware.Validate``, Rack/PSGI middleware). Status
-/// is the HTTP status code, headers the response headers, body the
-/// response body text.
+/// rejected: ``(status, headers, body)``. Status is the HTTP status code,
+/// headers the response headers, body the response body text.
 using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, std::string>;
 
 /// Framework-free webhook-validation decision core. This is the decomposed
 /// shape the SDK exposes so users can validate a signed inbound
 /// request WITHOUT depending on a specific HTTP framework — the
 /// cpp-httplib ``WrapWithSignatureValidation`` middleware is a thin
-/// PORT_ADDITION idiom built on top of this.
+/// convenience built on top of this.
 ///
 /// Pulls ``X-SignalWire-Signature`` (or the legacy ``X-Twilio-Signature``
 /// alias) out of ``headers``, then runs ``ValidateWebhookSignature``

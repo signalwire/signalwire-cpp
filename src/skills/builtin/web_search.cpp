@@ -13,7 +13,7 @@ namespace skills {
 
 /// Google Custom Search API skill — issues a real GET against Google's
 /// `customsearch/v1` endpoint, parses the `items[]` results, and returns
-/// a human-readable summary. Matches Python's `WebSearchSkill` behavior.
+/// a human-readable summary.
 ///
 /// Configuration:
 ///   - api_key (or env GOOGLE_SEARCH_API_KEY / GOOGLE_API_KEY)

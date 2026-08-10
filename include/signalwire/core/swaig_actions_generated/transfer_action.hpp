@@ -23,7 +23,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct TransferAction {
-  std::optional<json> dest;
+  std::optional<std::string> dest;
   std::optional<bool> summarize;
   json extras = json::object();
 };

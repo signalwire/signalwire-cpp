@@ -3,15 +3,13 @@
 //
 // SwmlRenderer — SWML document rendering utilities.
 //
-// Mirrors the Python reference signalwire.core.swml_renderer.SwmlRenderer (two
-// static helpers) and the Java port com.signalwire.sdk.swml.SwmlRenderer. Both
-// helpers are static; they build a document on a swml::Service (via SWMLBuilder)
-// and return the rendered SWML string.
+// Two static helpers; both build a document on a swml::Service (via
+// SWMLBuilder) and return the rendered SWML string.
 //
-// render_swml has many optional inputs. The reference passes them as keyword
-// args; the C++ idiom for that is a RenderOptions struct (named fields with
-// reference defaults), mirroring the Java RenderOptions builder object. A
-// convenience minimal-form overload covers the common (prompt, service) call.
+// render_swml has many optional inputs, so they are gathered into a
+// RenderOptions struct of named fields with defaults rather than a long
+// positional parameter list. A convenience minimal-form overload covers the
+// common (prompt, service) call.
 
 #pragma once
 
@@ -27,9 +25,9 @@ namespace core {
 
 using json = nlohmann::json;
 
-/// Named-parameter options for SwmlRenderer::render_swml — the C++ analog of the
-/// reference's keyword arguments. The two required inputs (prompt, service) are
-/// passed to render_swml directly; the rest live here with reference defaults.
+/// Named-parameter options for SwmlRenderer::render_swml. The two required
+/// inputs (prompt, service) are passed to render_swml directly; every other
+/// input lives here with a default.
 struct RenderOptions {
   std::optional<std::string> post_prompt;
   std::optional<std::string> post_prompt_url;
@@ -58,7 +56,9 @@ class SwmlRenderer {
                                                const RenderOptions& opts = {});
 
   /// Generate a SWML document for a function response — a `play` of the
-  /// response text followed by any provided actions.
+  /// response text followed by any provided actions. The response text is
+  /// emitted as `play: {url: "say:<text>"}`: the SWML `play` verb has no
+  /// `text` key, so the `say:` URL scheme is how spoken text reaches the wire.
   [[nodiscard]] static std::string render_function_response_swml(
       const std::string& response_text, swml::Service& service,
       const std::optional<std::vector<json>>& actions = std::nullopt,

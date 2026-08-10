@@ -128,6 +128,7 @@ static std::vector<TestCase>& get_tests() {
 
 // Utils
 #include "test_execution_mode.cpp"
+#include "test_schema_anyof.cpp"
 #include "test_schema_utils_parity.cpp"
 #include "test_url_validator.cpp"
 

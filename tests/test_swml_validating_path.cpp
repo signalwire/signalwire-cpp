@@ -163,13 +163,12 @@ TEST(validating_path_builder_hangup_unknown_key_rejected) {
   // where it previously rode the raw path into the document.
   //
   // NOTE — a SEPARATE, PRE-EXISTING gap, deliberately not asserted here:
-  // ``$defs/Hangup.reason`` is a CLOSED enum (``anyOf`` of ``const``
-  // hangup|busy|decline) and the Python reference REJECTS
-  // ``hangup {reason: "done"}``, but this port's ``validate_verb_full`` does not
-  // enforce ``anyOf``/``const`` VALUES — only key names and coarse types. That
-  // is a validator-depth gap, not a bypass gap, and fixing it is out of scope
-  // for the ITEM-4 routing change; asserting it here would red on a defect this
-  // commit does not claim to fix.
+  // ``$defs/Hangup.reason`` is a CLOSED enum of the six values the engine
+  // accepts (``relay_apis.c:1105``: hangup,cancel,busy,noAnswer,decline,error),
+  // so ``hangup {reason: "done"}`` is invalid on the wire — but this port's
+  // ``validate_verb_full`` does not enforce ``enum``/``const`` VALUES, only key
+  // names and coarse types. That is a validator-depth gap, not a bypass gap;
+  // asserting it here would red on a defect this commit does not claim to fix.
   signalwire::swml::Service svc;
   svc.set_name("s").set_route("/s");
   ASSERT_THROWS(svc.add_verb("hangup", json::object({{"raeson", "busy"}})));

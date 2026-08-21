@@ -558,25 +558,19 @@
                     "type": "object",
                     "properties": {
                         "reason": {
-                            "anyOf": [
-                                {
-                                    "type": "string",
-                                    "const": "hangup"
-                                },
-                                {
-                                    "type": "string",
-                                    "const": "busy"
-                                },
-                                {
-                                    "type": "string",
-                                    "const": "decline"
-                                }
+                            "type": "string",
+                            "enum": [
+                                "hangup",
+                                "cancel",
+                                "busy",
+                                "noAnswer",
+                                "decline",
+                                "error"
                             ],
                             "examples": [
                                 "busy"
                             ],
-                            "description": "The reason for hanging up the call.",
-                            "x-sdk-widen": true
+                            "description": "The reason for hanging up the call."
                         }
                     },
                     "unevaluatedProperties": {

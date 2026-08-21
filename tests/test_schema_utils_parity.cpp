@@ -139,43 +139,34 @@ TEST(schema_validation_error_message) {
 // Hangup.reason: the schema's const-union is a HINT, not a closed set
 // ============================================================================
 //
-// `$defs/Hangup.reason` declares anyOf[const "hangup", const "busy",
-// const "decline"] and carries the marker meaning "the platform accepts any
-// value of the base type; this union is only a hint". The validator therefore
-// must NOT reject a legitimate platform value that is absent from the union --
-// rejecting one is a bug on the public API in the direction nobody looks for:
-// too STRICT, refusing documents the platform accepts.
+// `$defs/Hangup.reason` publishes the engine's closed six-value set.
+// mod_infrastructure/relay_apis.c:1105 states
+//   JSON_CHECK_STRING_MATCHES_OPTIONAL(reason, "hangup,cancel,busy,noAnswer,decline,error")
+// and a non-match is a hard reject, so those six -- and only those six -- are
+// valid on the wire. The schema previously listed only hangup|busy|decline and
+// carried an x-sdk-widen marker; both were wrong, and the node now carries the
+// real enum with no marker.
 //
-// The validator reaches that behaviour by not enforcing const/enum VALUES at
-// all. This test pins the OBSERVABLE contract rather than the mechanism, so it
-// keeps holding if const enforcement is ever added -- at which point whoever
-// adds it must make this field read the marker, or go red here. That is the
-// point: widen-awareness is a PRECONDITION of const enforcement, not a
-// follow-up to it.
-TEST(schema_utils_hangup_reason_accepts_values_outside_the_const_union) {
+// This port's validate_verb_full does not enforce const/enum VALUES at all, so
+// every string passes here regardless. The test pins the six ENGINE values as
+// the ones that must keep passing, so whoever adds value enforcement has the
+// right target: enforcing against the schema keeps this test green, while a
+// non-engine reason such as `no_answer` would then correctly start failing.
+TEST(schema_utils_hangup_reason_accepts_every_engine_value) {
   SchemaUtils su;
 
-  // In the union -- accepted, obviously.
-  for (const char* in_union : {"hangup", "busy", "decline"}) {
-    auto [ok, errors] = su.validate_verb("hangup", json{{"reason", in_union}});
-    ASSERT_TRUE(ok);
-    ASSERT_TRUE(errors.empty());
-  }
-
-  // NOT in the union, but legitimate platform values. Rejecting either of
-  // these would be the too-strict bug.
-  for (const char* outside : {"no_answer", "user_hangup"}) {
-    auto [ok, errors] = su.validate_verb("hangup", json{{"reason", outside}});
+  // The six values relay_apis.c:1105 accepts. cancel, noAnswer and error were
+  // absent from the schema's earlier three-const union.
+  for (const char* reason : {"hangup", "cancel", "busy", "noAnswer", "decline", "error"}) {
+    auto [ok, errors] = su.validate_verb("hangup", json{{"reason", reason}});
     ASSERT_TRUE(ok);
     ASSERT_TRUE(errors.empty());
   }
   return true;
 }
 
-// The BASE TYPE still binds. Treating the union as a hint widens the field to
-// "any string" -- it does not erase the type, so a non-string is still wrong
-// and must still be rejected. A validator that accepted 42 here would have
-// widened by deleting the constraint rather than by recovering the base type.
+// The BASE TYPE still binds: a non-string is wrong and must be rejected even
+// though this validator does not check the value set.
 TEST(schema_utils_hangup_reason_still_rejects_wrong_base_type) {
   SchemaUtils su;
   const std::vector<json> not_strings = {json(42), json(true), json::object(), json::array()};

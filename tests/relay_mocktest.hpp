@@ -139,6 +139,10 @@ struct InboundCallOpts {
     std::vector<std::string> auto_states;
     int delay_ms = 50;
     std::string session_id;
+    // Replay the calling.call.receive frame this many EXTRA times
+    // (byte-identical, before the state frames) to drive RELAY's
+    // at-least-once delivery. See porting-sdk RELAY_IMPLEMENTATION_GUIDE.md.
+    int redeliver_receive = 0;
 };
 json inbound_call(const InboundCallOpts& opts);
 

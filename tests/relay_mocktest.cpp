@@ -488,6 +488,7 @@ json inbound_call(const InboundCallOpts& opts) {
     body["to_number"] = opts.to_number;
     body["context"] = opts.context;
     body["delay_ms"] = opts.delay_ms;
+    body["redeliver_receive"] = opts.redeliver_receive;
     if (!opts.auto_states.empty()) {
         body["auto_states"] = opts.auto_states;
     } else {

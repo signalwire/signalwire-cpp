@@ -11,6 +11,7 @@
 #include "relay_mocktest.hpp"
 #include "signalwire/relay/client.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -538,6 +539,117 @@ TEST(relay_mock_inbound_without_handler_does_not_crash) {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     ASSERT_TRUE(client->is_connected());
+    client->disconnect();
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Redelivered calling.call.receive (porting-sdk#141)
+//
+// RELAY delivers at least once: the same receive frame can arrive twice for
+// one call. Receive must therefore be idempotent per call_id — see the
+// "Event Redelivery" section of porting-sdk's RELAY_IMPLEMENTATION_GUIDE.md.
+// ---------------------------------------------------------------------------
+
+// Without the idempotency guard the second receive builds a second Call and
+// re-registers it under the same call_id. Routing only ever reads that map, so
+// the first Call — the reference the application's handler was given — silently
+// stops receiving events and never reaches a terminal state.
+TEST(relay_mock_redelivered_receive_keeps_the_live_call) {
+    auto client = mt::make_client();
+    std::vector<Call*> handler_calls;
+    std::mutex mtx;
+    std::condition_variable cv;
+
+    client->on_call([&](Call& c) {
+        std::unique_lock<std::mutex> lock(mtx);
+        handler_calls.push_back(&c);
+        cv.notify_all();
+    });
+
+    mt::InboundCallOpts opts;
+    opts.call_id = "c-redeliver";
+    opts.auto_states = {"ringing", "answered"};
+    opts.delay_ms = 20;
+    opts.redeliver_receive = 1;
+    mt::inbound_call(opts);
+
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait_for(lock, std::chrono::seconds(5),
+                    [&] { return !handler_calls.empty(); });
+    }
+    // Let the redelivery and the trailing state frame drain.
+    std::this_thread::sleep_for(std::chrono::milliseconds(600));
+
+    Call* first = nullptr;
+    size_t invocations = 0;
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        invocations = handler_calls.size();
+        if (invocations > 0) first = handler_calls[0];
+    }
+
+    // 1. One call means one handler invocation.
+    ASSERT_EQ(invocations, static_cast<size_t>(1));
+
+    // 2. The instance the application holds is still the one events route to.
+    //    A replacement registered under the same id would leave it at "ringing".
+    ASSERT_TRUE(first != nullptr);
+    ASSERT_EQ(first->state(), std::string("answered"));
+
+    // The duplicate really was on the wire — otherwise this proves nothing.
+    size_t redelivered = 0;
+    for (const auto& e : mt::journal_send("calling.call.receive")) {
+        const json& inner = e.frame["params"]["params"];
+        if (inner.contains("call_id") && inner["call_id"] == "c-redeliver") {
+            redelivered++;
+        }
+    }
+    ASSERT_EQ(redelivered, static_cast<size_t>(2));
+
+    client->disconnect();
+    return true;
+}
+
+// The dedup is per call_id and must not swallow a genuinely new concurrent
+// inbound call.
+TEST(relay_mock_distinct_call_ids_still_create_separate_calls) {
+    auto client = mt::make_client();
+    std::vector<std::string> seen;
+    std::mutex mtx;
+    std::condition_variable cv;
+
+    client->on_call([&](Call& c) {
+        std::unique_lock<std::mutex> lock(mtx);
+        seen.push_back(c.call_id());
+        cv.notify_all();
+    });
+
+    mt::InboundCallOpts first_opts;
+    first_opts.call_id = "c-first";
+    first_opts.auto_states = {"ringing"};
+    first_opts.delay_ms = 5;
+    mt::inbound_call(first_opts);
+
+    mt::InboundCallOpts second_opts;
+    second_opts.call_id = "c-second";
+    second_opts.auto_states = {"ringing"};
+    second_opts.delay_ms = 5;
+    mt::inbound_call(second_opts);
+
+    {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait_for(lock, std::chrono::seconds(5),
+                    [&] { return seen.size() >= 2; });
+    }
+
+    std::unique_lock<std::mutex> lock(mtx);
+    ASSERT_EQ(seen.size(), static_cast<size_t>(2));
+    std::sort(seen.begin(), seen.end());
+    ASSERT_EQ(seen[0], std::string("c-first"));
+    ASSERT_EQ(seen[1], std::string("c-second"));
+
     client->disconnect();
     return true;
 }

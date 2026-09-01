@@ -504,10 +504,27 @@ void RelayClient::handle_inbound_call(const RelayEvent& ev) {
     return;
   }
 
+  // RELAY delivers at least once, so calling.call.receive can arrive again for
+  // a call already in flight. Receive is idempotent per call_id: keep the live
+  // instance and do NOT re-enter the on_call handler. Registering a
+  // replacement would orphan the Call the application is holding — routing only
+  // ever reads calls_ by call_id, so the original would silently stop receiving
+  // events and a blocking action on it would wait out its timeout instead of
+  // returning at hangup (and the displaced Call would linger in owned_calls_).
+  // The event is ACKed by the recv loop before this runs, so returning early
+  // still stops the server's retries. Mirrors the dial path, which already
+  // guards with find_call() before registering (handle_dial_event).
+  if (find_call(call_id) != nullptr) {
+    get_logger().debug("Ignoring redelivered calling.call.receive for in-flight call " + call_id);
+    return;
+  }
+
   // MAX_ACTIVE_CALLS cap (r5 F5.4): enforce the bound at insertion time so a
   // suppressed/dropped terminal event can never grow calls_ without limit. If
   // the map is already at max_active_calls, drop the inbound call rather than
-  // register it (mirrors python's _handle_inbound_call len-guard).
+  // register it (mirrors python's _handle_inbound_call len-guard). Checked
+  // AFTER the dedup above: a redelivery for a call already in the map is not a
+  // new call, so it must never be counted against the cap or logged as a drop.
   {
     std::lock_guard<std::mutex> lock(calls_mutex_);
     if (static_cast<int>(calls_.size()) >= config_.max_active_calls) {

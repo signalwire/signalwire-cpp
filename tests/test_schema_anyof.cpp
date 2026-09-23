@@ -91,7 +91,9 @@ inline std::vector<UnionVerb> union_verbs() {
 
 inline bool errors_mention(const std::vector<std::string>& errors, const std::string& needle) {
   for (const auto& e : errors) {
-    if (e.find(needle) != std::string::npos) return true;
+    if (e.find(needle) != std::string::npos) {
+      return true;
+    }
   }
   return false;
 }

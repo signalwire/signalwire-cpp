@@ -65,8 +65,8 @@ class NativeVectorSearchSkill : public SkillBase {
   }
 
  private:
-  /// Network mode (Python _search_remote): POST {query,index_name,count,...} to
-  /// <remote_url>/search and format the returned results into the tool result.
+  /// Network mode: POST {query,index_name,count,...} to <remote_url>/search
+  /// and format the returned results into the tool result.
   swaig::FunctionResult search_remote(const std::string& query, int count) const {
     json request = json::object({
         {"query", query},

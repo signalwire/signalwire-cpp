@@ -53,8 +53,8 @@ namespace relay {
 // CallState — calling.call.state `call_state`
 // ---------------------------------------------------------------------------
 
-/// Call lifecycle state. Mirrors `CALL_STATE_*` / `CALL_STATES` in
-/// `relay/constants.py`. Server-emitted and may grow → `call_state_from_string`
+/// Call lifecycle state. The typed form of `CALL_STATE_*` / `CALL_STATES` in
+/// `relay/constants.hpp`. Server-emitted and may grow → `call_state_from_string`
 /// returns an optional on an unknown value.
 enum class CallState {
   Created,
@@ -159,7 +159,8 @@ enum class DialState {
 // MessageState — messaging.state `message_state`
 // ---------------------------------------------------------------------------
 
-/// SMS/MMS delivery state. Mirrors `MESSAGE_STATE_*` in `relay/constants.py`.
+/// SMS/MMS delivery state. The typed form of `MESSAGE_STATE_*` in
+/// `relay/constants.hpp`.
 /// Terminal set == `MESSAGE_TERMINAL_STATES` {delivered, undelivered, failed}.
 /// NOTE `failed` here is the MESSAGE failure state — NOT `DialState::Failed`;
 /// the two vocabularies are separate and must not be unified. Server-emitted →

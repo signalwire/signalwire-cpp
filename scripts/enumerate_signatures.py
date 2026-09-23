@@ -37,6 +37,7 @@ import importlib.util as _ilu
 import os as _os
 import sysconfig as _sc
 
+
 def _macos_llvm_prefixes() -> list[str]:
     """Candidate Homebrew LLVM install prefixes on macOS, newest-pinned first.
 
@@ -47,10 +48,9 @@ def _macos_llvm_prefixes() -> list[str]:
     prefixes: list[str] = []
     # `brew --prefix llvm` / versioned kegs, without requiring brew on PATH:
     # probe the standard Apple-silicon and Intel Cellar/opt layouts.
-    import glob as _glob
     for base in ("/opt/homebrew/opt", "/usr/local/opt"):
         # Prefer an explicitly versioned keg (llvm@18, llvm@19, …) then plain llvm.
-        prefixes += sorted(_glob.glob(f"{base}/llvm@*"), reverse=True)
+        prefixes += sorted((str(q) for q in Path(base).glob("llvm@*")), reverse=True)
         prefixes.append(f"{base}/llvm")
     return prefixes
 
@@ -67,7 +67,6 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
     Derived from the same LLVM prefix that provided libclang.dylib so the dylib
     and headers are one self-consistent toolchain.
     """
-    import glob as _glob
     args: list[str] = []
     try:
         sdk = subprocess.run(
@@ -76,7 +75,10 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
         if sdk and Path(sdk).is_dir():
             args += ["-isysroot", sdk]
     except (OSError, subprocess.CalledProcessError) as e:
-        print(f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr)
+        print(
+            f"enumerate_signatures: xcrun --show-sdk-path failed ({e})", file=sys.stderr
+        )
+
     # Find a libc++ + builtin (resource) header pair. Prefer the prefix that
     # provided libclang.dylib (a self-consistent toolchain); but the pip
     # `libclang` package's dylib lives in clang/native/ with NO headers — in
@@ -84,11 +86,16 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
     # doesn't silently degrade types to `int`.
     def _libcxx_and_builtins(prefix: Path):
         libcxx = prefix / "include" / "c++" / "v1"
-        builtins = sorted(_glob.glob(str(prefix / "lib" / "clang" / "*" / "include")), reverse=True)
+        builtins = sorted(
+            (str(q) for q in (prefix / "lib" / "clang").glob("*/include")), reverse=True
+        )
         return (str(libcxx), builtins[0]) if libcxx.is_dir() and builtins else None
+
     found = None
     if libclang_path:
-        found = _libcxx_and_builtins(Path(libclang_path).parent.parent)  # <prefix>/lib/libclang.dylib
+        found = _libcxx_and_builtins(
+            Path(libclang_path).parent.parent
+        )  # <prefix>/lib/libclang.dylib
     if not found:
         for prefix in _macos_llvm_prefixes():
             found = _libcxx_and_builtins(Path(prefix))
@@ -98,9 +105,11 @@ def _macos_clang_args(libclang_path: str | None) -> list[str]:
         libcxx, builtins = found
         args += ["-nostdinc++", "-isystem", libcxx, "-isystem", builtins]
     else:
-        print("enumerate_signatures: no matched libc++/builtin headers found on "
-              "macOS (install a Homebrew `llvm` keg); C++ types may degrade to int",
-              file=sys.stderr)
+        print(
+            "enumerate_signatures: no matched libc++/builtin headers found on "
+            "macOS (install a Homebrew `llvm` keg); C++ types may degrade to int",
+            file=sys.stderr,
+        )
     return args
 
 
@@ -155,11 +164,14 @@ def _find_libclang() -> str | None:
         "/usr/lib/x86_64-linux-gnu/libclang-15.so.1",
         # Local-dev fallback: the clang python bindings' bundled native lib,
         # derived from $HOME so it is machine-agnostic.
-        str(Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"),
+        str(
+            Path.home() / ".local/lib/python3.12/site-packages/clang/native/libclang.so"
+        ),
     ):
         if Path(cand).is_file():
             return cand
     return None
+
 
 _LIBCLANG = _find_libclang()
 if _LIBCLANG:
@@ -190,9 +202,17 @@ PSDK = _resolve_psdk()
 sys.path.insert(0, str(HERE))
 from enumerate_surface import (  # type: ignore
     CALLBACK_TYPEDEFS_AS_CALLABLE,
-    CLASS_MODULE_MAP, CLASS_RENAME_MAP, FREE_FUNCTION_RENAMES,
-    MIXIN_PROJECTIONS, _METHOD_RENAMES,
-    camel_to_snake, module_for_class, native_ns_to_module,
+    CLASS_MODULE_MAP,
+    CLASS_RENAME_MAP,
+    FREE_FUNCTION_RENAMES,
+    MIXIN_PROJECTIONS,
+    SKILL_SOURCE_DIR,
+    _METHOD_RENAMES,
+    camel_to_snake,
+    module_for_class,
+    native_ns_to_module,
+    strip_block_comments,
+    strip_line_comments,
 )
 
 # Methods whose canonical name should resolve to the OVERLOAD WITH THE MOST
@@ -297,10 +317,10 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
         new_t = t
         for prefix in ("const ", "volatile ", "constexpr "):
             if new_t.startswith(prefix):
-                new_t = new_t[len(prefix):].strip()
+                new_t = new_t[len(prefix) :].strip()
         for suffix in ("&&", "&", "*"):
             if new_t.endswith(suffix):
-                new_t = new_t[:-len(suffix)].strip()
+                new_t = new_t[: -len(suffix)].strip()
         if new_t == t:
             break
         t = new_t
@@ -331,8 +351,7 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
         if head in ("std::optional", "boost::optional"):
             return f"optional<{canon_args[0]}>" if canon_args else "optional<any>"
         if head in ("std::shared_ptr", "std::unique_ptr", "std::weak_ptr"):
-            inner_canon = canon_args[0] if canon_args else "any"
-            return inner_canon
+            return canon_args[0] if canon_args else "any"
         if head in ("std::function",):
             # std::function<R(A,B,...)>
             if canon_args:
@@ -343,7 +362,10 @@ def translate_cpp_type(t: str, aliases: dict[str, str], context: str) -> str:
                     args_part = args_part[:-1]
                     ret = translate_cpp_type(ret_part, aliases, context)
                     if args_part.strip():
-                        canon_a = [translate_cpp_type(a, aliases, context) for a in split_top_commas(args_part)]
+                        canon_a = [
+                            translate_cpp_type(a, aliases, context)
+                            for a in split_top_commas(args_part)
+                        ]
                     else:
                         canon_a = []
                     return f"callable<list<{','.join(canon_a)}>,{ret}>"
@@ -388,7 +410,7 @@ def _build_rename_by_name() -> dict[str, tuple[str, str]]:
     multiple namespaces in the map, prefer the first registration.
     """
     by_name: dict[str, tuple[str, str]] = {}
-    for (ns, cls_name), (mod, py_cls) in CLASS_RENAME_MAP.items():
+    for (_ns, cls_name), (mod, py_cls) in CLASS_RENAME_MAP.items():
         by_name.setdefault(cls_name, (mod, py_cls))
     return by_name
 
@@ -437,8 +459,7 @@ def _translate_sdk_class_ref(t: str) -> str:
     # table keys on ``(signalwire::rest, AddressesNamespace)``.
     ns_candidates = [ns_path] if ns_path else []
     parts = ns_path.split("::") if ns_path else []
-    for i in range(len(parts) - 1, 0, -1):
-        ns_candidates.append("::".join(parts[:i]))
+    ns_candidates.extend("::".join(parts[:i]) for i in range(len(parts) - 1, 0, -1))
     for ns in ns_candidates:
         if (ns, name) in CLASS_RENAME_MAP:
             target_mod, target_cls = CLASS_RENAME_MAP[(ns, name)]
@@ -454,7 +475,11 @@ def _translate_sdk_class_ref(t: str) -> str:
     mod = module_for_class(name, ns_path)
     if mod:
         return f"class:{mod}.{name}"
-    return f"class:signalwire.{native_ns_to_module(ns_path)}.{name}" if ns_path else f"class:{name}"
+    return (
+        f"class:signalwire.{native_ns_to_module(ns_path)}.{name}"
+        if ns_path
+        else f"class:{name}"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -463,7 +488,8 @@ def _translate_sdk_class_ref(t: str) -> str:
 
 
 def walk_translation_unit(
-    tu: TranslationUnit, file_filter: Path,
+    tu: TranslationUnit,
+    file_filter: Path,
 ) -> tuple[list[dict], list[dict], dict[str, list[dict]]]:
     """Walk a clang TU and emit (class entries, free-function entries).
 
@@ -477,7 +503,7 @@ def walk_translation_unit(
 
     def visit(cursor, ns_path: list[str]):
         if cursor.kind in (CursorKind.NAMESPACE,):
-            new_ns = ns_path + [cursor.spelling]
+            new_ns = [*ns_path, cursor.spelling]
             for child in cursor.get_children():
                 visit(child, new_ns)
             return
@@ -495,27 +521,16 @@ def walk_translation_unit(
             fname = cursor.spelling
             if not fname or fname.startswith("_"):
                 return
-            params = []
-            for arg in cursor.get_arguments():
-                params.append({
-                    "name": arg.spelling,
-                    "type": arg.type.spelling,
-                    # Carry the canonical spelling alongside the
-                    # typedef-aware spelling so the translator can fall
-                    # back to it when a typedef (e.g. ``ParamsOrBody``
-                    # over ``std::variant<...>``) is opaque to its
-                    # bare-name lookup. Class methods use the same trick
-                    # via ``extract_method``.
-                    "canonical_type": arg.type.get_canonical().spelling,
-                    "has_default": _has_default_value(arg),
-                })
-            free_functions.append({
-                "namespace": "::".join(ns_path),
-                "name": fname,
-                "parameters": params,
-                "return_type": cursor.result_type.spelling,
-                "canonical_return_type": cursor.result_type.get_canonical().spelling,
-            })
+            params = [_param_record(arg) for arg in cursor.get_arguments()]
+            free_functions.append(
+                {
+                    "namespace": "::".join(ns_path),
+                    "name": fname,
+                    "parameters": params,
+                    "return_type": cursor.result_type.spelling,
+                    "canonical_return_type": cursor.result_type.get_canonical().spelling,
+                }
+            )
             return
         if cursor.kind in (CursorKind.CLASS_DECL, CursorKind.STRUCT_DECL):
             if not cursor.is_definition():
@@ -545,11 +560,13 @@ def walk_translation_unit(
                 fname = child.spelling
                 if not fname or fname.startswith("_") or fname.endswith("_"):
                     continue
-                fields.append({
-                    "name": fname,
-                    "type": child.type.spelling,
-                    "canonical_type": child.type.get_canonical().spelling,
-                })
+                fields.append(
+                    {
+                        "name": fname,
+                        "type": child.type.spelling,
+                        "canonical_type": child.type.get_canonical().spelling,
+                    }
+                )
             for child in cursor.get_children():
                 if child.kind == CursorKind.CXX_METHOD:
                     if child.access_specifier.name != "PUBLIC":
@@ -586,13 +603,33 @@ def walk_translation_unit(
             # and thereby inventing an inventory class.
             if fields:
                 options_structs[f"{ns_str}::{class_name}"] = fields
-            if methods:
-                entries.append({
+            # A fields-only POD is admitted to the inventory ONLY when the
+            # reference ORACLE records a class of that name in the module this
+            # class maps to — i.e. the reference genuinely has this class and
+            # spells its whole surface as attributes. That is the case for the
+            # credential carriers (``BasicCredentials``/``BearerCredentials``,
+            # two std::string fields and no methods at all): the reference
+            # records them as dataclasses whose members ARE the fields, so
+            # dropping them here made an implemented carrier read as
+            # missing-port drift. The oracle gate is what keeps this from
+            # inventing an inventory class out of an internal options struct
+            # (``RelayConfig`` has no reference counterpart and stays out).
+            if (
+                not methods
+                and fields
+                and _oracle_records_class(ns_str, class_name, str(fn.name))
+            ):
+                methods = []
+            elif not methods:
+                return
+            entries.append(
+                {
                     "namespace": ns_str,
                     "name": class_name,
                     "methods": methods,
                     "fields": fields,
-                })
+                }
+            )
             return
         # Recurse into other top-level structures
         for child in cursor.get_children():
@@ -615,35 +652,57 @@ def _is_copy_or_move_ctor(cursor) -> bool:
             try:
                 if fn():
                     return True
-            except Exception:
-                pass
+            except (AttributeError, TypeError, ValueError) as e:
+                # The binding exposes the name but cannot evaluate it (older
+                # libclang builds raise instead of returning False). That is
+                # precisely what the structural fallback below exists for, so
+                # carry on -- but SAY which predicate was unusable: a silent
+                # pass here is indistinguishable from "the predicate said no",
+                # and the two have very different consequences for the
+                # ctor/dunder classification this function drives.
+                print(
+                    f"enumerate_signatures: libclang {pred}() unusable ({e}); "
+                    "falling back to the structural copy/move test",
+                    file=sys.stderr,
+                )
     args = list(cursor.get_arguments())
     if len(args) != 1:
         return False
     t = args[0].type.get_canonical().spelling
     for prefix in ("const ", "volatile "):
         while t.startswith(prefix):
-            t = t[len(prefix):]
+            t = t[len(prefix) :]
     t = t.rstrip("&").strip()
     for prefix in ("const ", "volatile "):
         while t.startswith(prefix):
-            t = t[len(prefix):]
+            t = t[len(prefix) :]
     return t.rsplit("::", 1)[-1] == cursor.semantic_parent.spelling
 
 
+def _param_record(arg) -> dict:
+    """Raw parameter record for one PARM_DECL cursor.
+
+    ``canonical_type`` carries the typedef-EXPANDED spelling alongside the
+    typedef-aware one so the translator can fall back to it when a port-internal
+    typedef (e.g. ``ParamsOrBody`` over ``std::variant<...>``) is opaque to its
+    bare-name lookup. See ``_translate_with_canonical_fallback``.
+
+    ``default_value`` is the parsed default-argument literal, or ``_NO_DEFAULT``
+    when the parameter has no default OR its default is a non-literal expression;
+    ``has_default`` distinguishes those two cases.
+    """
+    has_default, default_value = _extract_default(arg)
+    return {
+        "name": arg.spelling,
+        "type": arg.type.spelling,
+        "canonical_type": arg.type.get_canonical().spelling,
+        "has_default": has_default,
+        "default_value": default_value,
+    }
+
+
 def extract_method(cursor, is_ctor: bool) -> dict:
-    params = []
-    for arg in cursor.get_arguments():
-        params.append({
-            "name": arg.spelling,
-            "type": arg.type.spelling,
-            # Carry the canonical (typedef-expanded) spelling so the
-            # translator can fall back to it when a port-internal
-            # typedef hides a known type. See
-            # ``_translate_with_canonical_fallback``.
-            "canonical_type": arg.type.get_canonical().spelling,
-            "has_default": _has_default_value(arg),
-        })
+    params = [_param_record(arg) for arg in cursor.get_arguments()]
     return {
         "name": "<init>" if is_ctor else cursor.spelling,
         "is_constructor": is_ctor,
@@ -656,13 +715,634 @@ def extract_method(cursor, is_ctor: bool) -> dict:
     }
 
 
-def _has_default_value(arg) -> bool:
-    """Heuristic: scan tokens for '=' after the arg name."""
+# Sentinel distinguishing "this parameter has NO default" from "it has a default
+# whose value we could not reduce to a JSON literal". ``None`` cannot serve for
+# either, because ``None`` is also the value we emit for a genuine ``nullptr`` /
+# ``std::nullopt`` default.
+_NO_DEFAULT = object()
+
+
+def _default_tokens(arg) -> list[str] | None:
+    """Token spellings of a parameter's default-argument EXPRESSION, or None.
+
+    libclang's Python binding has no ``clang_getParmDeclDefaultArgument``, but the
+    PARM_DECL cursor's own token extent covers the whole ``<type> <name> = <expr>``
+    declaration, so the default expression is recoverable as the tokens after the
+    parameter's top-level ``=``.
+
+    "Top-level" is load-bearing: the ``=`` must be located at zero bracket depth so
+    a template argument list (``std::map<std::string, int> m = {}``) or a nested
+    ``<...>`` cannot be mistaken for the assignment.
+
+    Depth is counted PER CHARACTER, not per token, because libclang emits a nested
+    template close as the SINGLE token ``>>`` (and ``>>>`` for triple nesting) —
+    the C++ right-shift spelling. Decrementing once per token left the depth
+    permanently positive for every ``std::optional<std::vector<std::string>>``
+    parameter, so its ``=`` was never seen at top level and a real default was
+    silently reported as NO default (flipping ``required`` to true on 32 params).
+    Likewise ``->`` / ``<=`` / ``>=`` must not be counted as brackets at all.
+    """
     try:
-        tokens = list(arg.get_tokens())
+        tokens = [t.spelling for t in arg.get_tokens()]
     except Exception:
+        return None
+    # Multi-character operator tokens that CONTAIN an angle bracket but are not
+    # template punctuation. Checked before the per-character bracket count.
+    _NON_BRACKET_OPS = {"->", "->*", "<=", ">=", "<=>", "==", "!=", "<<", "&&"}
+    depth = 0
+    for i, tok in enumerate(tokens):
+        if tok == "=" and depth == 0:
+            rest = tokens[i + 1 :]
+            return rest or None
+        if tok in _NON_BRACKET_OPS:
+            continue
+        for ch in tok:
+            if ch in "<([{":
+                depth += 1
+            elif ch in ">)]}":
+                depth -= 1
+    return None
+
+
+# C++ default expressions that mean "absent" and translate to a JSON null. These
+# are REAL defaults — a parameter carrying one is ``required: false`` with an
+# explicit null, which is NOT the same as a parameter with no default at all.
+_NULLISH_DEFAULTS = {
+    ("nullptr",),
+    ("NULL",),
+    ("std", "::", "nullopt"),
+    ("nullopt",),
+}
+
+# Empty brace-init ``= {}`` — a real default meaning "value-initialized". Its JSON
+# form depends on the parameter's type, resolved by the caller.
+_EMPTY_BRACE = ("{", "}")
+
+_INT_RE = re.compile(r"^[+-]?(?:0[xX][0-9a-fA-F]+|0[bB][01]+|\d+)[uUlL]*$")
+_FLOAT_RE = re.compile(r"^[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fFlL]?$")
+
+
+def _parse_cpp_literal(tokens: list[str]):
+    """Reduce a C++ default-argument token list to a JSON-comparable value.
+
+    Returns ``_NO_DEFAULT`` when the expression is NOT a static literal — an enum
+    value, a constructor call, an arithmetic expression, a named constant. Those
+    are recorded as ``default: null`` by the caller rather than guessed at: the
+    reference records concrete values, and inventing one here would manufacture a
+    confident wrong answer, which is worse than a documented blind spot.
+    """
+    if not tokens:
+        return _NO_DEFAULT
+
+    if tuple(tokens) in _NULLISH_DEFAULTS:
+        return None
+
+    # String literals: one or more adjacent literals, concatenated as C++ does.
+    # Covers ``""`` (empty string) and ``"a" "b"``. Only plain/UTF-8 literals with
+    # no escape sequences beyond the common ones are decoded; anything exotic
+    # falls through to non-literal.
+    if all(t.startswith('"') and t.endswith('"') and len(t) >= 2 for t in tokens):
+        out = []
+        for t in tokens:
+            body = t[1:-1]
+            try:
+                out.append(json.loads('"' + body + '"'))
+            except ValueError:
+                return _NO_DEFAULT
+        return "".join(out)
+
+    if len(tokens) == 1:
+        tok = tokens[0]
+        if tok == "true":
+            return True
+        if tok == "false":
+            return False
+        if _INT_RE.match(tok):
+            digits = tok.rstrip("uUlL")
+            try:
+                return int(digits, 0)
+            except ValueError:
+                return _NO_DEFAULT
+        if _FLOAT_RE.match(tok) and (
+            "." in tok or "e" in tok.lower() or tok[-1] in "fF"
+        ):
+            try:
+                return float(tok.rstrip("fFlL"))
+            except ValueError:
+                return _NO_DEFAULT
+        # A bare char literal, an identifier (named constant / enum), etc.
+        return _NO_DEFAULT
+
+    # Unary sign applied to a numeric literal: ``= -1``, ``= +2.5``.
+    if len(tokens) == 2 and tokens[0] in ("-", "+"):
+        inner = _parse_cpp_literal([tokens[1]])
+        if isinstance(inner, (int, float)) and not isinstance(inner, bool):
+            return -inner if tokens[0] == "-" else inner
+        return _NO_DEFAULT
+
+    # Everything else (``Color::Red``, ``std::string("x")``, ``60 * 60``,
+    # ``Opt{}``, ``SomeConstant``) is a non-literal expression.
+    return _NO_DEFAULT
+
+
+# Canonical types whose ``= {}`` value-initialization has a well-defined JSON form.
+# A ``{}`` default on any other type (an SDK class, a struct) is a constructed
+# object, not a literal, and is left non-literal.
+def _empty_brace_default(canon_type: str):
+    t = (canon_type or "").strip()
+    if t.startswith("list<"):
+        return []
+    if t.startswith("dict<"):
+        return {}
+    if t == "string":
+        return ""
+    if t == "bool":
         return False
-    return any(tok.spelling == "=" for tok in tokens)
+    if t in ("int", "float"):
+        return 0 if t == "int" else 0.0
+    if t.startswith("optional<") or t == "any":
+        return None
+    return _NO_DEFAULT
+
+
+def _extract_default(arg):
+    """(has_default, value) for one PARM_DECL cursor.
+
+    ``value`` is ``_NO_DEFAULT`` when a default exists but is a non-literal
+    expression we deliberately refuse to evaluate.
+    """
+    tokens = _default_tokens(arg)
+    if tokens is None:
+        return False, _NO_DEFAULT
+    if tuple(tokens) == _EMPTY_BRACE:
+        return True, _EMPTY_BRACE
+    return True, _parse_cpp_literal(tokens)
+
+
+def _has_default_value(arg) -> bool:
+    """True when the parameter declares a default argument (value aside)."""
+    return _default_tokens(arg) is not None
+
+
+# ---------------------------------------------------------------------------
+# The null <-> zero-value sentinel fold (the C++ "no nullable scalars" idiom)
+# ---------------------------------------------------------------------------
+#
+# THE VOCABULARY RULE
+# ===================
+# Python expresses "the caller did not supply this" as ``x: T | None = None`` and
+# then guards the wire with ``if x is not None:``. C++ has no nullable scalar and
+# no keyword arguments, so the SAME contract is spelled as a ZERO-VALUE SENTINEL
+# default plus an absence guard in the body:
+#
+#     python   def user_event(self, event: str | None = None)     if event is not None: p["event"] = event
+#     cpp      Action user_event(const std::string& event = "")   if (!event.empty()) { p["event"] = event; }
+#
+# Those two are behaviourally identical: a caller who omits the argument produces
+# the identical wire frame in both languages. Recording the C++ side as
+# ``default: ""`` while the reference records ``default: null`` manufactures drift
+# out of two spellings of "absent".
+#
+# So the enumerator FOLDS the sentinel to ``null`` — at the emitter, in the
+# canonical vocabulary, so the comparison keeps running (an allow-list would stop
+# comparing and blind the gate to a real value change).
+#
+# THE FOLD IS EVIDENCE-GATED. It is NOT "empty string always means null". A port
+# that defaults ``prompt=""`` and then SENDS ``prompt: ""`` ships a different
+# request body than a reference that omits the key, and that is a REAL divergence
+# the gate must keep reporting. The fold therefore requires BOTH:
+#
+#   1. the default is the parameter type's ZERO VALUE / documented sentinel
+#      (table below), AND
+#   2. a GUARD in the method's definition body that tests that sentinel and
+#      suppresses the value's use.
+#
+# No guard -> no fold. The sentinel is then a value the port genuinely ships, and
+# the ``default-mismatch`` finding stands as a real one.
+#
+#   type              sentinel      guard that proves absence
+#   ---------------   -----------   -----------------------------------------
+#   std::string       ""            !p.empty()  /  p.empty() ? ... : p  /  p != ""
+#   vector/map/json   {}            !p.empty()  /  p.empty() ? ...
+#   integral          0, -1         p > 0  /  p >= 0  /  p != 0  /  p != -1
+#   floating          -1.0, 0.0     p >= 0.0  /  p > 0.0  /  p != -1.0
+#   optional/pointer  nullopt/null  (already recorded as null; nothing to fold)
+#
+# ONE TRANSITIVE HOP — AND NOT FOR STRINGS. Several methods store the sentinel on
+# a member and guard it at SERIALIZATION rather than at the entry point — e.g.
+# ``Step::set_gather_info`` assigns ``GatherInfo(output_key, ...)`` and
+# ``GatherInfo::to_json()`` then does ``if (!output_key_.empty())``. The guard is
+# still the proof that the sentinel never reaches the wire, so a member-name guard
+# (``<param>_`` or ``<param>``, the repo's member spelling) anywhere in the SAME
+# source file counts. Exactly one hop; the scanner never chases further, so an
+# unproven chain reports drift rather than folding on a guess.
+#
+# The transitive hop is DISALLOWED for the ``""`` sentinel, and this is the whole
+# reason the string case needs its own rule. Measured against the oracle
+# (2026-07-27): ``[]`` and ``{}`` NEVER appear as a reference default — 0 of
+# 1,505 recorded defaults — so an empty container in the reference is always
+# ``None`` and a guarded empty-container sentinel is unambiguously "absent".
+# ``""``, by contrast, is a REAL reference default 111 times, and ``0``/``0.0``
+# 35 times. An empty string is a value Python genuinely sends.
+#
+# What separates the two IS visible on the port side: the C++ code models the
+# distinction in its STORAGE type, the same way the reference models it in its
+# annotation. ``pom::Section`` declares ``std::optional<std::string> title``
+# (reference: ``str | None = None``) next to ``std::string body`` (reference:
+# ``str = ""``) — the port and the reference agree, independently. A parameter
+# stored verbatim onto a non-optional member and only guarded later at
+# serialization (``body``) is a real empty-string default; a parameter the method
+# itself tests before use (``event``, ``status_url``) models absence.
+#
+# So: strings fold ONLY on a DIRECT guard in the method's own body. Without that
+# split the fold turns the 5 POM ``body`` parameters into nulls, inventing a
+# ``"" vs null`` mismatch in the other direction — which is the same class of
+# error as not folding at all, just pointing the other way.
+#
+# WHAT THIS RULE DOES NOT PROVE, stated plainly so the next reader does not
+# mistake it for stronger than it is:
+#
+#   * NUMERICS keep the transitive hop even though ``0`` is also a real reference
+#     default (35 times). Every numeric fold this produces today is a ``timeout``
+#     / ``volume`` / ``max_duration`` parameter with a ``> 0`` guard and a
+#     reference ``None``, verified param-by-param — the hop is simply not
+#     load-bearing for any of them. If a future ``0``-defaulted numeric ever
+#     folds WRONG, tighten it to direct-guard-only the way strings already are.
+#   * A TRANSITIVELY-guarded STRING that the reference really does declare
+#     ``str | None`` (``Step::set_gather_info``'s three parameters) is NOT folded
+#     and keeps reporting drift. That is the rule choosing a false NEGATIVE over
+#     a false positive: the port stores those in plain ``std::string`` members,
+#     which is indistinguishable from the ``body`` shape. Closing them means
+#     changing the PORT to model absence (``std::optional<std::string>``, as
+#     ``pom::Section::title`` already does), not loosening this rule.
+#   * The hop is scoped to ONE source file. A parameter stored into a member
+#     declared and guarded in a different translation unit (``AgentBase::
+#     prompt_add_section``'s ``bullets``, guarded in ``pom.cpp``) does not fold.
+#     Widening to whole-tree matching would let any ``.empty()`` anywhere satisfy
+#     the guard, which is not evidence.
+
+# Sentinel default VALUES that are foldable per type, keyed by the canonical
+# (translated) type prefix. A value not in this table is a real default and is
+# never folded, however guarded the parameter is.
+_FOLDABLE_SENTINELS: dict[str, tuple] = {
+    "string": ("",),
+    "list": ([],),
+    "dict": ({},),
+    "int": (0, -1),
+    "float": (0.0, -1.0),
+}
+
+
+def _sentinel_kind(canon_type: str) -> str | None:
+    t = (canon_type or "").strip()
+    if t == "string":
+        return "string"
+    if t.startswith("list<"):
+        return "list"
+    if t.startswith("dict<") or t == "any":
+        # ``any`` is the translated form of nlohmann::json, whose ``= {}`` /
+        # empty-object default is guarded with ``.empty()`` exactly like a map.
+        return "dict"
+    if t == "int":
+        return "int"
+    if t == "float":
+        return "float"
+    return None
+
+
+def _is_foldable_sentinel(canon_type: str, value) -> bool:
+    kind = _sentinel_kind(canon_type)
+    if kind is None:
+        return False
+    if isinstance(value, bool):
+        # ``bool`` has no "absent" spelling: false is a real, sendable value.
+        return False
+    for sentinel in _FOLDABLE_SENTINELS[kind]:
+        if type(sentinel) is type(value) and sentinel == value:
+            return True
+        if (
+            kind == "float"
+            and isinstance(value, (int, float))
+            and float(sentinel) == float(value)
+        ):
+            return True
+    return False
+
+
+# Guard shapes, per sentinel kind, rendered against a parameter NAME placeholder.
+# Each is matched against the definition body with the name substituted in.
+_GUARD_PATTERNS: dict[str, list[str]] = {
+    # ``!p.empty()`` / ``p.empty() ?`` / ``!p.is_null()`` / ``p != ""``
+    "string": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\b{n}\s*!=\s*\"\"",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "list": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "dict": [
+        r"!\s*{n}\s*\.empty\s*\(\s*\)",
+        r"!\s*{n}\s*\.is_null\s*\(\s*\)",
+        r"\b{n}\s*\.empty\s*\(\s*\)\s*\?",
+        r"\b{n}\s*\.is_object\s*\(\s*\)\s*\?",
+        r"\bif\s*\(\s*{n}\s*\.empty\s*\(\s*\)\s*\)",
+    ],
+    "int": [
+        r"\b{n}\s*(?:>|>=|!=|==)\s*[-+]?\d",
+        r"\bif\s*\(\s*{n}\s*\)",
+    ],
+    "float": [
+        r"\b{n}\s*(?:>|>=|!=|==)\s*[-+]?[\d.]",
+    ],
+}
+
+
+def _member_spellings(param_name: str) -> list[str]:
+    """Names a parameter may have been stored under for the ONE transitive hop.
+
+    The repo's convention is a trailing-underscore private member
+    (``output_key`` -> ``output_key_``); a handful store under the bare name.
+    """
+    return [param_name + "_", param_name]
+
+
+def _param_names_from_list(param_list: str) -> list[str]:
+    """Parameter NAMES, in order, from a definition's parameter-list text.
+
+    ``param_list`` is everything between the ``(`` and the body's ``{``, minus the
+    leading ``(`` the caller already consumed. Split on top-level commas (so a
+    ``std::map<K, V>`` or a ``std::variant<A, B>`` argument is one parameter, not
+    two) and take the trailing identifier of each part — C++ puts the declarator
+    name last, after any ``const``/``&``/template spelling.
+    """
+    body_end = param_list.rfind(")")
+    inner = param_list[:body_end] if body_end >= 0 else param_list
+    parts: list[str] = []
+    depth, buf = 0, []
+    for ch in inner:
+        if ch in "<([{":
+            depth += 1
+        elif ch in ">)]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+            continue
+        buf.append(ch)
+    parts.append("".join(buf))
+    names: list[str] = []
+    ident = re.compile(r"([A-Za-z_]\w*)\s*(?:=[^,]*)?$")
+    for part in parts:
+        # Drop a default-argument expression and any trailing array extent, then
+        # take the last identifier.
+        head = part.split("=", 1)[0].strip().rstrip("[]").strip()
+        m = ident.search(head)
+        names.append(m.group(1) if m else "")
+    return names
+
+
+_FORWARD_RE = re.compile(
+    r"^\{\s*return\s+(?:[A-Za-z_]\w*::)*([A-Za-z_]\w*)\s*\((.*)\)\s*;\s*\}$", re.S
+)
+
+
+def _pure_forward_target(body: str) -> tuple[str, list[str]] | None:
+    """``(callee_name, [argument spellings])`` when ``body`` is one ``return f(...);``.
+
+    Only a body whose ENTIRE content is that single statement qualifies —
+    comments are stripped first, but any additional statement disqualifies it.
+    Arguments are split on top-level commas and kept verbatim, so the caller can
+    match a parameter by NAME and recover its position in the callee.
+    """
+    stripped = re.sub(r"//[^\n]*", "", body)
+    stripped = re.sub(r"/\*.*?\*/", "", stripped, flags=re.S)
+    stripped = " ".join(stripped.split())
+    m = _FORWARD_RE.match(stripped)
+    if not m:
+        return None
+    args, depth, buf = [], 0, []
+    for ch in m.group(2):
+        if ch in "<([{":
+            depth += 1
+        elif ch in ">)]}":
+            depth -= 1
+        if ch == "," and depth == 0:
+            args.append("".join(buf).strip())
+            buf = []
+            continue
+        buf.append(ch)
+    args.append("".join(buf).strip())
+    return m.group(1), args
+
+
+class GuardIndex:
+    """Which parameters of which C++ methods carry an absence guard.
+
+    Built by a text scan of the implementation tree (``src/**/*.cpp``) plus the
+    headers' inline bodies. libclang is not used here on purpose: the enumerator
+    parses headers with ``PARSE_SKIP_FUNCTION_BODIES`` (a 3-10x speedup on the
+    SIGNATURES gate), and re-parsing all 67 translation units to read bodies
+    would give back that entire saving to answer a question a brace-matched text
+    scan answers exactly as well.
+
+    Keyed by ``(ClassName, methodName)``; a class's method may be defined in more
+    than one file (and a method may be overloaded), so every matching body is
+    unioned — a guard in ANY definition of that name proves the port models the
+    absence.
+    """
+
+    def __init__(self, roots: list[Path]):
+        # (class, method) -> list[(body_text, file_text, [param names in order])]
+        self._bodies: dict[tuple[str, str], list[tuple[str, str, list[str]]]] = {}
+        # Free-function definitions, keyed by bare name — the forwarding-callee
+        # lookup below. Same (body, file_text, names) shape as _bodies.
+        self._free: dict[str, list[tuple[str, str, list[str]]]] = {}
+        self._defpat = re.compile(r"\b([A-Za-z_]\w*)::([A-Za-z_]\w*)\s*\(", re.M)
+        self._freepat = re.compile(
+            r"^[A-Za-z_][\w:<>,\s*&]*?\b([A-Za-z_]\w*)\s*\(", re.M
+        )
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for path in sorted(root.rglob("*.cpp")) + sorted(root.rglob("*.hpp")):
+                try:
+                    text = path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                self._index_file(text)
+
+    def _index_file(self, text: str) -> None:
+        for m in self._defpat.finditer(text):
+            cls, method = m.group(1), m.group(2)
+            open_brace = text.find("{", m.end())
+            if open_brace < 0:
+                continue
+            # A ';' between the parameter list and the next '{' means this was a
+            # declaration (or a call), not a definition.
+            if ";" in text[m.end() : open_brace]:
+                continue
+            depth, i = 0, open_brace
+            n = len(text)
+            while i < n:
+                ch = text[i]
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            body = text[open_brace : i + 1]
+            names = _param_names_from_list(text[m.end() : open_brace])
+            self._bodies.setdefault((cls, method), []).append((body, text, names))
+
+        # Free functions, for the pure-forwarder hop only.
+        for m in self._freepat.finditer(text):
+            name = m.group(1)
+            if name in ("if", "for", "while", "switch", "return", "catch", "sizeof"):
+                continue
+            open_brace = text.find("{", m.end())
+            if open_brace < 0 or ";" in text[m.end() : open_brace]:
+                continue
+            if "::" in text[m.start() : m.end()]:
+                continue  # already captured as a member definition
+            depth, i = 0, open_brace
+            n = len(text)
+            while i < n:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                i += 1
+            self._free.setdefault(name, []).append(
+                (
+                    text[open_brace : i + 1],
+                    text,
+                    _param_names_from_list(text[m.end() : open_brace]),
+                )
+            )
+
+    def guards(self, cls: str, method: str, param: str, index: int, kind: str) -> bool:
+        """True when SOME definition of ``cls::method`` guards this parameter.
+
+        ``param`` is the HEADER's spelling and ``index`` its position. A C++
+        definition is free to rename its parameters (``dial(const std::string&
+        tag)`` in the header is ``dial(..., const std::string& tag_in, ...)`` in
+        the .cpp, because the body shadows it with the resolved ``tag``), so the
+        definition-side name is resolved BY POSITION and the header name is only
+        a fallback. Matching on the header name alone silently found no guard for
+        every renamed parameter — and a missing guard reads as "the port really
+        sends this", i.e. a fold refused for a bookkeeping reason.
+
+        Direct: the guard names the parameter inside the method body.
+        One transitive hop: the parameter is stored (the body mentions it) and a
+        guard on the corresponding MEMBER name appears elsewhere in the same
+        source file — the store-then-guard-at-serialization shape. NOT available
+        to the ``""`` sentinel: see the vocabulary note above (a stored-then-
+        serialization-guarded string is a real empty-string default, which is
+        exactly how both the reference and this port model ``pom::Section::body``).
+        """
+        entries = self._bodies.get((cls, method))
+        if not entries:
+            return False
+        patterns = _GUARD_PATTERNS.get(kind, [])
+        for body, file_text, names in entries:
+            local = names[index] if 0 <= index < len(names) else None
+            candidates = [n for n in (local, param) if n]
+            for name in candidates:
+                for pat in patterns:
+                    if re.search(pat.format(n=re.escape(name)), body):
+                        return True
+                # A LOCAL ALIAS still counts as a direct guard. C++ cannot
+                # reassign a ``const T&`` parameter, so the "resolve the sentinel
+                # to the real value" idiom has to copy first:
+                #     std::string id = call_id;
+                #     if (id.empty()) { id = <generated>; }
+                # That is the same absence check as ``if (!call_id.empty())``,
+                # just one named local away, and it is still INSIDE this method —
+                # unlike the member/serialization hop, which is what distinguishes
+                # a modelled absence from a real empty-string default. Only a
+                # local DECLARED FROM this parameter qualifies.
+                for alias in re.findall(
+                    r"\b(?:auto|[A-Za-z_][\w:<>,\s*&]*?)\s+([A-Za-z_]\w*)\s*=\s*"
+                    + re.escape(name)
+                    + r"\s*;",
+                    body,
+                ):
+                    for pat in patterns:
+                        if re.search(pat.format(n=re.escape(alias)), body):
+                            return True
+            # PURE FORWARDER. A method whose ENTIRE body is a single
+            # ``return <fn>(...);`` delegates its contract wholesale; the guard
+            # lives in the callee. ``AgentBase::handle_serverless_request`` is
+            # exactly this — its one statement is
+            # ``return utils::handle_serverless_request(*this, event, context, mode);``
+            # and the free function does ``mode.empty() ? get_execution_mode() : mode``.
+            # Restricted to a body with ONE statement so it can only ever mean
+            # "this method IS the callee", never "somewhere downstream something
+            # is guarded". The callee's parameter is located BY NAME in the
+            # forwarding call's argument list, so an argument the forwarder
+            # reorders or wraps does not silently match.
+            fwd = _pure_forward_target(body)
+            if fwd is not None:
+                callee, args = fwd
+                for name in candidates:
+                    if name not in args:
+                        continue
+                    arg_index = args.index(name)
+                    for cbody, _cfile, cnames in self._free.get(callee, []):
+                        cname = (
+                            cnames[arg_index] if 0 <= arg_index < len(cnames) else None
+                        )
+                        for pat in patterns:
+                            if cname and re.search(
+                                pat.format(n=re.escape(cname)), cbody
+                            ):
+                                return True
+            if kind == "string":
+                continue
+            # One transitive hop: the body must actually USE the parameter (under
+            # EITHER spelling), and the member it lands on must be guarded in this
+            # file. The member is named after the CONCEPT, so every candidate
+            # spelling is tried for the member lookup once the parameter is known
+            # to be used — the definition's local name (``Section::add_subsection``
+            # spells ``bullets`` as ``bs``) is not the member's name.
+            if not any(
+                re.search(r"\b" + re.escape(n) + r"\b", body) for n in candidates
+            ):
+                continue
+            for name in candidates:
+                for member in _member_spellings(name):
+                    if member == name:
+                        # The bare-name hop would re-match the body itself; only
+                        # accept it OUTSIDE the body.
+                        outside = file_text.replace(body, "", 1)
+                    else:
+                        outside = file_text
+                    for pat in patterns:
+                        if re.search(pat.format(n=re.escape(member)), outside):
+                            return True
+        return False
+
+    def bodies(self, cls: str, method: str) -> list[tuple[str, list[str]]]:
+        """``[(body_text, param_names)]`` for every definition of ``cls::method``.
+
+        The raw material the options-carrier unfold needs: whether a method's
+        ``const json&`` parameter is SPREAD onto the wire frame (a bag standing
+        in for the reference's keyword params) or CONSUMED as one domain value.
+        Only the body and the definition-side parameter names are exposed; the
+        file text stays private to the guard scan.
+        """
+        return [
+            (body, names)
+            for body, _file_text, names in self._bodies.get((cls, method), [])
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -670,11 +1350,40 @@ def _has_default_value(arg) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _merge_overload_optionality(a: dict, b: dict) -> None:
+    """Union ``required``/``default`` across two equal-arity overloads, in place.
+
+    Positional match, because C++ overloads of one name share their parameter
+    ORDER (that is what makes them overloads). Only parameters whose optionality
+    DISAGREES are touched, and only in the permissive direction: if either side
+    declares a default, the caller can omit the argument, so both sides become
+    ``required: false`` carrying that default. Types and kinds are untouched —
+    those still come from whichever overload dedup selects.
+
+    Arity mismatch means the two are not the same call shape (a convenience
+    wrapper, not a typed sibling); leave them alone.
+    """
+    pa, pb = a.get("params", []), b.get("params", [])
+    if len(pa) != len(pb):
+        return
+    for x, y in zip(pa, pb, strict=False):
+        if x.get("kind") == "self" or y.get("kind") == "self":
+            continue
+        x_opt = x.get("required") is False
+        y_opt = y.get("required") is False
+        if x_opt == y_opt:
+            continue
+        src, dst = (x, y) if x_opt else (y, x)
+        dst["required"] = False
+        dst["default"] = src.get("default")
+
+
 def collect(
     raw_entries: list[dict],
     aliases: dict,
     raw_free_functions: list[dict] | None = None,
     raw_options_structs: dict[str, list[dict]] | None = None,
+    guards: GuardIndex | None = None,
 ) -> tuple[dict, list]:
     out_modules: dict = {}
     failures: list = []
@@ -699,7 +1408,8 @@ def collect(
             fctx = f"construction.{ref}.{f['name']}"
             try:
                 ftype = _translate_with_canonical_fallback(
-                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx)
+                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx
+                )
             except TypeTranslationError:
                 ftype = "any"
             typed[f["name"]] = ftype or "any"
@@ -716,9 +1426,12 @@ def collect(
             by_class[key]["methods"].extend(entry["methods"])
             by_class[key]["fields"].extend(entry.get("fields") or [])
         else:
-            by_class[key] = {"namespace": ns, "name": name,
-                             "methods": list(entry["methods"]),
-                             "fields": list(entry.get("fields") or [])}
+            by_class[key] = {
+                "namespace": ns,
+                "name": name,
+                "methods": list(entry["methods"]),
+                "fields": list(entry.get("fields") or []),
+            }
 
     for (ns, name), entry in by_class.items():
         # Check CLASS_RENAME_MAP first: (cpp_namespace, cpp_class) →
@@ -749,15 +1462,44 @@ def collect(
                 # Map C++ keyword-avoidance trailing underscore methods
                 # (delete_, etc.) back to Python's unsuffixed names so the
                 # diff lines up.
-                method_canonical = _METHOD_RENAMES.get(method_canonical, method_canonical)
+                method_canonical = _METHOD_RENAMES.get(
+                    method_canonical, method_canonical
+                )
             ctx = f"{mod}.{name}.{method_canonical}"
             try:
-                sig = build_signature(m, aliases, ctx)
+                sig = build_signature(
+                    m,
+                    aliases,
+                    ctx,
+                    guards=guards,
+                    cpp_class=entry["name"],
+                    cpp_method=(entry["name"] if native == "<init>" else native),
+                )
             except TypeTranslationError as e:
                 failures.append(str(e))
                 continue
             if method_canonical in methods_out:
                 existing = methods_out[method_canonical]
+                # OPTIONALITY IS A PROPERTY OF THE METHOD NAME, NOT OF ONE
+                # OVERLOAD. Only one overload survives dedup, but ``required``
+                # asks a question about the CALLER: can they omit this argument?
+                # If ANY overload of the name defaults the parameter, they can.
+                #
+                # C++ forces this apart where a port ships a flat ``std::string``
+                # overload alongside a typed ``enum class`` one: the string form
+                # defaults ``record_call(control_id="", stereo=false,
+                # format="wav", direction="both")``, but the typed form CANNOT
+                # repeat those defaults — two equal-arity overloads that are both
+                # callable with fewer arguments are ambiguous, so the compiler
+                # rejects it. The typed overload therefore declares them bare,
+                # and dedup (which prefers the typed form for the closed-set
+                # contract) was reporting ``required: true`` for four parameters
+                # a caller can plainly omit.
+                #
+                # Union optionality across equal-arity overloads before choosing
+                # a winner. Types/kinds still come from the chosen overload
+                # alone; only ``required``/``default`` merge.
+                _merge_overload_optionality(existing, sig)
                 if ctx in PREFER_TYPED_OVERLOAD:
                     # Equal-arity string-vs-enum overloads: keep the one that
                     # TYPES more params (the enum-class form), so its closed-set
@@ -770,8 +1512,9 @@ def collect(
                     old_typed = _typed_param_count(existing)
                     if new_typed < old_typed:
                         continue
-                    if new_typed == old_typed and \
-                            len(sig["params"]) >= len(existing["params"]):
+                    if new_typed == old_typed and len(sig["params"]) >= len(
+                        existing["params"]
+                    ):
                         continue
                 elif ctx in PREFER_FULL_OVERLOAD:
                     # Keep the LARGER-arity overload (the flat form that
@@ -785,7 +1528,7 @@ def collect(
                         continue
             methods_out[method_canonical] = sig
 
-        if not methods_out:
+        if not methods_out and not (entry.get("fields") or []):
             continue
         # Synthesize __init__ when libclang didn't surface an explicit
         # constructor — POD structs / classes with only the implicit
@@ -807,11 +1550,13 @@ def collect(
             fctx = f"construction.{mod}.{name}.{f['name']}"
             try:
                 ftype = _translate_with_canonical_fallback(
-                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx)
+                    f.get("type", ""), f.get("canonical_type", ""), aliases, fctx
+                )
             except TypeTranslationError:
                 ftype = "any"
             struct_fields.setdefault(f"{mod}.{name}", {}).setdefault(
-                f["name"], ftype or "any")
+                f["name"], ftype or "any"
+            )
 
         out_modules.setdefault(mod, {"classes": {}})
         out_modules[mod]["classes"].setdefault(name, {"methods": {}})
@@ -822,7 +1567,8 @@ def collect(
         # ctor param, so register it under its canonical class-ref too.
         if struct_fields.get(f"{mod}.{name}"):
             options_by_ref.setdefault(
-                f"class:{mod}.{name}", struct_fields[f"{mod}.{name}"])
+                f"class:{mod}.{name}", struct_fields[f"{mod}.{name}"]
+            )
 
     # Mixin projection — methods may live on AgentBase OR SWMLService
     # (Service is the parent class; many tool/auth/state helpers are
@@ -839,8 +1585,16 @@ def collect(
     # methods are all defined on AgentBase and return ``AgentBase``; the
     # mixin class is just an interface marker. Don't retarget for those —
     # leaving the C++ AgentBase return matches Python's AgentBase return.
-    ab_entry = out_modules.get("signalwire.core.agent_base", {}).get("classes", {}).get("AgentBase")
-    svc_entry = out_modules.get("signalwire.core.swml_service", {}).get("classes", {}).get("SWMLService")
+    ab_entry = (
+        out_modules.get("signalwire.core.agent_base", {})
+        .get("classes", {})
+        .get("AgentBase")
+    )
+    svc_entry = (
+        out_modules.get("signalwire.core.swml_service", {})
+        .get("classes", {})
+        .get("SWMLService")
+    )
     if ab_entry or svc_entry:
         ab_methods = ab_entry["methods"] if ab_entry else {}
         svc_methods = svc_entry["methods"] if svc_entry else {}
@@ -883,8 +1637,9 @@ def collect(
             # really produced the merged class.
             if retarget_returns:
                 out_modules[target_mod]["classes"][target_cls]["methods"].setdefault(
-                    "agent", {"params": [{"name": "self", "kind": "self"}],
-                              "returns": "any"})
+                    "agent",
+                    {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
+                )
             projected.update(present)
         for n in projected:
             # ``__init__`` is COPIED to the synthetic projection targets
@@ -988,7 +1743,10 @@ def collect(
     # ``HttpClient`` records request_options POSITIONAL on every transport verb, so
     # it is deliberately excluded.
     _RO_KEYWORD_BASE_CLASSES = {
-        "ReadResource", "CrudResource", "CrudWithAddresses", "FabricResource",
+        "ReadResource",
+        "CrudResource",
+        "CrudWithAddresses",
+        "FabricResource",
     }
     _bm = out_modules.get("signalwire.rest._base", {})
     for _bcls_name, _bcls in _bm.get("classes", {}).items():
@@ -996,8 +1754,14 @@ def collect(
             continue
         for _bsig in _bcls.get("methods", {}).values():
             _bparams = _bsig.get("params", [])
-            _ro_idx = next((i for i, p in enumerate(_bparams)
-                            if p.get("name") == "request_options"), None)
+            _ro_idx = next(
+                (
+                    i
+                    for i, p in enumerate(_bparams)
+                    if p.get("name") == "request_options"
+                ),
+                None,
+            )
             if _ro_idx is None:
                 continue
             _bparams[_ro_idx]["kind"] = "keyword"
@@ -1005,10 +1769,15 @@ def collect(
             # by libclang as a positional ``dict<string,string>`` / var_keyword map),
             # so request_options lands at the reference's position and ``params`` is
             # the ignored trailing extra.
-            if _ro_idx == len(_bparams) - 1 and len(_bparams) >= 2 \
-                    and _bparams[_ro_idx - 1].get("name") == "params":
-                _bparams[_ro_idx - 1], _bparams[_ro_idx] = \
-                    _bparams[_ro_idx], _bparams[_ro_idx - 1]
+            if (
+                _ro_idx == len(_bparams) - 1
+                and len(_bparams) >= 2
+                and _bparams[_ro_idx - 1].get("name") == "params"
+            ):
+                _bparams[_ro_idx - 1], _bparams[_ro_idx] = (
+                    _bparams[_ro_idx],
+                    _bparams[_ro_idx - 1],
+                )
 
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a
@@ -1022,6 +1791,13 @@ def collect(
     # such method shows up as a kind+type mismatch even though the
     # contract is identical.
     _project_kwargs_shape(out_modules)
+
+    # METHOD-LEVEL options-carrier unfold. The construction contract already
+    # unfolds an options STRUCT param into its named fields (RelayClient(
+    # RelayConfig{...}) vs five reference kwargs); ordinary METHODS carry the
+    # same idiom and needed the same fold. Two carrier spellings, one rule —
+    # see _project_options_carrier for the evidence gates.
+    _project_options_carrier(out_modules, options_by_ref, guards)
 
     # Callable-shape projection: when the Python reference uses a fully
     # parameterized ``callable<list<...>,ret>`` annotation but the C++
@@ -1076,6 +1852,20 @@ def collect(
     # cpp_unified_action idiom, tracked in PORT_SIGNATURE_OMISSIONS).
     _project_relay_action_subclasses(out_modules)
 
+    # Built-in-skill value accessors: the skill classes live in
+    # ``src/skills/builtin/*.cpp``, which the libclang HEADER walk never opens,
+    # so an implemented accessor would otherwise read as missing-port drift.
+    # Signature-side twin of enumerate_surface's ``_project_builtin_skills``.
+    _project_skill_accessors(out_modules)
+
+    # Built-in-skill SkillBase HOOK surface, same reason: the concrete skill
+    # classes are .cpp-only, so libclang never sees the hooks they define or
+    # inherit. porting-sdk 8496c77 made all 18 skill modules visible to the
+    # signature oracle, which is contract this enumerator must project rather
+    # than excuse. Emits the C++ SkillBase's OWN walked signatures, so it must
+    # run AFTER the header walk has populated signalwire.core.skill_base.
+    _project_builtin_skill_hooks(out_modules)
+
     # AI-Chat signature fold: the Python reference records the whole AI-Chat
     # surface in ONE module (signalwire.ai_chat.client) with kwargs-exploded
     # method params; the C++ port splits it across ai_chat_client.hpp /
@@ -1110,16 +1900,20 @@ def collect(
     # (the structs inherit from RelayEvent, so the generated-payload parser can't
     # reach them — this handles the inheriting form). Field-vs-getter idiom, RULES §2.
     _project_named_struct_getters(
-        out_modules, "signalwire.relay.event",
-        PORT_ROOT / "include" / "signalwire" / "relay" / "typed_events.hpp")
+        out_modules,
+        "signalwire.relay.event",
+        PORT_ROOT / "include" / "signalwire" / "relay" / "typed_events.hpp",
+    )
 
     # RequestOptions optional-field getters (timeout/retries/retry_on_status/
     # retry_backoff), gated on the oracle's _request_options getter set. abort_signal
     # is a pointer field (documented cpp_field_not_property omission) and merge is a
     # real method libclang already emits — neither is touched here.
     _project_named_struct_getters(
-        out_modules, "signalwire.rest._request_options",
-        PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp")
+        out_modules,
+        "signalwire.rest._request_options",
+        PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp",
+    )
 
     sorted_modules = {}
     for k in sorted(out_modules):
@@ -1141,7 +1935,8 @@ def collect(
         "generated_from": "signalwire-cpp via libclang",
         "modules": sorted_modules,
         "construction": build_construction(
-            sorted_modules, struct_fields, options_by_ref),
+            sorted_modules, struct_fields, options_by_ref
+        ),
     }, failures
 
 
@@ -1150,10 +1945,22 @@ def collect(
 # ---------------------------------------------------------------------------
 
 # Members that are construction MECHANISM, never a construction parameter.
-_CONSTRUCTION_NON_PARAMS = frozenset({
-    "__init__", "__repr__", "__eq__", "from_payload", "from_params", "from_env",
-    "from_json", "to_json", "merge", "build", "builder", "clone",
-})
+_CONSTRUCTION_NON_PARAMS = frozenset(
+    {
+        "__init__",
+        "__repr__",
+        "__eq__",
+        "from_payload",
+        "from_params",
+        "from_env",
+        "from_json",
+        "to_json",
+        "merge",
+        "build",
+        "builder",
+        "clone",
+    }
+)
 
 # C++ ctor / accessor parameter spellings that name the SAME configurable as the
 # reference, under a different word. A RENAME (ALLOWLIST_DISCIPLINE §7 / RULES §2
@@ -1178,8 +1985,9 @@ _CONSTRUCTION_PARAM_RENAMES: dict[str, str] = {
 _TRANSPORT_PARAM_RENAME = ("client", "http")
 
 
-def _construction_params_from_signature(sig: dict, options_by_ref: dict,
-                                        ref_param_names: set) -> dict:
+def _construction_params_from_signature(
+    sig: dict, options_by_ref: dict, ref_param_names: set
+) -> dict:
     """Name-keyed construction params from an emitted ``__init__`` signature.
 
     A parameter whose TYPE is a known options struct is UNFOLDED into that
@@ -1219,8 +2027,9 @@ def _construction_params_from_signature(sig: dict, options_by_ref: dict,
     return params
 
 
-def build_construction(modules: dict, struct_fields: dict,
-                       options_by_ref: dict | None = None) -> dict:
+def build_construction(
+    modules: dict, struct_fields: dict, options_by_ref: dict | None = None
+) -> dict:
     """Return ``{"module.Class": {"params": {name: {type, required}}}}``.
 
     A NAME-KEYED, unordered SET of configurable parameters — order, arity and
@@ -1267,10 +2076,10 @@ def build_construction(modules: dict, struct_fields: dict,
             init = cinfo.get("methods", {}).get("__init__")
             if not isinstance(init, dict):
                 continue
-            ref_names = set(
-                ref_construction.get(f"{mod}.{cls}", {}).get("params", {}))
+            ref_names = set(ref_construction.get(f"{mod}.{cls}", {}).get("params", {}))
             params = _construction_params_from_signature(
-                init, options_by_ref, ref_names)
+                init, options_by_ref, ref_names
+            )
             if params:
                 out[f"{mod}.{cls}"] = {"params": params}
 
@@ -1323,8 +2132,11 @@ def build_construction(modules: dict, struct_fields: dict,
                     continue
                 if not isinstance(msig, dict):
                     continue
-                args = [p for p in msig.get("params", [])
-                        if (p.get("kind") or "positional") not in ("self", "cls")]
+                args = [
+                    p
+                    for p in msig.get("params", [])
+                    if (p.get("kind") or "positional") not in ("self", "cls")
+                ]
                 if len(args) != 1:
                     continue
                 pname = mname[4:]
@@ -1347,8 +2159,11 @@ def build_construction(modules: dict, struct_fields: dict,
         ref_names = set(ref_construction.get(key, {}).get("params", {}))
         params: dict = {}
         for pname, spec in entry["params"].items():
-            if (pname == cpp_transport and ref_transport in ref_names
-                    and cpp_transport not in ref_names):
+            if (
+                pname == cpp_transport
+                and ref_transport in ref_names
+                and cpp_transport not in ref_names
+            ):
                 pname = ref_transport
             pname = _CONSTRUCTION_PARAM_RENAMES.get(f"{key}.{pname}", pname)
             # A rename may collide with an already-canonical name; the ctor
@@ -1361,8 +2176,15 @@ def build_construction(modules: dict, struct_fields: dict,
 
 def _load_rest_sidecar() -> dict:
     """Load the generator's rest_signatures.json (Class::method -> [records])."""
-    sc = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-          / "generated" / "rest_signatures.json")
+    sc = (
+        PORT_ROOT
+        / "include"
+        / "signalwire"
+        / "rest"
+        / "namespaces"
+        / "generated"
+        / "rest_signatures.json"
+    )
     if not sc.is_file():
         return {}
     return json.loads(sc.read_text()).get("methods", {})
@@ -1371,8 +2193,15 @@ def _load_rest_sidecar() -> dict:
 def _generated_class_modules() -> dict[str, str]:
     """Map each generated resource/container CLASS -> its python module, from
     generated_surface_map.json (the same source enumerate_surface projects)."""
-    smap = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-            / "generated" / "generated_surface_map.json")
+    smap = (
+        PORT_ROOT
+        / "include"
+        / "signalwire"
+        / "rest"
+        / "namespaces"
+        / "generated"
+        / "generated_surface_map.json"
+    )
     if not smap.is_file():
         return {}
     return json.loads(smap.read_text())
@@ -1382,10 +2211,10 @@ def _generated_container_members() -> dict[str, list[str]]:
     """Parse the generated namespace-container headers for their public resource
     member fields (FabricNamespace { AiAgents ai_agents; ... }) so the client
     tree's accessor surface can be projected onto the oracle shape."""
-    gen_dir = (PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces"
-               / "generated")
+    gen_dir = PORT_ROOT / "include" / "signalwire" / "rest" / "namespaces" / "generated"
     out: dict[str, list[str]] = {}
     import re as _re
+
     for hdr in gen_dir.glob("*Namespace.hpp"):
         src = hdr.read_text()
         m = _re.search(r"class (\w+Namespace)\s*\{(.*?)\n\};", src, _re.S)
@@ -1433,19 +2262,24 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
             # map; a miss means the map is stale — fail loud rather than drift.
             raise SystemExit(
                 f"enumerate_signatures: sidecar class {cls!r} not in "
-                f"generated_surface_map.json (regenerate the REST layer)")
+                f"generated_surface_map.json (regenerate the REST layer)"
+            )
         out_modules.setdefault(mod, {"classes": {}})
         cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
         for canon, records in methods.items():
             cls_entry["methods"][canon] = {
-                "params": [{"name": "self", "kind": "self"}] + [dict(r) for r in records],
+                "params": [{"name": "self", "kind": "self"}]
+                + [dict(r) for r in records],
                 "returns": "any",
             }
         # Ensure a constructor is present (POD resource: implicit default ctor).
-        cls_entry["methods"].setdefault("__init__", {
-            "params": [{"name": "self", "kind": "self"}],
-            "returns": "void",
-        })
+        cls_entry["methods"].setdefault(
+            "__init__",
+            {
+                "params": [{"name": "self", "kind": "self"}],
+                "returns": "void",
+            },
+        )
 
     # Client-tree container accessors: the Python oracle records each namespace
     # container's resource members (FabricNamespace.ai_agents, ...) as zero-arg
@@ -1458,19 +2292,28 @@ def _apply_rest_sidecar(out_modules: dict) -> None:
         if mod is None:
             raise SystemExit(
                 f"enumerate_signatures: container {cls!r} not in "
-                f"generated_surface_map.json (regenerate the REST layer)")
+                f"generated_surface_map.json (regenerate the REST layer)"
+            )
         out_modules.setdefault(mod, {"classes": {}})
         cls_entry = out_modules[mod]["classes"].setdefault(cls, {"methods": {}})
         for member in members:
-            cls_entry["methods"].setdefault(member, {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "any",
-            })
-        cls_entry["methods"].setdefault("__init__", {
-            "params": [{"name": "self", "kind": "self"},
-                       {"name": "http", "type": "any", "required": True}],
-            "returns": "void",
-        })
+            cls_entry["methods"].setdefault(
+                member,
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                },
+            )
+        cls_entry["methods"].setdefault(
+            "__init__",
+            {
+                "params": [
+                    {"name": "self", "kind": "self"},
+                    {"name": "http", "type": "any", "required": True},
+                ],
+                "returns": "void",
+            },
+        )
 
 
 # A public data-member declaration inside one of the generated payload structs,
@@ -1493,6 +2336,7 @@ def _gen_payload_ns_to_module() -> dict[str, str]:
     ``include/``. Import (don't hardcode) so a new payload namespace registered
     for the surface side is automatically covered here too."""
     from enumerate_surface import GENERATED_PAYLOAD_NS  # type: ignore
+
     return dict(GENERATED_PAYLOAD_NS)
 
 
@@ -1534,7 +2378,8 @@ def _gen_payload_struct_fields(payload_dir: Path) -> dict[str, list[str]]:
 # it inherits (``: public RelayEvent``), which the generated-payload ``struct Name {``
 # regex above does not. Used for the relay Event dataclasses + RequestOptions.
 _NAMED_STRUCT_RE_SIG = re.compile(
-    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S)
+    r"(?:struct|class)\s+(\w+)\s*(?::[^{]+)?\{(.*?)\n\};", re.S
+)
 
 
 def _named_struct_public_fields(header: Path) -> dict[str, list[str]]:
@@ -1583,8 +2428,9 @@ def _oracle_class_members(module: str, cls: str) -> set[str]:
     out: set[str] = set(ref_cls.get("methods", {})) if ref_cls else set()
     if module == "signalwire.core.agent_base":
         for mod, entry in ref_modules.items():
-            if mod != "signalwire.core.agent_base" and \
-                    not mod.startswith("signalwire.core.mixins."):
+            if mod != "signalwire.core.agent_base" and not mod.startswith(
+                "signalwire.core.mixins."
+            ):
                 continue
             for cls_entry in entry.get("classes", {}).values():
                 out |= set(cls_entry.get("methods", {}))
@@ -1613,10 +2459,13 @@ def _project_public_fields_as_getters(out_modules: dict, struct_fields: dict) ->
             continue
         for field in fields:
             if field in allowed:
-                cls_entry["methods"].setdefault(field, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+                cls_entry["methods"].setdefault(
+                    field,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
 
 
 def _fold_setter_signatures(out_modules: dict) -> None:
@@ -1648,10 +2497,13 @@ def _fold_setter_signatures(out_modules: dict) -> None:
                 # shape — carrying the setter's ``(self, value) -> Self``
                 # signature over would be a spurious arity/return mismatch
                 # against an attribute.
-                methods.setdefault(target, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+                methods.setdefault(
+                    target,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
 
 
 def _project_named_struct_getters(out_modules: dict, module: str, header: Path) -> None:
@@ -1678,18 +2530,19 @@ def _project_named_struct_getters(out_modules: dict, module: str, header: Path) 
         ref_cls = ref_classes.get(cls)
         if not ref_cls:
             continue
-        oracle_getters = {
-            m for m in ref_cls.get("methods", {}) if m != "__init__"
-        }
+        oracle_getters = {m for m in ref_cls.get("methods", {}) if m != "__init__"}
         present = [f for f in fields if f in oracle_getters]
         if not present:
             continue
         cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
         for field in present:
-            cls_entry["methods"].setdefault(field, {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "any",
-            })
+            cls_entry["methods"].setdefault(
+                field,
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "any",
+                },
+            )
 
 
 # Oracle-recorded control methods per concrete RELAY call-action (mirrors
@@ -1719,6 +2572,7 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     symbols (abort-loud on a missing one) so nothing is invented. Drops the
     mis-routed native ai_chat modules."""
     import re as _re
+
     client_hpp = PORT_ROOT / "include" / "signalwire" / "ai_chat" / "ai_chat_client.hpp"
     if not client_hpp.is_file():
         return  # port doesn't ship AI-Chat
@@ -1729,7 +2583,8 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
             raise SystemExit(
                 f"enumerate_signatures: AI-Chat projection expected {what} in "
                 f"{client_hpp.name} but it is gone -- fix the projection, do not "
-                f"emit a member the port no longer has")
+                f"emit a member the port no longer has"
+            )
 
     # Client + RAII/verbs the projection reconciles must genuinely exist.
     _need(r"\bclass\s+AIChatClient\b", "class AIChatClient")
@@ -1742,11 +2597,18 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     # The class-B2 ctor-param reads the projection emits below.
     _need(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference self.url)")
     _need(r"\bint\s+code\s*\(\s*\)\s*const", "AIChatError::code")
-    _need(r"\bserver_message\s*\(\s*\)\s*const",
-          "AIChatError::server_message (reference message)")
+    _need(
+        r"\bserver_message\s*\(\s*\)\s*const",
+        "AIChatError::server_message (reference message)",
+    )
     # Options structs whose fields the unfold below relies on.
-    for _s in ("AIChatClientOptions", "CreateConversationOptions", "ChatOptions",
-               "SummarizeOptions", "ConversationTurnOptions"):
+    for _s in (
+        "AIChatClientOptions",
+        "CreateConversationOptions",
+        "ChatOptions",
+        "SummarizeOptions",
+        "ConversationTurnOptions",
+    ):
         _need(rf"\bstruct\s+{_s}\b", f"struct {_s}")
     # Error family + result structs.
     _need(r"\bclass\s+AIChatError\b", "class AIChatError")
@@ -1773,32 +2635,38 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     # idiom divergence (cpp-stateless-transport), NOT invented here.
     aic = {
         "__init__": {
-            "params": [_self(),
-                       _p("project", "optional<string>", False),
-                       _p("token", "optional<string>", False),
-                       _p("space", "optional<string>", False),
-                       _p("url", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("project", "optional<string>", False),
+                _p("token", "optional<string>", False),
+                _p("space", "optional<string>", False),
+                _p("url", "optional<string>", False),
+            ],
             "returns": "void",
         },
         "chat": {
-            "params": [_self(),
-                       _p("conversation_id", "string", True),
-                       _p("message", "string", True),
-                       _p("role", "string", False, "user"),
-                       _p("config_url", "optional<string>", False),
-                       _p("user_metadata", "optional<dict<string,any>>", False),
-                       _p("timeout", "optional<int>", False),
-                       _p("reinit", "bool", False, False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("message", "string", True),
+                _p("role", "string", False, "user"),
+                _p("config_url", "optional<string>", False),
+                _p("user_metadata", "optional<dict<string,any>>", False),
+                _p("timeout", "optional<int>", False),
+                _p("reinit", "bool", False, False),
+            ],
             "returns": "class:signalwire.ai_chat.client.ChatResponse",
         },
         "create_conversation": {
-            "params": [_self(),
-                       _p("conversation_id", "string", True),
-                       _p("config_url", "string", True),
-                       _p("user_message", "optional<string>", False),
-                       _p("timeout", "optional<int>", False),
-                       _p("user_metadata", "optional<dict<string,any>>", False),
-                       _p("reinit", "bool", False, False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("config_url", "string", True),
+                _p("user_message", "optional<string>", False),
+                _p("timeout", "optional<int>", False),
+                _p("user_metadata", "optional<dict<string,any>>", False),
+                _p("reinit", "bool", False, False),
+            ],
             "returns": "class:signalwire.ai_chat.client.ConversationInfo",
         },
         "end": {
@@ -1814,8 +2682,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
             "returns": "class:signalwire.ai_chat.client.ChatLog",
         },
         "summarize": {
-            "params": [_self(), _p("conversation_id", "string", True),
-                       _p("summary_prompt", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("conversation_id", "string", True),
+                _p("summary_prompt", "optional<string>", False),
+            ],
             "returns": "string",
         },
         # close() is a genuine C++ method (RAII no-op) folded onto the reference
@@ -1831,9 +2702,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
 
     err = {
         "__init__": {
-            "params": [_self(),
-                       _p("code", "optional<int>", True),
-                       _p("message", "string", True)],
+            "params": [
+                _self(),
+                _p("code", "optional<int>", True),
+                _p("message", "string", True),
+            ],
             "returns": "void",
         },
         # code / message: ctor params the reference stores publicly, recorded by
@@ -1843,6 +2716,7 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
         "code": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
         "message": {"params": [{"name": "self", "kind": "self"}], "returns": "any"},
     }
+
     # Each result DTO is @dataclass-shaped in the reference: besides ``__init__``
     # the oracle records every field as a zero-arg property getter. The C++ port
     # carries them as public struct fields; emit the oracle's getter shape (self-
@@ -1853,10 +2727,12 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
 
     conv_info = {
         "__init__": {
-            "params": [_self(),
-                       _p("id", "string", True),
-                       _p("status", "string", True),
-                       _p("initial_message", "optional<string>", False)],
+            "params": [
+                _self(),
+                _p("id", "string", True),
+                _p("status", "string", True),
+                _p("initial_message", "optional<string>", False),
+            ],
             "returns": "void",
         },
         "id": _getter(),
@@ -1865,10 +2741,12 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
     chat_resp = {
         "__init__": {
-            "params": [_self(),
-                       _p("text", "string", True),
-                       _p("conversation_id", "string", True),
-                       _p("user_event", "optional<dict<string,any>>", False)],
+            "params": [
+                _self(),
+                _p("text", "string", True),
+                _p("conversation_id", "string", True),
+                _p("user_event", "optional<dict<string,any>>", False),
+            ],
             "returns": "void",
         },
         "text": _getter(),
@@ -1877,9 +2755,11 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
     chat_log = {
         "__init__": {
-            "params": [_self(),
-                       _p("messages", "list<dict<string,any>>", False, "list()"),
-                       _p("call_timeline", "list<dict<string,any>>", False, "list()")],
+            "params": [
+                _self(),
+                _p("messages", "list<dict<string,any>>", False, "list()"),
+                _p("call_timeline", "list<dict<string,any>>", False, "list()"),
+            ],
             "returns": "void",
         },
         "messages": _getter(),
@@ -1887,8 +2767,10 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     }
 
     # Drop the mis-routed native modules, emit the single canonical one.
-    for _native in ("signalwire.ai_chat.ai_chat_client",
-                    "signalwire.ai_chat.ai_chat_error"):
+    for _native in (
+        "signalwire.ai_chat.ai_chat_client",
+        "signalwire.ai_chat.ai_chat_error",
+    ):
         out_modules.pop(_native, None)
 
     mod = out_modules.setdefault("signalwire.ai_chat.client", {"classes": {}})
@@ -1920,17 +2802,29 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
     )
     if not action_cls:
         return
-    call_mod = out_modules.setdefault("signalwire.relay.call", {"classes": {}, "functions": {}})
+    call_mod = out_modules.setdefault(
+        "signalwire.relay.call", {"classes": {}, "functions": {}}
+    )
     call_classes = call_mod.setdefault("classes", {})
 
     # The BASE ``Action``: the reference declares it in ``signalwire.relay.call``
-    # with __init__/is_done/wait/result plus the two ctor params it stores
-    # publicly — ``call`` (the back-reference) and ``control_id`` — which the
-    # oracle's class-B2 rule records. The unified C++ Action carries all of
-    # them; project the reference-recorded subset onto relay.call so the base
+    # with __init__/is_done/wait/result plus the ctor/derived attrs it stores
+    # publicly — ``call`` (the back-reference), ``control_id``, and
+    # ``completed`` (the bool state flag that starts False and flips True on
+    # completion) — which the oracle's class-B2 rule records. The unified C++
+    # Action carries all of them (``is_done()`` delegates to ``completed()``);
+    # project the reference-recorded subset onto relay.call so the base
     # symbol lines up (the richer C++ surface stays under relay.action).
     base_entry = call_classes.setdefault("Action", {"methods": {}})
-    for m in ("__init__", "is_done", "wait", "result", "control_id", "call"):
+    for m in (
+        "__init__",
+        "is_done",
+        "wait",
+        "result",
+        "control_id",
+        "call",
+        "completed",
+    ):
         if m in action_cls:
             base_entry["methods"].setdefault(m, action_cls[m])
     # ``call`` is REFERENCE surface (relay.call.Action.call), now homed on the
@@ -1944,6 +2838,368 @@ def _project_relay_action_subclasses(out_modules: dict) -> None:
         for m in methods:
             if m in action_cls:  # only if the C++ Action truly defines it
                 entry["methods"][m] = action_cls[m]
+
+
+# Built-in-skill members the oracle records as a SIGNATURE (not merely surface
+# membership) and that the C++ port implements as a zero-arg accessor on the
+# skill class. The skill classes live in ``.cpp`` IMPLEMENTATION files the
+# header walker never opens — so libclang cannot see them and the accessor
+# would read as missing-port drift even though it is implemented. This is the
+# signature-side twin of enumerate_surface's ``_project_builtin_skills``: same
+# fold, same fail-honest rule.
+#
+# ``oracle_key -> (candidate cpp sources, cpp class, {member: accessor})``.
+# The tuple of sources used to carry TWO entries for spider, because the skill
+# was registered twice — once by ``src/skills/builtin/spider.cpp`` and once by a
+# duplicate ``SpiderSkillR`` in ``src/skills/skill_registry.cpp`` — with
+# ``register_skill`` silently overwriting, so which class ran was decided by
+# unspecified cross-TU static-init order. That duplication is now GONE (the
+# ``*SkillR`` copies were deleted and ``register_skill`` throws on a duplicate
+# name), so each skill has exactly one defining source and the file the
+# enumerator reads is the file that runs.
+#
+# A member is projected ONLY when the named accessor is genuinely present in
+# EVERY listed source — a deleted or renamed accessor drops out rather than
+# being invented (RULES §2/§3).
+_SKILL_ACCESSOR_PROJECTIONS: dict[str, tuple[tuple[str, ...], str, dict[str, str]]] = {
+    "signalwire.skills.spider.skill.SpiderSkill": (
+        ("src/skills/builtin/spider.cpp",),
+        "SpiderSkill",
+        # ``self.remove_xpaths`` — the PREFILLED xpath list the reference sets
+        # in ``__init__`` and walks in ``_fast_text_extract``. C++ idiom: a
+        # field plus a ``remove_xpaths()`` reader (+ ``set_remove_xpaths``).
+        {"remove_xpaths": "remove_xpaths"},
+    ),
+}
+
+
+def _project_skill_accessors(out_modules: dict) -> None:
+    """Project built-in-skill value accessors (see _SKILL_ACCESSOR_PROJECTIONS).
+
+    The C++ skill classes are defined in ``.cpp`` implementation files, which
+    the libclang header walk never parses. Verify the accessor really exists in
+    every candidate source and emit the oracle-shaped zero-arg signature for
+    it; skip it entirely when any source or the accessor is absent, so the
+    enumerator can never invent surface the port does not have.
+    """
+    for oracle_key, (
+        cpp_files,
+        _cpp_cls,
+        members,
+    ) in _SKILL_ACCESSOR_PROJECTIONS.items():
+        srcs = [PORT_ROOT / f for f in cpp_files]
+        if not all(s.is_file() for s in srcs):
+            continue  # skill not implemented in this tree — don't invent it
+        texts = [s.read_text(encoding="utf-8") for s in srcs]
+        module, cls = oracle_key.rsplit(".", 1)
+        for member, accessor in members.items():
+            # The accessor must be DEFINED (``name() const {`` / ``name() {``),
+            # not merely mentioned. A bare call site does not count.
+            pat = re.compile(
+                r"\b"
+                + re.escape(accessor)
+                + r"\s*\(\s*\)\s*(?:const\s*)?(?:noexcept\s*)?\{"
+            )
+            if not all(pat.search(t) for t in texts):
+                continue
+            mod_entry = out_modules.setdefault(module, {"classes": {}, "functions": {}})
+            cls_entry = mod_entry.setdefault("classes", {}).setdefault(
+                cls, {"methods": {}}
+            )
+            cls_entry["methods"].setdefault(
+                member,
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "list<string>",
+                },
+            )
+
+
+# ---------------------------------------------------------------------------
+# Built-in-skill HOOK projection (the signature-side twin of
+# enumerate_surface's ``_project_builtin_skills``)
+# ---------------------------------------------------------------------------
+# Until 2026-07-30 the SIGNATURE oracle recorded only 7 of the 18 builtin skill
+# modules: ``enumerate_python_signatures`` dropped every base-identical override,
+# which emptied a skill class's ``methods_out`` and deleted the CLASS — and with
+# it the module. porting-sdk 8496c77 fixed that (class survival is now the
+# invariant), so all 18 skill modules are visible and each skill's SkillBase hook
+# set (``setup``/``register_tools``/``get_hints``/``get_global_data``/
+# ``get_prompt_sections``/``get_parameter_schema``/``get_instance_key``/
+# ``cleanup``) is recorded contract.
+#
+# This enumerator carried the matching stale assumption: it projected exactly ONE
+# skill member (``SpiderSkill.remove_xpaths``, above) on the premise that the
+# signature oracle recorded skill subclasses method-LESS. That premise is dead,
+# so the hooks now project generally.
+#
+# THE HOOKS ARE REAL C++ SURFACE, NOT INVENTED. Every C++ builtin skill derives
+# from ``signalwire::skills::SkillBase``, whose hooks are virtual with real
+# bodies (``get_hints``/``get_global_data``/``get_prompt_sections``/
+# ``get_parameter_schema``/``get_instance_key``/``cleanup``) or pure-virtual and
+# overridden in each skill (``setup``/``register_tools``). A caller holding a
+# concrete skill can call all of them; libclang simply never sees the classes
+# because they live in ``src/skills/builtin/*.cpp`` implementation files that the
+# HEADER walk does not open.
+#
+# The emitted signature is the C++ ``SkillBase``'s OWN recorded signature for
+# that hook — read back out of ``out_modules`` after the header walk, never
+# hand-written — so the audit compares the port's genuine shape against the
+# reference. Nothing is flattened to a convenient shape to go green: of the eight
+# hooks, five (``get_hints``/``get_global_data``/``get_instance_key``/
+# ``cleanup``/``get_parameter_schema``) match the reference exactly and go
+# straight to zero drift.
+#
+# Three hooks do NOT go to zero, and that is the correct outcome rather than a
+# gap in this projection. ``setup`` (C++ takes the params json at attach time),
+# ``register_tools`` and ``get_prompt_sections`` (C++ RETURNS the typed payload
+# instead of calling back into the agent) genuinely diverge from the reference on
+# ``SkillBase`` ITSELF — a real, pre-existing C++ design divergence already
+# recorded once on the base in PORT_SIGNATURE_OMISSIONS
+# (``cpp_typed_overload_subset`` / ``cpp_typed_skill_pipeline``). PHP, which
+# absorbed the same oracle change with zero findings, implements the reference
+# shapes literally (``setup(self) -> bool``, ``register_tools() -> void``), so
+# this is C++'s divergence and not an artifact of the audit.
+#
+# They are projected ANYWAY, with their true C++ shape, so the audit reports what
+# actually diverges (``param-count-mismatch`` / ``return-mismatch``) rather than
+# the false ``missing-port`` that withholding them would produce — the methods
+# are real, present and callable; only their shape differs.
+#
+# Fail-honest, four ways:
+#   1. the skill's ``.cpp`` must exist and define the C++ class (the shared
+#      ``enumerate_surface._scan_skill_methods`` scan, same source of truth as
+#      the surface projection);
+#   2. the member must be one the C++ class genuinely has — own-defined or a
+#      real ``SkillBase`` hook it inherits;
+#   3. the reference oracle must record that member on that class (read LIVE from
+#      python_signatures.json, never from a hand-maintained list — the surface
+#      enumerator's ``py_methods`` lists are the SURFACE oracle's and are wider
+#      than the signature oracle's, so trusting them emitted four skills'
+#      hooks the signature reference does not record);
+#   4. ``SkillBase`` must genuinely carry that hook in the walked headers.
+# A member failing any of the four is dropped, never invented.
+#
+# ---------------------------------------------------------------------------
+# INHERITED-DIVERGENCE FOLD (the per-subclass repetition of a base-level fact)
+# ---------------------------------------------------------------------------
+# Projecting the base's true C++ shape onto all 18 subclasses made the audit
+# report the SAME THREE divergences 31 more times — once per concrete skill that
+# inherits ``setup`` / ``register_tools`` / ``get_prompt_sections``. Those three
+# are one C++ design decision taken ONCE on ``SkillBase`` and already described
+# exactly once in PORT_SIGNATURE_OMISSIONS (``cpp_typed_overload_subset`` /
+# ``cpp_typed_skill_pipeline``). A subclass that merely inherits it is not a
+# second divergence; re-reporting it per-subclass is the audit counting one fact
+# 31 times, which is idiom repetition, and idiom folds at the emitter (RULES §2).
+#
+# So: when a concrete skill's override is SIGNATURE-IDENTICAL to the hook
+# ``SkillBase`` declares, the subclass adds no divergence of its own, and the
+# projected member is emitted in the REFERENCE's shape — the base keeps the one
+# recorded description of the difference, and the subclass compares equal.
+#
+# THE FOLD CANNOT HIDE A GENUINE MEMBER. It is gated on the C++ SOURCE, not on a
+# hand-kept list: ``_scan_skill_hook_decls`` reads each skill's own ``.cpp`` and
+# ``SkillBase``'s header and compares the NORMALIZED DECLARATION TEXT (return
+# type, parameter list, const-qualifier). A skill whose override diverges from
+# the base in ANY of those — a different return type, an extra/renamed/retyped
+# parameter, a dropped ``const`` — does NOT match, is emitted with the true C++
+# ``SkillBase``-walked signature instead, and surfaces as drift exactly as it
+# does today. Likewise a hook the base does not declare, or a skill whose source
+# the scan cannot read, never folds. (Negative control: perturbing one skill's
+# override in the source re-reds the gate — see the commit message.)
+#
+# Only the base-divergent hooks are foldable. The five hooks that already match
+# the reference (``get_hints`` / ``get_global_data`` / ``get_instance_key`` /
+# ``cleanup`` / ``get_parameter_schema``) need no fold and are excluded, so the
+# fold is scoped to the divergence it describes rather than blanketing the hook
+# set.
+_SKILL_BASE_ORACLE_KEY = "signalwire.core.skill_base"
+_SKILL_BASE_CPP_CLASS = "SkillBase"
+_SKILL_BASE_HEADER = "include/signalwire/skills/skill_base.hpp"
+
+# The hooks whose C++ shape diverges from the reference ON ``SkillBase`` ITSELF,
+# recorded once each in PORT_SIGNATURE_OMISSIONS. These — and only these — are
+# the members whose per-subclass repetition is folded. Keep this in step with
+# the base entries: a hook listed here MUST be excused on ``SkillBase``, or the
+# fold would be hiding a divergence nothing describes. ``_project_builtin_skill_hooks``
+# enforces that at runtime against PORT_SIGNATURE_OMISSIONS.
+_SKILL_BASE_DIVERGENT_HOOKS = {
+    "setup",  # cpp_typed_overload_subset: C++ takes the params json
+    "register_tools",  # cpp_typed_skill_pipeline: C++ returns the typed payload
+    "get_prompt_sections",  # cpp_typed_skill_pipeline: ditto
+}
+
+
+def _normalize_decl(text: str) -> str:
+    """Collapse a C++ declarator to comparable text (whitespace-insensitive)."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _scan_skill_hook_decls(
+    repo: Path,
+) -> tuple[dict[str, str], dict[str, dict[str, str]]]:
+    """Read the C++ SOURCE and return the normalized declaration text for each
+    base hook, on ``SkillBase`` and on every builtin skill that overrides it.
+
+    Returns ``(base_decls, per_skill_decls)`` where ``base_decls`` maps
+    ``hook -> "<ret> <name>(<params>)[ const]"`` for ``SkillBase``, and
+    ``per_skill_decls`` maps ``cpp_class -> {hook: same-shaped text}``. A hook a
+    skill does not override is simply absent (it inherits, so its shape IS the
+    base's).
+
+    This is the fold's gate: a subclass folds only when its text equals the
+    base's. Anything the scan cannot read yields no entry and therefore no fold.
+    """
+    hooks = "|".join(sorted(_SKILL_BASE_DIVERGENT_HOOKS))
+    # ``<return type> <hook>(<params>) [const] [override] {`` or ``... = 0;``
+    decl_re = re.compile(
+        r"(?:\[\[nodiscard\]\]\s*)?(?:virtual\s+)?"
+        r"([A-Za-z_][\w:<>,\s*&]*?)\s+"
+        r"\b(" + hooks + r")\s*"
+        r"\(([^;{]*?)\)\s*"
+        r"(const\b)?\s*"
+        r"(?:override\b\s*)?(?:noexcept\b\s*)?(?:=\s*0\s*;|\{)"
+    )
+
+    def _decls(text: str) -> tuple[dict[str, str], str]:
+        text = strip_block_comments(text)
+        text = "\n".join(strip_line_comments(ln) for ln in text.splitlines())
+        out: dict[str, str] = {}
+        for ret, name, params, is_const in decl_re.findall(text):
+            out.setdefault(
+                name,
+                _normalize_decl(f"{ret} {name}({params}) {is_const}"),
+            )
+        return out, text
+
+    base_path = repo / _SKILL_BASE_HEADER
+    base_decls: dict[str, str] = {}
+    if base_path.is_file():
+        base_decls, _ = _decls(base_path.read_text(encoding="utf-8"))
+
+    per_skill: dict[str, dict[str, str]] = {}
+    src = repo / SKILL_SOURCE_DIR
+    if src.is_dir():
+        class_re = re.compile(r"\bclass\s+([A-Za-z_]\w*Skill)\b")
+        for cpp in sorted(src.glob("*.cpp")):
+            decls, stripped = _decls(cpp.read_text(encoding="utf-8"))
+            for cls in class_re.findall(stripped):
+                per_skill.setdefault(cls, {}).update(decls)
+    return base_decls, per_skill
+
+
+def _skill_base_divergences_are_recorded() -> set[str]:
+    """Return the subset of ``_SKILL_BASE_DIVERGENT_HOOKS`` that the port's
+    PORT_SIGNATURE_OMISSIONS genuinely excuses on ``SkillBase``.
+
+    The fold's premise is that the divergence is described exactly ONCE, on the
+    base. If an entry is ever deleted, the fold must stop folding that hook —
+    otherwise the subclasses would silently absorb a difference nothing records.
+    Read the ledger, never assume it.
+    """
+    doc = PORT_ROOT / "PORT_SIGNATURE_OMISSIONS.md"
+    if not doc.is_file():
+        return set()
+    text = doc.read_text(encoding="utf-8")
+    recorded = set()
+    for hook in _SKILL_BASE_DIVERGENT_HOOKS:
+        if re.search(
+            r"^\s*signalwire\.core\.skill_base\.SkillBase\."
+            + re.escape(hook)
+            + r"\s*:",
+            text,
+            re.MULTILINE,
+        ):
+            recorded.add(hook)
+    return recorded
+
+
+def _project_builtin_skill_hooks(out_modules: dict) -> None:
+    """Project each builtin skill's SkillBase hook surface into its Python-
+    canonical module, reusing the C++ ``SkillBase``'s own walked signatures —
+    except for the three hooks whose divergence is a BASE-level fact already
+    recorded once, where a signature-identical override folds to the reference
+    shape (see the block comment above)."""
+    try:
+        from enumerate_surface import (  # type: ignore
+            SKILL_PROJECTIONS,
+            _SKILL_BASE_METHODS,
+            _scan_skill_methods,
+        )
+    except ImportError:  # pragma: no cover - enumerate_surface is a hard sibling
+        return
+
+    ref = _load_python_signatures()
+    ref_modules = ref.get("modules", {}) if ref else {}
+    if not ref_modules:
+        return  # no oracle to gate against -- emit nothing rather than guess
+
+    base_methods = (
+        out_modules.get(_SKILL_BASE_ORACLE_KEY, {})
+        .get("classes", {})
+        .get(_SKILL_BASE_CPP_CLASS, {})
+        .get("methods", {})
+    )
+    if not base_methods:
+        raise SystemExit(
+            "enumerate_signatures: builtin-skill hook projection found no walked "
+            f"{_SKILL_BASE_ORACLE_KEY}.{_SKILL_BASE_CPP_CLASS} signatures -- the "
+            "header walk changed; fix the projection rather than emitting a "
+            "hand-written shape"
+        )
+
+    base_decls, skill_decls = _scan_skill_hook_decls(PORT_ROOT)
+    if not base_decls:
+        raise SystemExit(
+            "enumerate_signatures: could not read the SkillBase hook declarations "
+            f"from {_SKILL_BASE_HEADER} -- the inherited-divergence fold is gated "
+            "on that source text; fix the scan rather than folding blind"
+        )
+    foldable = _SKILL_BASE_DIVERGENT_HOOKS & _skill_base_divergences_are_recorded()
+
+    defined = _scan_skill_methods(PORT_ROOT)
+    for cpp_cls, (module, py_cls, _py_methods) in SKILL_PROJECTIONS.items():
+        if cpp_cls not in defined:
+            continue  # skill not implemented in this tree -- don't invent it
+        ref_members = (
+            ref_modules.get(module, {})
+            .get("classes", {})
+            .get(py_cls, {})
+            .get("methods", {})
+        )
+        if not ref_members:
+            continue  # the signature oracle records nothing here -- nothing to fold
+        own = defined[cpp_cls]
+        mod_entry = out_modules.setdefault(module, {"classes": {}, "functions": {}})
+        cls_entry = mod_entry.setdefault("classes", {}).setdefault(
+            py_cls, {"methods": {}}
+        )
+        for member in sorted(ref_members):
+            # ``__init__`` and skill-specific helpers (``get_tools`` /
+            # ``search_wiki`` / ``remove_xpaths``) are NOT projected here: the
+            # ctor is a per-skill construction shape, and the helpers are covered
+            # by the accessor projection above.
+            if member not in _SKILL_BASE_METHODS:
+                continue
+            # The C++ class must genuinely have it: own-defined, or inherited.
+            if member not in own and member not in _SKILL_BASE_METHODS:
+                continue
+            sig = base_methods.get(member)
+            if sig is None:
+                continue  # SkillBase lost the hook -- drop, never invent
+            # INHERITED-DIVERGENCE FOLD. Only for a hook whose base-level
+            # divergence the ledger genuinely records, and only when this
+            # skill's own C++ declaration is byte-equal (modulo whitespace) to
+            # the one SkillBase declares. Anything else keeps the true C++
+            # shape and stays visible to the audit.
+            if member in foldable:
+                base_text = base_decls.get(member)
+                own_text = skill_decls.get(cpp_cls, {}).get(member, base_text)
+                if base_text is not None and own_text == base_text:
+                    ref_sig = ref_members.get(member)
+                    if ref_sig is not None:
+                        sig = ref_sig
+            cls_entry["methods"].setdefault(member, json.loads(json.dumps(sig)))
 
 
 def _project_gen_payload_getters(out_modules: dict) -> None:
@@ -1960,15 +3216,44 @@ def _project_gen_payload_getters(out_modules: dict) -> None:
     enumerator force-registering these as method-less types (empty member list
     on both sides → SURFACE-DIFF green).
 
-    Only project a field whose wire-key name the oracle records as a getter for
-    that class. Port-only data members the reference does not expose as a
-    property (e.g. the open ``extras`` member, and the wire keys Python's
-    payload class simply doesn't surface) are NOT projected — projecting them
-    would invent method surface the reference lacks. Each getter is emitted with
-    the oracle's zero-arg shape and an ``any`` return (``types_compatible``
-    treats ``any`` as compatible with the oracle's typed ``union<…>`` /
-    ``class:…`` getter returns), matching the container-accessor projection in
-    ``_apply_rest_sidecar``.
+    Project EVERY field these structs declare — deliberately NOT only the ones
+    the oracle happens to record. The field set is derived from the SPEC, not
+    mirrored from the reference: each of these headers is emitted by a
+    generator from its authoritative spec (``schema.json`` ``$defs`` for
+    swml_verbs, the swaig/post-prompt component schemas, the RELAY protocol
+    spec), every file is marked ``DO NOT EDIT``, and the GEN-FRESH/-SWML/
+    -RELAY/-SWAIG gates byte-compare the committed tree to a fresh regen. So a
+    field is present here IF AND ONLY IF the spec declares it — which is a
+    STRONGER guarantee than "the oracle also lists it", and it is what makes
+    projecting the full set safe under RULES §3 (no invented surface).
+
+    Intersecting with the oracle instead — ``[f for f in fields if f in
+    oracle_getters]`` — is what this function used to do, and it is a permanent
+    blind spot: it DEFINES the port's projected surface as a subset of the
+    reference's, so a field the port implements and the reference lacks can
+    never drift. Measured 2026-08-05 by negative control: adding a bogus
+    ``totally_invented_field`` to ``ai_params.hpp`` left the enumerated surface
+    completely unchanged, because the oracle does not record that name. It also
+    made the projection track the oracle silently — when the oracle widened
+    AIParams 60 → 87, this function's output followed it with no change to the
+    port and no gate ever verifying the port. Deleting a real field IS still
+    caught (it disappears from the port side and DRIFT reports it missing), so
+    the old rule failed in exactly one direction: the additive one.
+
+    Keeping the per-CLASS oracle gate (``ref_cls`` below) is a different
+    question and is retained: a payload class the reference has no counterpart
+    for at all (the 123 ``relay.protocol_types_generated`` structs, whose
+    Python module does not exist) is left unprojected rather than emitted as
+    123 classes of unmatchable surface. That is a module-scope decision, not a
+    field-level filter, and it does not hide drift WITHIN a class both sides
+    have.
+
+    The open ``extras`` member is not a wire key and is excluded upstream by
+    the parser (it carries an initializer, not an ``std::optional`` wire
+    field). Each getter is emitted with the oracle's zero-arg shape and an
+    ``any`` return (``types_compatible`` treats ``any`` as compatible with the
+    oracle's typed ``union<…>`` / ``class:…`` getter returns), matching the
+    container-accessor projection in ``_apply_rest_sidecar``.
     """
     ref = _load_python_signatures()
     if not ref:
@@ -1989,23 +3274,25 @@ def _project_gen_payload_getters(out_modules: dict) -> None:
             ref_cls = ref_classes.get(cls)
             if not ref_cls:
                 continue
-            oracle_getters = {
-                m for m in ref_cls.get("methods", {}) if m != "__init__"
-            }
-            present = [f for f in fields if f in oracle_getters]
-            if not present:
+            if not fields:
                 continue
             cls_entry = mod_entry["classes"].setdefault(cls, {"methods": {}})
-            for field in present:
-                cls_entry["methods"].setdefault(field, {
-                    "params": [{"name": "self", "kind": "self"}],
-                    "returns": "any",
-                })
+            for field in fields:
+                cls_entry["methods"].setdefault(
+                    field,
+                    {
+                        "params": [{"name": "self", "kind": "self"}],
+                        "returns": "any",
+                    },
+                )
             # Method-less POD: implicit default constructor is available.
-            cls_entry["methods"].setdefault("__init__", {
-                "params": [{"name": "self", "kind": "self"}],
-                "returns": "void",
-            })
+            cls_entry["methods"].setdefault(
+                "__init__",
+                {
+                    "params": [{"name": "self", "kind": "self"}],
+                    "returns": "void",
+                },
+            )
 
 
 def _project_kwargs_shape(out_modules: dict) -> None:
@@ -2064,6 +3351,281 @@ def _project_kwargs_shape(out_modules: dict) -> None:
             ref_sig = ref_fns.get((mod, fn))
             if ref_sig:
                 project_one(sig, ref_sig)
+
+
+# ---------------------------------------------------------------------------
+# Method-level options-carrier unfold
+# ---------------------------------------------------------------------------
+#
+# THE IDIOM
+# =========
+# Python spells "these N knobs are individually optional" as N keyword-only
+# params. C++ has no keyword arguments, so the SAME contract is carried by ONE
+# object parameter — either a typed options STRUCT (``RenderOptions``) or an
+# untyped ``const json&`` bag. The construction contract already unfolds the
+# struct form (``RelayClient(RelayConfig{project, token, …})`` vs five reference
+# kwargs, see ``_construction_params_from_signature``); ordinary METHODS carry
+# exactly the same idiom, and this is the same fold applied to them.
+#
+# Folding at the emitter is the point: the diff keeps comparing every named knob
+# afterwards, so dropping or renaming one still reports. An omission would stop
+# comparing the whole method — which is what the nine ``cpp_options_object`` /
+# ``cpp_options_struct`` entries this replaces were doing.
+#
+# THE BOUNDARY — a carrier, not every dict-typed parameter
+# ========================================================
+# A single dict-typed parameter is NOT automatically a carrier. The reference has
+# genuine DOMAIN parameters whose value simply IS a dict — ``Call.execute_swml(
+# swml)``, ``Call.refer(device)``, ``DataMap.foreach(mapping)``. Unfolding one of
+# those would invent params the port never had and destroy a real one. The fold
+# therefore fires only on EVIDENCE, never on the parameter's type alone:
+#
+#   TYPED-STRUCT form — the param's emitted type resolves to a known options
+#     struct (``options_by_ref``). The struct's public FIELDS are the named set;
+#     they are declared, not guessed. Skipped when the REFERENCE also declares a
+#     param of that name (the reference passes the same object, so the carrier IS
+#     the contract — same exclusion the construction unfold makes for
+#     ``RestClient(request_options=…)``).
+#
+#   UNTYPED-BAG form — the param is the untyped ``any`` (``const json&``) AND the
+#     method body SPREADS it onto the outgoing frame rather than reading fixed
+#     keys out of it. ``Call::queue_enter`` is ``json p = params.is_object() ?
+#     params : json::object(); p["queue_name"] = queue_name; return
+#     execute_simple("queue.enter", p);`` — every key the caller puts in the bag
+#     reaches the wire verbatim, so the reference's keyword names ARE reachable
+#     through it and the two calls produce identical frames. A body that instead
+#     does ``params["mapping"]`` / ``p["swml"] = swml`` is consuming a domain
+#     value and is left alone.
+#
+# In both forms the reference must have named keyword params to unfold TO, and
+# the port must not already declare them. Anything unproven stays as it was and
+# reports drift, which is the correct outcome for a case this cannot decide.
+_BAG_SPREAD_RE = (
+    # ``json p = <param>.is_object() ? <param> : json::object();`` — the copy-the
+    # whole-bag-then-add-fixed-keys idiom every Call.* action method uses.
+    r"=\s*{n}\s*\.\s*is_object\s*\(\s*\)\s*\?\s*{n}\b",
+    # ``for (auto& [k, v] : <param>.items()) out[k] = v;`` — explicit spread.
+    r"\b{n}\s*\.\s*items\s*\(\s*\)",
+    # ``p.update(<param>)`` / ``p.merge_patch(<param>)`` / ``p.insert(…{n}…)``.
+    r"\.\s*(?:update|merge_patch)\s*\(\s*{n}\s*\)",
+)
+
+
+def _is_callable_type(t: str) -> bool:
+    """True for a canonical type whose value is a function, not JSON data.
+
+    ``callable<…>`` and ``optional<callable<…>>`` are the two spellings the
+    oracle records. A JSON bag cannot hold either.
+    """
+    t = (t or "").strip()
+    if t.startswith("optional<") and t.endswith(">"):
+        t = t[len("optional<") : -1].strip()
+    return t.startswith("callable<") or t == "callable"
+
+
+def _bag_is_spread(
+    guards: GuardIndex | None, cls: str, method: str, param: str, index: int
+) -> bool:
+    """True when SOME definition of ``cls::method`` spreads ``param`` wholesale.
+
+    Same position-then-name resolution the guard scan uses: a definition may
+    rename its parameters relative to the header, so the definition-side name at
+    this index is tried first and the header spelling is the fallback.
+    """
+    if guards is None:
+        return False
+    for body, names in guards.bodies(cls, method):
+        local = names[index] if 0 <= index < len(names) else None
+        for name in (n for n in (local, param) if n):
+            for pat in _BAG_SPREAD_RE:
+                if re.search(pat.format(n=re.escape(name)), body):
+                    return True
+    return False
+
+
+def _project_options_carrier(
+    out_modules: dict, options_by_ref: dict, guards: GuardIndex | None
+) -> None:
+    """Unfold a method's options carrier into the reference's keyword params.
+
+    See the block comment above for the idiom and the two evidence gates. The
+    unfolded params are emitted ``kind: keyword`` with the reference's own type
+    and default, because that is what the carrier genuinely offers: C++ aggregate
+    init and a JSON bag both let the caller set any subset, in any order.
+    """
+    ref = _load_python_signatures()
+    if not ref:
+        return
+    for mod, entry in out_modules.items():
+        ref_classes = ref.get("modules", {}).get(mod, {}).get("classes", {})
+        if not ref_classes:
+            continue
+        for cls, cinfo in entry.get("classes", {}).items():
+            ref_methods = ref_classes.get(cls, {}).get("methods", {})
+            if not ref_methods:
+                continue
+            for meth, sig in cinfo.get("methods", {}).items():
+                # ``__init__`` is the CONSTRUCTION contract's, not this fold's.
+                # ``build_construction`` runs its own unfold with deliberately
+                # different semantics: it emits the options struct's WHOLE field
+                # set, because a construction knob the reference lacks is still a
+                # real configurable the port offers (and the diff reports it as
+                # such). Folding here first would consume the carrier and hide
+                # those — measured: it silently dropped RelayConfig's ``port`` /
+                # ``max_connections`` / ``request_timeout_ms`` from
+                # ``RelayClient``'s construction params.
+                if meth == "__init__":
+                    continue
+                ref_sig = ref_methods.get(meth)
+                if ref_sig:
+                    _unfold_one_carrier(sig, ref_sig, options_by_ref, guards, cls, meth)
+
+
+def _unfold_one_carrier(
+    sig: dict,
+    ref_sig: dict,
+    options_by_ref: dict,
+    guards: GuardIndex | None,
+    cls: str,
+    meth: str,
+) -> None:
+    port_params = sig.get("params", [])
+    ref_params = ref_sig.get("params", [])
+    if not port_params or not ref_params:
+        return
+    # The reference's OPTIONAL named params are what a carrier stands in for.
+    # Two exclusions:
+    #   * ``self``/``cls`` and the trailing ``**kwargs`` — the latter is already
+    #     reconciled by ``_project_kwargs_shape``, and consuming it here would
+    #     let a carrier match a method whose only reference knob is the open
+    #     spread.
+    #   * a REQUIRED param — an options carrier is optional by construction
+    #     (both aggregate init and a JSON bag let the caller set any subset), so
+    #     it cannot stand in for something the reference demands. A required
+    #     reference param the port lacks is a genuine gap and must keep
+    #     reporting.
+    # The reference records keyword-ONLY params as ``kind: keyword`` and
+    # positional-or-keyword ones with no ``kind`` at all; both are settable BY
+    # NAME, which is the whole contract a carrier carries, so both qualify.
+    ref_kw = [
+        p
+        for p in ref_params
+        if p.get("name")
+        and (p.get("kind") or "positional")
+        not in ("self", "cls", "var_keyword", "var_positional")
+        and p.get("required") is False
+    ]
+    if not ref_kw:
+        return
+    port_names = {p.get("name") for p in port_params}
+    # Nothing to unfold to if the port already declares them all.
+    target = [p for p in ref_kw if p["name"] not in port_names]
+    if not target:
+        return
+    # The C++ definition's parameter list has no ``self``, so a port param's
+    # position in the C++ signature is its index MINUS the leading self/cls.
+    self_offset = sum(
+        1 for p in port_params if (p.get("kind") or "positional") in ("self", "cls")
+    )
+    for idx, p in enumerate(port_params):
+        if (p.get("kind") or "positional") in ("self", "cls"):
+            continue
+        name = p.get("name")
+        if not name:
+            continue
+        # A carrier the REFERENCE also declares by name is the contract itself,
+        # not a stand-in — leave it typed and whole.
+        if any(rp.get("name") == name for rp in ref_params):
+            continue
+        # A REQUIRED parameter is not an optional-knob carrier. C++ overloads a
+        # long reference signature as a domain OBJECT the caller must supply
+        # (``define_tool(const ToolDefinition&)``,
+        # ``add_language(const LanguageConfig&)``) — the object carries the
+        # reference's REQUIRED params too (name/description/parameters/handler,
+        # name/code/voice), which an optional-only unfold would silently drop
+        # while still consuming the carrier. Measured: without this gate the
+        # fold turned ``define_tool(tool)`` into ``define_tool(secure)`` and
+        # ``add_language(lang)`` into five optional knobs, destroying the
+        # required surface in both. An options carrier the caller may omit
+        # entirely cannot be standing in for anything mandatory, so requiring
+        # the carrier itself to be optional is exactly the right discriminator.
+        if p.get("required") is not False:
+            continue
+        ptype = p.get("type", "")
+        fields = options_by_ref.get(ptype)
+        if fields is not None:
+            # TYPED-STRUCT form: unfold only the reference keywords the struct
+            # genuinely declares a field for. A reference keyword the struct
+            # LACKS stays missing and keeps reporting as drift — the fold must
+            # not manufacture a knob the port cannot set.
+            unfold = [rp for rp in target if rp["name"] in fields]
+        elif ptype == "any" and _bag_is_spread(
+            guards, cls, meth, name, idx - self_offset
+        ):
+            # UNTYPED-BAG form: a proven wholesale spread reaches every key, so
+            # every remaining reference knob is settable — but ONLY the ones a
+            # JSON object can actually hold. A ``const json&`` cannot carry a
+            # ``std::function``, so unfolding a reference CALLABLE out of it
+            # would claim a callback the port does not accept. (Measured: the
+            # fold otherwise invented ``on_completed`` on
+            # ``detect_answering_machine`` and ``transcribe``.) A callable knob
+            # the port genuinely lacks stays missing and keeps reporting drift,
+            # which is the honest result.
+            unfold = [rp for rp in target if not _is_callable_type(rp.get("type", ""))]
+        else:
+            continue
+        if not unfold:
+            continue
+        # Emit each unfolded knob in the reference's OWN kind/type/default. The
+        # carrier genuinely offers exactly that: settable by name, in any order,
+        # any subset, defaulting to the reference's default when unset. Copying
+        # the reference's kind (rather than forcing ``keyword``) keeps the
+        # keyword-only vs positional-or-keyword distinction the oracle draws.
+        replacement = []
+        for rp in unfold:
+            np: dict = {"name": rp["name"]}
+            if rp.get("kind"):
+                np["kind"] = rp["kind"]
+            np["type"] = rp.get("type", "any")
+            np["required"] = False
+            np["default"] = rp.get("default")
+            replacement.append(np)
+        tail = port_params[idx + 1 :]
+        # A port param the reference declares KEYWORD-ONLY carries the same kind
+        # as its unfolded siblings. C++ has no keyword arguments at all — every
+        # parameter is positional — so on a method whose carrier is being
+        # unfolded, a param that is separately declared purely because its API
+        # name differs from its wire key (``bind_digit(bind_params)``,
+        # ``amazon_bedrock(ai_params)``) is reachable by name exactly the way the
+        # bag's keys are. Recording it ``positional`` next to keyword siblings
+        # the same fold just emitted would report the carrier's own idiom as
+        # drift on one param and not the others.
+        ref_kind = {rp["name"]: rp.get("kind") for rp in ref_params if rp.get("name")}
+        for i, tp in enumerate(tail):
+            if ref_kind.get(tp.get("name")) == "keyword" and not tp.get("kind"):
+                # Rebuild so ``kind`` lands in its usual slot (right after
+                # ``name``) — the artifact is committed and reviewed, so a
+                # param record's key order stays uniform across the file.
+                rebuilt = {"name": tp["name"], "kind": "keyword"}
+                rebuilt.update({k: v for k, v in tp.items() if k != "name"})
+                tail[i] = rebuilt
+        # ORDER the unfolded knobs (and any optional port params that follow the
+        # carrier) by the REFERENCE's declaration order. A carrier is unordered
+        # by nature — a JSON bag and an aggregate initializer both let the caller
+        # set any subset in any order — but the diff matches params by POSITION,
+        # so an arbitrary order manufactures param-mismatch findings against the
+        # neighbouring names. (Measured: ``bind_digit``'s explicit
+        # ``bind_params``, declared after the bag so the existing call shape
+        # keeps its meaning, otherwise collided with ``realm``/``max_triggers``
+        # and reported three bogus type mismatches.) Port params the reference
+        # does not name keep their relative order at the end — they are the
+        # genuine extras and must stay visible as such.
+        ref_order = {rp["name"]: i for i, rp in enumerate(ref_params) if rp.get("name")}
+        merged = replacement + [tp for tp in tail if tp.get("required") is False]
+        rest = [tp for tp in tail if tp.get("required") is not False]
+        merged.sort(key=lambda x: ref_order.get(x.get("name"), len(ref_order)))
+        sig["params"] = port_params[:idx] + merged + rest
+        return
 
 
 def _project_callable_shape(out_modules: dict) -> None:
@@ -2128,6 +3690,39 @@ def _load_python_signatures() -> dict:
         return {}
 
 
+def _oracle_records_class(ns_str: str, class_name: str, header_path: str) -> bool:
+    """True when the reference oracle records ``class_name`` in the Python module
+    this C++ class maps to — the gate that lets a fields-only POD into the
+    signature inventory.
+
+    Resolves the module the SAME way the emit loop does (CLASS_RENAME_MAP, then
+    CLASS_MODULE_MAP / module_for_class) so the answer cannot disagree with where
+    the class would actually land.
+
+    GENERATED DTOs ARE EXCLUDED BY PATH, and that exclusion is load-bearing rather
+    than cosmetic. ``CLASS_MODULE_MAP`` is keyed by bare class NAME, so it is
+    namespace-blind: the generated read-side DTO ``signalwire::rest::…::messages::
+    Message`` and the generated SWML verb ``…::DataMap`` resolve to the SAME
+    canonical key as the hand-written ``signalwire.relay.message.Message`` /
+    ``signalwire.core.data_map.DataMap``. Admitting a DTO therefore does not add a
+    class — it MERGES its wire fields into the hand-written class's construction
+    contract (measured: +13 bogus construction params on Message, and DataMap lost
+    its real ``function_name``). The generated DTOs already reach the audit through
+    their own generated-payload path; they must not enter here."""
+    if "/generated/" in header_path or "_generated/" in header_path:
+        return False
+    rename_key = (ns_str, class_name)
+    if rename_key in CLASS_RENAME_MAP:
+        mod, cls = CLASS_RENAME_MAP[rename_key]
+    else:
+        cls = class_name
+        mod = CLASS_MODULE_MAP.get(class_name) or module_for_class(class_name, ns_str)
+    if not mod:
+        return False
+    ref = _load_python_signatures()
+    return cls in ref.get("modules", {}).get(mod, {}).get("classes", {})
+
+
 def _load_python_free_function_targets() -> set[tuple[str, str]]:
     """Read the Python reference's module-level ``functions`` map so the
     walker only emits things the Python oracle also exposes at module
@@ -2139,15 +3734,14 @@ def _load_python_free_function_targets() -> set[tuple[str, str]]:
     except FileNotFoundError:
         return targets
     for mod, entry in ref.get("modules", {}).items():
-        for fn in (entry.get("functions") or {}).keys():
+        for fn in entry.get("functions") or {}:
             targets.add((mod, fn))
     return targets
 
 
-def _translate_with_canonical_fallback(spelling: str,
-                                        canonical_spelling: str,
-                                        aliases: dict,
-                                        ctx: str) -> str:
+def _translate_with_canonical_fallback(
+    spelling: str, canonical_spelling: str, aliases: dict, ctx: str
+) -> str:
     """Translate a C++ type spelling, with awareness of typedef expansion.
 
     libclang reports the typedef name in ``arg.type.spelling``
@@ -2180,16 +3774,22 @@ def _translate_with_canonical_fallback(spelling: str,
     # ``class:<module>.<TypedefName>`` invented from the typedef's
     # bare name, but the typedef actually wraps a stdlib type the
     # canonical spelling can decompose.
-    if canonical_spelling and canonical_spelling != spelling and \
-            primary.startswith("class:") and "." in primary:
+    if (
+        canonical_spelling
+        and canonical_spelling != spelling
+        and primary.startswith("class:")
+        and "." in primary
+    ):
         # Look up the typedef name in CLASS_MODULE_MAP / CLASS_RENAME_MAP
         # to see if there's an intentional class-rename target. If so,
         # keep the primary translation; otherwise prefer canonical.
         tail = primary.split(":", 1)[1]
         cls_name = tail.rsplit(".", 1)[-1]
-        if cls_name not in CLASS_MODULE_MAP and \
-                not any(v[1] == cls_name for v in CLASS_RENAME_MAP.values()) and \
-                cls_name not in CALLBACK_TYPEDEFS_AS_CALLABLE:
+        if (
+            cls_name not in CLASS_MODULE_MAP
+            and not any(v[1] == cls_name for v in CLASS_RENAME_MAP.values())
+            and cls_name not in CALLBACK_TYPEDEFS_AS_CALLABLE
+        ):
             try:
                 return translate_cpp_type(canonical_spelling, aliases, ctx)
             except TypeTranslationError:
@@ -2198,16 +3798,27 @@ def _translate_with_canonical_fallback(spelling: str,
     return primary
 
 
-def build_signature(method: dict, aliases: dict, context: str) -> dict:
+def build_signature(
+    method: dict,
+    aliases: dict,
+    context: str,
+    *,
+    guards: GuardIndex | None = None,
+    cpp_class: str | None = None,
+    cpp_method: str | None = None,
+) -> dict:
     params_out: list = []
     is_static = method.get("is_static", False)
     is_ctor = method.get("is_constructor", False)
     if not is_static:
         params_out.append({"name": "self", "kind": "self"})
-    for p in method.get("parameters", []):
+    for p_index, p in enumerate(method.get("parameters", [])):
         ctx = f"{context}[{p.get('name')}]"
         canon_type = _translate_with_canonical_fallback(
-            p.get("type", ""), p.get("canonical_type", ""), aliases, ctx,
+            p.get("type", ""),
+            p.get("canonical_type", ""),
+            aliases,
+            ctx,
         )
         param: dict = {
             "name": p.get("name", "_") or "_",
@@ -2215,15 +3826,45 @@ def build_signature(method: dict, aliases: dict, context: str) -> dict:
         }
         if p.get("has_default"):
             param["required"] = False
-            param["default"] = None
+            # C++ declares real default arguments, so the VALUE is recoverable
+            # from the header (unlike languages whose reflection only reports
+            # that a default exists). A default we could not reduce to a literal
+            # — an enum value, a constructor call, an arithmetic expression —
+            # stays ``null``: a documented blind spot, never a guessed value.
+            dv = p.get("default_value", _NO_DEFAULT)
+            if dv is _EMPTY_BRACE:
+                dv = _empty_brace_default(canon_type)
+            dv = None if dv is _NO_DEFAULT else dv
+            # THE NULL <-> ZERO-VALUE SENTINEL FOLD (see GuardIndex). A sentinel
+            # default whose absence the body PROVES with a guard is the C++
+            # spelling of the reference's ``= None``; record it as null so the
+            # two compare equal. An unguarded sentinel is a value the port really
+            # ships and keeps reporting as drift.
+            if (
+                dv is not None
+                and guards is not None
+                and cpp_class
+                and cpp_method
+                and _is_foldable_sentinel(canon_type, dv)
+            ):
+                kind = _sentinel_kind(canon_type)
+                if kind and guards.guards(
+                    cpp_class, cpp_method, p.get("name") or "", p_index, kind
+                ):
+                    dv = None
+            param["default"] = dv
         else:
             param["required"] = True
         params_out.append(param)
-    return_canon = "void" if is_ctor else _translate_with_canonical_fallback(
-        method.get("return_type", "void"),
-        method.get("canonical_return_type", ""),
-        aliases,
-        context + "[->]",
+    return_canon = (
+        "void"
+        if is_ctor
+        else _translate_with_canonical_fallback(
+            method.get("return_type", "void"),
+            method.get("canonical_return_type", ""),
+            aliases,
+            context + "[->]",
+        )
     )
     return {"params": params_out, "returns": return_canon}
 
@@ -2232,7 +3873,27 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include", type=Path, default=PORT_ROOT / "include")
     parser.add_argument("--out", type=Path, default=PORT_ROOT / "port_signatures.json")
-    parser.add_argument("--strict", action="store_true")
+    # FAIL-LOUD BY DEFAULT (2026-07-30). This used to be an opt-in
+    # `--strict` that NOT ONE of the six gate invocations passed — run-ci.sh,
+    # porting-sdk/scripts/suites/_signatures_fresh.py:156/163 and
+    # _surface_commands.py:448/481/535/562/589/635 all call this script bare. So
+    # the fail-loud path was dead code, and a translation failure printed a
+    # warning and STILL EXITED 0 while the affected symbol vanished from
+    # port_signatures.json entirely. Measured on this repo before the fix: 5
+    # failures at rc=0, with ContextBuilder.attach_tool_name_supplier and
+    # SWMLService.generate_random_hex silently absent despite being declared.
+    #
+    # BooleanOptionalAction with default=True means the six existing callers need
+    # no change — they simply start failing loud. `--no-strict` is the local-only
+    # escape hatch for deliberately inspecting a partial artifact. `--strict`
+    # still parses, so the documented invocation keeps working.
+    parser.add_argument(
+        "--strict",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="fail (exit 1) on any type-translation failure instead of silently "
+        "emitting an artifact that omits the affected symbols (default: enabled)",
+    )
     args = parser.parse_args()
 
     aliases = load_aliases()
@@ -2310,8 +3971,11 @@ def main() -> int:
             raw_options_structs.update(opt_structs)
             single_tu_ok = True
     except Exception as e:
-        print(f"enumerate_signatures: single-TU parse failed ({e}); "
-              f"falling back to per-header", file=sys.stderr)
+        print(
+            f"enumerate_signatures: single-TU parse failed ({e}); "
+            f"falling back to per-header",
+            file=sys.stderr,
+        )
 
     if not single_tu_ok:
         raw_entries.clear()
@@ -2323,26 +3987,54 @@ def main() -> int:
             except Exception as e:
                 print(f"skip {header}: {e}", file=sys.stderr)
                 continue
-            cls_entries, fn_entries, opt_structs = walk_translation_unit(tu, args.include)
+            cls_entries, fn_entries, opt_structs = walk_translation_unit(
+                tu, args.include
+            )
             raw_entries.extend(cls_entries)
             raw_free_functions.extend(fn_entries)
             raw_options_structs.update(opt_structs)
 
-    canonical, failures = collect(raw_entries, aliases, raw_free_functions,
-                                  raw_options_structs)
+    # Body index for the null <-> zero-value sentinel fold. Built from the
+    # implementation tree + the headers (inline bodies); see GuardIndex.
+    guards = GuardIndex([PORT_ROOT / "src", args.include])
+
+    canonical, failures = collect(
+        raw_entries, aliases, raw_free_functions, raw_options_structs, guards=guards
+    )
     if failures:
-        print(f"enumerate_signatures: {len(failures)} translation failure(s)", file=sys.stderr)
+        print(
+            f"enumerate_signatures: {len(failures)} translation failure(s)",
+            file=sys.stderr,
+        )
         for f in failures[:30]:
             print(f"  - {f}", file=sys.stderr)
         if len(failures) > 30:
             print(f"  ... ({len(failures) - 30} more)", file=sys.stderr)
         if args.strict:
+            print(
+                "enumerate_signatures: REFUSING to write a signature artifact that "
+                "silently OMITS the symbols above. A failed translation drops that "
+                "method from port_signatures.json entirely, so the SIGNATURES / DRIFT "
+                "gates would compare against a surface this port does not actually "
+                "have. Add the type to porting-sdk/type_aliases.yaml under aliases.cpp "
+                "if it is real vocabulary, or make the member non-public if it is an "
+                "internal seam. --no-strict emits the partial artifact anyway (local "
+                "inspection only; no gate should ever pass it).",
+                file=sys.stderr,
+            )
             return 1
 
-    args.out.write_text(json.dumps(canonical, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    args.out.write_text(
+        json.dumps(canonical, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+    )
     n_mods = len(canonical["modules"])
-    n_methods = sum(sum(len(c["methods"]) for c in m.get("classes", {}).values()) for m in canonical["modules"].values())
-    print(f"enumerate_signatures: wrote {args.out} ({n_mods} modules, {n_methods} methods)")
+    n_methods = sum(
+        sum(len(c["methods"]) for c in m.get("classes", {}).values())
+        for m in canonical["modules"].values()
+    )
+    print(
+        f"enumerate_signatures: wrote {args.out} ({n_mods} modules, {n_methods} methods)"
+    )
     return 0
 
 

@@ -72,14 +72,6 @@ diverge from Python's.
   return is structurally a subtype of the C++ unified Action — same
   callable contract, lower static guarantee. Tracked for audit clarity;
   not load-bearing for cross-language code.
-- `cpp_constructor_default_only`: C++ ships an explicit default-only or
-  config-struct constructor where Python's `__init__` enumerates each
-  field as a keyword argument. Construction is reached either by
-  calling the no-arg constructor and using setters, or by passing a
-  pre-built config struct (`RelayClient::Config`,
-  `AgentBase::Builder`). The full set of Python `__init__` keywords is
-  reachable through the C++ setters / config-struct fields — same
-  callable contract, different idiomatic shape.
 - `cpp_typed_overload_subset`: C++ exposes a smaller-arity overload of
   the method where Python merges all variants into one signature with
   default-valued kwargs. The remaining options are reached either via
@@ -102,9 +94,6 @@ diverge from Python's.
   passes the variant as a single parameter (e.g.
   `Call::join_conference(name)` vs `Call.join_conference(**kwargs)`).
   Same callable contract; C++ just static-types the call site.
-- `cpp_idiom_optional_int_timeout`: C++ uses `int` (with `0` meaning
-  "no timeout") where Python uses `Optional[float]`. Same semantics;
-  C++ avoids `std::optional<int>` for the canonical no-timeout sentinel.
 - `cpp_action_collapsed_return`: paired with `cpp_unified_action`. C++
   methods on Call return the unified `Action` while Python returns
   per-verb subclasses (`PlayAction`, `RecordAction`, ...). The Action
@@ -158,27 +147,11 @@ diverge from Python's.
 - `cpp_pattern_string`: Python's `DataMap.expression(pattern)` accepts
   `Union[Pattern, str]`; C++ accepts `string` only and compiles
   internally. Same regex contract.
-- `cpp_postal_code_string`: Python's `FunctionResult.pay(postal_code:
-  Union[bool, str])` accepts a sentinel boolean to mean "ask for
-  postal code at runtime"; C++ accepts only `string` (the empty
-  string acts as the sentinel). Same wire payload.
-- `cpp_debug_level_bool`: Python's
-  `AIConfigMixin.enable_debug_events(level: int)` accepts a verbosity
-  level; C++ accepts a bool (on/off). The level-of-detail modes are
-  not yet ported; the boolean variant covers the common
-  enable-or-disable case.
 - `cpp_load_skill_signature`: Python's
   `SkillManager.load_skill(skill_name, ..., params)` accepts a
   `params: dict` runtime configuration; C++ accepts the parent
   agent reference instead, with skill-specific options reached via
   `SkillBase` setter methods. Same load-time configuration contract.
-- `cpp_questions_string`: Python's
-  `InfoGathererAgent.__init__(questions: list[dict])` accepts a list
-  of typed question dicts; C++ accepts a `string` JSON spec for the
-  same data. Construction-time only.
-- `cpp_dial_int_timeout`: paired with `cpp_idiom_optional_int_timeout`
-  — `RelayClient.dial(dial_timeout: int)` uses `0` for "no
-  timeout"; Python uses `Optional[float]`.
 - `cpp_register_skill_factory`: Python's
   `SkillRegistry.register_skill(skill_class)` accepts a class object
   (Python's metaclass machinery introspects it for name/factory);
@@ -224,10 +197,6 @@ diverge from Python's.
   optional `params` query-string dict; C++ omits this — POST URLs
   with query params aren't used by the SignalWire REST API surface
   C++ targets.
-- `cpp_rest_error_field_layout`: C++ `SignalWireRestError.__init__`
-  takes `(status, message, body)`; Python takes
-  `(status_code, body, url, method)`. The two carry the same
-  diagnostic content under different field names.
 - `cpp_typed_setter_no_extra_dict`: Python's
   `PhoneNumbersResource.set_*` helpers accept an `extra: dict`
   catch-all for fields the typed setters don't enumerate; C++
@@ -247,27 +216,6 @@ diverge from Python's.
   a bare Python callable.
 
 ## Documented signature divergences
-
-### __init__ default-only / config-struct construction
-
-signalwire.agent_server.AgentServer.__init__: cpp_constructor_default_only
-signalwire.core.agent_base.AgentBase.__init__: cpp_constructor_default_only
-signalwire.core.contexts.Context.__init__: cpp_constructor_default_only
-signalwire.core.contexts.ContextBuilder.__init__: cpp_constructor_default_only
-signalwire.core.contexts.Step.__init__: cpp_constructor_default_only
-signalwire.core.security.session_manager.SessionManager.__init__: cpp_constructor_default_only
-signalwire.core.skill_base.SkillBase.__init__: cpp_constructor_default_only
-signalwire.core.skill_manager.SkillManager.__init__: cpp_constructor_default_only
-signalwire.core.swml_service.SWMLService.__init__: cpp_constructor_default_only
-signalwire.prefabs.concierge.ConciergeAgent.__init__: cpp_constructor_default_only
-signalwire.prefabs.faq_bot.FAQBotAgent.__init__: cpp_constructor_default_only
-signalwire.prefabs.receptionist.ReceptionistAgent.__init__: cpp_constructor_default_only
-signalwire.prefabs.survey.SurveyAgent.__init__: cpp_constructor_default_only
-signalwire.relay.call.Call.__init__: cpp_constructor_default_only
-signalwire.relay.client.RelayClient.__init__: cpp_constructor_default_only
-signalwire.relay.message.Message.__init__: cpp_constructor_default_only
-signalwire.rest._base.SignalWireRestError.__init__: cpp_rest_error_field_layout
-signalwire.prefabs.info_gatherer.InfoGathererAgent.__init__: cpp_questions_string
 
 ### Unified Action — Call methods
 
@@ -315,7 +263,7 @@ signalwire.relay.message.Message.wait: cpp_wait_returns_bool
 signalwire.relay.client.RelayClient.connect: cpp_connect_returns_bool
 signalwire.relay.client.RelayClient.on_call: cpp_handler_register_void
 signalwire.relay.client.RelayClient.on_message: cpp_handler_register_void
-signalwire.relay.client.RelayClient.dial: cpp_dial_int_timeout
+signalwire.relay.client.RelayClient.dial: cpp_positional_kwargs: the reference declares `dial(devices, *, tag, max_duration, dial_timeout)` — the last three are KEYWORD-ONLY — while C++ has no keyword-only parameter form, so all three land as positional (client.hpp:136). The `devices` param is nlohmann::json (projected to `any`) where the reference types it list<list<dict<string,any>>>. NOTE: the timeout TYPE no longer diverges — C++ declares `std::optional<double> dial_timeout = std::nullopt` in SECONDS, matching the reference's `Optional[float]` (the old `dial_timeout_ms: int` / `0 == no timeout` shape was fixed; see the past-tense note at client.hpp:120-135).
 
 ### Typed-overload subset (C++ ships fewer kwargs)
 
@@ -332,7 +280,6 @@ signalwire.core.agent_base.AgentBase.on_summary: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_function_include: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_internal_filler: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_language: cpp_typed_overload_subset
-signalwire.core.mixins.ai_config_mixin.AIConfigMixin.add_pattern_hint: cpp_typed_overload_subset
 signalwire.core.mixins.auth_mixin.AuthMixin.get_basic_auth_credentials: cpp_overload_for_optional_kw
 signalwire.core.mixins.prompt_mixin.PromptMixin.define_contexts: cpp_define_contexts_typed_return
 signalwire.core.mixins.prompt_mixin.PromptMixin.prompt_add_section: cpp_typed_overload_subset
@@ -358,8 +305,6 @@ signalwire.core.agent.tools.registry.ToolRegistry.get_function: cpp_typed_tool_p
 signalwire.core.agent_base.AgentBase.on_debug_event: cpp_callable_typedef
 signalwire.core.contexts.Context.add_step: cpp_typed_step_positional
 signalwire.core.data_map.DataMap.expression: cpp_pattern_string
-signalwire.core.function_result.FunctionResult.pay: cpp_postal_code_string
-signalwire.core.mixins.ai_config_mixin.AIConfigMixin.enable_debug_events: cpp_debug_level_bool
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.set_languages: cpp_typed_overload_subset
 signalwire.core.mixins.ai_config_mixin.AIConfigMixin.set_pronunciations: cpp_typed_overload_subset
 signalwire.core.mixins.prompt_mixin.PromptMixin.get_prompt: cpp_get_prompt_string_only
@@ -371,12 +316,10 @@ signalwire.skills.registry.SkillRegistry.list_skills: cpp_list_skills_names
 
 ## POM (signalwire.pom.pom) — C++ idiom
 
-signalwire.pom.pom.PromptObjectModel.__init__: cpp-overload-set — C++ exposes overloaded ctors (default, copy-from-list, copy-from-PromptObjectModel) where Python has a single __init__ with default arg
 signalwire.pom.pom.PromptObjectModel.add_section: cpp-overload-set — C++ exposes 4 overloads (title-only / title+body / title+bullets / full) where Python uses single positional+kwargs
 signalwire.pom.pom.PromptObjectModel.add_pom_as_subsection: cpp-typed-overload — C++ takes typed Section& or std::string title parameter where Python uses Union[str, Section]
 signalwire.pom.pom.PromptObjectModel.from_json: cpp-typed-overload — C++ takes const std::string& where Python's from_json takes Union[str, dict]
 signalwire.pom.pom.PromptObjectModel.from_yaml: cpp-typed-overload — C++ takes const std::string& where Python's from_yaml takes Union[str, dict]
-signalwire.pom.pom.Section.__init__: cpp-overload-set — C++ exposes overloaded ctors (default, builder, copy) where Python has a single __init__ with positional+kwargs
 signalwire.pom.pom.Section.add_subsection: cpp-overload-set — C++ exposes 4 overloads (title-only / title+body / title+bullets / full) where Python uses single positional+kwargs
 
 ## Webhook signature validation (signalwire.core.security.*) — C++ idiom
@@ -384,11 +327,8 @@ signalwire.pom.pom.Section.add_subsection: cpp-overload-set — C++ exposes 4 ov
 signalwire.core.security.webhook_validator.validate_request: cpp-typed-overload — C++ ParamsOrBody is std::variant<string, vector<pair<string,vector<string>>>> covering raw-body and pre-parsed form-params; Python's Union additionally lists Mapping[str,Any] and None which collapse to the same Scheme B path. Same wire contract — different idiomatic typing.
 
 # ---- item H/I signature idioms (relay events/actions, bedrock, core infra, mixins, prefabs) ----
-signalwire.agent_server.AgentServer.agents: cpp_property_via_getter: Python exposes `agents` as a @property returning dict<string,AgentBase>; the C++ port exposes the same registry via the named getter get_agents() (returning vector<pair<string,AgentBase>>) — the getter is already the parity method (surface-matched); the bare property name has no distinct C++ symbol. Same registered-agents access, property-vs-getter idiom (not a kwargs spread).
 signalwire.agent_server.AgentServer.register_global_routing_callback: cpp_typed_callback: the port takes a concrete GlobalRoutingCallback functor class where the Python reference records a bare callable<[dict,dict],optional<string>> annotation, and returns AgentServer& (fluent) where Python returns void; same multi-agent routing registration — the typed callback + fluent return are the C++ idiom, not a kwargs spread.
 signalwire.core.agent_base.AgentBase.add_swaig_query_params: cpp_json_param_untyped: the C++ param is nlohmann::json (projected to `any`) where the Python reference types it concretely (dict<string,string>); same query-param map, the open json param is the C++ carrier — NOT a **kwargs spread (the oracle records a single typed param, no var_keyword).
-signalwire.core.auth_handler.AuthHandler.verify_basic_auth: cpp_idiom_carrier: AuthHandler verify_* take typed C++ credential carriers (BasicCredentials/BearerCredentials) where Python takes framework HTTPBasicCredentials/HTTPAuthorizationCredentials; same auth check (mirrors Java's records).
-signalwire.core.auth_handler.AuthHandler.verify_bearer_token: cpp_idiom_carrier: AuthHandler verify_* take typed C++ credential carriers (BasicCredentials/BearerCredentials) where Python takes framework HTTPBasicCredentials/HTTPAuthorizationCredentials; same auth check (mirrors Java's records).
 signalwire.core.contexts.Context.set_enter_fillers: cpp_json_param_untyped: the C++ param is nlohmann::json (projected to `any`) where the Python reference types it concretely (dict<string,list<string>>); same enter-fillers map, open-json carrier idiom (not a kwargs spread).
 signalwire.core.contexts.Context.set_exit_fillers: cpp_json_param_untyped: the C++ param is nlohmann::json (projected to `any`) where the Python reference types it concretely (dict<string,list<string>>); same exit-fillers map, open-json carrier idiom (not a kwargs spread).
 signalwire.core.contexts.Context.to_dict: cpp_serializer_to_json: the C++ Context serializer is to_json() returning nlohmann::json (projected to `any`); the Python reference records the same serializer as to_dict() -> dict<string,any>. The surface enumerator already aliases to_json->to_dict for membership; the signature-level residual is only the json/`any` vs concrete-dict return (json IS the open `any` type). Same on-wire serialization, serializer idiom (not a kwargs spread).
@@ -409,8 +349,6 @@ signalwire.core.mixins.web_mixin.WebMixin.register_routing_callback: cpp_typed_c
 signalwire.core.pom_builder.PomBuilder.from_sections: cpp_json_param_untyped: the C++ sections param is nlohmann::json (projected to `any`) where the Python reference types it list<dict<string,any>>; same section list, open-json carrier idiom (mirrors Java PomBuilder; not a kwargs spread).
 signalwire.core.security.security_utils.filter_sensitive_headers: cpp_concrete_map: the C++ filter_sensitive_headers takes/returns map<string,string> where the Python reference records a generic TypeVar _V (dict<string,_V>); the C++ header map is the concrete instantiation — same header-hygiene behavior, concrete-type idiom (not a kwargs spread).
 signalwire.core.security_config.SecurityConfig.validate_ssl_config: cpp_kwargs_positional: SecurityConfig ctor takes typed C++ params where Python takes config_file/service_name keyword args; same env-driven config (mirrors Java SecurityConfig).
-signalwire.core.skill_manager.SkillManager.loaded_skills: cpp_property_via_getter: Python exposes `loaded_skills` as a @property returning dict<string,SkillBase>; the C++ port exposes the same via the named getter list_loaded_skills() — the getter is already the parity method (surface-matched); the bare property name has no distinct C++ symbol. Same loaded-skills access, property-vs-getter idiom (not a kwargs spread).
-signalwire.core.swaig_function.SWAIGFunction.__init__: cpp_typed_callback_plus_json: the C++ ctor takes a concrete SwaigFunctionHandler class where the Python reference records a bare callable<[any],any>, and its parameters argument is nlohmann::json (projected to `any`) where Python types it optional<dict<string,dict>>; plus a trailing json extra_swaig_fields carrier — same SWAIG descriptor, typed-handler + open-json idiom (not a kwargs spread).
 signalwire.core.swaig_function.SWAIGFunction.validate_args: cpp_typed_return: the C++ validate_args returns a concrete ArgsValidationResult where the Python reference returns a raw tuple<any,any>; the args param is nlohmann::json (projected to `any`) where Python types it dict<string,any> — same validation contract, typed-return-object idiom (not a kwargs spread).
 signalwire.core.swml_builder.SWMLBuilder.add_section: cpp_fluent_self: SWMLBuilder verb methods return the concrete SWMLBuilder& (fluent chaining) where Python's type hint is Self; and kwargs land as a trailing nlohmann::json — same document, C++ builder idiom.
 signalwire.core.swml_builder.SWMLBuilder.ai: cpp_fluent_self: SWMLBuilder verb methods return the concrete SWMLBuilder& (fluent chaining) where Python's type hint is Self; and kwargs land as a trailing nlohmann::json — same document, C++ builder idiom.
@@ -419,9 +357,7 @@ signalwire.core.swml_builder.SWMLBuilder.hangup: cpp_fluent_self: SWMLBuilder ve
 signalwire.core.swml_builder.SWMLBuilder.play: cpp_fluent_self: SWMLBuilder verb methods return the concrete SWMLBuilder& (fluent chaining) where Python's type hint is Self; and kwargs land as a trailing nlohmann::json — same document, C++ builder idiom.
 signalwire.core.swml_builder.SWMLBuilder.reset: cpp_fluent_self: SWMLBuilder verb methods return the concrete SWMLBuilder& (fluent chaining) where Python's type hint is Self; and kwargs land as a trailing nlohmann::json — same document, C++ builder idiom.
 signalwire.core.swml_builder.SWMLBuilder.say: cpp_fluent_self: SWMLBuilder verb methods return the concrete SWMLBuilder& (fluent chaining) where Python's type hint is Self; and kwargs land as a trailing nlohmann::json — same document, C++ builder idiom.
-signalwire.core.swml_handler.AIVerbHandler.build_config: cpp_options_object: the C++ AIVerbHandler.build_config takes a single nlohmann::json config object collapsing Python's typed keyword params (prompt_text, prompt_pom, contexts, post_prompt, post_prompt_url, swaig), and returns json (projected to `any`) where Python returns a concrete dict; same AI-verb config shape — options-object idiom (not a **kwargs spread; the oracle records named typed params, no var_keyword).
 signalwire.core.swml_handler.SWMLVerbHandler.validate_config: cpp_typed_return: the C++ SWMLVerbHandler.validate_config returns a concrete VerbValidationResult where the Python reference returns a raw tuple<bool,list<string>>; the config param is json (projected to `any`) where Python types it dict<string,any> — same verb-validation contract, typed-return-object idiom (not a kwargs spread).
-signalwire.core.swml_renderer.SwmlRenderer.render_swml: cpp_options_struct: SwmlRenderer.render_swml collapses Python's ~14 keyword render options into a RenderOptions struct arg (the port's options-object idiom, mirrors Java's RenderOptions) — same rendered SWML.
 signalwire.core.swml_service.SWMLService.add_verb_to_section: cpp_fluent_return: the C++ SWMLService.add_verb_to_section returns SWMLService& (fluent chaining) where the Python reference returns bool; the config param is json (projected to `any`) where Python types it union<dict,int> — same add-verb behavior, fluent-return + open-json idiom (not a kwargs spread).
 signalwire.core.swml_service.SWMLService.register_routing_callback: cpp_typed_callback: SWMLService takes a concrete RoutingCallback functor class where the Python reference records a bare callable<[dict,dict],optional<string>> annotation; same routing-callback registration — the typed callback is the C++ idiom, not a kwargs spread.
 signalwire.prefabs.concierge.ConciergeAgent.on_summary: cpp_overload: the C++ prefab method is a real handler/callback whose signature the reference records once (on_summary/on_swml_request take the C++ request+headers form); same behavior, port overload idiom (mirrors Java prefabs).
@@ -431,40 +367,27 @@ signalwire.prefabs.info_gatherer.InfoGathererAgent.set_question_callback: cpp_ov
 signalwire.prefabs.receptionist.ReceptionistAgent.on_summary: cpp_overload: the C++ prefab method is a real handler/callback whose signature the reference records once (on_summary/on_swml_request take the C++ request+headers form); same behavior, port overload idiom (mirrors Java prefabs).
 signalwire.prefabs.survey.SurveyAgent.on_summary: cpp_overload: the C++ prefab method is a real handler/callback whose signature the reference records once (on_summary/on_swml_request take the C++ request+headers form); same behavior, port overload idiom (mirrors Java prefabs).
 signalwire.register_skill: cpp_typed_callback: the top-level register_skill free function takes a factory callable<[],SkillBase> where the Python reference takes the SkillBase *type object* directly; C++ has no first-class type value, so registration is by factory — same skill registration, factory-callable idiom (not a kwargs spread).
-signalwire.relay.call.AIAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.Action.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.Action.result: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
 signalwire.relay.call.Action.wait: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.Call.ai_hold: cpp_options_object: the C++ Call.ai_hold takes a single nlohmann::json params object collapsing Python's typed keyword params (timeout, prompt), and returns relay::Action where Python returns the raw dict; same calling.ai_hold wire frame (verified vs relay_apis.c) — options-object + typed-return idiom, NOT a **kwargs spread (the oracle records named typed params, no var_keyword).
-signalwire.relay.call.Call.ai_message: cpp_options_object: the C++ Call.ai_message takes a single nlohmann::json params object collapsing Python's typed keyword params (message_text, role, reset, global_data), and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
+signalwire.relay.call.Call.ai_hold: cpp_typed_return: the C++ Call.ai_hold returns relay::Action where the Python reference returns the raw dict; params match (timeout, prompt) — same calling.ai_hold wire frame (verified vs relay_apis.c:2006), typed-return-object idiom.
+signalwire.relay.call.Call.ai_message: cpp_typed_return: the C++ Call.ai_message returns relay::Action where the Python reference returns the raw dict; params match (message_text, role, reset, global_data) — same wire frame (verified vs relay_apis.c), typed-return-object idiom.
 signalwire.relay.call.Call.ai_unhold: cpp_typed_return: the C++ Call.ai_unhold takes prompt positionally (Python marks it keyword) as a json-carried value and returns relay::Action where Python returns the raw dict; same calling.ai_unhold wire frame (verified vs relay_apis.c) — positional + typed-return idiom (not a kwargs spread).
-signalwire.relay.call.Call.amazon_bedrock: cpp_options_object: the C++ Call.amazon_bedrock takes a single nlohmann::json params object collapsing Python's typed keyword params (prompt, SWAIG, ai_params, global_data, post_prompt, post_prompt_url), and returns relay::Action where Python returns the raw dict; same calling.amazon_bedrock wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
-signalwire.relay.call.Call.bind_digit: cpp_options_object: the C++ Call.bind_digit takes typed (digits, bind_method) plus a single nlohmann::json params object collapsing Python's remaining typed keyword params (bind_params, realm, max_triggers), and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
+signalwire.relay.call.Call.amazon_bedrock: cpp_typed_return: the C++ Call.amazon_bedrock returns relay::Action where the Python reference returns the raw dict; params match (prompt, SWAIG, ai_params, global_data, post_prompt, post_prompt_url) — same calling.amazon_bedrock wire frame (verified vs relay_apis.c:1982), typed-return-object idiom.
+signalwire.relay.call.Call.bind_digit: cpp_typed_return: the C++ Call.bind_digit returns relay::Action where the Python reference returns the raw dict; params match (digits, bind_method, bind_params, realm, max_triggers) — same wire frame (verified vs relay_apis.c:1479), typed-return-object idiom.
 signalwire.relay.call.Call.clear_digit_bindings: cpp_typed_return: the C++ Call.clear_digit_bindings takes realm positionally (Python marks it keyword) and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — positional + typed-return idiom (not a kwargs spread).
 signalwire.relay.call.Call.denoise: cpp_typed_return: the C++ Call.denoise returns relay::Action where the Python reference returns the raw dict; params match — same calling.denoise wire frame (verified vs relay_apis.c), typed-return-object idiom (not a kwargs spread).
 signalwire.relay.call.Call.denoise_stop: cpp_typed_return: the C++ Call.denoise_stop returns relay::Action where the Python reference returns the raw dict; params match — same wire frame (verified vs relay_apis.c), typed-return-object idiom (not a kwargs spread).
-signalwire.relay.call.Call.echo: cpp_options_object: the C++ Call.echo takes a single nlohmann::json params object collapsing Python's typed keyword params (timeout, status_url), and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
+signalwire.relay.call.Call.echo: cpp_typed_return: the C++ Call.echo returns relay::Action where the Python reference returns the raw dict; params match (timeout, status_url) — same calling.echo wire frame (verified vs relay_apis.c), typed-return-object idiom.
 signalwire.relay.call.Call.leave_conference: cpp_typed_return: the C++ Call.leave_conference returns relay::Action where the Python reference returns the raw dict; the conference_id param is typed and matches — same wire frame (verified vs relay_apis.c), typed-return-object idiom (not a kwargs spread).
 signalwire.relay.call.Call.leave_room: cpp_typed_return: the C++ Call.leave_room returns relay::Action where the Python reference returns the raw dict; params match — same wire frame (verified vs relay_apis.c), typed-return-object idiom (not a kwargs spread).
 signalwire.relay.call.Call.on: cpp_typed_callback: the C++ Call.on binds a single typed CallEvent handler (callable<[CallEvent],void>) where the Python reference takes (event_type, handler) with an EventHandler class; the C++ event kind is carried by the typed handler / dispatch rather than a leading string param — same event subscription, typed-callback idiom.
 signalwire.relay.call.Call.pass_: cpp_typed_return: the C++ Call.pass_ returns relay::Action where the Python reference returns the raw dict; params match — same wire frame (verified vs relay_apis.c), typed-return-object idiom (not a kwargs spread).
-signalwire.relay.call.Call.queue_enter: cpp_options_object: the C++ Call.queue_enter takes typed (queue_name) plus a single nlohmann::json params object collapsing Python's remaining typed keyword params (control_id, status_url), and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
-signalwire.relay.call.Call.queue_leave: cpp_options_object: the C++ Call.queue_leave takes typed (queue_name) plus a single nlohmann::json params object collapsing Python's remaining typed keyword params (control_id, queue_id, status_url), and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — options-object + typed-return idiom (not a kwargs spread).
+signalwire.relay.call.Call.queue_enter: cpp_typed_return: the C++ Call.queue_enter returns relay::Action where the Python reference returns the raw dict; params match (queue_name, control_id, status_url) — same calling.queue.enter wire frame (verified vs relay_apis.c:1333), typed-return-object idiom.
+signalwire.relay.call.Call.queue_leave: cpp_typed_return: the C++ Call.queue_leave returns relay::Action where the Python reference returns the raw dict; params match (queue_name, control_id, queue_id, status_url) — same calling.queue.leave wire frame (verified vs relay_apis.c), typed-return-object idiom.
 signalwire.relay.call.Call.refer: cpp_typed_return: the C++ Call.refer takes device (json) + status_url positionally (Python marks status_url keyword) and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — positional + open-json + typed-return idiom (not a kwargs spread).
 signalwire.relay.call.Call.user_event: cpp_typed_return: the C++ Call.user_event takes event positionally (Python marks it keyword) and returns relay::Action where Python returns the raw dict; same wire frame (verified vs relay_apis.c) — positional + typed-return idiom (not a kwargs spread).
 signalwire.relay.call.Call.wait_for: cpp_verb_shape: the C++ Call.wait_for is a call-state waiter — (target_state, timeout_ms) -> bool — where the Python reference's wait_for is a RELAY-event waiter (event_type, predicate, timeout) -> RelayEvent; the two expose different wait surfaces under the same name (the C++ event-wait path is Call.on / the typed event handlers). Kept as a documented signature divergence — NOT a kwargs spread.
-signalwire.relay.call.CollectAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
 signalwire.relay.call.CollectAction.start_input_timers: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.DetectAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.FaxAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.PayAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.PlayAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.RecordAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.StandaloneCollectAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
 signalwire.relay.call.StandaloneCollectAction.start_input_timers: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.StreamAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.TapAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
-signalwire.relay.call.TranscribeAction.__init__: cpp_unified_action: C++ flattens every RELAY call-action onto a single relay::Action (concrete PlayAction/RecordAction/... inherit its ctor); the projected __init__/start_input_timers carry the unified Action's signature, not Python's per-subclass one (documented cpp_unified_action idiom).
 signalwire.relay.call.AIAction.stop: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
 signalwire.relay.call.CollectAction.pause: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
 signalwire.relay.call.CollectAction.resume: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
@@ -484,59 +407,10 @@ signalwire.relay.call.StandaloneCollectAction.stop: cpp_unified_action: the conc
 signalwire.relay.call.StreamAction.stop: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
 signalwire.relay.call.TapAction.stop: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
 signalwire.relay.call.TranscribeAction.stop: cpp_unified_action: the concrete action's control method is inherited from the unified relay::Action; it fires the `<prefix>.<op>` frame (control_id) and returns void, where Python's coroutine awaits and returns the result dict — same wire frame, C++ fire-and-forget return idiom.
-signalwire.relay.event.CallReceiveEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CallReceiveEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CallStateEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CallStateEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CallingErrorEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CallingErrorEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CollectEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.CollectEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ConferenceEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ConferenceEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ConnectEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ConnectEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DenoiseEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DenoiseEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DetectEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DetectEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DialEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.DialEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.EchoEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.EchoEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.FaxEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.FaxEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.HoldEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.HoldEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.MessageReceiveEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.MessageReceiveEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.MessageStateEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.MessageStateEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.PayEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.PayEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.PlayEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.PlayEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.QueueEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.QueueEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.RecordEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.RecordEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ReferEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.ReferEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.RelayEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.RelayEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.SendDigitsEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.SendDigitsEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.StreamEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.StreamEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.TapEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.TapEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.TranscribeEvent.__init__: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.TranscribeEvent.from_payload: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
-signalwire.relay.event.parse_event: cpp_typed_event_ctor: C++ typed RELAY events construct from a single nlohmann::json payload (from_payload(json)/ctor), where Python spreads the decoded event fields as typed __init__ params; same wire event, C++ passes the raw JSON object (the port's typed-event idiom).
+signalwire.relay.event.parse_event: cpp_free_function_not_enumerated: parse_event IS implemented in C++ with a matching signature — `RelayEvent parse_event(const json& payload)` at include/signalwire/relay/typed_events.hpp:558, dispatching on event_type exactly as the reference does (relay/event.py:634-638) — but the libclang SIGNATURE enumerator does not record namespace-scope free functions, so the gate reports it missing-port. Not a capability gap and not an idiom difference: an enumerator blind spot. Fix is to project namespace-scope free functions in the signature enumerator, not to change the port.
 signalwire.relay.message.Message.on: cpp_typed_callback: the C++ Message.on binds a typed callable<[Message],void> handler where the Python reference records callable<[RelayEvent],any>; same message-event subscription, the concrete handler element type is the C++ typed-callback idiom.
 signalwire.rest._base.CrudWithAddresses.__init__: cpp_crud_idiom: generated CrudWithAddresses base method takes the C++ typed params object where Python spreads **kwargs; same REST wire shape (documented CRUD idiom).
 signalwire.skills.registry.SkillRegistry.get_skill_class: cpp_return_idiom: C++ get_skill_class returns bool (whether the skill factory is known) where Python returns the skill type object; C++ has no first-class type value — use create() to instantiate (same discovery-by-name contract).
-signalwire.web.web_service.WebService.__init__: cpp_kwargs_positional: WebService ctor/start collapse Python's many keyword options (directories/basic_auth/allowed_extensions/ssl_cert/...) into positional C++ params / accessors; same static-file service behavior (mirrors Java WebService).
 signalwire.web.web_service.WebService.start: cpp_kwargs_positional: WebService ctor/start collapse Python's many keyword options (directories/basic_auth/allowed_extensions/ssl_cert/...) into positional C++ params / accessors; same static-file service behavior (mirrors Java WebService).
 
 ## KNOWN PRE-EXISTING RESIDUAL (NOT item H/I) — gen-payload SWML AI-payload structs
@@ -555,8 +429,6 @@ UNTAGGED on purpose — an honest gate failure, not silenced with a blanket
 allowlist. Fix requires the signature enumerator to project POD-struct fields
 under `swml_verbs_generated` as property-getters (or the port to expose them as
 accessors).
-signalwire.rest._request_options.RequestOptions.__init__: cpp_constructor_default_only: RequestOptions is an aggregate struct with public data fields (timeout/retries/retry_on_status/retry_backoff/abort_signal); Python's dataclass __init__ enumerates each field as a keyword. The full set is reachable via the C++ public fields (ro.retries = 1, ro.abort_signal = &flag) — same callable contract, aggregate-init idiom instead of a keyword ctor (go/ts/ruby/java value-struct match).
-signalwire.rest._request_options.RequestOptions.abort_signal: cpp_field_not_property: Python exposes abort_signal as a @property getter *method*; C++ implements it as a public data member (std::atomic<bool>* abort_signal) the libclang enumerator does not emit as a method. Reachable directly as ro.abort_signal — same callable contract, public-field idiom (the RequestOptions data fields are deliberately not surface symbols, exactly as the Python dataclass fields aren't).
 
 ## A-fold / G-fold signature re-key
 # The surface allow-lists re-key these to the folded agentbase-family.<m> / canonical
@@ -572,7 +444,6 @@ signalwire.core.agent_base.AgentBase.session_manager: agentbase_port_helper: por
 signalwire.core.agent_base.AgentBase.set_auth: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_auth in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
 signalwire.core.agent_base.AgentBase.set_name: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_name in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
 signalwire.core.agent_base.AgentBase.set_post_prompt_url_direct: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_post_prompt_url_direct in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
-signalwire.core.agent_base.AgentBase.set_signing_key: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_signing_key in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
 signalwire.core.agent_base.AgentBase.set_use_pom: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_use_pom in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
 signalwire.core.agent_base.AgentBase.set_webhook_url: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.set_webhook_url in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
 signalwire.core.agent_base.AgentBase.supported_internal_filler_names: agentbase_port_helper: port-only C++ AgentBase member (composition-delegate or typed helper) with no Python reference twin; documented as an addition under agentbase-family.supported_internal_filler_names in PORT_ADDITIONS.md (ALLOWLIST_DISCIPLINE §4c). Re-keyed here for the signature side.
@@ -583,8 +454,6 @@ signalwire.core.swml_service.SWMLService.switch: cpp_typed_verb: C++ swml::Servi
 signalwire.core.agent_base.AgentBase.skill_manager: cpp_private_composition: Python AgentBase.skill_manager is a @property exposing the SkillManager instance; C++ composes it privately and surfaces the operations as AgentBase methods (add_skill/remove_skill/list_skills/has_skill). Documented under agentbase-family.skill_manager in PORT_OMISSIONS.md.
 signalwire.core.mixins.tool_mixin.ToolMixin.tool: cpp_no_decorator: Python @tool decorator method relies on the decorator protocol; C++ has no method-decorator feature — tools register via define_tool(...). Documented under agentbase-family.tool in PORT_OMISSIONS.md (Java/TS/PHP omit likewise).
 signalwire.core.mixins.web_mixin.WebMixin.get_app: cpp_no_framework_app: returns a FastAPI/Flask app object; C++ runs httplib directly with no app object to return. Documented under agentbase-family.get_app in PORT_OMISSIONS.md (Java/TS/PHP omit likewise).
-signalwire.pom.pom.PromptObjectModel.sections: cpp_field_not_property: Python PromptObjectModel.sections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as pom.sections — public-collection idiom.
-signalwire.pom.pom.Section.subsections: cpp_field_not_property: Python Section.subsections is a @property; C++ implements it as a public std::vector<Section> data member (surfaced on the surface side, libclang emits no getter method). Reachable directly as section.subsections — public-collection idiom.
 
 # ---- dual-gate: dead for SURFACE-DIFF (A-fold/G-fold/folded types drop these as
 # surface symbols), but LIVE for this signature DRIFT gate — the signature gate has
@@ -629,4 +498,3 @@ signalwire.core.swml_service.SWMLService.unset: cpp_typed_verb: C++ swml::Servic
 signalwire.core.swml_service.SWMLService.user_event: cpp_typed_verb: C++ swml::Service exposes every SWML verb as a typed method; Python routes them via __getattr__ dispatch.
 signalwire.rest._base.CrudResource.__init__: cpp_base_ctor: the C++ hand base CrudResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (HttpClient receiver + composed base path); Python's CrudResource inherits __init__ up its base chain and griffe records no own __init__ on it. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
 signalwire.rest._base.ReadResource.__init__: cpp_base_ctor: the C++ hand base ReadResource (base_resource.hpp, routed to rest._base) carries an explicit constructor (receiver + composed base path); Python's ReadResource inherits __init__ from BaseResource and griffe records no own __init__ on ReadResource. Same construction contract, C++ declares the ctor on each base per its inheritance idiom.
-signalwire.agent_server.AgentServer.app: cpp_only: Python AgentServer.app exposes the underlying Flask/FastAPI app for advanced HTTP integration; C++ AgentServer uses httplib directly with no analogous app object to surface. End users reach HTTP customization via on_request / on_swml_request / register_route hooks instead. (Signature missing-port: the surface oracle omits `app`, so its former SURFACE omission was dead and was removed; the signature oracle records it, so it is excused here.)

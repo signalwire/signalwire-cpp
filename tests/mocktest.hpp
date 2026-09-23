@@ -17,10 +17,10 @@
 #pragma once
 
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
 
 #include "signalwire/rest/rest_client.hpp"
 
@@ -32,17 +32,17 @@ using nlohmann::json;
 
 // JournalEntry mirrors mock_signalwire.journal.JournalEntry over the wire.
 struct JournalEntry {
-    double timestamp = 0.0;
-    std::string method;
-    std::string path;
-    std::map<std::string, std::vector<std::string>> query_params;
-    std::map<std::string, std::string> headers;
-    json body;                   // Either a JSON object/array or a string
-    std::optional<std::string> matched_route;
-    std::optional<int> response_status;
+  double timestamp = 0.0;
+  std::string method;
+  std::string path;
+  std::map<std::string, std::vector<std::string>> query_params;
+  std::map<std::string, std::string> headers;
+  json body;  // Either a JSON object/array or a string
+  std::optional<std::string> matched_route;
+  std::optional<int> response_status;
 
-    // Convenience: returns true iff the request body parses as a JSON object.
-    bool body_is_object() const { return body.is_object(); }
+  // Convenience: returns true iff the request body parses as a JSON object.
+  bool body_is_object() const { return body.is_object(); }
 };
 
 // Probe-or-spawn the mock server. Returns the configured base URL once the
@@ -104,9 +104,7 @@ JournalEntry journal_last();
 // active auth header (server-side) when set, so a concurrent test can't consume
 // it. Subsequent hits fall back to spec synthesis. The endpoint id is the
 // OpenAPI operationId; the active list is exposed at /__mock__/scenarios.
-void scenario_set(const std::string& endpoint_id,
-                  int status,
-                  const json& body);
+void scenario_set(const std::string& endpoint_id, int status, const json& body);
 
 // Build a RestClient pointed at the mock server with a UNIQUE RANDOM project
 // (`test_proj_<hex>`) and token="test_tok", and set this thread's active scope
@@ -115,6 +113,6 @@ void scenario_set(const std::string& endpoint_id,
 // the scoped (auth-filtered) journal view starts empty.
 RestClient make_client();
 
-} // namespace mocktest
-} // namespace rest
-} // namespace signalwire
+}  // namespace mocktest
+}  // namespace rest
+}  // namespace signalwire

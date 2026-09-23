@@ -320,86 +320,93 @@ std::vector<Case> corpus() {
 }  // namespace
 
 int main() {
-  json out = json::object();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    json out = json::object();
 
-  for (const auto& c : corpus()) {
-    json artifact = {
-        {"raised", false},        {"error_kind", nullptr},
-        {"status_code", nullptr}, {"body_error_code", nullptr},
-        {"request_count", 0},
-    };
+    for (const auto& c : corpus()) {
+      json artifact = {
+          {"raised", false},        {"error_kind", nullptr},
+          {"status_code", nullptr}, {"body_error_code", nullptr},
+          {"request_count", 0},
+      };
 
-    RestClient client = [&]() -> RestClient {
-      if (c.transport) {
-        // Point at a DEAD port -- nothing listening once released. No mock
-        // harness involved (a fresh, disposable RestClient), so no journal
-        // scoping applies; request_count stays 0 by construction.
-        int port = dead_port();
-        return RestClient::with_base_url("http://127.0.0.1:" + std::to_string(port),
-                                         "envelope_proj", "envelope_tok");
-      }
-      // A fresh mock-backed client per case: unique random project -> unique
-      // auth header -> an isolated (empty-start) scoped journal view, so
-      // request_count is exact without needing an explicit reset.
-      auto mc = signalwire::rest::mocktest::make_client();
-      if (c.has_scenario) {
-        // Arm the SAME override scenario_repeat times (FIFO), so a retry-armed
-        // case sees the failure on every attempt it is armed for.
-        for (int i = 0; i < c.scenario_repeat; ++i) {
-          signalwire::rest::mocktest::scenario_set(c.endpoint, c.status, c.response);
+      RestClient client = [&]() -> RestClient {
+        if (c.transport) {
+          // Point at a DEAD port -- nothing listening once released. No mock
+          // harness involved (a fresh, disposable RestClient), so no journal
+          // scoping applies; request_count stays 0 by construction.
+          int port = dead_port();
+          return RestClient::with_base_url("http://127.0.0.1:" + std::to_string(port),
+                                           "envelope_proj", "envelope_tok");
         }
-      }
-      return mc;
-    }();
-
-    // Build the per-request options envelope.
-    RequestOptions ro;
-    if (c.has_request_options) {
-      ro.retries = c.retries;
-      ro.retry_backoff = c.retry_backoff;
-    }
-
-    try {
-      json body;
-      if (c.is_post) {
-        body = client.http_client().post(c.call_path, c.post_body, ro);
-      } else {
-        body = client.http_client().get(c.call_path, {}, ro);
-      }
-      (void)body;
-    } catch (const SignalWireRestError& e) {
-      // A member of the typed error family (HTTP error OR transport error).
-      artifact["raised"] = true;
-      artifact["error_kind"] = "typed";
-      // status_code() == 0 => a transport failure (no HTTP response); report null
-      // so the artifact matches the oracle (python raises status_code=None).
-      artifact["status_code"] = e.status_code() == 0 ? json(nullptr) : json(e.status_code());
-      artifact["body_error_code"] = decode_body_error_code(e.body());
-    } catch (const std::exception& e) {
-      // A leaked, non-family exception -- the contract violation the gate
-      // catches.
-      artifact["raised"] = true;
-      artifact["error_kind"] = std::string("bare:") + typeid(e).name();
-    }
-
-    if (!c.transport) {
-      // Count journal hits for the path (retry check: 1 == no retry, retries+1
-      // for a retry-armed case). Scoped to this case's client via the
-      // thread-local active scope make_client() set, so a concurrent run can't
-      // cross-contaminate.
-      int count = 0;
-      for (const auto& j : signalwire::rest::mocktest::journal()) {
-        if (j.path == c.call_path) {
-          ++count;
+        // A fresh mock-backed client per case: unique random project -> unique
+        // auth header -> an isolated (empty-start) scoped journal view, so
+        // request_count is exact without needing an explicit reset.
+        auto mc = signalwire::rest::mocktest::make_client();
+        if (c.has_scenario) {
+          // Arm the SAME override scenario_repeat times (FIFO), so a retry-armed
+          // case sees the failure on every attempt it is armed for.
+          for (int i = 0; i < c.scenario_repeat; ++i) {
+            signalwire::rest::mocktest::scenario_set(c.endpoint, c.status, c.response);
+          }
         }
+        return mc;
+      }();
+
+      // Build the per-request options envelope.
+      RequestOptions ro;
+      if (c.has_request_options) {
+        ro.retries = c.retries;
+        ro.retry_backoff = c.retry_backoff;
       }
-      artifact["request_count"] = count;
-      signalwire::rest::mocktest::clear_active_scope();
+
+      try {
+        json body;
+        if (c.is_post) {
+          body = client.http_client().post(c.call_path, c.post_body, ro);
+        } else {
+          body = client.http_client().get(c.call_path, {}, ro);
+        }
+        (void)body;
+      } catch (const SignalWireRestError& e) {
+        // A member of the typed error family (HTTP error OR transport error).
+        artifact["raised"] = true;
+        artifact["error_kind"] = "typed";
+        // status_code() == 0 => a transport failure (no HTTP response); report null
+        // so the artifact matches the oracle (python raises status_code=None).
+        artifact["status_code"] = e.status_code() == 0 ? json(nullptr) : json(e.status_code());
+        artifact["body_error_code"] = decode_body_error_code(e.body());
+      } catch (const std::exception& e) {
+        // A leaked, non-family exception -- the contract violation the gate
+        // catches.
+        artifact["raised"] = true;
+        artifact["error_kind"] = std::string("bare:") + typeid(e).name();
+      }
+
+      if (!c.transport) {
+        // Count journal hits for the path (retry check: 1 == no retry, retries+1
+        // for a retry-armed case). Scoped to this case's client via the
+        // thread-local active scope make_client() set, so a concurrent run can't
+        // cross-contaminate.
+        int count = 0;
+        for (const auto& j : signalwire::rest::mocktest::journal()) {
+          if (j.path == c.call_path) {
+            ++count;
+          }
+        }
+        artifact["request_count"] = count;
+        signalwire::rest::mocktest::clear_active_scope();
+      }
+
+      out[c.id] = artifact;
     }
 
-    out[c.id] = artifact;
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  std::cout << out.dump() << "\n";
-  return 0;
 }

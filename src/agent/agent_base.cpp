@@ -30,10 +30,9 @@ namespace agent {
 
 namespace {
 
-/// Load the ``service`` section of the agent's config file, mirroring the
-/// reference's ``AgentBase._load_service_config(config_file, name)``: use the
-/// explicit path when given, else discover one for this service name; return
-/// an empty object when nothing loads.
+/// Load the ``service`` section of the agent's config file: use the explicit
+/// path when given, else discover one for this service name; return an empty
+/// object when nothing loads.
 json load_service_config(const std::optional<std::string>& config_file,
                          const std::string& service_name) {
   std::optional<std::string> path = config_file;
@@ -215,7 +214,10 @@ AgentBase::AgentBase(const AgentBase& other)
   global_data_ = other.global_data_;
   native_functions_ = other.native_functions_;
   internal_fillers_ = other.internal_fillers_;
-  debug_events_ = other.debug_events_;
+  // Reference copies both fields onto the ephemeral agent
+  // (agent_base.py:1587-1588).
+  debug_events_enabled_ = other.debug_events_enabled_;
+  debug_events_level_ = other.debug_events_level_;
   prompt_llm_params_ = other.prompt_llm_params_;
   post_prompt_llm_params_ = other.post_prompt_llm_params_;
   pre_answer_verbs_ = other.pre_answer_verbs_;
@@ -287,9 +289,9 @@ AgentBase& AgentBase::prompt_add_section(const std::string& title, const std::st
   return *this;
 }
 
-AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
-                                            const std::string& title, const std::string& body,
-                                            const std::vector<std::string>& bullets) {
+AgentBase& AgentBase::prompt_add_subsection(
+    const std::string& parent_title, const std::string& title, const std::string& body,
+    const std::optional<std::vector<std::string>>& bullets) {
   // #182: auto-create the parent section if it does not exist yet, matching
   // the TS reference (`addSubsection` calls `addSection(parentTitle)` when
   // missing) — previously this was a no-op for an unknown parent.
@@ -301,7 +303,8 @@ AgentBase& AgentBase::prompt_add_subsection(const std::string& parent_title,
       PomSection sub;
       sub.title = title;
       sub.body = body;
-      sub.bullets = bullets;
+      // Reference: ``bullets or []`` — absent becomes the empty list.
+      sub.bullets = bullets.value_or(std::vector<std::string>{});
       section.subsections.push_back(std::move(sub));
       break;
     }
@@ -529,6 +532,33 @@ bool AgentBase::validate_tool_token(const std::string& function_name, const std:
   }
 }
 
+std::optional<swaig::FunctionResult> AgentBase::swaig_validate_token(
+    const std::string& function_name, const std::optional<std::string>& token,
+    const std::optional<std::string>& call_id) const {
+  auto tool_it = tools_.find(function_name);
+  if (tool_it == tools_.end() || !tool_it->second.secure) {
+    // Unknown function (the caller reports that separately) or an explicitly
+    // insecure tool: never refused here, it runs ungated.
+    return std::nullopt;
+  }
+
+  // A token can only be validated against a call_id; without one there is
+  // nothing to check it against, so treat it as unvalidated rather than as a
+  // bypass. An empty-string token counts as ABSENT, not as "present but wrong".
+  const bool have_token = token.has_value() && !token->empty();
+  const bool valid =
+      have_token && call_id.has_value() && validate_tool_token(function_name, *token, *call_id);
+  if (valid) {
+    return std::nullopt;
+  }
+
+  get_logger().warn("swaig secure_function_refused function=" + function_name +
+                    " token_present=" + (have_token ? "true" : "false"));
+  return swaig::FunctionResult(
+      "I'm sorry, the security token for this function is invalid or expired. "
+      "I cannot execute this action.");
+}
+
 // ============================================================================
 // AI Config Methods
 // ============================================================================
@@ -753,8 +783,9 @@ AgentBase& AgentBase::add_internal_filler(const std::string& function_name,
   return *this;
 }
 
-AgentBase& AgentBase::enable_debug_events(bool enable) {
-  debug_events_ = enable;
+AgentBase& AgentBase::enable_debug_events(int level) {
+  debug_events_enabled_ = true;
+  debug_events_level_ = level;
   return *this;
 }
 
@@ -1499,14 +1530,42 @@ json AgentBase::build_swaig_functions(const std::string& webhook_url,
       // ``__token=`` query parameter IS the wire manifestation of ``secure`` —
       // the platform presents it on the callback and the /swaig dispatcher
       // validates it. An INSECURE tool gets no token.
-      std::string url = webhook_url;
+      std::string token;
       if (it->second.secure && !call_id.empty()) {
-        std::string token = session_manager_.create_tool_token(name, call_id);
+        token = session_manager_.create_tool_token(name, call_id);
+      }
+
+      // WHETHER this entry gets its own ``web_hook_url`` at all — the reference
+      // guard at agent_base.py:1085-1099, verbatim:
+      //
+      //     if func.webhook_url:        -> use the external URL
+      //     elif token or _swaig_query_params:
+      //                                 -> build the local URL (+ __token)
+      //     # else: NO web_hook_url key on the entry AT ALL
+      //
+      // The else branch is load-bearing SECURITY, not a cosmetic difference: an
+      // insecure tool that is handed the local URL publishes an
+      // UNAUTHENTICATED, function-specific callback on the wire. With no key it
+      // falls back to the shared ``SWAIG.defaults.web_hook_url``, which is the
+      // whole point of ``secure=false``. Emitting an empty string / null / a
+      // tokenless URL are all the same defect — the KEY must be absent.
+      //
+      // C++ has no per-tool external webhook (``ToolDefinition`` carries no
+      // ``webhook_url``; the agent-level override lives in ``webhook_url_`` and
+      // is already folded into ``webhook_url`` by build_webhook_url), so the
+      // first reference branch has no analog here and the guard reduces to the
+      // ``elif``.
+      const bool wants_own_webhook = !token.empty() || !swaig_query_params_.empty();
+
+      std::string url;
+      if (wants_own_webhook) {
+        url = webhook_url;
         if (!token.empty()) {
           url += (url.find('?') == std::string::npos ? "?" : "&");
           url += "__token=" + signalwire::url_encode(token);
         }
       }
+      // to_swaig_json omits the key entirely for an empty url.
       functions.push_back(it->second.to_swaig_json(url));
     }
   }
@@ -1551,9 +1610,22 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     ai["post_prompt_url"] = pp_url;
   }
 
-  // AI params
-  if (!ai_params_.is_null() && !ai_params_.empty()) {
-    ai["params"] = ai_params_;
+  // AI params. The debug-event webhook is auto-wired INTO params when enabled,
+  // exactly as the reference does (agent_base.py:1248-1261): it sets
+  // ``params.debug_webhook_url`` and ``params.debug_webhook_level``. Neither
+  // the reference nor swml/schema.json has any ``ai.debug_events`` key.
+  json params = ai_params_.is_null() ? json::object() : ai_params_;
+  if (debug_events_enabled_) {
+    std::string debug_url = webhook_url;
+    auto swaig_pos = debug_url.rfind("/swaig");
+    if (swaig_pos != std::string::npos) {
+      debug_url = debug_url.substr(0, swaig_pos) + "/debug_events";
+    }
+    params["debug_webhook_url"] = debug_url;
+    params["debug_webhook_level"] = debug_events_level_;
+  }
+  if (!params.empty()) {
+    ai["params"] = params;
   }
 
   // Hints
@@ -1596,6 +1668,25 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
   json functions = build_swaig_functions(webhook_url, call_id);
   if (!functions.empty()) {
     swaig_section["functions"] = functions;
+    // The SHARED fallback endpoint, emitted whenever there are functions at all
+    // (reference agent_base.py:1108-1113: ``if functions: ... if "defaults" not
+    // in swaig_obj: swaig_obj["defaults"] = {"web_hook_url": ...}``).
+    //
+    // This is the OTHER half of the build_swaig_functions webhook guard and must
+    // not be separated from it. That guard correctly withholds a per-tool
+    // ``web_hook_url`` from an INSECURE tool — but an insecure tool is not
+    // meant to be unreachable, it is meant to fall back to THIS shared endpoint.
+    // Without the defaults block the insecure tool renders with no callback
+    // endpoint at all, which is a worse failure than the unauthenticated
+    // per-tool callback the guard removed. The SECURE-DEFAULT gate inspects only
+    // ``functions[]``, so it cannot see this — it is pinned by test
+    // tool_secure_and_insecure_tools_render_divergent_webhooks instead.
+    //
+    // An explicit ``default_webhook_url`` set above wins (the reference's
+    // ``if "defaults" not in swaig_obj`` guard).
+    if (!swaig_section.contains("defaults")) {
+      swaig_section["defaults"] = json::object({{"web_hook_url", webhook_url}});
+    }
   }
   if (!function_includes_.empty()) {
     swaig_section["includes"] = function_includes_;
@@ -1608,6 +1699,19 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     swaig_section["mcp_servers"] = mcp_servers_;
   }
 
+  // Internal fillers live INSIDE the SWAIG object under their canonical name
+  // ``internal_fillers`` — schema ``$defs/SWAIG`` declares exactly
+  // [defaults, functions, includes, internal_fillers, native_functions].
+  // This previously emitted ``ai.fillers``: wrong KEY and wrong NESTING LEVEL at
+  // once. ``$defs/AIObject`` is closed over nine keys via
+  // ``unevaluatedProperties: {"not": {}}`` and ``fillers`` is not one of them, so
+  // every document from an agent with internal fillers was schema-invalid and the
+  // server never read them. Reference: ``agent_base.py:1029``
+  // ``swaig_obj["internal_fillers"] = ...``.
+  if (!internal_fillers_.is_null() && !internal_fillers_.empty()) {
+    swaig_section["internal_fillers"] = internal_fillers_;
+  }
+
   if (!swaig_section.empty()) {
     ai["SWAIG"] = swaig_section;
   }
@@ -1617,19 +1721,17 @@ json AgentBase::build_ai_verb(const std::string& webhook_url, const std::string&
     ai["global_data"] = global_data_;
   }
 
-  // Contexts
+  // Contexts belong INSIDE the prompt ($defs/AIPromptText / $defs/AIPromptPom),
+  // not at the ai top level — ``$defs/AIObject`` is closed over nine keys and
+  // ``contexts`` is not among them, so an agent using the steps feature emitted a
+  // document the schema rejects. Reference: ``swml_handler.py:191``
+  // ``prompt_config["contexts"] = contexts``. (Same defect independently found in
+  // the typescript port.)
   if (context_builder_ && context_builder_->has_contexts()) {
-    ai["contexts"] = context_builder_->to_json();
-  }
-
-  // Debug events
-  if (debug_events_) {
-    ai["debug_events"] = true;
-  }
-
-  // Internal fillers
-  if (!internal_fillers_.is_null() && !internal_fillers_.empty()) {
-    ai["fillers"] = internal_fillers_;
+    if (!ai.contains("prompt") || !ai["prompt"].is_object()) {
+      ai["prompt"] = json::object();
+    }
+    ai["prompt"]["contexts"] = context_builder_->to_json();
   }
 
   return ai;
@@ -1823,9 +1925,22 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
 
   swml::Document doc;
 
+  // Every verb below is schema-checked before it lands in the document (task
+  // #194). The document assembled here is LOCAL — it is not the Service's own
+  // ``document_`` — so ``Service::add_verb`` cannot be used to append to it, and
+  // before this fix nothing validated any of it: an agent rendered whatever the
+  // caller had configured, straight onto the wire. AgentBase derives from
+  // swml::Service, so it validates through the same protected check every
+  // Service-level entry point uses.
+  const auto emit = [this, &doc](const std::string& verb_name, const json& params) {
+    validate_verb_or_throw(verb_name, params);
+    doc.main().add_verb(verb_name, params);
+  };
+  const auto emit_verb = [&emit](const swml::Verb& v) { emit(v.name, v.params); };
+
   // Phase 1: Pre-answer verbs
   for (const auto& v : pre_answer_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   // Phase 2: Answer verb — only when auto_answer is enabled (reference:
@@ -1833,30 +1948,29 @@ json AgentBase::render_swml_internal(const std::map<std::string, std::string>& h
   // configured answer verbs still win over the default config.
   if (auto_answer_) {
     if (answer_verbs_.empty()) {
-      doc.main().add_verb("answer", json::object({{"max_duration", 3600}}));
+      emit("answer", json::object({{"max_duration", 3600}}));
     } else {
       for (const auto& v : answer_verbs_) {
-        doc.main().add_verb(v);
+        emit_verb(v);
       }
     }
   }
 
   // Phase 3: Post-answer verbs — recording first, as in the reference.
   if (record_call_) {
-    doc.main().add_verb("record_call",
-                        json::object({{"format", record_format_}, {"stereo", record_stereo_}}));
+    emit("record_call", json::object({{"format", record_format_}, {"stereo", record_stereo_}}));
   }
   for (const auto& v : post_answer_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   // Phase 4: AI verb
   json ai_verb = build_ai_verb(webhook_url, call_id);
-  doc.main().add_verb("ai", ai_verb);
+  emit("ai", ai_verb);
 
   // Phase 5: Post-AI verbs
   for (const auto& v : post_ai_verbs_) {
-    doc.main().add_verb(v);
+    emit_verb(v);
   }
 
   json swml = doc.to_json();
@@ -2009,24 +2123,31 @@ void AgentBase::handle_swaig_request(const httplib::Request& req, httplib::Respo
     args = body["argument"]["parsed"][0];
   }
 
-  // Check the security token if the tool is secure. The token travels on the
-  // QUERY STRING as ``__token`` (with ``token`` accepted as the reference's
-  // fallback spelling) — reference agent_base.py:1414
-  // ``request.query_params.get("__token") or request.query_params.get("token")``.
-  // It is the same value build_swaig_functions appended to this tool's
-  // ``web_hook_url`` at render time. (``meta_data_token`` is a DIFFERENT wire
-  // field: the SWML ``UserSWAIGFunction`` meta_data SCOPING token, not a
-  // credential — reading it here validated the wrong value.)
-  auto tool_it = tools_.find(func_name);
-  if (tool_it != tools_.end() && tool_it->second.secure) {
-    std::string token = req.get_param_value("__token");
-    if (token.empty()) {
+  // Enforce `secure` through the transport-agnostic core every transport
+  // shares, so the HTTP endpoint and the serverless envelopes cannot drift
+  // apart. The credential travels on the QUERY STRING as ``__token`` (with
+  // ``token`` accepted as the fallback spelling) — the same value
+  // build_swaig_functions appended to this tool's ``web_hook_url`` at render
+  // time. The ``call_id`` travels in the POST BODY. (``meta_data_token`` is a
+  // DIFFERENT wire field: the SWML ``UserSWAIGFunction`` meta_data SCOPING
+  // token, not a credential — reading it here validated the wrong value.)
+  //
+  // A refusal is a 200 + FunctionResult body, NOT an HTTP error status: the
+  // engine has no handling for a refusal status, so a non-200 would be dropped
+  // rather than relayed to the caller as "I cannot execute this action".
+  {
+    std::optional<std::string> token;
+    if (req.has_param("__token")) {
+      token = req.get_param_value("__token");
+    } else if (req.has_param("token")) {
       token = req.get_param_value("token");
     }
-    std::string call_id = body.value("call_id", "");
-    if (!session_manager_.validate_token(token, func_name, call_id)) {
-      res.status = 403;
-      res.set_content("{\"error\":\"invalid or expired token\"}", "application/json");
+    std::optional<std::string> call_id;
+    if (body.contains("call_id") && body["call_id"].is_string()) {
+      call_id = body["call_id"].get<std::string>();
+    }
+    if (auto refusal = swaig_validate_token(func_name, token, call_id)) {
+      res.set_content(refusal->to_string(), "application/json");
       return;
     }
   }
@@ -2064,6 +2185,37 @@ void AgentBase::handle_post_prompt_request(const httplib::Request& req, httplib:
       get_logger().error(std::string("Summary callback error: ") + e.what());
     }
   }
+
+  res.set_content("{\"status\":\"ok\"}", "application/json");
+}
+
+void AgentBase::handle_debug_events_request(const httplib::Request& req, httplib::Response& res) {
+  // Mirrors the reference's ``_handle_debug_events_request`` (web_mixin.py:1131):
+  // auth-checked, POST-only, JSON body, structured-log the event, 200 {"status":"ok"}.
+  add_security_headers(res);
+  if (!validate_auth(req, res)) {
+    return;
+  }
+
+  json body;
+  try {
+    body = json::parse(req.body);
+  } catch (...) {
+    res.status = 400;
+    res.set_content("{\"error\":\"invalid JSON\"}", "application/json");
+    return;
+  }
+
+  // ``label`` then ``action``, defaulting to "unknown" — the reference's
+  // ``body.get("label") or body.get("action", "unknown")``.
+  std::string event_type = "unknown";
+  if (body.contains("label") && body["label"].is_string() &&
+      !body["label"].get<std::string>().empty()) {
+    event_type = body["label"].get<std::string>();
+  } else if (body.contains("action") && body["action"].is_string()) {
+    event_type = body["action"].get<std::string>();
+  }
+  get_logger().info("debug_event event_type=" + event_type);
 
   res.set_content("{\"status\":\"ok\"}", "application/json");
 }
@@ -2161,6 +2313,16 @@ void AgentBase::setup_routes(httplib::Server& server) {
                 handle_post_prompt_request(req, res);
               }));
 
+  // Debug-event webhook endpoint. Mounted when enable_debug_events() has been
+  // called — the same condition that puts params.debug_webhook_url on the wire,
+  // so the URL we advertise always resolves.
+  if (debug_events_enabled_) {
+    std::string de_path = base + (base.back() == '/' ? "" : "/") + "debug_events";
+    server.Post(de_path, wrap_post([this](const httplib::Request& req, httplib::Response& res) {
+                  handle_debug_events_request(req, res);
+                }));
+  }
+
   // MCP server endpoint (JSON-RPC 2.0)
   if (mcp_server_enabled_) {
     std::string mcp_path = base + (base.back() == '/' ? "" : "/") + "mcp";
@@ -2217,10 +2379,15 @@ void AgentBase::setup_routes(httplib::Server& server) {
 void AgentBase::serve() {
   init_auth();
 
-  // TLS termination in-process when SWML_SSL_ENABLED + cert/key are set
-  // (mirrors Python's SecurityConfig). SSLServer upcasts into the existing
-  // unique_ptr<Server>; setup_routes() is unchanged.
-  auto tls = server::resolve_tls_config_from_env();
+  // TLS termination in-process, driven by the inherited swml::Service TLS
+  // values (seeded in its ctor from SecurityConfig — so SWML_SSL_ENABLED /
+  // SWML_SSL_CERT_PATH / SWML_SSL_KEY_PATH and any config file still apply —
+  // and overridable via set_ssl_*()). SSLServer upcasts into the existing
+  // shared_ptr<Server>; setup_routes() is unchanged.
+  server::TlsServerConfig tls;
+  tls.enabled = ssl_enabled();
+  tls.cert_path = ssl_cert_path().value_or("");
+  tls.key_path = ssl_key_path().value_or("");
 
   // Build + configure under the lock, then listen() with our OWN strong
   // reference and the lock released: a concurrent stop() must be able to

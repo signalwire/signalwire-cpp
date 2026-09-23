@@ -24,53 +24,54 @@
 // Probe:
 //     curl -u user:pass http://localhost:3000/swml
 
-#include <signalwire/swml/service.hpp>
-
 #include <cstdlib>
 #include <iostream>
+#include <signalwire/swml/service.hpp>
 #include <string>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 static void build_voicemail(swml::Service& svc) {
-    svc.answer();
-    svc.play(json{{"url", "https://cdn.signalwire.com/voicemail/greeting.mp3"}});
-    svc.record(json{
-        {"format", "mp4"},
-        {"stereo", true},
-        {"max_length", 120},
-    });
-    svc.hangup();
+  svc.answer();
+  svc.play(json{{"url", "https://cdn.signalwire.com/voicemail/greeting.mp3"}});
+  svc.record(json{
+      {"format", "mp4"},
+      {"stereo", true},
+      {"max_length", 120},
+  });
+  svc.hangup();
 }
 
 static void build_ivr(swml::Service& svc) {
-    svc.answer();
-    svc.play(json{{"url", "https://cdn.signalwire.com/ivr/menu.mp3"}});
-    svc.send_digits(json{{"digits", "1"}});  // demo placeholder
-    svc.transfer(json{{"dest", "+15555555555"}});
-    svc.hangup();
+  svc.answer();
+  svc.play(json{{"url", "https://cdn.signalwire.com/ivr/menu.mp3"}});
+  svc.send_digits(json{{"digits", "1"}});  // demo placeholder
+  svc.transfer(json{{"dest", "+15555555555"}});
+  svc.hangup();
 }
 
 static void build_transfer(swml::Service& svc) {
-    svc.answer();
-    svc.play(json{{"url", "https://cdn.signalwire.com/transfer/please_hold.mp3"}});
-    svc.transfer(json{{"dest", "sip:agent@example.com"}});
+  svc.answer();
+  svc.play(json{{"url", "https://cdn.signalwire.com/transfer/please_hold.mp3"}});
+  svc.transfer(json{{"dest", "sip:agent@example.com"}});
 }
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     swml::Service svc;
-    svc.set_name("basic-swml")
-       .set_route("/swml");
+    svc.set_name("basic-swml").set_route("/swml");
 
     const char* flow = std::getenv("FLOW");
     std::string which = flow ? flow : "voicemail";
     if (which == "ivr") {
-        build_ivr(svc);
+      build_ivr(svc);
     } else if (which == "transfer") {
-        build_transfer(svc);
+      build_transfer(svc);
     } else {
-        build_voicemail(svc);
+      build_voicemail(svc);
     }
 
     std::cout << "Basic SWMLService — flow: " << which << "\n";
@@ -81,4 +82,8 @@ int main() {
 
     svc.serve();
     return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

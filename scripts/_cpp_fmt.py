@@ -29,6 +29,7 @@ it shells out to the same clang-format the FMT gate uses, so a generator can ass
 own output is already clean (it should have nothing to do). It is NOT on the normal
 emit path.
 """
+
 from __future__ import annotations
 
 import re
@@ -56,6 +57,7 @@ def _repo_root() -> Path:
 # Deterministic formatter (the emit path).
 # ---------------------------------------------------------------------------
 
+
 def _split_toplevel(param_str: str) -> list[str]:
     """Split a top-level comma list respecting <> and () nesting."""
     out: list[str] = []
@@ -76,8 +78,9 @@ def _split_toplevel(param_str: str) -> list[str]:
     return out
 
 
-def _binpack(first_line: str, params: list[str], tail: str, cont: str,
-             first_inline: bool) -> list[str]:
+def _binpack(
+    first_line: str, params: list[str], tail: str, cont: str, first_inline: bool
+) -> list[str]:
     """Bin-pack ``params`` (BinPackParameters/BinPackArguments). ``tail`` (e.g.
     ') const {' or ');') is attached to the LAST param for the fit decision so
     clang-format's break-before-last behaviour is reproduced. If ``first_inline`` the
@@ -154,7 +157,9 @@ def _wrap_line(indent: str, s: str) -> list[str]:
     # method signature / function-call: <head>(<params>)<tail>
     m = re.match(r"^(.*?\()(.*)(\)[^()]*)$", s)
     if m:
-        return _wrap_signature(indent, m.group(1), _split_toplevel(m.group(2)), m.group(3))
+        return _wrap_signature(
+            indent, m.group(1), _split_toplevel(m.group(2)), m.group(3)
+        )
     return [indent + s]
 
 
@@ -165,11 +170,19 @@ def _collapse_short_functions(rows: list) -> list:
     i, n = 0, len(rows)
     while i < n:
         item = rows[i]
-        if (item != "" and item[1].endswith("{") and "(" in item[1] and ")" in item[1]
-                and not _CTRL.match(item[1])
-                and i + 2 < n and rows[i + 1] != "" and rows[i + 2] != ""
-                and rows[i + 2][1] == "}"
-                and "{" not in rows[i + 1][1] and "}" not in rows[i + 1][1]):
+        if (
+            item != ""
+            and item[1].endswith("{")
+            and "(" in item[1]
+            and ")" in item[1]
+            and not _CTRL.match(item[1])
+            and i + 2 < n
+            and rows[i + 1] != ""
+            and rows[i + 2] != ""
+            and rows[i + 2][1] == "}"
+            and "{" not in rows[i + 1][1]
+            and "}" not in rows[i + 1][1]
+        ):
             ind, sig = item
             stmt = rows[i + 1][1]
             if len(f"{ind}{sig} {stmt} }}") <= COL:
@@ -278,6 +291,7 @@ def format_generated_cpp(src: str) -> str:
         else:
             prev_blank = False
             lines.append(s)
+
     # Rejoin continuation lines: if a code line has unbalanced '(' (a wrapped
     # signature/call split across lines), merge following lines until the parens
     # balance. This makes the formatter idempotent — feeding it already-wrapped input
@@ -309,8 +323,12 @@ def format_generated_cpp(src: str) -> str:
             k += 1
             continue
         bal = _paren_balance(cur)
-        while bal > 0 and k + 1 < len(lines) and lines[k + 1] != "" \
-                and not lines[k + 1].lstrip().startswith("//"):
+        while (
+            bal > 0
+            and k + 1 < len(lines)
+            and lines[k + 1] != ""
+            and not lines[k + 1].lstrip().startswith("//")
+        ):
             k += 1
             cur = cur + " " + lines[k]
             bal += _paren_balance(lines[k])
@@ -324,15 +342,22 @@ def format_generated_cpp(src: str) -> str:
     k = 0
     while k < len(lines):
         cur = lines[k]
-        if (k + 1 < len(lines) and cur.startswith("explicit ") and cur.endswith(")")
-                and lines[k + 1].startswith(": ")):
+        if (
+            k + 1 < len(lines)
+            and cur.startswith("explicit ")
+            and cur.endswith(")")
+            and lines[k + 1].startswith(": ")
+        ):
             init = lines[k + 1]
             k += 1
             # absorb continuation initializer lines until the init list terminates
             # (a line ending in '{}' or '{' closes the constructor head).
-            while not (init.rstrip().endswith("{}") or init.rstrip().endswith("{")) \
-                    and k + 1 < len(lines) and lines[k + 1] != "" \
-                    and not lines[k + 1].lstrip().startswith("//"):
+            while (
+                not (init.rstrip().endswith("{}") or init.rstrip().endswith("{"))
+                and k + 1 < len(lines)
+                and lines[k + 1] != ""
+                and not lines[k + 1].lstrip().startswith("//")
+            ):
                 k += 1
                 init = init + " " + lines[k]
             joined.append(cur + " " + init)
@@ -384,9 +409,8 @@ def format_generated_cpp(src: str) -> str:
         for ch in s:
             if ch == "{":
                 stack.append("ns" if is_ns else "blk")
-            elif ch == "}":
-                if stack:
-                    stack.pop()
+            elif ch == "}" and stack:
+                stack.pop()
     rows = _collapse_short_functions(rows)
     # wrap over-long code lines
     final: list[str] = []
@@ -408,6 +432,7 @@ def format_generated_cpp(src: str) -> str:
 # ---------------------------------------------------------------------------
 # Verify-only backstop (NOT on the emit path).
 # ---------------------------------------------------------------------------
+
 
 def clang_format_source(src: str, *, assume_filename: str = "x.hpp") -> str:
     """Return ``src`` formatted with the repo's clang-format config — the verify-only

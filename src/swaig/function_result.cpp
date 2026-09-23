@@ -604,11 +604,12 @@ FunctionResult& FunctionResult::send_sms(const std::string& to, const std::strin
 FunctionResult& FunctionResult::pay(
     const std::string& payment_connector_url, const std::string& input_method,
     const std::string& status_url, const std::string& payment_method, int timeout, int max_attempts,
-    bool security_code, const std::string& postal_code, int min_postal_code_length,
-    const std::string& token_type, const std::string& charge_amount, const std::string& currency,
-    const std::string& language, const std::string& voice, const std::string& description_text,
-    const std::string& valid_card_types, const std::vector<json>& parameters,
-    const std::vector<json>& prompts, const std::string& ai_response) {
+    bool security_code, const std::variant<bool, std::string>& postal_code,
+    int min_postal_code_length, const std::string& token_type, const std::string& charge_amount,
+    const std::string& currency, const std::string& language, const std::string& voice,
+    const std::string& description_text, const std::string& valid_card_types,
+    const std::vector<json>& parameters, const std::vector<json>& prompts,
+    const std::string& ai_response) {
   json pay_params;
   pay_params["payment_connector_url"] = payment_connector_url;
   pay_params["input"] = input_method;
@@ -616,7 +617,15 @@ FunctionResult& FunctionResult::pay(
   pay_params["timeout"] = std::to_string(timeout);
   pay_params["max_attempts"] = std::to_string(max_attempts);
   pay_params["security_code"] = security_code ? "true" : "false";
-  pay_params["postal_code"] = postal_code;
+  // Mirrors the reference's ``isinstance(postal_code, bool)`` branch: a bool
+  // becomes the lowercase string "true"/"false"; an explicit postcode string is
+  // passed through verbatim. Both wire forms are STRINGS (schema ``postal_code``
+  // is anyOf[boolean,string]; the reference emits ``str(value).lower()``).
+  if (const bool* pc_flag = std::get_if<bool>(&postal_code)) {
+    pay_params["postal_code"] = *pc_flag ? "true" : "false";
+  } else {
+    pay_params["postal_code"] = std::get<std::string>(postal_code);
+  }
   pay_params["min_postal_code_length"] = std::to_string(min_postal_code_length);
   pay_params["token_type"] = token_type;
   pay_params["currency"] = currency;

@@ -241,10 +241,9 @@ agent.prompt_add_to_section("Process", "", {"Follow up", "Close ticket"});
 ##### `prompt_add_subsection`
 
 ```cpp
-signalwire::agent::AgentBase& prompt_add_subsection(const std::string& parent_title,
-                                 const std::string& title,
-                                 const std::string& body = "",
-                                 const std::vector<std::string>& bullets = {});
+signalwire::agent::AgentBase& prompt_add_subsection(
+    const std::string& parent_title, const std::string& title, const std::string& body = "",
+    const std::optional<std::vector<std::string>>& bullets = std::nullopt);
 ```
 Add a subsection to an existing prompt section.
 
@@ -252,13 +251,14 @@ Add a subsection to an existing prompt section.
 - `parent_title` (`std::string`): Title of the parent section
 - `title` (`std::string`): Subsection title
 - `body` (`std::string`): Subsection content (default: `""`)
-- `bullets` (`std::vector<std::string>`): Subsection bullet points (default: empty)
+- `bullets` (`std::optional<std::vector<std::string>>`): Subsection bullet points
+  (default: `std::nullopt`, matching the reference's `bullets: list[str] | None = None`)
 
 **Usage:**
 ```cpp
 agent.prompt_add_subsection("Guidelines", "Escalation Rules",
     "Escalate when:",
-    {"Customer is angry", "Technical issue beyond scope"});
+    std::vector<std::string>{"Customer is angry", "Technical issue beyond scope"});
 ```
 
 ### Voice and Language Configuration
@@ -1840,7 +1840,7 @@ result.join_conference("support_conference", opts);
 
 ### Payment Processing
 
-##### `pay(const std::string& payment_connector_url, const std::string& input_method = "dtmf", const std::string& status_url = "", const std::string& payment_method = "credit-card", int timeout = 5, int max_attempts = 1, bool security_code = true, const std::string& postal_code = "true", int min_postal_code_length = 0, const std::string& token_type = "reusable", const std::string& charge_amount = "", const std::string& currency = "usd", const std::string& language = "en-US", const std::string& voice = "woman", const std::string& description = "", const std::string& valid_card_types = "visa mastercard amex", const std::vector<json>& parameters = {}, const std::vector<json>& prompts = {}) -> FunctionResult&`
+##### `pay(const std::string& payment_connector_url, const std::string& input_method = "dtmf", const std::string& status_url = "", const std::string& payment_method = "credit-card", int timeout = 5, int max_attempts = 1, bool security_code = true, const std::variant<bool, std::string>& postal_code = true, int min_postal_code_length = 0, const std::string& token_type = "reusable", const std::string& charge_amount = "", const std::string& currency = "usd", const std::string& language = "en-US", const std::string& voice = "woman", const std::string& description = "", const std::string& valid_card_types = "visa mastercard amex", const std::vector<json>& parameters = {}, const std::vector<json>& prompts = {}) -> FunctionResult&`
 Process a payment through the call.
 
 **Parameters:**
@@ -1851,7 +1851,7 @@ Process a payment through the call.
 - `timeout` (`int`): Input timeout in seconds (default: 5)
 - `max_attempts` (`int`): Maximum retry attempts (default: 1)
 - `security_code` (`bool`): Require security code (default: `true`)
-- `postal_code` (`std::string`): Require postal code (default: "true")
+- `postal_code` (`std::variant<bool, std::string>`): Whether to prompt for a postal code, or an actual postcode (default: `true`). A bool is emitted as the lowercase string `"true"`/`"false"`; a string is passed through verbatim.
 - `min_postal_code_length` (`int`): Minimum postal code length (default: 0)
 - `token_type` (`std::string`): Token type: "reusable", "one-time" (default: "reusable")
 - `charge_amount` (`std::string`): Amount to charge
@@ -2176,34 +2176,9 @@ data_map.webhook(
     json{{"Authorization", "Bearer YOUR_API_TOKEN"}});  // Use static credentials
 ```
 
-##### `body(const json& data) -> DataMap&`
-Set the JSON body for the last-added webhook (POST/PUT requests).
-
-**Parameters:**
-- `data` (`json`): JSON body data (supports `${variable}` substitution)
-
-**Usage:**
-```cpp
-// Static body with parameter substitution
-data_map.body({
-    {"query", "${args.search_term}"},
-    {"limit", 5},
-    {"filters", {
-        {"category", "${args.category}"},
-        {"active", true}
-    }}
-});
-
-// Body with call-related data (NOT sensitive info)
-data_map.body({
-    {"customer_id", "${global_data.customer_id}"},
-    {"request_id", "${meta_data.call_id}"},
-    {"search", "${args.query}"}
-});
-```
-
 ##### `params(const json& data) -> DataMap&`
-Set request params for the last-added webhook (alias for `body`).
+Set request params for the last-added webhook — including the data sent with
+POST/PUT requests.
 
 **Parameters:**
 - `data` (`json`): Query parameters (supports `${variable}` substitution)
@@ -2460,7 +2435,7 @@ auto search_tool = signalwire::datamap::DataMap("search_knowledge")
         "POST",
         "https://api.company.com/search",
         json{{"Authorization", "Bearer TOKEN"}})
-    .body({
+    .params({
         {"query", "${args.query}"},
         {"category", "${args.category}"},
         {"limit", 5}

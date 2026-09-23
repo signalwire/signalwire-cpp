@@ -6,31 +6,39 @@
 // README-INCLUDE gate, so the doc code can never drift from working code.
 
 // region: agent
-#include <signalwire/agent/agent_base.hpp>
 #include <ctime>
+#include <iostream>
+#include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 class MyAgent : public agent::AgentBase {
-public:
-    MyAgent() : AgentBase("my-agent", "/agent") {
-        add_language({"English", "en-US", "inworld.Mark"});
-        prompt_add_section("Role", "You are a helpful assistant.");
+ public:
+  MyAgent() : AgentBase("my-agent", "/agent") {
+    add_language({"English", "en-US", "inworld.Mark"});
+    prompt_add_section("Role", "You are a helpful assistant.");
 
-        define_tool("get_time", "Get the current time",
-            {{"type", "object"}, {"properties", json::object()}},
-            [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
-                auto now = std::time(nullptr);
-                char buf[32];
-                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
-                return swaig::FunctionResult(std::string("The time is ") + buf);
-            });
-    }
+    define_tool("get_time", "Get the current time",
+                {{"type", "object"}, {"properties", json::object()}},
+                [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
+                  auto now = std::time(nullptr);
+                  char buf[32];
+                  std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
+                  return swaig::FunctionResult(std::string("The time is ") + buf);
+                });
+  }
 };
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     MyAgent agent;
     agent.run();  // Serves on http://0.0.0.0:3000/agent
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 // endregion: agent

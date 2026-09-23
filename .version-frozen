@@ -1,0 +1,38 @@
+# VERSION FREEZE — TEMPORARY. DELETE THIS FILE BEFORE RELEASING.
+#
+# Ruled by the owner 2026-07-28. This port declares version 3.0.0, and its SemVer
+# release floor (port_signatures.baseline.json -> baseline_version) is pinned at
+# 3.0.0 with the recorded surface payload overwritten to match today's surface.
+#
+# THIS FILE IS DOCUMENTATION ONLY (owner ruling, 2026-07-28). No gate reads it and
+# nothing fails if it is present. It exists so that neither a person nor a future
+# session has to re-derive why the versions look the way they do — and so nobody
+# casually bumps one.
+#
+# WHY THE FREEZE: versions had drifted to 3.0.2 / 3.2.0 / 3.2.1 / 3.3.0 / 4.0.0
+# across the fleet with NOTHING EVER PUBLISHED above v2.x. `git ls-remote --tags
+# origin` tops out at v1.1.2 for rust/dotnet and v2.0.x for most others; php's
+# v3.2.0 tag is local-only, zero remote matches. That scatter was never a release
+# history, so collapsing it rewrote nothing real.
+#
+# WHILE THIS FILE EXISTS:
+#   - do NOT bump this port's version
+#   - do NOT re-anchor its release floor
+#   - DO land surface changes freely. The floor is a snapshot of the 3.0.0 wave,
+#     not of a published release, so SEMVER-DIFF will not flag anything already in
+#     today's surface. Anything added AFTER the freeze is still caught normally.
+#
+# BEFORE CUTTING A RELEASE:
+#   1. DELETE this file in every port.
+#   2. Re-anchor each port_signatures.baseline.json to the actual released
+#      commit/tag and regenerate its surface payload from that point.
+#   3. Re-enable enforcement: ports invoke SEMVER-DIFF with --report-only today
+#      (the D5 "re-anchor at cut" setting). Dropping that flag turns semver
+#      enforcement back on.
+#
+# NOTE: perl is deliberately NOT floor-pinned. It is the only port anchored to a
+# genuinely published tag (v2.0.2, sha 83376ff) and already passes at 3.0.0;
+# overwriting it would destroy the fleet's only real release anchor.
+#
+# Owner rulings: porting-sdk tasks #143 (version) and #146 (floor).
+# Full context: porting-sdk/SESSION_HANDOFF_2026-07-28.md

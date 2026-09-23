@@ -3,28 +3,30 @@
 // Compare with joke_agent.cpp (raw data_map).
 // Required: API_NINJAS_KEY environment variable.
 
-#include <signalwire/agent/agent_base.hpp>
 #include <cstdlib>
+#include <iostream>
+#include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     const char* api_key = std::getenv("API_NINJAS_KEY");
     if (!api_key || std::string(api_key).empty()) {
-        std::cerr << "Error: API_NINJAS_KEY environment variable is required.\n";
-        std::cerr << "Get your free API key from https://api.api-ninjas.com/\n";
-        return 1;
+      std::cerr << "Error: API_NINJAS_KEY environment variable is required.\n";
+      std::cerr << "Get your free API key from https://api.api-ninjas.com/\n";
+      return 1;
     }
 
     agent::AgentBase agent("joke-skill-demo", "/joke-skill");
 
-    agent.prompt_add_section("Personality",
-        "You are a cheerful comedian who loves sharing jokes.");
-    agent.prompt_add_section("Instructions", "", {
-        "When users ask for jokes, use your joke functions",
-        "Be enthusiastic and fun in your responses",
-        "You can tell both regular jokes and dad jokes"
-    });
+    agent.prompt_add_section("Personality", "You are a cheerful comedian who loves sharing jokes.");
+    agent.prompt_add_section("Instructions", "",
+                             {"When users ask for jokes, use your joke functions",
+                              "Be enthusiastic and fun in your responses",
+                              "You can tell both regular jokes and dad jokes"});
 
     agent.add_language({"English", "en-US", "inworld.Mark"});
     agent.set_params({{"ai_model", "gpt-4.1-nano"}});
@@ -37,4 +39,8 @@ int main() {
     std::cout << "    - Automatic validation and error handling\n";
     std::cout << "    - Reusable across agents\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

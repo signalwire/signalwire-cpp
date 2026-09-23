@@ -1,12 +1,16 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Multi-endpoint agent with multiple webhook URLs and query params.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("multi-endpoint", "/multi-endpoint");
 
     agent.prompt_add_section("Role", "You are a multi-endpoint demo agent.");
@@ -20,20 +24,22 @@ int main() {
     agent.add_swaig_query_param("env", "production");
 
     // Function includes from remote servers
-    agent.add_function_include({
-        {"url", "https://tools.example.com/functions"},
-        {"functions", {"translate", "summarize"}}
-    });
+    agent.add_function_include({{"url", "https://tools.example.com/functions"},
+                                {"functions", {"translate", "summarize"}}});
 
-    agent.define_tool("local_tool", "A locally-handled tool",
-        {{"type", "object"}, {"properties", {
-            {"input", {{"type", "string"}, {"description", "Input text"}}}
-        }}},
+    agent.define_tool(
+        "local_tool", "A locally-handled tool",
+        {{"type", "object"},
+         {"properties", {{"input", {{"type", "string"}, {"description", "Input text"}}}}}},
         [](const json& args, const json& raw) -> swaig::FunctionResult {
-            (void)raw;
-            return swaig::FunctionResult("Processed: " + args.value("input", ""));
+          (void)raw;
+          return swaig::FunctionResult("Processed: " + args.value("input", ""));
         });
 
     std::cout << "Multi-endpoint at http://0.0.0.0:3000/multi-endpoint\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

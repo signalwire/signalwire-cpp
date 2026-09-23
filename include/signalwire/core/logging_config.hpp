@@ -5,17 +5,21 @@
 
 #pragma once
 
+#include <nlohmann/json.hpp>
 #include <string>
+
+// `get_logger` below returns a NAMED logger by value, so the type must be
+// complete here (not merely forward-declared).
+#include "signalwire/logging/logger.hpp"
 
 namespace signalwire {
 namespace core {
 namespace logging_config {
 
 /**
- * Cross-language SDK contract for serverless / deployment-mode detection.
+ * Detect the serverless / deployment mode from the environment.
  *
- * Mirrors `signalwire.core.logging_config.get_execution_mode` in the
- * Python reference. Order of precedence (FIRST match wins):
+ * Order of precedence (FIRST match wins):
  *
  *   1. GATEWAY_INTERFACE                                       -> "cgi"
  *   2. AWS_LAMBDA_FUNCTION_NAME or LAMBDA_TASK_ROOT            -> "lambda"
@@ -32,8 +36,7 @@ std::string get_execution_mode();
 
 /**
  * Configure the SDK logging system once, globally, from environment
- * variables (idempotent). Mirrors Python's
- * ``signalwire.core.logging_config.configure_logging``. Reads
+ * variables (idempotent). Reads
  * ``SIGNALWIRE_LOG_MODE`` (off/stderr/default/auto) and
  * ``SIGNALWIRE_LOG_LEVEL`` and applies them to the process logger. Safe to
  * call repeatedly; only the first call takes effect until
@@ -43,30 +46,49 @@ void configure_logging();
 
 /**
  * Reset the one-shot logging-configured flag so a subsequent
- * ``configure_logging`` call re-reads the environment. Mirrors Python's
- * ``reset_logging_configuration`` (useful when env vars change at runtime).
+ * ``configure_logging`` call re-reads the environment. Useful when env vars
+ * change at runtime.
  */
 void reset_logging_configuration();
 
 /**
- * Return whether ``configure_logging`` has already run (the internal flag).
- * Ensures the logger is configured on first access, mirroring Python's
- * ``get_logger`` single-entry-point behavior. The C++ logger is a process
- * singleton (see ``signalwire::get_logger``); this helper guarantees it has
- * been configured before use and returns the configured state.
+ * Obtain the SDK logger, configuring it on first access. This is the single
+ * entry point every SDK module should use.
  *
- * @param name Logical logger name (recorded for API compatibility; the C++
- *   Logger is a process singleton so the name is advisory).
+ * Returns a NAMED logger BY VALUE, so the caller can log directly and ``name``
+ * is honoured. Delegates to ``signalwire::logging::get_logger(name)``; the only
+ * thing this entry point adds is the guarantee that ``configure_logging`` has
+ * run first.
+ *
+ * (Note ``signalwire::get_logger()``, taking no argument, is a DIFFERENT
+ * overload returning the process singleton by reference; it is unrelated to
+ * this contract.)
+ *
+ * @param name Logical logger name, conventionally the calling module's name.
  */
-bool get_logger(const std::string& name);
+::signalwire::logging::Logger get_logger(const std::string& name);
 
 /**
- * Strip control characters (to prevent log injection) from ``value``.
- * Mirrors Python's ``strip_control_chars`` structlog processor, reduced to
- * the value-sanitizing core: removes ASCII control chars except ``\t``,
- * ``\n`` and ``\r``.
+ * Strip control characters from a single string.
+ *
+ * Removes ASCII control chars except ``\t``, ``\n`` and ``\r``.
+ *
+ * INTERNAL helper: the public entry point is the event-map form
+ * (``strip_control_chars`` below); this is the per-value scrub that form is
+ * built out of.
  */
-std::string strip_control_chars(const std::string& value);
+std::string strip_control_chars_str(const std::string& value);
+
+/**
+ * Strip control characters from log event values to prevent log injection.
+ *
+ * Takes the log event map, scrubs every STRING value, and returns the map.
+ * Non-string values pass through untouched.
+ *
+ * This is called from ``signalwire::logging::Logger::log``, so the scrub sits
+ * on the real emission path rather than merely being available to callers.
+ */
+nlohmann::json strip_control_chars(const nlohmann::json& event_dict);
 
 }  // namespace logging_config
 }  // namespace core

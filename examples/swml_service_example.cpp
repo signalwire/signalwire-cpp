@@ -1,12 +1,15 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Low-level SWML Service: build SWML documents directly with verbs.
 
-#include <signalwire/swml/service.hpp>
 #include <iostream>
+#include <signalwire/swml/service.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     swml::Service svc;
     svc.set_route("/swml-service");
     svc.set_port(3000);
@@ -14,10 +17,8 @@ int main() {
     // Build a simple IVR flow
     svc.answer({{"max_duration", 3600}});
     svc.play({{"url", "https://example.com/greeting.mp3"}});
-    svc.ai({
-        {"prompt", {{"text", "You are a helpful assistant."}}},
-        {"post_prompt", {{"text", "Summarize the conversation."}}}
-    });
+    svc.ai({{"prompt", {{"text", "You are a helpful assistant."}}},
+            {"post_prompt", {{"text", "Summarize the conversation."}}}});
     svc.hangup();
 
     // Print the document
@@ -26,4 +27,8 @@ int main() {
 
     std::cout << "SWML Service at http://0.0.0.0:3000/swml-service\n";
     svc.serve();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

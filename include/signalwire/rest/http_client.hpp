@@ -23,10 +23,9 @@ using json = nlohmann::json;
 /// Error thrown on non-2xx REST API responses.
 ///
 /// Carries the full request/response envelope — HTTP ``status`` code, response
-/// ``body``, the request ``url`` and ``method`` — mirroring Python's
-/// ``SignalWireRestError(status_code, body, url, method, headers)``. Every
-/// field is exposed so a caller catching the error can inspect exactly which
-/// request failed and how.
+/// ``body``, the request ``url`` and ``method``, and the response ``headers``.
+/// Every field is exposed so a caller catching the error can inspect exactly
+/// which request failed and how.
 ///
 /// §6.6 error-observability: ``headers()`` is the response header map (empty
 /// for a transport error that produced no response) and ``request_id()`` is
@@ -39,7 +38,7 @@ class SignalWireRestError : public std::runtime_error {
   SignalWireRestError(int status, const std::string& message, const std::string& body = "",
                       const std::string& url = "", const std::string& method = "GET",
                       const std::map<std::string, std::string>& headers = {});
-  /// HTTP status of the failing response (reference: ``self.status_code``).
+  /// HTTP status of the failing response.
   /// ``0`` for a transport failure that never reached a response.
   int status_code() const { return status_; }
   const std::string& body() const { return body_; }
@@ -50,16 +49,16 @@ class SignalWireRestError : public std::runtime_error {
   const std::map<std::string, std::string>& headers() const { return headers_; }
   /// Platform request id extracted from the response headers — the first of
   /// ``x-request-id`` / ``x-signalwire-request-id`` / ``request-id`` /
-  /// ``x-amzn-requestid`` present (matched case-insensitively; the same
-  /// preference order as the Python reference). Empty string when absent.
+  /// ``x-amzn-requestid`` present, matched case-insensitively and in that
+  /// preference order. Empty string when absent.
   const std::string& request_id() const { return request_id_; }
 
  private:
   // Defined in src/rest/http_client.cpp: first matching request-id header
-  // (case-insensitive, python-reference preference order), else "".
+  // (case-insensitive, in the documented preference order), else "".
   static std::string extract_request_id(const std::map<std::string, std::string>& headers);
-  // Defined in src/rest/http_client.cpp: appends the python-mirrored
-  // request-id suffix to the message when an id is present.
+  // Defined in src/rest/http_client.cpp: appends the request-id suffix to the
+  // message when an id is present.
   static std::string with_request_id(const std::string& message, const std::string& request_id);
 
   int status_;
@@ -75,14 +74,12 @@ class SignalWireRestError : public std::runtime_error {
 /// reset, TLS error), as opposed to a well-formed non-2xx HTTP response.
 ///
 /// A member of the ``SignalWireRestError`` family: ``status_code()`` is ``0``
-/// (the sentinel this port uses for "no HTTP status" — there is no response
-/// to carry one), and the underlying transport-library error text is
+/// (the sentinel for "no HTTP status" — there is no response to carry one),
+/// and the underlying transport-library error text is
 /// preserved as the exception message. Because it extends
 /// ``SignalWireRestError``, a caller catching that one type handles both an
 /// HTTP-error response and a transport failure with a single ``catch``,
-/// instead of a bare cpp-httplib/curl error leaking through. Mirrors the
-/// Python reference's ``SignalWireRestTransportError(SignalWireRestError)``
-/// (plan 1.3b).
+/// instead of a bare cpp-httplib/curl error leaking through.
 class SignalWireRestTransportError : public SignalWireRestError {
  public:
   SignalWireRestTransportError(const std::string& message, const std::string& url = "",
@@ -130,8 +127,6 @@ class HttpClient {
   /// Sets the underlying SSLClient's CA path and keeps server-certificate
   /// verification ON. Production (public CAs) needs no call — the system
   /// trust store is used, and SSL_CERT_FILE is also honored automatically.
-  /// C++-only ergonomic hook (Python's requests-based client trusts a custom
-  /// CA via the SSL_CERT_FILE / REQUESTS_CA_BUNDLE env vars instead).
   void set_ca_cert_path(const std::string& path);
 
   const std::string& base_url() const { return base_url_; }
@@ -160,20 +155,19 @@ class HttpClient {
 
 /// Iterates items across paginated API responses.
 ///
-/// Mirrors signalwire-python's ``signalwire.rest._pagination.PaginatedIterator``:
-/// fetches the configured path with the configured params, walks the
+/// Fetches the configured path with the configured params, walks the
 /// ``data_key`` array, then follows ``links.next`` (parsing its query string
 /// for the next page's params) until the response carries no ``links.next``.
 ///
 /// Iteration is lazy -- the constructor records inputs but performs no
 /// HTTP. The first ``has_next()`` / ``next()`` call performs the first
-/// fetch. Cursor query params are extracted by parsing ``links.next`` like
-/// Python's ``urllib.parse.urlparse + parse_qs``.
+/// fetch. Cursor query params are extracted by parsing the ``links.next`` URL
+/// and decoding its query string.
 class PaginatedIterator {
  public:
   /// ``request_options`` (per-request transport envelope: timeout / retries /
-  /// abort) is the reference's trailing param — it is applied to every page
-  /// fetch this iterator performs. Never part of the query/body.
+  /// abort) is applied to every page fetch this iterator performs. It is never
+  /// part of the query or body.
   PaginatedIterator(const HttpClient& http, const std::string& path,
                     const std::map<std::string, std::string>& params = {},
                     const std::string& data_key = "data",
@@ -187,7 +181,7 @@ class PaginatedIterator {
   [[nodiscard]] bool has_next();
 
   /// Returns the next item; throws std::out_of_range when the iterator
-  /// is exhausted (mirrors Python's StopIteration).
+  /// is exhausted.
   /// [[nodiscard]]: dropping the returned item silently consumes it.
   [[nodiscard]] json next();
 
@@ -212,10 +206,10 @@ class PaginatedIterator {
   std::vector<json> items_;
   size_t index_ = 0;
   bool done_ = false;
-  // Cycle guard (CPP-4): next-link cursors already followed. A server that
-  // keeps returning the SAME ``links.next`` would otherwise loop forever, since
-  // termination is now driven only by an ABSENT next link (empty-page fix).
-  // Seeing a repeat terminates iteration. Mirrors Python's _seen_next.
+  // Cycle guard: next-link cursors already followed. A server that keeps
+  // returning the SAME ``links.next`` would otherwise loop forever, since
+  // termination is driven only by an ABSENT next link. Seeing a repeat
+  // terminates iteration.
   std::set<std::string> seen_next_;
 };
 

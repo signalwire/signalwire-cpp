@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <iomanip>
 #include <random>
 #include <sstream>
@@ -99,6 +100,27 @@ bool RelayClient::open_ws_transport() {
     host = host.substr(0, colon);
   }
   if (scheme == "ws" || scheme == "ws://") {
+    // NO SILENT DOWNGRADE. Setting SIGNALWIRE_RELAY_CA_FILE is an explicit
+    // request to VERIFY the RELAY peer against that CA — which is meaningless
+    // without TLS. If the transport also resolved to plain ws:// (a stale
+    // SIGNALWIRE_RELAY_SCHEME, a harness export leaking out of a test run, an
+    // operator who changed one setting and not the other), connect_plain()
+    // would happily complete a PLAINTEXT session and authenticate over it: the
+    // caller asked for encryption, got none, and was never told. Refuse, and
+    // name the setting that would otherwise have been silently ignored.
+    // Plaintext WITHOUT the CA var is untouched — that is a deliberate,
+    // unambiguous request for a clear connection (the audit fixture / dev
+    // servers), and it still works exactly as before.
+    // Matches the guard signalwire-rust ships in src/relay/client.rs.
+    const char* relay_ca = std::getenv("SIGNALWIRE_RELAY_CA_FILE");
+    if (relay_ca != nullptr && *relay_ca != '\0') {
+      get_logger().error(
+          "SIGNALWIRE_RELAY_CA_FILE is set (TLS verification requested) but the RELAY "
+          "endpoint resolved to plaintext ws:// — refusing to downgrade. Use the wss:// "
+          "transport (check SIGNALWIRE_RELAY_SCHEME), or unset SIGNALWIRE_RELAY_CA_FILE "
+          "to connect in the clear deliberately.");
+      return false;
+    }
     return ws_->connect_plain(host, port);
   }
   return ws_->connect(host, port);
@@ -761,8 +783,8 @@ json RelayClient::send_raw_request(const std::string& method, const json& params
   return send_request(method, params);
 }
 
-Call RelayClient::dial(const json& devices, const std::string& tag_in, int dial_timeout_ms,
-                       int max_duration) {
+Call RelayClient::dial(const json& devices, const std::string& tag_in, int max_duration,
+                       std::optional<double> dial_timeout) {
   std::string tag = tag_in.empty() ? generate_uuid() : tag_in;
 
   // Register pending dial before sending RPC
@@ -790,8 +812,11 @@ Call RelayClient::dial(const json& devices, const std::string& tag_in, int dial_
     return Call();
   }
 
-  // Wait for the dial event (with timeout)
-  auto status = future.wait_for(std::chrono::milliseconds(dial_timeout_ms));
+  // Wait for the dial event. dial_timeout is in SECONDS (reference unit), and
+  // absent means 120s — the reference's
+  // `timeout = dial_timeout if dial_timeout is not None else 120.0`.
+  const double timeout_s = dial_timeout.value_or(120.0);
+  auto status = future.wait_for(std::chrono::duration<double>(timeout_s));
   {
     std::lock_guard<std::mutex> lock(dials_mutex_);
     pending_dials_.erase(tag);

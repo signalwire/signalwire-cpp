@@ -6,26 +6,23 @@
 // README-INCLUDE gate, so the doc code can never drift from working code.
 
 // region: relay
-#include <signalwire/relay/client.hpp>
-
 #include <iostream>
+#include <signalwire/relay/client.hpp>
 
 using namespace signalwire::relay;
 
 int main() {
-    auto client = RelayClient::from_env();
+  auto client = RelayClient::from_env();
 
-    client.on_call([](Call& call) {
-        call.answer();
-        auto action = call.play({
-            {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
-        });
-        if (!action.wait()) {  // false = call ended before playback finished
-            std::cerr << "playback interrupted\n";
-        }
-        call.hangup();
-    });
+  client.on_call([](Call& call) {
+    call.answer();
+    auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}});
+    if (!action.wait()) {  // false = call ended before playback finished
+      std::cerr << "playback interrupted\n";
+    }
+    call.hangup();
+  });
 
-    client.run();
+  client.run();
 }
 // endregion: relay

@@ -34,8 +34,8 @@ struct PostPromptSwaigLogEntry {
   std::optional<json> delayed_post_response;
   std::optional<std::string> mcp_url;
   std::optional<std::string> mcp_tool;
-  std::optional<json> mcp_response;
-  std::optional<std::string> mcp_error;
+  std::optional<std::string> mcp_response;
+  std::optional<bool> mcp_error;
   json extras = json::object();
 };
 

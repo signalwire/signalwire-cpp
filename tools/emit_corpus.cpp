@@ -351,22 +351,29 @@ std::vector<Entry> corpus() {
 }  // namespace
 
 int main() {
-  json out = json::object();
-  std::vector<std::string> seen;
-  for (auto& e : corpus()) {
-    for (const auto& s : seen) {
-      if (s == e.id) {
-        std::cerr << "emit_corpus: duplicate corpus id " << e.id << "\n";
-        return 1;
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    json out = json::object();
+    std::vector<std::string> seen;
+    for (auto& e : corpus()) {
+      for (const auto& s : seen) {
+        if (s == e.id) {
+          std::cerr << "emit_corpus: duplicate corpus id " << e.id << "\n";
+          return 1;
+        }
       }
+      seen.push_back(e.id);
+      out[e.id] = e.build().to_json();
     }
-    seen.push_back(e.id);
-    out[e.id] = e.build().to_json();
-  }
 
-  // nlohmann sorts object keys -> canonical JSON. dump() without indent for a
-  // single compact line; ensure_ascii is off by default so '+'/'&' stay literal
-  // (matches Python's json output, like Go's SetEscapeHTML(false)).
-  std::cout << out.dump() << "\n";
-  return 0;
+    // nlohmann sorts object keys -> canonical JSON. dump() without indent for a
+    // single compact line; ensure_ascii is off by default so '+'/'&' stay literal
+    // (matches Python's json output, like Go's SetEscapeHTML(false)).
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -36,8 +36,8 @@ using json = nlohmann::json;
 // functions onto the Python module-level functions in the enumerators.
 // ===========================================================================
 
-/// The inferred-schema 5-tuple (Python's
-/// ``(parameters, required, description, is_typed, has_raw_data)``):
+/// The inferred-schema 5-tuple
+/// ``(parameters, required, description, is_typed, has_raw_data)``:
 ///   - parameters:   the JSON-Schema ``properties`` object (name -> property).
 ///   - required:     the list of required parameter names.
 ///   - description:  the tool description (nullopt when none supplied).
@@ -46,23 +46,20 @@ using json = nlohmann::json;
 using InferredSchema =
     std::tuple<json, std::vector<std::string>, std::optional<std::string>, bool, bool>;
 
-/// Infer a JSON-Schema for a SWAIG tool's parameters from the port's typed
-/// ``ParameterSchema`` params-builder (Python:
-/// ``infer_schema(func) -> (parameters, required, description, is_typed,
-/// has_raw_data)``). The ``raw_data`` property is the SWAIG raw-payload channel
-/// and is excluded from the emitted ``parameters``/``required`` — its presence
-/// is reported via ``has_raw_data`` instead, matching the reference.
+/// Infer a JSON-Schema for a SWAIG tool's parameters from the typed
+/// ``ParameterSchema`` params-builder. The ``raw_data`` property is the SWAIG
+/// raw-payload channel and is excluded from the emitted
+/// ``parameters``/``required`` — its presence is reported via ``has_raw_data``
+/// instead.
 ///
 /// @param params      the typed schema built via ``ParameterSchema``.
-/// @param description  optional tool description (Python derives this from the
-///                     handler's docstring; C++ lambdas carry none, so the
-///                     caller supplies it — default nullopt).
+/// @param description  optional tool description. C++ lambdas carry no
+///                     docstring, so the caller supplies it — default nullopt.
 [[nodiscard]] InferredSchema infer_schema(
     const ParameterSchema& params, const std::optional<std::string>& description = std::nullopt);
 
 /// Wrap a typed handler so it can be invoked with the standard SWAIG calling
-/// convention ``(args, raw_data)`` (Python:
-/// ``create_typed_handler_wrapper(func, has_raw_data) -> wrapper``). The
+/// convention ``(args, raw_data)``. The
 /// wrapper normalizes the ``args`` object to a JSON object and forwards it;
 /// when ``has_raw_data`` is set it also forwards the raw payload, otherwise it
 /// passes an empty object so the wrapped handler never sees the raw channel it

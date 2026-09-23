@@ -23,6 +23,8 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SwaigRequest {
+  std::optional<json> SWMLCall;
+  std::optional<json> SWMLVars;
   std::optional<std::string> ai_session_id;
   std::optional<std::string> app_name;
   std::optional<std::string> args;

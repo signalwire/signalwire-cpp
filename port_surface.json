@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 4875e642abb190b9dba8a9c30eadefdb605f61cd",
+  "generated_from": "signalwire-cpp @ 96c1e29639092cfcdd3cf066e160766faa2fc88b",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -94,15 +94,18 @@
         "AuthenticationError": [],
         "ChatInProgressError": [],
         "ChatLog": [
+          "__init__",
           "call_timeline",
           "messages"
         ],
         "ChatResponse": [
+          "__init__",
           "conversation_id",
           "text",
           "user_event"
         ],
         "ConversationInfo": [
+          "__init__",
           "id",
           "initial_message",
           "status"
@@ -286,6 +289,16 @@
           "verify_api_key",
           "verify_basic_auth",
           "verify_bearer_token"
+        ],
+        "BasicCredentials": [
+          "__init__",
+          "password",
+          "username"
+        ],
+        "BearerCredentials": [
+          "__init__",
+          "credentials",
+          "scheme"
         ]
       },
       "functions": []
@@ -346,7 +359,6 @@
         "ContextBuilder": [
           "__init__",
           "add_context",
-          "attach_tool_name_supplier",
           "get_context",
           "has_contexts",
           "reset",
@@ -410,7 +422,6 @@
       "classes": {
         "DataMap": [
           "__init__",
-          "body",
           "description",
           "error_keys",
           "expression",
@@ -656,7 +667,9 @@
         "PostPromptEot": [],
         "PostPromptStampsUs": [],
         "PostPromptSwaigLogEntry": [
-          "post_data"
+          "delayed_post_response",
+          "post_data",
+          "post_response"
         ],
         "PostPromptSystemEntry": [],
         "PostPromptSystemLogEntry": [],
@@ -801,6 +814,8 @@
         "ContextSwitchAction": [],
         "HoldAction": [],
         "PlaybackBgAction": [],
+        "SwaigAction": [],
+        "SwaigResponse": [],
         "TransferAction": []
       },
       "functions": []
@@ -912,6 +927,7 @@
           "denoise",
           "detect_machine",
           "document",
+          "domain",
           "enter_queue",
           "execute",
           "extract_introspect_payload",
@@ -967,6 +983,9 @@
           "set_auth",
           "sip_refer",
           "sleep",
+          "ssl_cert_path",
+          "ssl_enabled",
+          "ssl_key_path",
           "stop",
           "stop_denoise",
           "stop_record_call",
@@ -1507,6 +1526,7 @@
         "Action": [
           "__init__",
           "call",
+          "completed",
           "control_id",
           "is_done",
           "result",
@@ -1564,7 +1584,6 @@
           "play_silence",
           "play_tts",
           "project_id",
-          "prompt",
           "prompt_audio",
           "prompt_tts",
           "queue_enter",
@@ -1731,6 +1750,7 @@
     "signalwire.relay.event": {
       "classes": {
         "CallReceiveEvent": [
+          "__init__",
           "call_state",
           "context",
           "device",
@@ -1742,6 +1762,7 @@
           "tag"
         ],
         "CallStateEvent": [
+          "__init__",
           "call_state",
           "device",
           "direction",
@@ -1749,11 +1770,13 @@
           "from_payload"
         ],
         "CallingErrorEvent": [
+          "__init__",
           "code",
           "from_payload",
           "message"
         ],
         "CollectEvent": [
+          "__init__",
           "control_id",
           "final",
           "from_payload",
@@ -1761,45 +1784,54 @@
           "state"
         ],
         "ConferenceEvent": [
+          "__init__",
           "conference_id",
           "from_payload",
           "name",
           "status"
         ],
         "ConnectEvent": [
+          "__init__",
           "connect_state",
           "from_payload",
           "peer"
         ],
         "DenoiseEvent": [
+          "__init__",
           "denoised",
           "from_payload"
         ],
         "DetectEvent": [
+          "__init__",
           "control_id",
           "detect",
           "from_payload"
         ],
         "DialEvent": [
+          "__init__",
           "call",
           "dial_state",
           "from_payload",
           "tag"
         ],
         "EchoEvent": [
+          "__init__",
           "from_payload",
           "state"
         ],
         "FaxEvent": [
+          "__init__",
           "control_id",
           "fax",
           "from_payload"
         ],
         "HoldEvent": [
+          "__init__",
           "from_payload",
           "state"
         ],
         "MessageReceiveEvent": [
+          "__init__",
           "body",
           "context",
           "direction",
@@ -1813,6 +1845,7 @@
           "to_number"
         ],
         "MessageStateEvent": [
+          "__init__",
           "body",
           "context",
           "direction",
@@ -1827,16 +1860,19 @@
           "to_number"
         ],
         "PayEvent": [
+          "__init__",
           "control_id",
           "from_payload",
           "state"
         ],
         "PlayEvent": [
+          "__init__",
           "control_id",
           "from_payload",
           "state"
         ],
         "QueueEvent": [
+          "__init__",
           "control_id",
           "from_payload",
           "position",
@@ -1846,6 +1882,7 @@
           "status"
         ],
         "RecordEvent": [
+          "__init__",
           "control_id",
           "duration",
           "from_payload",
@@ -1855,6 +1892,7 @@
           "url"
         ],
         "ReferEvent": [
+          "__init__",
           "from_payload",
           "sip_notify_response_code",
           "sip_refer_response_code",
@@ -1862,6 +1900,7 @@
           "state"
         ],
         "RelayEvent": [
+          "__init__",
           "call_id",
           "event_type",
           "from_payload",
@@ -1869,11 +1908,13 @@
           "timestamp"
         ],
         "SendDigitsEvent": [
+          "__init__",
           "control_id",
           "from_payload",
           "state"
         ],
         "StreamEvent": [
+          "__init__",
           "control_id",
           "from_payload",
           "name",
@@ -1881,6 +1922,7 @@
           "url"
         ],
         "TapEvent": [
+          "__init__",
           "control_id",
           "device",
           "from_payload",
@@ -1888,6 +1930,7 @@
           "tap"
         ],
         "TranscribeEvent": [
+          "__init__",
           "control_id",
           "duration",
           "from_payload",
@@ -2160,6 +2203,7 @@
     "signalwire.rest._request_options": {
       "classes": {
         "RequestOptions": [
+          "__init__",
           "abort_signal",
           "merge",
           "retries",
@@ -3565,7 +3609,6 @@
           "get_hints",
           "get_instance_key",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3579,7 +3622,6 @@
           "get_hints",
           "get_instance_key",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3591,7 +3633,6 @@
         "DateTimeSkill": [
           "get_hints",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3603,7 +3644,6 @@
         "GoogleMapsSkill": [
           "get_hints",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3628,7 +3668,6 @@
           "get_global_data",
           "get_hints",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3640,7 +3679,6 @@
         "MathSkill": [
           "get_hints",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3655,7 +3693,6 @@
           "get_hints",
           "get_instance_key",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3703,6 +3740,7 @@
           "get_instance_key",
           "get_parameter_schema",
           "register_tools",
+          "remove_xpaths",
           "setup"
         ]
       },
@@ -3714,7 +3752,6 @@
           "get_hints",
           "get_instance_key",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3740,7 +3777,6 @@
           "get_hints",
           "get_instance_key",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "setup"
         ]
@@ -3752,7 +3788,6 @@
         "WikipediaSearchSkill": [
           "get_hints",
           "get_parameter_schema",
-          "get_prompt_sections",
           "register_tools",
           "search_wiki",
           "setup"

@@ -286,7 +286,8 @@ TEST(rest_mock_gen_video_conferences_get_err) {
 TEST(rest_mock_gen_video_conferences_list_conference_tokens_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_conference_tokens", 200, json::object());
-  (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
+  (void)(client.video().conferences.list_conference_tokens("X",
+                                                           std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -304,7 +305,8 @@ TEST(rest_mock_gen_video_conferences_list_conference_tokens_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
+    (void)(client.video().conferences.list_conference_tokens("X",
+                                                             std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();

@@ -3,17 +3,13 @@
 //
 // SWMLBuilder — fluent builder for SWML documents.
 //
-// Mirrors the Python reference signalwire.core.swml_builder.SWMLBuilder (which
-// wraps an SWMLService) and the Java port com.signalwire.sdk.swml.SWMLBuilder.
-// It delegates to an underlying swml::Service instance (the C++ analog of the
-// reference's SWMLService) for the actual document construction; each verb
-// method appends a verb to the main section and returns *this for chaining.
+// It delegates to an underlying swml::Service instance for the actual document
+// construction; each verb method appends a verb to the main section and returns
+// *this for chaining.
 //
-// The reference installs the remaining schema verbs dynamically via __getattr__
-// at runtime. C++ has no __getattr__ / method_missing analog, so that dynamic
-// dispatch is intentionally NOT ported — the explicit verb helpers below cover
-// the reference's named verb methods (answer/hangup/ai/play/say), matching the
-// enumerated method surface.
+// The builder exposes explicit helpers for answer / hangup / ai / play / say.
+// Any other schema verb is added through the underlying ``swml::Service``,
+// reachable via ``service()``.
 
 #pragma once
 

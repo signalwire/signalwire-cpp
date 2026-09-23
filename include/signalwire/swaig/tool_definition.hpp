@@ -18,9 +18,8 @@ struct ToolDefinition {
   std::string description;
   json parameters;  // JSON schema for parameters
   ToolHandler handler;
-  /// Whether this tool requires SWAIG token validation. Defaults to TRUE
-  /// fleet-wide (reference: ``tool_mixin.define_tool(secure=True)``) — a tool
-  /// defined without an explicit ``secure`` is SECURE, so its rendered webhook
+  /// Whether this tool requires SWAIG token validation. Defaults to TRUE — a
+  /// tool defined without an explicit ``secure`` is SECURE, so its rendered webhook
   /// carries the per-tool ``__token`` and its dispatch validates it. Defaulting
   /// this to false would silently ship every tool unauthenticated.
   bool secure = true;

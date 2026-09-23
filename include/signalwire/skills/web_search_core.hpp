@@ -4,7 +4,7 @@
 
 // Shared core for the web_search skill's latency-control + result formatting.
 //
-// Ports Python signalwire/skills/web_search/skill.py (51101da + 295745b):
+// The latency-control knobs:
 //   per_page_timeout  — per-page fetch timeout (the HTTP client's per-request
 //                       timeout). Default 2.0s.
 //   overall_deadline  — wall-clock budget for the whole tool call, enforced
@@ -86,7 +86,7 @@ struct LatencyParams {
 /// Format Google CSE snippets without fetching the underlying pages. Used for
 /// the `snippets_only` fast path AND as the graceful fallback when scraping is
 /// abandoned by the overall_deadline. Always non-empty when there is at least
-/// one candidate. Mirrors Python's `_format_snippet_results`.
+/// one candidate.
 [[nodiscard]] inline std::string format_snippet_results(const std::string& query,
                                                         const std::vector<Candidate>& cands,
                                                         int num_results) {
@@ -281,7 +281,7 @@ struct LatencyParams {
 /// returned zero items" (return empty_no_items_message) from "CSE returned
 /// items but none scraped" (snippet fallback).
 ///
-/// Steps mirror Python's search_and_scrape_best:
+/// Steps, in order:
 ///   1. snippets_only       -> format CSE snippets directly.
 ///   2. scrape under deadline.
 ///   3. no scraped survivors -> snippet fallback (non-empty).
@@ -334,8 +334,7 @@ struct LatencyParams {
 }
 
 /// Build the parameter-schema fragment advertising the 6 latency / response
-/// params. Merged into each skill's get_parameter_schema(). Mirrors Python's
-/// get_parameter_schema entries (295745b) and the Go reference port.
+/// params. Merged into each skill's get_parameter_schema().
 [[nodiscard]] inline json schema_fragment() {
   return json::object(
       {{"response_prefix",

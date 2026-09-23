@@ -13,9 +13,8 @@ namespace relay {
 /// `std::string` for their `gender` argument. The enum gives editor
 /// autocompletion and makes a typo fail at the call site — a bare string
 /// like `"femaie"` only fails at runtime, on the TTS engine. The string
-/// overload matches the Python reference (which uses a bare
-/// `Optional[str]`) and still allows engine-/voice-specific values that
-/// aren't one of the two canonical genders.
+/// overload keeps the set open, so engine-/voice-specific values that aren't
+/// one of the two canonical genders stay expressible.
 ///
 ///     call.play_tts("hi", "en-US", Gender::Female);  // typed, autocompleted
 ///     call.play_tts("hi", "en-US", "female");        // string still works

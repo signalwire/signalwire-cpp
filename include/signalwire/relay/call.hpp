@@ -53,18 +53,17 @@ class Call {
   const std::string& from() const { return s_->from; }
   const std::string& to() const { return s_->to; }
   const std::string& tag() const { return s_->tag; }
-  /// reference: ``self.project_id`` — the SignalWire project the call belongs
-  /// to (from the inbound event's ``project_id``, else the client's project).
+  /// The SignalWire project the call belongs to (from the inbound event's
+  /// ``project_id``, else the client's project).
   const std::string& project_id() const { return s_->project_id; }
-  /// reference: ``self.context`` — the RELAY context the call arrived on
-  /// (the connect-issued protocol, else the event's ``context``/``protocol``).
+  /// The RELAY context the call arrived on (the connect-issued protocol, else
+  /// the event's ``context``/``protocol``).
   const std::string& context() const { return s_->context; }
-  /// reference: ``self.segment_id`` — the call segment identifier, empty when
-  /// the server did not report one.
+  /// The call segment identifier, empty when the server did not report one.
   const std::string& segment_id() const { return s_->segment_id; }
-  /// reference: ``self.device`` — the raw device descriptor object from the
-  /// inbound event (``{type, params:{from_number,to_number,…}}``); an empty
-  /// object when absent, matching the reference's ``device or {}``.
+  /// The raw device descriptor object from the inbound event
+  /// (``{type, params:{from_number,to_number,…}}``); an empty object when
+  /// absent.
   const json& device() const { return s_->device; }
 
   bool is_answered() const { return s_->state == CALL_STATE_ANSWERED; }
@@ -95,8 +94,6 @@ class Call {
   Action play_ringtone(const std::string& name, double duration = -1.0, double volume = 0.0);
   Action record(const json& params = json::object(), const std::string& control_id = "");
   Action record_call(const json& params = json::object());
-  Action prompt(const json& play_media, const json& collect_params,
-                const std::string& control_id = "");
   Action play_and_collect(const json& play_media, const json& collect_params,
                           const std::string& control_id = "");
   // Typed prompt convenience wrappers (mirror Python's prompt_tts/
@@ -116,10 +113,8 @@ class Call {
   /// Bridge the call to one or more destinations. ``devices`` is the nested
   /// serial/parallel device array; ``options`` carries the optional bridge
   /// knobs (``ringback``, ``tag``, ``max_duration``, ``max_price_per_minute``,
-  /// ``status_url``, or any extra) merged into the ``calling.connect`` frame —
-  /// Corresponds to ``Call.connect(devices, *, ringback=…, tag=…,
-  /// max_duration=…, **kwargs)``. Without ``options`` these knobs never reached
-  /// the wire.
+  /// ``status_url``, or any extra) merged into the ``calling.connect`` frame.
+  /// Without ``options`` these knobs never reach the wire.
   Action connect(const json& devices, const json& options = json::object());
   Action disconnect();
   Action detect(const json& params, const std::string& control_id = "");
@@ -182,8 +177,17 @@ class Call {
   /// Disable denoise on the call (calling.denoise.stop).
   Action denoise_stop();
   /// Bind a digit sequence to a method (calling.bind_digit).
+  ///
+  /// ``bind_params`` is emitted under the nested WIRE key ``params``
+  /// (``params["params"] = bind_params``). Every other knob this method offers
+  /// is spelled identically on the API and the wire, so the trailing options
+  /// bag carries them verbatim; ``bind_params`` is the one that needs its own
+  /// parameter, because a caller who put it in the bag would ship it under the
+  /// wrong wire key. Bag keys still ride through. The bag stays in its existing
+  /// 3rd position so the current call shape keeps its meaning.
   Action bind_digit(const std::string& digits, const std::string& bind_method,
-                    const json& params = json::object());
+                    const json& params = json::object(),
+                    const std::optional<json>& bind_params = std::nullopt);
   /// Clear digit bindings, optionally scoped to a realm
   /// (calling.clear_digit_bindings).
   Action clear_digit_bindings(const std::string& realm = "");
@@ -192,36 +196,41 @@ class Call {
   /// Leave a queue (calling.queue.leave).
   Action queue_leave(const std::string& queue_name, const json& params = json::object());
   /// Leave the current conference (calling.leave_conference).
-  Action leave_conference(const std::string& conference_id = "");
+  /// ``conference_id`` is REQUIRED — it has no default and is always sent.
+  Action leave_conference(const std::string& conference_id);
   /// Leave the current room (calling.leave_room).
   Action leave_room();
   /// AI helpers.
   Action ai_hold(const json& params = json::object());
   Action ai_unhold(const json& params = json::object());
   Action ai_message(const json& params = json::object());
-  /// Start Amazon Bedrock AI on the call. RULES §4: calling.ai + a Bedrock
-  /// engine routes to a DEDICATED `calling.amazon_bedrock` RPC, so this
-  /// emits that wire method rather than `calling.ai`.
-  Action amazon_bedrock(const json& params = json::object());
-  /// Pass on an inbound call offer (calling.pass). Named `pass_` because
-  /// `pass` is not a C++ keyword but the reserved-word rename convention is
-  /// applied for cross-language consistency (wire method stays `pass`).
+  /// Start Amazon Bedrock AI on the call. A Bedrock engine routes to a
+  /// DEDICATED `calling.amazon_bedrock` RPC, so this emits that wire method
+  /// rather than `calling.ai`.
+  ///
+  /// ``ai_params`` is emitted under the nested WIRE key ``params``
+  /// (``params["params"] = ai_params``); same reason as
+  /// ``bind_digit(bind_params)``. Every other knob is spelled the same on the
+  /// API and the wire and rides in the leading bag, which stays FIRST so the
+  /// existing single-argument call shape keeps its meaning.
+  Action amazon_bedrock(const json& params = json::object(),
+                        const std::optional<json>& ai_params = std::nullopt);
+  /// Pass on an inbound call offer (calling.pass). Named `pass_` by the
+  /// SDK-wide reserved-word rename convention; the wire method stays `pass`.
   Action pass_();
 
   // Event handling
   void on_event(CallEventHandler handler);
-  /// Register an event handler (Python/Java `on`). Alias of on_event — the
-  /// unified name the reference exposes.
+  /// Register an event handler. Alias of on_event.
   void on(CallEventHandler handler) { on_event(std::move(handler)); }
   /// Block until the call reaches `target_state` (one of the
   /// CALL_STATE_* values), returning true on reaching it (or already at/past
-  /// it) and false on timeout. Python/Java `wait_for`. Backed by the same
-  /// lifecycle-rank machinery as wait_for_answered/ringing/ending.
+  /// it) and false on timeout. Backed by the same lifecycle-rank machinery as
+  /// wait_for_answered/ringing/ending.
   /// [[nodiscard]] for the same reason as those: ignoring reached-vs-timeout
   /// is always a bug.
   [[nodiscard]] bool wait_for(const std::string& target_state, int timeout_ms = 0);
-  /// Python `__repr__` — a compact debug string `Call(id=..., state=...,
-  /// direction=...)`. Named `repr()` (the reserved-name rename of the dunder).
+  /// A compact debug string `Call(id=..., state=..., direction=...)`.
   [[nodiscard]] std::string repr() const;
   // [[nodiscard]]: the return value is the whole point of a wait — it tells
   // you whether the call actually reached the terminal state vs. timed out.
@@ -277,6 +286,29 @@ class Call {
   // collect-only resolution. Backs prompt_tts/prompt_audio.
   Action prompt_with_media(const json& media, const json& collect, double volume);
 
+  /// The state a `Call` and all of its copies share.
+  ///
+  /// Like `Action`, `Call` is a copyable value whose copies must observe the
+  /// same leg, so the real state sits behind a `shared_ptr`.
+  ///
+  /// It holds the leg's wire identity and metadata (`call_id`/`node_id`,
+  /// `state`, `direction`, `from`/`to`, `tag`, plus `project_id`,
+  /// `context`, `segment_id`, and `device`), a NON-OWNING `client` back-pointer for
+  /// sending frames, and three pieces of concurrency machinery:
+  ///
+  ///   * `event_handlers` + `handlers_mutex` — `on_event()` mutates the vector
+  ///     from the user thread while `dispatch_event()` iterates it from the
+  ///     WebSocket reader thread, so the mutex is load-bearing, not defensive.
+  ///   * `actions` + `actions_mutex` — the in-flight action registry, keyed by
+  ///     `control_id`. It stores `Action` BY VALUE: an `Action` keeps its state
+  ///     in a `shared_ptr`, so the stored copy shares state with the caller's
+  ///     copy and resolving one resolves both. Storing a raw `Action*` dangled
+  ///     as soon as the caller's stack-local went out of scope.
+  ///   * `ended_mutex` + `ended_cv` + `state_cv` — the wait rendezvous.
+  ///     `state_cv` is notified on EVERY state transition, not only on `ended`,
+  ///     which is what lets `wait_for_answered`/`ringing`/`ending` wake on
+  ///     intermediate states; both condition variables are guarded by
+  ///     `ended_mutex`, which already serialises `state`.
   struct SharedState {
     std::string call_id;
     std::string node_id;

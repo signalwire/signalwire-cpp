@@ -10,10 +10,10 @@
 #include "signalwire/rest/request_options.hpp"
 
 // Hand-written base hierarchy for the GENERATED REST resource layer
-// (include/signalwire/rest/namespaces/generated/*.hpp). Mirrors Python's
-// signalwire/rest/_base.py: BaseResource (bare receiver), ReadResource
-// (list/get), CrudResource (list/create/get/update/delete with a per-resource
-// update verb), FabricResource (CrudResource + list_addresses). Each generated
+// (include/signalwire/rest/namespaces/generated/*.hpp): BaseResource (bare
+// receiver), ReadResource (list/get), CrudResource (list/create/get/update/
+// delete with a per-resource update verb), FabricResource (CrudResource +
+// list_addresses). Each generated
 // resource class EXTENDS one of these and supplies only its resource-specific
 // operation / command / set_* / sub-collection methods; the shared CRUD verbs
 // live here so the emitted headers stay thin.
@@ -46,7 +46,7 @@ class BaseResource {
   std::string base_path_;
 };
 
-/// Read-only resource: ``list`` + ``get`` (Python ReadResource).
+/// Read-only resource: ``list`` + ``get``.
 class ReadResource : public BaseResource {
  public:
   ReadResource(const HttpClient& client, const std::string& base_path)
@@ -58,7 +58,7 @@ class ReadResource : public BaseResource {
   }
   /// Iterate every item across all pages of this resource's list endpoint.
   ///
-  /// Mirrors Python's ``ReadResource.paginate``: ``list()`` returns a single
+  /// ``list()`` returns a single
   /// raw page; ``paginate()`` returns a ``PaginatedIterator`` that walks
   /// ``resp["data"]`` and follows ``resp["links"]["next"]`` so callers page
   /// through a list endpoint without hand-building the token loop.
@@ -78,8 +78,8 @@ class ReadResource : public BaseResource {
   }
 };
 
-/// Full CRUD resource (Python CrudResource). The update verb (PUT vs PATCH) is
-/// baked in at construction, mirroring Python's ``_update_method``.
+/// Full CRUD resource. The update verb (PUT vs PATCH) is baked in at
+/// construction and defaults to PATCH.
 class CrudResource : public BaseResource {
  public:
   CrudResource(const HttpClient& client, const std::string& base_path,
@@ -103,8 +103,8 @@ class CrudResource : public BaseResource {
     return (update_method_ == "PUT") ? client_.put(base_path_ + "/" + id, data, request_options)
                                      : client_.patch(base_path_ + "/" + id, data, request_options);
   }
-  /// ``delete_`` — ``delete`` is a C++ keyword; the enumerator renames this to
-  /// the canonical ``delete`` (reserved-word rename, wire verb DELETE preserved).
+  /// ``delete_`` carries a trailing underscore because ``delete`` is a C++
+  /// keyword. The HTTP verb sent is DELETE.
   [[nodiscard]] json delete_(const std::string& id,
                              const RequestOptions& request_options = {}) const {
     return client_.del(base_path_ + "/" + id, request_options);
@@ -114,11 +114,11 @@ class CrudResource : public BaseResource {
   std::string update_method_;
 };
 
-/// Fabric resource: CRUD + the ``list_addresses`` sub-collection (Python
-/// FabricResource / CrudWithAddresses). The base ``list_addresses`` hangs off
-/// this resource's own base path; the four sibling-path fabric subclasses
-/// (CallFlows / ConferenceRooms / CxmlApplications / GenericResources) override
-/// it with their singularised sub-path in the generated header (L12).
+/// Fabric resource: CRUD + the ``list_addresses`` sub-collection. The base
+/// ``list_addresses`` hangs off this resource's own base path; the four
+/// sibling-path fabric subclasses (CallFlows / ConferenceRooms /
+/// CxmlApplications / GenericResources) override it with their singularised
+/// sub-path in the generated header.
 class FabricResource : public CrudResource {
  public:
   FabricResource(const HttpClient& client, const std::string& base_path,

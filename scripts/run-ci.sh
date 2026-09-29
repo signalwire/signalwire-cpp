@@ -679,7 +679,7 @@ run_gate "PUBLIC-JARGON" "no internal porting jargon leaked into public doc comm
 # and asserts the client speaks the AI Chat JSON-RPC protocol per the vendored spec
 # (ai-chat-specs/ai-chat.yaml). The gate script (diff_port_ai_chat.py) + mock live
 # on the porting-sdk `ai-chat-client` branch, so during the coordinated pass
-# PORTING_SDK_REF pins that branch and the gate runs; on plain main it skip-passes
+# the .porting-sdk-ref pin selects that branch and the gate runs; on plain main it skip-passes
 # until the branch merges. The dump binary is built by the TEST gate; resolve its
 # path per BUILD_MODE exactly like the other dump gates (host binary / docker exec /
 # throwaway docker run that rebuilds it).
@@ -735,7 +735,7 @@ run_gate "WIRED-MODES" "load-bearing run-ci modes present (WIRED_MODES.md merge-
 # up via --write-floor. BLOCKING: every public class carries a doxygen header, so any
 # new undocumented one is a real regression and must red the run, not merely be noted.
 # The skip-with-pass guard is GONE. It existed for when doc_surface.py lived only on a
-# porting-sdk plan branch; the script is on the pinned PORTING_SDK_REF now, so the branch is
+# porting-sdk plan branch; the script is on the pinned .porting-sdk-ref branch now, so the branch is
 # dead — and a MISSING gate script must FAIL, not pass. Guarding it made "BLOCKING" above a
 # lie: a path typo or a bad checkout would have disabled the gate under a green tick.
 run_gate "DOC-SURFACE" "public doc-comment coverage floor (.doc_surface_floor ratchet; 100% — blocking)" \

@@ -200,3 +200,21 @@ TEST(skill_spider_live_impl_is_the_builtin_and_strips_script_and_nav) {
   ASSERT_TRUE(resp.find("VISIBLE BODY") != std::string::npos);
   return true;
 }
+
+// SSRF protection (signalwire-python skills/spider/skill.py): a caller-supplied
+// URL on a private or internal address is refused before any fetch, unless
+// SWML_ALLOW_PRIVATE_URLS is set.
+TEST(skill_spider_refuses_private_urls) {
+  ::unsetenv("SPIDER_BASE_URL");
+  ::unsetenv("SWML_ALLOW_PRIVATE_URLS");
+  auto skill = sw_skills::SkillRegistry::instance().create("spider");
+  ASSERT_TRUE(skill->setup(json::object()));
+  auto tools = skill->register_tools();
+  for (const auto& tool : tools) {
+    std::string arg = tool.name.find("crawl") != std::string::npos ? "start_url" : "url";
+    auto result = tool.handler(json::object({{arg, "http://127.0.0.1:9/admin"}}), json::object());
+    ASSERT_EQ(result.to_json()["response"].get<std::string>(),
+              std::string("URL rejected: cannot access private or internal URLs"));
+  }
+  return true;
+}

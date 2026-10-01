@@ -453,6 +453,15 @@ def _translate_sdk_class_ref(t: str) -> str:
     # the post-build _project_callable_shape pass instead.
     if name in CALLBACK_TYPEDEFS_AS_CALLABLE:
         return "class:Callable"
+    # ``signalwire::server::Router`` — the mountable route set ChatGateway /
+    # HandoffRouter ``router()`` return and AgentBase::mount takes. Python's
+    # routers return a FastAPI ``APIRouter`` (the app includes it under a
+    # prefix); the C++ unit with the same capability is a callable that
+    # registers the routes on an httplib::Server under a prefix. Same role,
+    # cpp-httplib's idiom (the as_router/HostAppRouter reconciliation's
+    # sibling), so it records as the reference's class.
+    if name == "Router" and ns_path.endswith("server"):
+        return "class:APIRouter"
     # Walk progressively-shorter namespace prefixes so we also catch the
     # case where libclang emits the class spelling as
     # ``signalwire::rest::RestClient::AddressesNamespace`` — the rename
@@ -1784,10 +1793,22 @@ def collect(
     # trailing defaulted parameter with the SAME default. Record them in the
     # reference's shape: (module, class or None for a free function, method) ->
     # {param: default as the reference records it}.
+    _KEEP = object()  # keyword-only, but keep the recorded default/required-ness
     _KEYWORD_ONLY_TRAILING = {
         ("signalwire.core.mixins.web_mixin", "WebMixin", "mount"): {
             "prefix": "",
             "name": None,
+        },
+        ("signalwire.ai_chat.gateway", "ChatGateway", "prepare"): {
+            "origin": _KEEP,
+            "key": _KEEP,
+        },
+        ("signalwire.ai_chat.handoff", "HandoffRouter", "register"): {
+            "conversation_id": _KEEP,
+            "call_id": None,
+        },
+        ("signalwire.core.post_prompt", None, "dialogue_turns"): {
+            "drop_echo": None,
         },
     }
     for (_kmod, _kcls, _kmeth), _kparams in _KEYWORD_ONLY_TRAILING.items():
@@ -1800,7 +1821,8 @@ def collect(
         for _kp in (_ksig or {}).get("params", []):
             if _kp.get("name") in _kparams:
                 _kp["kind"] = "keyword"
-                _kp["default"] = _kparams[_kp["name"]]
+                if _kparams[_kp["name"]] is not _KEEP:
+                    _kp["default"] = _kparams[_kp["name"]]
 
     # ``HttpClient`` per-call ``headers``: the reference takes it KEYWORD-ONLY
     # (``get(path, params=None, request_options=None, *, headers=None)``). C++ has no
@@ -1957,6 +1979,12 @@ def collect(
         out_modules,
         "signalwire.core.post_prompt",
         PORT_ROOT / "include" / "signalwire" / "core" / "post_prompt.hpp",
+    )
+    # NonceEntry (signalwire.ai_chat.handoff): the reference @dataclass's fields.
+    _project_named_struct_getters(
+        out_modules,
+        "signalwire.ai_chat.handoff",
+        PORT_ROOT / "include" / "signalwire" / "ai_chat" / "handoff.hpp",
     )
 
     sorted_modules = {}
@@ -2637,6 +2665,9 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
     for _m in ("create_conversation", "chat", "end", "log", "summarize"):
         _need(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
     _need(r"\bbool\s+del\s*\(", "AIChatClient::del (reference delete)")
+    _need(
+        r"\bint\s+raw_post\s*\(", "AIChatClient::raw_post (streams the body to a sink)"
+    )
     _need(r"\bvoid\s+close\s*\(", "AIChatClient::close (folds reference close)")
     # The class-B2 ctor-param reads the projection emits below.
     _need(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference self.url)")
@@ -2738,6 +2769,20 @@ def _project_ai_chat_signatures(out_modules: dict) -> None:
         # PROTOCOL dunders have no snake_case-nameable C++ member (surface
         # PORT_OMISSIONS impossible:, TS/PHP/perl/dotnet fleet-consistent).
         "close": {"params": [_self()], "returns": "void"},
+        # raw_post: the reference is an async context manager YIELDING the
+        # response with its body unread (iterate resp.content). C++ has no
+        # async generator; the same capability -- the body handed over chunk by
+        # chunk as it arrives, unbuffered -- is a trailing sink callback
+        # (RawPostChunkHandler) and the HTTP status as the return. Same call
+        # (method, params), idiomatic delivery of the stream.
+        "raw_post": {
+            "params": [
+                _self(),
+                _p("method", "string", True),
+                _p("params", "dict<string,any>", True),
+            ],
+            "returns": "any",
+        },
         # url: the reference's `self.url` — a public __init__ attribute that is
         # ALSO a ctor param, recorded by the oracle's class-B2 rule. The C++
         # `url()` const getter is that attribute's read.

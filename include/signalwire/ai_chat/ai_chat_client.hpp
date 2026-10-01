@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -189,6 +191,9 @@ struct AIChatClientOptions {
 
 // ── Client ───────────────────────────────────────────────────────────
 
+/// Receives a streamed response body chunk by chunk; return false to stop.
+using RawPostChunkHandler = std::function<bool(const char* data, size_t length)>;
+
 /// Synchronous client for the SignalWire AI Chat service.
 ///
 /// Speaks the standard SignalWire front-door protocol: HTTP Basic
@@ -245,6 +250,17 @@ class AIChatClient {
 
   /// Return the full message history plus the call timeline.
   ChatLog log(const std::string& conversation_id);
+
+  /// Send one JSON-RPC call and hand the response body to ``on_chunk`` as it
+  /// arrives, unread and unbuffered -- for proxies that must stream the body
+  /// through. The service pads a slow response with keepalive whitespace so
+  /// intermediaries do not sever the connection mid-turn; a proxy that awaits
+  /// the whole body absorbs that padding and reintroduces the timeout it exists
+  /// to prevent. ``on_chunk`` returns false to stop reading. The caller owns
+  /// interpreting the result -- including that a JSON-RPC error arrives under
+  /// HTTP 200. Returns the HTTP status; throws AIChatError when no response
+  /// arrives. Prefer the typed methods unless you are relaying bytes.
+  int raw_post(const std::string& method, const json& params, const RawPostChunkHandler& on_chunk);
 
   /// Return an AI summary of the conversation (rate limited server-side).
   ///

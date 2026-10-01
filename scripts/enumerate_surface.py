@@ -87,6 +87,11 @@ def _resolve_psdk() -> Path:
 CLASS_MODULE_MAP: dict[str, str] = {
     # -- agent ------------------------------------------------------------
     "AgentBase": "signalwire.core.agent_base",
+    # -- ai_chat browser-facing routers (ai_chat/gateway.py, handoff.py) ----
+    "ChatGateway": "signalwire.ai_chat.gateway",
+    "GatewayRejection": "signalwire.ai_chat.gateway",
+    "HandoffRouter": "signalwire.ai_chat.handoff",
+    "NonceEntry": "signalwire.ai_chat.handoff",
     # -- pom --------------------------------------------------------------
     # PromptObjectModel has no name conflict; Section does (swml::Section).
     # PromptObjectModel can use the simple class-name map; Section is
@@ -519,7 +524,12 @@ def _is_generated_type_ns(ns_path: str) -> bool:
 # specific signature).
 CALLBACK_TYPEDEFS_AS_CALLABLE: set[str] = {
     "CallEndHandler",
+    "CaptureLeg",
     "DebugEventCallback",
+    "EndCall",
+    "NextConversationId",
+    "RawPostChunkHandler",
+    "SendMessage",
     "DynamicConfigCallback",
     "SummaryCallback",
 }
@@ -1397,6 +1407,7 @@ _AI_CHAT_CLIENT_METHODS = [
     "delete",
     "end",
     "log",
+    "raw_post",
     "summarize",
     "url",
 ]
@@ -1442,6 +1453,9 @@ def _project_ai_chat(modules: dict, repo: Path) -> None:
     for _m in ("create_conversation", "chat", "end", "log", "summarize"):
         _require(rf"\b{_m}\s*\(", f"AIChatClient::{_m}")
     _require(r"\bbool\s+del\s*\(", "AIChatClient::del (reference ``delete``)")
+    _require(
+        r"\bint\s+raw_post\s*\(", "AIChatClient::raw_post (streams the body to a sink)"
+    )
     # The ctor-param reads the oracle's class-B2 rule records.
     _require(r"\burl\s*\(\s*\)\s*const", "AIChatClient::url (reference ``self.url``)")
 
@@ -2507,6 +2521,9 @@ def _project_post_prompt_fields(modules: dict, repo: Path) -> None:
     spells the normalized leg as a frozen @dataclass, C++ as an aggregate."""
     header = repo / "include/signalwire/core/post_prompt.hpp"
     _emit_oracle_gated_fields(modules, "signalwire.core.post_prompt", header)
+    # NonceEntry: the reference @dataclass's fields (signalwire.ai_chat.handoff).
+    header = repo / "include/signalwire/ai_chat/handoff.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.ai_chat.handoff", header)
 
 
 def build_native_names(include_dir: Path) -> dict:

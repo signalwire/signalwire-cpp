@@ -328,6 +328,8 @@ Guides are also available in the [`docs/`](docs/) directory:
 | `SIGNALWIRE_PROJECT_ID` | RELAY, REST | Project identifier |
 | `SIGNALWIRE_API_TOKEN` | RELAY, REST | API token |
 | `SIGNALWIRE_PERSONAL_ACCESS_TOKEN` | REST | Personal Access Token (`pat_...`) for the Space Administration API (`client.space()`); may stand in for the project/token pair on a space-administration-only client |
+| `SIGNALWIRE_CHAT_GATEWAY_KEY` | AI Chat | Publishable key a browser presents to `ai_chat::ChatGateway` when the gateway is constructed without one (otherwise a `pk_...` key is generated) |
+| `SIGNALWIRE_CHAT_GATEWAY_SECRET` | AI Chat | HMAC key `ai_chat::ChatGateway` signs conversation handles with when constructed without one (otherwise random per process, so handles stop verifying across restarts and replicas) |
 | `SIGNALWIRE_JWT_TOKEN` | RELAY | JWT for RELAY auth. An **alternative** to the project/token pair, not an addition — when set (or `jwt_token` is passed), the connect frame authenticates with the JWT alone and `SIGNALWIRE_PROJECT_ID` / `SIGNALWIRE_API_TOKEN` are not required. |
 | `SIGNALWIRE_SPACE` | RELAY, REST | Space hostname (e.g. `example.signalwire.com`) |
 | `SWML_BASIC_AUTH_USER` | Agents | Basic auth username (default: auto-generated) |

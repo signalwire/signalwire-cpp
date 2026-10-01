@@ -342,6 +342,14 @@ target_link_libraries(envelope_dump signalwire)
 # (MOCK_AI_CHAT_URL) and prints ONE JSON object to stdout.
 add_executable(ai_chat_dump tools/ai_chat_dump.cpp)
 target_link_libraries(ai_chat_dump signalwire)
+
+# ai_chat_gateway_dump — the AI-CHAT-GATEWAY gate's dump program
+# (porting-sdk/scripts/diff_port_ai_chat_gateway.py). Serves ChatGateway +
+# HandoffRouter on a loopback ephemeral port against mock_ai_chat
+# (MOCK_AI_CHAT_URL), runs the shared ai_chat_gateway_corpus steps and prints
+# ONE JSON object to stdout.
+add_executable(ai_chat_gateway_dump tools/ai_chat_gateway_dump.cpp)
+target_link_libraries(ai_chat_gateway_dump signalwire)
 target_include_directories(envelope_dump PRIVATE ${CMAKE_SOURCE_DIR}/tests)
 target_compile_definitions(envelope_dump PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 

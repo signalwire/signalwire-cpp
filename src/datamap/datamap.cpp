@@ -103,11 +103,11 @@ DataMap& DataMap::params(const json& data) {
   return *this;
 }
 
-DataMap& DataMap::body(const json& data) {
+DataMap& DataMap::body(const std::map<std::string, json>& data) {
   if (webhooks_.empty()) {
     throw std::runtime_error("Must add webhook before setting body");
   }
-  webhooks_.back()["params"] = data;
+  webhooks_.back()["params"] = json(data);
   return *this;
 }
 

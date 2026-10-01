@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ b6fcd7b22508ce34f0fa25a7fc37a8e9f30ad2ba",
+  "generated_from": "signalwire-cpp @ 92b2a842ffee84269d62d522fb2a503b824d0639",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -83,6 +83,7 @@
           "delete",
           "end",
           "log",
+          "raw_post",
           "summarize",
           "url"
         ],
@@ -113,6 +114,67 @@
         "ConversationNotFoundError": [],
         "RateLimitError": [],
         "SummaryError": []
+      },
+      "functions": []
+    },
+    "signalwire.ai_chat.gateway": {
+      "classes": {
+        "ChatGateway": [
+          "__init__",
+          "allowed_origins",
+          "check_key",
+          "check_origin",
+          "close",
+          "config_url",
+          "conversation_timeout",
+          "effective_timeout",
+          "handle_ttl",
+          "key",
+          "last_activity",
+          "max_new_conversations",
+          "max_turns",
+          "mint_handle",
+          "prepare",
+          "read_handle",
+          "read_user_metadata",
+          "router",
+          "visible_messages",
+          "window_seconds"
+        ],
+        "GatewayRejection": [
+          "__init__",
+          "reason",
+          "status"
+        ]
+      },
+      "functions": []
+    },
+    "signalwire.ai_chat.handoff": {
+      "classes": {
+        "HandoffRouter": [
+          "__init__",
+          "capture_leg",
+          "capture_timeout",
+          "end_call",
+          "escalate",
+          "gateway",
+          "max_messages_per_call",
+          "next_conversation_id",
+          "nonce_ttl",
+          "redeem",
+          "register",
+          "router",
+          "say",
+          "send_message"
+        ],
+        "NonceEntry": [
+          "__init__",
+          "call_id",
+          "conversation_id",
+          "issued_at",
+          "messages",
+          "redeemed"
+        ]
       },
       "functions": []
     },

@@ -223,6 +223,7 @@ static std::vector<TestCase>& get_tests() {
 // canonical route, superseding the hand-written test_rest_full_coverage.cpp.
 // Regenerate with scripts/generate_rest_tests.py; GEN-FRESH-TESTS gated.
 #include "test_agent_call_end_mount.cpp"
+#include "test_ai_chat_gateway.cpp"
 #include "test_capabilities.cpp"
 #include "test_post_prompt_normalize.cpp"
 #include "test_rest_generated_calling.cpp"

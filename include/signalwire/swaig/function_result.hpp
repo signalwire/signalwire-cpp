@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -433,7 +434,8 @@ class FunctionResult {
                                  std::optional<json> global_data = std::nullopt);
   /// Merge `data` into another call's global_data, with no conversation turn
   /// (rpc_ai_message with only global_data).
-  FunctionResult& rpc_ai_global_data(const std::string& call_id, const json& data);
+  FunctionResult& rpc_ai_global_data(const std::string& call_id,
+                                     const std::map<std::string, json>& data);
   FunctionResult& rpc_ai_unhold(const std::string& call_id);
 
   // ========================================================================

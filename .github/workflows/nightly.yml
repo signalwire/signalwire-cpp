@@ -260,6 +260,12 @@ jobs:
           pip install -e porting-sdk/test_harness/mock_relay
           pip install -e porting-sdk/test_harness/mock_signalwire
 
+      # The AI-CHAT-GATEWAY gate's reference dump (porting-sdk
+      # ai_chat_gateway_dump_reference.py) drives signalwire-python's routers over
+      # httpx's ASGI transport, so httpx must be importable.
+      - name: Install the AI-CHAT-GATEWAY reference dump's HTTP client (httpx)
+        run: pip install httpx
+
       - name: Install signalwire-python (EMISSION oracle) if not importable
         run: |
           if python -c "import signalwire.core.function_result" 2>/dev/null; then

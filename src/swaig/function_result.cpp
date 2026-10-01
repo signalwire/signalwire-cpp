@@ -772,8 +772,9 @@ FunctionResult& FunctionResult::rpc_ai_message(const std::string& call_id,
   return execute_rpc("ai_message", params, call_id);
 }
 
-FunctionResult& FunctionResult::rpc_ai_global_data(const std::string& call_id, const json& data) {
-  return rpc_ai_message(call_id, std::nullopt, "system", data);
+FunctionResult& FunctionResult::rpc_ai_global_data(const std::string& call_id,
+                                                   const std::map<std::string, json>& data) {
+  return rpc_ai_message(call_id, std::nullopt, "system", json(data));
 }
 
 FunctionResult& FunctionResult::rpc_ai_unhold(const std::string& call_id) {

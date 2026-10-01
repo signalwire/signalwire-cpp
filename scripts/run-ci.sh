@@ -256,14 +256,14 @@ test_gate() {
             cmake --build build --target emit_corpus emit_skills \
                 wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump \
                 pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump \
-                secure_default_dump secret_scrub_dump token_interop_mint -j"$(sw_build_jobs)" || return 1
+                secure_default_dump secret_scrub_dump token_interop_mint ai_chat_gateway_dump -j"$(sw_build_jobs)" || return 1
             bash "$PORT_ROOT/scripts/run-tests.sh"
             ;;
         exec:*)
             local c="${BUILD_MODE#exec:}"
             docker exec "$c" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint ai_chat_gateway_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         run:*)
@@ -272,7 +272,7 @@ test_gate() {
             # adjacency walk) and use --network host to reach host-run mocks.
             docker run --rm --network host -v "$(dirname "$PORT_ROOT")":/src "$img" bash -c "
                 cmake -S '$SWCPP_CONTAINER_REPO' -B '$SWCPP_CONTAINER_BUILD' -DCMAKE_BUILD_TYPE=Release \
-                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint -j\"\$(nproc)\" \
+                && cmake --build '$SWCPP_CONTAINER_BUILD' --target run_tests emit_corpus emit_skills wire_dump swml_dump strict_render_dump state_dump http_dump wire_relay_dump doc_wire_dump pagination_dump relay_liveness_dump wait_liveness_dump ai_chat_dump secure_default_dump secret_scrub_dump token_interop_mint ai_chat_gateway_dump -j\"\$(nproc)\" \
                 && '$SWCPP_CONTAINER_BUILD/run_tests'"
             ;;
         *)
@@ -720,6 +720,38 @@ ai_chat_gate() {
 }
 run_gate "AI-CHAT" "AIChatClient speaks the AI Chat protocol per the vendored spec (mock_ai_chat wire-behavioral)" \
     ai_chat_gate
+
+# AI-CHAT-GATEWAY: the browser-facing half. Drives build/ai_chat_gateway_dump
+# (ChatGateway + HandoffRouter served on a loopback port against mock_ai_chat)
+# through the shared ai_chat_gateway_corpus and compares every answer, callback
+# and chat-service request with signalwire-python's own routers. The dump emits
+# every step, so --require-all. The binary is built by the TEST gate.
+ai_chat_gateway_gate() {
+    if [ ! -f "$PORTING_SDK_DIR/scripts/diff_port_ai_chat_gateway.py" ]; then
+        echo "[ai-chat-gateway] diff_port_ai_chat_gateway.py not on this porting-sdk checkout — skip-pass"
+        return 0
+    fi
+    case "$BUILD_MODE" in
+        host)
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat_gateway.py" --port cpp --require-all \
+                --dump-cmd "$PORT_ROOT/build/ai_chat_gateway_dump"
+            ;;
+        exec:*)
+            local c="${BUILD_MODE#exec:}"
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat_gateway.py" --port cpp --require-all \
+                --dump-cmd "docker exec -e MOCK_AI_CHAT_URL -e SIGNALWIRE_PROJECT_ID -e SIGNALWIRE_API_TOKEN $c $SWCPP_CONTAINER_BUILD/ai_chat_gateway_dump"
+            ;;
+        run:*)
+            local img="${BUILD_MODE#run:}"
+            python3 "$PORTING_SDK_DIR/scripts/diff_port_ai_chat_gateway.py" --port cpp --require-all \
+                --dump-cmd "docker run --rm --network host -e MOCK_AI_CHAT_URL -e SIGNALWIRE_PROJECT_ID -e SIGNALWIRE_API_TOKEN -v $(dirname "$PORT_ROOT"):/src $img bash -c 'cmake -S $SWCPP_CONTAINER_REPO -B $SWCPP_CONTAINER_BUILD -DCMAKE_BUILD_TYPE=Release >&2 && cmake --build $SWCPP_CONTAINER_BUILD --target ai_chat_gateway_dump -j\"\$(nproc)\" >&2 && $SWCPP_CONTAINER_BUILD/ai_chat_gateway_dump'"
+            ;;
+        *)
+            echo "unknown BUILD_MODE: $BUILD_MODE"; return 1 ;;
+    esac
+}
+run_gate "AI-CHAT-GATEWAY" "ChatGateway and HandoffRouter answer the browser as the reference's do (mock_ai_chat)" \
+    ai_chat_gateway_gate
 
 # WIRED-MODES (plan 1.6 / D7): the merge-coherence guard. WIRED_MODES.md lists the
 # load-bearing env/mode lines this run-ci MUST carry (MOCK_RELAY_STRICT=1, the

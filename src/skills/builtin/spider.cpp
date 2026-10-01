@@ -9,6 +9,7 @@
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/skills/skills_http.hpp"
+#include "signalwire/utils/url_validator.hpp"
 
 namespace signalwire {
 namespace skills {
@@ -139,6 +140,13 @@ class SpiderSkill : public SkillBase {
           }
 
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
 
           auto resp = http_get(effective);
@@ -192,6 +200,13 @@ class SpiderSkill : public SkillBase {
           }
 
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
 
           auto resp = http_get(effective);
@@ -216,6 +231,13 @@ class SpiderSkill : public SkillBase {
             return swaig::FunctionResult("No URL provided");
           }
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
           auto resp = http_get(effective);
           if (resp.status == 0) {

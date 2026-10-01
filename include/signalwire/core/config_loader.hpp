@@ -3,18 +3,14 @@
 //
 // Configuration loader with environment-variable substitution.
 //
-// C++ port of the Python reference
-// ``signalwire.core.config_loader.ConfigLoader`` (cross-checked against the
-// Java ``com.signalwire.sdk.core.ConfigLoader``). Supports ``${VAR|default}``
-// syntax for referencing environment variables within configuration files. The
-// first existing, parseable file in the search paths wins.
+// Supports ``${VAR|default}`` syntax for referencing environment variables
+// within configuration files. The first existing, parseable file in the search
+// paths wins.
 //
-// Idiom mapping: the C++ port parses JSON only — the vendored ``nlohmann::json``
-// is a JSON library and the port carries no YAML dependency, so ``.yaml``/
-// ``.yml`` files are NOT supported here (the Python/Java ports also default to
-// JSON config files; the default search paths are all ``*.json``). After
-// substitution, string values that look like booleans/integers/floats are
-// coerced to those native JSON types.
+// JSON only: the vendored ``nlohmann::json`` is a JSON library and there is no
+// YAML dependency, so ``.yaml``/``.yml`` files are NOT supported (the default
+// search paths are all ``*.json``). After substitution, string values that look
+// like booleans/integers/floats are coerced to those native JSON types.
 #pragma once
 
 #include <nlohmann/json.hpp>
@@ -27,6 +23,33 @@ namespace core {
 
 using json = nlohmann::json;
 
+/// Loads a JSON configuration file and resolves ``${VAR|default}``
+/// environment-variable references inside it.
+///
+/// Construction walks the supplied search paths (or the built-in defaults) and
+/// keeps the FIRST file that exists and parses; ``has_config`` and
+/// ``get_config_file`` report whether and which. The stored config is the RAW
+/// document — substitution happens on read, so ``get``/``get_section``/
+/// ``merge_with_env`` see current environment values, while ``get_config``
+/// hands back the unsubstituted original.
+///
+/// Substitution is recursive over objects and arrays. ``${VAR}`` expands to
+/// the environment value, ``${VAR|default}`` falls back to ``default`` when
+/// the variable is unset. Nesting deeper than ``max_depth`` (10 by default)
+/// throws ``std::invalid_argument`` rather than looping. After substitution, a
+/// string that looks like a boolean, integer, or float is COERCED to that
+/// native JSON type, so ``"${PORT|8080}"`` reads back as a number.
+///
+/// ``get`` addresses values by dot-notation path (``"security.ssl_enabled"``)
+/// and returns ``default_value`` for a missing path — no exception.
+/// ``merge_with_env`` folds ``SWML_``-prefixed environment variables into the
+/// config (prefix stripped, lowercased, split on underscore boundaries) but
+/// only where the config does not already define the key: **the config file
+/// wins over the environment**, the opposite precedence from ``SecurityConfig``.
+///
+/// JSON only. The vendored ``nlohmann::json`` is a JSON library and there is no
+/// YAML dependency, so ``.yaml``/``.yml`` files are not supported (every
+/// default search path is a ``*.json``).
 class ConfigLoader {
  public:
   /// Initialize the config loader.
@@ -35,10 +58,10 @@ class ConfigLoader {
   ///   parseable file wins.
   explicit ConfigLoader(const std::optional<std::vector<std::string>>& config_paths = std::nullopt);
 
-  /// The config file paths this loader searches, in order (reference:
-  /// ``self.config_paths``) — the caller-supplied list, or the default search
-  /// paths when none was given. A caller hands these in, so a caller can read
-  /// back exactly which paths were consulted.
+  /// The config file paths this loader searches, in order — the
+  /// caller-supplied list, or the default search paths when none was given. A
+  /// caller hands these in, so a caller can read back exactly which paths were
+  /// consulted.
   [[nodiscard]] const std::vector<std::string>& config_paths() const { return config_paths_; }
 
   /// Check if a configuration was loaded.

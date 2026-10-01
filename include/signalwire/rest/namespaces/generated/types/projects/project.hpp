@@ -29,7 +29,6 @@ struct Project {
   std::optional<std::string> name;
   std::optional<json> parent_project_id;
   std::optional<bool> subproject;
-  std::optional<std::string> region_preference;
   std::optional<bool> protect_recordings;
   std::optional<bool> protect_message_media;
   std::optional<bool> protect_fax_media;

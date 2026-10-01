@@ -117,76 +117,83 @@ Call* answered_call(RelayClient& client) {
 }  // namespace
 
 int main() {
-  // Silence the SDK logger programmatically so ONLY the JSON reaches stdout (the
-  // logger writes INFO to std::cout; an env-only guard is racy against the RELAY
-  // connect log). Mirrors wire_relay_dump.
-  signalwire::Logger::instance().suppress();
-  json out = json::object();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    // Silence the SDK logger programmatically so ONLY the JSON reaches stdout (the
+    // logger writes INFO to std::cout; an env-only guard is racy against the RELAY
+    // connect log). Mirrors wire_relay_dump.
+    signalwire::Logger::instance().suppress();
+    json out = json::object();
 
-  // ---- live_play_wait -----------------------------------------------------
-  {
-    auto client = mt::make_client();
-    Call* call = answered_call(*client);
-    arm_finished("calling.play");
-    Action action = call->play(play_media(), 0.0, kCid);
-    out["live_play_wait"] = classify(drive(action));
-    client->disconnect();
-  }
+    // ---- live_play_wait -----------------------------------------------------
+    {
+      auto client = mt::make_client();
+      Call* call = answered_call(*client);
+      arm_finished("calling.play");
+      Action action = call->play(play_media(), 0.0, kCid);
+      out["live_play_wait"] = classify(drive(action));
+      client->disconnect();
+    }
 
-  // ---- live_record_wait ---------------------------------------------------
-  {
-    auto client = mt::make_client();
-    Call* call = answered_call(*client);
-    arm_finished("calling.record");
-    Action action = call->record({{"audio", {{"format", "mp3"}}}}, kCid);
-    out["live_record_wait"] = classify(drive(action));
-    client->disconnect();
-  }
-
-  // ---- live_nested_wait ---------------------------------------------------
-  // The "wait inside on_completed" re-entrancy pattern. Like the python oracle
-  // (diff_port_wait_liveness.py::_drive_nested) and the rust dump, the inner wait
-  // is driven right AFTER the outer wait returns (not synchronously inside the
-  // completion callback, which fires on the read-loop thread and would deadlock a
-  // thread-blocking wait). It still exercises re-entrancy of the receive path: the
-  // inner wait pumps the same connection the outer just used. FOLD: timed_out if
-  // EITHER hung, blocked only if BOTH blocked, completed_state from the inner.
-  {
-    auto client = mt::make_client();
-    Call* call = answered_call(*client);
-
-    arm_finished("calling.play");
-    Action outer = call->play(play_media(), 0.0, kCid);
-    json outer_cls = classify(drive(outer));
-
-    json folded;
-    if (outer_cls.value("timed_out", false)) {
-      folded = {{"blocked_until_event", false},
-                {"returned_after_event", false},
-                {"completed_state", ""},
-                {"timed_out", true}};
-    } else {
+    // ---- live_record_wait ---------------------------------------------------
+    {
+      auto client = mt::make_client();
+      Call* call = answered_call(*client);
       arm_finished("calling.record");
-      Action inner = call->record({{"audio", {{"format", "mp3"}}}}, kCid);
-      json inner_cls = classify(drive(inner));
-      if (inner_cls.value("timed_out", false)) {
+      Action action = call->record({{"audio", {{"format", "mp3"}}}}, kCid);
+      out["live_record_wait"] = classify(drive(action));
+      client->disconnect();
+    }
+
+    // ---- live_nested_wait ---------------------------------------------------
+    // The "wait inside on_completed" re-entrancy pattern. Like the python oracle
+    // (diff_port_wait_liveness.py::_drive_nested) and the rust dump, the inner wait
+    // is driven right AFTER the outer wait returns (not synchronously inside the
+    // completion callback, which fires on the read-loop thread and would deadlock a
+    // thread-blocking wait). It still exercises re-entrancy of the receive path: the
+    // inner wait pumps the same connection the outer just used. FOLD: timed_out if
+    // EITHER hung, blocked only if BOTH blocked, completed_state from the inner.
+    {
+      auto client = mt::make_client();
+      Call* call = answered_call(*client);
+
+      arm_finished("calling.play");
+      Action outer = call->play(play_media(), 0.0, kCid);
+      json outer_cls = classify(drive(outer));
+
+      json folded;
+      if (outer_cls.value("timed_out", false)) {
         folded = {{"blocked_until_event", false},
                   {"returned_after_event", false},
                   {"completed_state", ""},
                   {"timed_out", true}};
       } else {
-        bool both_blocked = outer_cls.value("blocked_until_event", false) &&
-                            inner_cls.value("blocked_until_event", false);
-        folded = {{"blocked_until_event", both_blocked},
-                  {"returned_after_event", true},
-                  {"completed_state", inner_cls.value("completed_state", "")},
-                  {"timed_out", false}};
+        arm_finished("calling.record");
+        Action inner = call->record({{"audio", {{"format", "mp3"}}}}, kCid);
+        json inner_cls = classify(drive(inner));
+        if (inner_cls.value("timed_out", false)) {
+          folded = {{"blocked_until_event", false},
+                    {"returned_after_event", false},
+                    {"completed_state", ""},
+                    {"timed_out", true}};
+        } else {
+          bool both_blocked = outer_cls.value("blocked_until_event", false) &&
+                              inner_cls.value("blocked_until_event", false);
+          folded = {{"blocked_until_event", both_blocked},
+                    {"returned_after_event", true},
+                    {"completed_state", inner_cls.value("completed_state", "")},
+                    {"timed_out", false}};
+        }
       }
+      out["live_nested_wait"] = folded;
+      client->disconnect();
     }
-    out["live_nested_wait"] = folded;
-    client->disconnect();
-  }
 
-  std::cout << out.dump() << "\n";
-  return 0;
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

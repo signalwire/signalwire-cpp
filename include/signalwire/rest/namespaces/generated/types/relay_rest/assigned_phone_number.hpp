@@ -30,7 +30,6 @@ struct AssignedPhoneNumber {
   std::optional<json> id;
   std::optional<std::string> name;
   std::optional<std::string> number;
-  std::optional<std::string> status_callback_url;
   json extras = json::object();
 };
 

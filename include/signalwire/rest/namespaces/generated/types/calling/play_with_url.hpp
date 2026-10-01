@@ -26,12 +26,14 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PlayWithURL {
   std::optional<json> auto_answer;
-  std::optional<json> volume;
-  std::optional<std::string> say_voice;
-  std::optional<std::string> say_language;
-  std::optional<std::string> say_gender;
-  std::optional<std::string> status_url;
+  std::optional<json> loop;
+  std::optional<json> say_gender;
+  std::optional<json> say_language;
+  std::optional<json> say_voice;
+  std::optional<json> status_url;
   std::optional<json> url;
+  std::optional<json> urls;
+  std::optional<json> volume;
   json extras = json::object();
 };
 

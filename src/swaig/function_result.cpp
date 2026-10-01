@@ -5,8 +5,14 @@
 namespace signalwire {
 namespace swaig {
 
-FunctionResult::FunctionResult(const std::string& response, bool post_process)
-    : response_(response), post_process_(post_process) {}
+FunctionResult::FunctionResult(const std::string& response, bool post_process,
+                               std::optional<std::string> tool_result,
+                               std::optional<std::string> tool_prompt)
+    : response_(response), post_process_(post_process) {
+  if (tool_result.has_value() || tool_prompt.has_value()) {
+    set_tool_response(std::move(tool_result), std::move(tool_prompt));
+  }
+}
 
 // ========================================================================
 // Core
@@ -14,6 +20,19 @@ FunctionResult::FunctionResult(const std::string& response, bool post_process)
 
 FunctionResult& FunctionResult::set_response(const std::string& response) {
   response_ = response;
+  return *this;
+}
+
+FunctionResult& FunctionResult::set_tool_response(std::optional<std::string> tool_result,
+                                                  std::optional<std::string> tool_prompt) {
+  json payload = json::object();
+  if (tool_result.has_value()) {
+    payload["tool_result"] = *tool_result;
+  }
+  if (tool_prompt.has_value()) {
+    payload["tool_prompt"] = *tool_prompt;
+  }
+  response_ = std::move(payload);
   return *this;
 }
 
@@ -72,9 +91,31 @@ FunctionResult& FunctionResult::swml_transfer(const std::string& dest,
 
 FunctionResult& FunctionResult::hangup() { return add_action("hangup", json(true)); }
 
-FunctionResult& FunctionResult::hold(int timeout) {
+FunctionResult& FunctionResult::hold(std::optional<std::variant<std::string, int>> prompt,
+                                     int timeout, std::optional<std::string> step,
+                                     std::optional<std::string> timeout_step) {
+  // Back-compat: hold(120) used to mean hold(timeout=120).
+  if (prompt.has_value() && std::holds_alternative<int>(*prompt)) {
+    timeout = std::get<int>(*prompt);
+    prompt.reset();
+  }
+  if (prompt.has_value()) {
+    set_tool_response(std::string("status: on hold"), std::get<std::string>(*prompt));
+    post_process_ = true;
+  }
   int clamped = std::max(0, std::min(timeout, 900));
-  return add_action("hold", json(clamped));
+  // Bare integer unless routing is requested, so existing output is unchanged.
+  if (!step.has_value() && !timeout_step.has_value()) {
+    return add_action("hold", json(clamped));
+  }
+  json hold_config = json::object({{"timeout", clamped}});
+  if (step.has_value()) {
+    hold_config["step"] = *step;
+  }
+  if (timeout_step.has_value()) {
+    hold_config["timeout_step"] = *timeout_step;
+  }
+  return add_action("hold", hold_config);
 }
 
 FunctionResult& FunctionResult::wait_for_user(std::optional<bool> enabled,
@@ -169,6 +210,10 @@ FunctionResult& FunctionResult::play_background_file(const std::string& filename
     return add_action("playback_bg", json::object({{"file", filename}, {"wait", true}}));
   }
   return add_action("playback_bg", json(filename));
+}
+
+FunctionResult& FunctionResult::change_voice(const std::string& voice) {
+  return add_action("change_voice", json(voice));
 }
 
 FunctionResult& FunctionResult::stop_background_file() {
@@ -314,10 +359,15 @@ FunctionResult& FunctionResult::execute_swml(const json& swml_content, bool tran
   } else {
     action = swml_content;
   }
+  // transfer rides BESIDE the SWML document, not inside it — the same shape
+  // connect() and swml_transfer() emit. Inside the document it is not a SWML
+  // key and the call never exits the agent.
+  json entry = json::object({{"SWML", std::move(action)}});
   if (transfer) {
-    action["transfer"] = "true";
+    entry["transfer"] = "true";
   }
-  return add_action("SWML", action);
+  actions_.push_back(std::move(entry));
+  return *this;
 }
 
 namespace {
@@ -360,7 +410,7 @@ std::string strip(const std::string& s) {
 
 FunctionResult& FunctionResult::join_conference(
     const std::string& name, bool muted, const std::string& beep, bool start_on_enter,
-    bool end_on_exit, std::optional<std::string> wait_url, int max_participants,
+    bool end_on_exit, std::optional<std::string> wait_url, std::optional<int> max_participants,
     const std::string& record, std::optional<std::string> region, const std::string& trim,
     std::optional<std::string> coach, std::optional<std::string> status_callback_event,
     std::optional<std::string> status_callback, const std::string& status_callback_method,
@@ -372,8 +422,12 @@ FunctionResult& FunctionResult::join_conference(
   if (!contains(valid_beep, beep)) {
     throw std::invalid_argument("beep must be one of " + render_choices(valid_beep));
   }
-  if (max_participants <= 0 || max_participants > 250) {
-    throw std::invalid_argument("max_participants must be a positive integer <= 250");
+  // The platform requires a positive number, and its conference refuses fewer
+  // than 2; it sets no upper limit. Unset leaves it out so the platform default
+  // applies.
+  if (max_participants.has_value() && *max_participants < 2) {
+    throw std::invalid_argument("max_participants must be an integer of at least 2, got " +
+                                std::to_string(*max_participants));
   }
   static const std::vector<std::string> valid_record = {"do-not-record", "record-from-start"};
   if (!contains(valid_record, record)) {
@@ -399,7 +453,7 @@ FunctionResult& FunctionResult::join_conference(
   // --- Emission: simple bare-name string when all params are at default --
   bool all_default =
       !muted && beep == "true" && start_on_enter && !end_on_exit && !wait_url.has_value() &&
-      max_participants == 250 && record == "do-not-record" && !region.has_value() &&
+      !max_participants.has_value() && record == "do-not-record" && !region.has_value() &&
       trim == "trim-silence" && !coach.has_value() && !status_callback_event.has_value() &&
       !status_callback.has_value() && status_callback_method == "POST" &&
       !recording_status_callback.has_value() && recording_status_callback_method == "POST" &&
@@ -427,8 +481,8 @@ FunctionResult& FunctionResult::join_conference(
     if (wait_url.has_value()) {
       obj["wait_url"] = *wait_url;
     }
-    if (max_participants != 250) {
-      obj["max_participants"] = max_participants;
+    if (max_participants.has_value()) {
+      obj["max_participants"] = *max_participants;
     }
     if (record != "do-not-record") {
       obj["record"] = record;
@@ -479,9 +533,9 @@ FunctionResult& FunctionResult::join_conference(const std::string& name,
   return join_conference(
       name, o.muted.value_or(false), o.beep ? o.beep->str() : std::string("true"),
       o.start_on_enter.value_or(true), o.end_on_exit.value_or(false), o.wait_url,
-      o.max_participants.value_or(250), o.record ? o.record->str() : std::string("do-not-record"),
-      o.region, o.trim ? o.trim->str() : std::string("trim-silence"), o.coach,
-      o.status_callback_event, o.status_callback,
+      o.max_participants, o.record ? o.record->str() : std::string("do-not-record"), o.region,
+      o.trim ? o.trim->str() : std::string("trim-silence"), o.coach, o.status_callback_event,
+      o.status_callback,
       o.status_callback_method ? o.status_callback_method->str() : std::string("POST"),
       o.recording_status_callback,
       o.recording_status_callback_method ? o.recording_status_callback_method->str()
@@ -509,10 +563,10 @@ FunctionResult& FunctionResult::sip_refer(const std::string& to_uri) {
 FunctionResult& FunctionResult::tap(const std::string& uri, const std::string& control_id,
                                     const std::string& direction, const std::string& codec,
                                     int rtp_ptime, const std::string& status_url) {
-  // Validate direction {speak, hear, both}, codec {PCMU, PCMA}, and
+  // Validate direction {speak, listen, both}, codec {PCMU, PCMA}, and
   // rtp_ptime > 0 — byte-exact Python ValueError messages. Python renders the
   // first two with f"... must be one of {list}" (single-quoted list-repr).
-  static const std::vector<std::string> valid_directions = {"speak", "hear", "both"};
+  static const std::vector<std::string> valid_directions = {"speak", "listen", "both"};
   if (!contains(valid_directions, direction)) {
     throw std::invalid_argument("direction must be one of " + render_choices(valid_directions));
   }
@@ -529,9 +583,9 @@ FunctionResult& FunctionResult::tap(const std::string& uri, const std::string& c
   if (!control_id.empty()) {
     tap_params["control_id"] = control_id;
   }
-  if (direction != "both") {
-    tap_params["direction"] = direction;
-  }
+  // Always sent: the verb's own default is "speak", not this helper's "both",
+  // so omitting it would tap less than the caller asked for.
+  tap_params["direction"] = direction;
   if (codec != "PCMU") {
     tap_params["codec"] = codec;
   }
@@ -550,7 +604,7 @@ FunctionResult& FunctionResult::tap(const std::string& uri, const std::string& c
 // Typed overload: normalize the TapDirection/Codec enums to their canonical
 // wire strings and delegate to the std::string tap above — single source of
 // truth, so the emitted SWML is byte-identical to passing the equivalent bare
-// strings. (tap direction is {speak,hear,both}; codec is {PCMU,PCMA}.)
+// strings. (tap direction is {speak,listen,both}; codec is {PCMU,PCMA}.)
 FunctionResult& FunctionResult::tap(const std::string& uri, const std::string& control_id,
                                     TapDirection direction, Codec codec, int rtp_ptime,
                                     const std::string& status_url) {
@@ -604,11 +658,12 @@ FunctionResult& FunctionResult::send_sms(const std::string& to, const std::strin
 FunctionResult& FunctionResult::pay(
     const std::string& payment_connector_url, const std::string& input_method,
     const std::string& status_url, const std::string& payment_method, int timeout, int max_attempts,
-    bool security_code, const std::string& postal_code, int min_postal_code_length,
-    const std::string& token_type, const std::string& charge_amount, const std::string& currency,
-    const std::string& language, const std::string& voice, const std::string& description_text,
-    const std::string& valid_card_types, const std::vector<json>& parameters,
-    const std::vector<json>& prompts, const std::string& ai_response) {
+    bool security_code, const std::variant<bool, std::string>& postal_code,
+    int min_postal_code_length, const std::string& token_type, const std::string& charge_amount,
+    const std::string& currency, const std::string& language, const std::string& voice,
+    const std::string& description_text, const std::string& valid_card_types,
+    const std::vector<json>& parameters, const std::vector<json>& prompts,
+    const std::string& ai_response) {
   json pay_params;
   pay_params["payment_connector_url"] = payment_connector_url;
   pay_params["input"] = input_method;
@@ -616,7 +671,15 @@ FunctionResult& FunctionResult::pay(
   pay_params["timeout"] = std::to_string(timeout);
   pay_params["max_attempts"] = std::to_string(max_attempts);
   pay_params["security_code"] = security_code ? "true" : "false";
-  pay_params["postal_code"] = postal_code;
+  // Mirrors the reference's ``isinstance(postal_code, bool)`` branch: a bool
+  // becomes the lowercase string "true"/"false"; an explicit postcode string is
+  // passed through verbatim. Both wire forms are STRINGS (schema ``postal_code``
+  // is anyOf[boolean,string]; the reference emits ``str(value).lower()``).
+  if (const bool* pc_flag = std::get_if<bool>(&postal_code)) {
+    pay_params["postal_code"] = *pc_flag ? "true" : "false";
+  } else {
+    pay_params["postal_code"] = std::get<std::string>(postal_code);
+  }
   pay_params["min_postal_code_length"] = std::to_string(min_postal_code_length);
   pay_params["token_type"] = token_type;
   pay_params["currency"] = currency;
@@ -692,9 +755,26 @@ FunctionResult& FunctionResult::rpc_dial(const std::string& to_number,
 }
 
 FunctionResult& FunctionResult::rpc_ai_message(const std::string& call_id,
-                                               const std::string& message_text,
-                                               const std::string& role) {
-  return execute_rpc("ai_message", {{"role", role}, {"message_text", message_text}}, call_id);
+                                               std::optional<std::string> message_text,
+                                               const std::string& role,
+                                               std::optional<json> global_data) {
+  json params = json::object();
+  if (message_text.has_value()) {
+    params["role"] = role;
+    params["message_text"] = *message_text;
+  }
+  if (global_data.has_value()) {
+    params["global_data"] = *global_data;
+  }
+  if (params.empty()) {
+    throw std::invalid_argument("rpc_ai_message needs message_text, global_data, or both");
+  }
+  return execute_rpc("ai_message", params, call_id);
+}
+
+FunctionResult& FunctionResult::rpc_ai_global_data(const std::string& call_id,
+                                                   const std::map<std::string, json>& data) {
+  return rpc_ai_message(call_id, std::nullopt, "system", json(data));
 }
 
 FunctionResult& FunctionResult::rpc_ai_unhold(const std::string& call_id) {
@@ -737,7 +817,11 @@ json FunctionResult::create_payment_parameter(const std::string& name, const std
 json FunctionResult::to_json() const {
   json result;
 
-  if (!response_.empty()) {
+  // Python's `if self.response:` — an empty string and an empty object are both
+  // falsey, so neither is emitted.
+  const bool has_response = (response_.is_string() && !response_.get<std::string>().empty()) ||
+                            (response_.is_object() && !response_.empty());
+  if (has_response) {
     result["response"] = response_;
   }
 

@@ -14,6 +14,7 @@
 #include <optional>
 #include <string>
 
+#include "signalwire/common.hpp"
 #include "signalwire/rest/base_resource.hpp"
 
 namespace signalwire {
@@ -28,14 +29,23 @@ class Calling {
  public:
   struct DialParams {
     std::string from;
-    std::string to;
+    std::optional<std::string> to;
     std::optional<std::string> caller_id;
     std::optional<std::string> fallback_url;
     std::optional<std::string> status_url;
     std::optional<json> status_events;
     std::optional<std::string> url_method;
-    std::optional<std::string> url;
     std::optional<json> codecs;
+    std::optional<json> to_script;
+    std::optional<int> timeout;
+    std::optional<double> max_price_per_minute;
+    std::optional<std::string> send_digits;
+    std::optional<json> region;
+    std::optional<std::string> username;
+    std::optional<std::string> password;
+    std::optional<json> headers;
+    std::optional<json> custom_variables;
+    std::optional<std::string> url;
     std::optional<json> swml;
     json extras = json::object();
   };
@@ -56,8 +66,8 @@ class Calling {
   };
 
   struct AiHoldParams {
-    std::optional<int> timeout;
     std::optional<std::string> prompt;
+    std::optional<json> timeout;
     json extras = json::object();
   };
 
@@ -67,15 +77,16 @@ class Calling {
   };
 
   struct AiMessageParams {
-    std::optional<std::string> role;
+    std::optional<json> global_data;
     std::optional<std::string> message_text;
     std::optional<json> reset;
-    std::optional<json> global_data;
+    std::optional<std::string> role;
     json extras = json::object();
   };
 
   struct LiveTranscribeParams {
     json action;
+    std::optional<json> hints;
     json extras = json::object();
   };
 
@@ -102,10 +113,13 @@ class Calling {
   struct PlayParams {
     json play;
     std::optional<std::string> control_id;
-    std::optional<double> volume;
     std::optional<std::string> direction;
+    std::optional<std::string> gender;
+    std::optional<std::string> language;
     std::optional<int> loop;
     std::optional<std::string> status_url;
+    std::optional<std::string> voice;
+    std::optional<double> volume;
     json extras = json::object();
   };
 
@@ -132,13 +146,15 @@ class Calling {
 
   struct RecordParams {
     std::optional<std::string> control_id;
-    std::optional<json> audio;
+    std::optional<json> record;
     std::optional<std::string> status_url;
+    std::optional<json> audio;
     json extras = json::object();
   };
 
   struct RecordPauseParams {
     std::string control_id;
+    std::optional<std::string> behavior;
     json extras = json::object();
   };
 
@@ -153,12 +169,16 @@ class Calling {
   };
 
   struct CollectParams {
-    std::optional<std::string> control_id;
-    std::optional<double> initial_timeout;
-    std::optional<json> digits;
-    std::optional<json> speech;
+    std::optional<bool> continue_;
     std::optional<bool> continuous;
+    std::optional<std::string> control_id;
+    std::optional<json> digits;
+    std::optional<double> initial_timeout;
     std::optional<bool> partial_results;
+    std::optional<bool> send_start_of_input;
+    std::optional<json> speech;
+    std::optional<bool> start_input_timers;
+    std::optional<std::string> status_url;
     json extras = json::object();
   };
 
@@ -175,6 +195,7 @@ class Calling {
   struct DetectParams {
     json detect;
     std::optional<std::string> control_id;
+    std::optional<std::string> status_url;
     std::optional<double> timeout;
     json extras = json::object();
   };
@@ -185,9 +206,10 @@ class Calling {
   };
 
   struct TapParams {
-    json tap;
     json device;
+    json tap;
     std::optional<std::string> control_id;
+    std::optional<std::string> status_url;
     json extras = json::object();
   };
 
@@ -198,11 +220,14 @@ class Calling {
 
   struct StreamParams {
     std::string url;
-    std::optional<std::string> control_id;
-    std::optional<std::string> codec;
-    std::optional<std::string> track;
     std::optional<std::string> authorization_bearer_token;
+    std::optional<std::string> codec;
+    std::optional<std::string> control_id;
     std::optional<json> custom_parameters;
+    std::optional<std::string> name;
+    std::optional<std::string> status_url;
+    std::optional<std::string> status_url_method;
+    std::optional<std::string> track;
     json extras = json::object();
   };
 
@@ -231,7 +256,41 @@ class Calling {
   };
 
   struct AiStopParams {
-    std::string control_id;
+    std::optional<std::string> control_id;
+    json extras = json::object();
+  };
+
+  struct AiSidecarParams {
+    std::string lang;
+    std::optional<json> SWAIG;
+    std::optional<json> action;
+    std::optional<std::string> customer_role;
+    std::optional<json> direction;
+    std::optional<json> global_data;
+    std::optional<json> hints;
+    std::optional<std::string> model;
+    std::optional<json> params;
+    std::optional<json> permissions;
+    std::optional<json> prompt;
+    std::optional<std::string> url;
+    json extras = json::object();
+  };
+
+  struct AiSidecarAskParams {
+    std::string text;
+    json extras = json::object();
+  };
+
+  struct AiSidecarPokeParams {
+    std::string text;
+    json extras = json::object();
+  };
+
+  struct AiSidecarStopParams {
+    json extras = json::object();
+  };
+
+  struct AiSidecarStatusParams {
     json extras = json::object();
   };
 
@@ -258,7 +317,9 @@ class Calling {
   [[nodiscard]] json dial(const DialParams& p, const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["from"] = p.from;
-    params["to"] = p.to;
+    if (p.to.has_value()) {
+      params["to"] = *p.to;
+    }
     if (p.caller_id.has_value()) {
       params["caller_id"] = *p.caller_id;
     }
@@ -274,11 +335,38 @@ class Calling {
     if (p.url_method.has_value()) {
       params["url_method"] = *p.url_method;
     }
-    if (p.url.has_value()) {
-      params["url"] = *p.url;
-    }
     if (p.codecs.has_value()) {
       params["codecs"] = *p.codecs;
+    }
+    if (p.to_script.has_value()) {
+      params["to_script"] = *p.to_script;
+    }
+    if (p.timeout.has_value()) {
+      params["timeout"] = *p.timeout;
+    }
+    if (p.max_price_per_minute.has_value()) {
+      params["max_price_per_minute"] = *p.max_price_per_minute;
+    }
+    if (p.send_digits.has_value()) {
+      params["send_digits"] = *p.send_digits;
+    }
+    if (p.region.has_value()) {
+      params["region"] = *p.region;
+    }
+    if (p.username.has_value()) {
+      params["username"] = *p.username;
+    }
+    if (p.password.has_value()) {
+      params["password"] = *p.password;
+    }
+    if (p.headers.has_value()) {
+      params["headers"] = *p.headers;
+    }
+    if (p.custom_variables.has_value()) {
+      params["custom_variables"] = *p.custom_variables;
+    }
+    if (p.url.has_value()) {
+      params["url"] = *p.url;
     }
     if (p.swml.has_value()) {
       params["swml"] = *p.swml;
@@ -326,11 +414,11 @@ class Calling {
   [[nodiscard]] json ai_hold(const std::string& call_id, const AiHoldParams& p,
                              const RequestOptions& request_options = {}) const {
     json params = json::object();
-    if (p.timeout.has_value()) {
-      params["timeout"] = *p.timeout;
-    }
     if (p.prompt.has_value()) {
       params["prompt"] = *p.prompt;
+    }
+    if (p.timeout.has_value()) {
+      params["timeout"] = *p.timeout;
     }
     if (!p.extras.is_null()) {
       params.update(p.extras);
@@ -351,8 +439,8 @@ class Calling {
   [[nodiscard]] json ai_message(const std::string& call_id, const AiMessageParams& p,
                                 const RequestOptions& request_options = {}) const {
     json params = json::object();
-    if (p.role.has_value()) {
-      params["role"] = *p.role;
+    if (p.global_data.has_value()) {
+      params["global_data"] = *p.global_data;
     }
     if (p.message_text.has_value()) {
       params["message_text"] = *p.message_text;
@@ -360,8 +448,8 @@ class Calling {
     if (p.reset.has_value()) {
       params["reset"] = *p.reset;
     }
-    if (p.global_data.has_value()) {
-      params["global_data"] = *p.global_data;
+    if (p.role.has_value()) {
+      params["role"] = *p.role;
     }
     if (!p.extras.is_null()) {
       params.update(p.extras);
@@ -372,6 +460,9 @@ class Calling {
                                      const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["action"] = p.action;
+    if (p.hints.has_value()) {
+      params["hints"] = *p.hints;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
@@ -422,11 +513,14 @@ class Calling {
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
     }
-    if (p.volume.has_value()) {
-      params["volume"] = *p.volume;
-    }
     if (p.direction.has_value()) {
       params["direction"] = *p.direction;
+    }
+    if (p.gender.has_value()) {
+      params["gender"] = *p.gender;
+    }
+    if (p.language.has_value()) {
+      params["language"] = *p.language;
     }
     if (p.loop.has_value()) {
       params["loop"] = *p.loop;
@@ -434,8 +528,17 @@ class Calling {
     if (p.status_url.has_value()) {
       params["status_url"] = *p.status_url;
     }
+    if (p.voice.has_value()) {
+      params["voice"] = *p.voice;
+    }
+    if (p.volume.has_value()) {
+      params["volume"] = *p.volume;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.play", params, call_id, request_options);
   }
@@ -482,14 +585,20 @@ class Calling {
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
     }
-    if (p.audio.has_value()) {
-      params["audio"] = *p.audio;
+    if (p.record.has_value()) {
+      params["record"] = *p.record;
     }
     if (p.status_url.has_value()) {
       params["status_url"] = *p.status_url;
     }
+    if (p.audio.has_value()) {
+      params["record"]["audio"] = *p.audio;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.record", params, call_id, request_options);
   }
@@ -497,6 +606,9 @@ class Calling {
                                   const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["control_id"] = p.control_id;
+    if (p.behavior.has_value()) {
+      params["behavior"] = *p.behavior;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
@@ -523,26 +635,41 @@ class Calling {
   [[nodiscard]] json collect(const std::string& call_id, const CollectParams& p,
                              const RequestOptions& request_options = {}) const {
     json params = json::object();
-    if (p.control_id.has_value()) {
-      params["control_id"] = *p.control_id;
-    }
-    if (p.initial_timeout.has_value()) {
-      params["initial_timeout"] = *p.initial_timeout;
-    }
-    if (p.digits.has_value()) {
-      params["digits"] = *p.digits;
-    }
-    if (p.speech.has_value()) {
-      params["speech"] = *p.speech;
+    if (p.continue_.has_value()) {
+      params["continue"] = *p.continue_;
     }
     if (p.continuous.has_value()) {
       params["continuous"] = *p.continuous;
     }
+    if (p.control_id.has_value()) {
+      params["control_id"] = *p.control_id;
+    }
+    if (p.digits.has_value()) {
+      params["digits"] = *p.digits;
+    }
+    if (p.initial_timeout.has_value()) {
+      params["initial_timeout"] = *p.initial_timeout;
+    }
     if (p.partial_results.has_value()) {
       params["partial_results"] = *p.partial_results;
     }
+    if (p.send_start_of_input.has_value()) {
+      params["send_start_of_input"] = *p.send_start_of_input;
+    }
+    if (p.speech.has_value()) {
+      params["speech"] = *p.speech;
+    }
+    if (p.start_input_timers.has_value()) {
+      params["start_input_timers"] = *p.start_input_timers;
+    }
+    if (p.status_url.has_value()) {
+      params["status_url"] = *p.status_url;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.collect", params, call_id, request_options);
   }
@@ -572,11 +699,17 @@ class Calling {
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
     }
+    if (p.status_url.has_value()) {
+      params["status_url"] = *p.status_url;
+    }
     if (p.timeout.has_value()) {
       params["timeout"] = *p.timeout;
     }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.detect", params, call_id, request_options);
   }
@@ -592,13 +725,19 @@ class Calling {
   [[nodiscard]] json tap(const std::string& call_id, const TapParams& p,
                          const RequestOptions& request_options = {}) const {
     json params = json::object();
-    params["tap"] = p.tap;
     params["device"] = p.device;
+    params["tap"] = p.tap;
     if (p.control_id.has_value()) {
       params["control_id"] = *p.control_id;
     }
+    if (p.status_url.has_value()) {
+      params["status_url"] = *p.status_url;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.tap", params, call_id, request_options);
   }
@@ -615,23 +754,35 @@ class Calling {
                             const RequestOptions& request_options = {}) const {
     json params = json::object();
     params["url"] = p.url;
-    if (p.control_id.has_value()) {
-      params["control_id"] = *p.control_id;
+    if (p.authorization_bearer_token.has_value()) {
+      params["authorization_bearer_token"] = *p.authorization_bearer_token;
     }
     if (p.codec.has_value()) {
       params["codec"] = *p.codec;
     }
-    if (p.track.has_value()) {
-      params["track"] = *p.track;
-    }
-    if (p.authorization_bearer_token.has_value()) {
-      params["authorization_bearer_token"] = *p.authorization_bearer_token;
+    if (p.control_id.has_value()) {
+      params["control_id"] = *p.control_id;
     }
     if (p.custom_parameters.has_value()) {
       params["custom_parameters"] = *p.custom_parameters;
     }
+    if (p.name.has_value()) {
+      params["name"] = *p.name;
+    }
+    if (p.status_url.has_value()) {
+      params["status_url"] = *p.status_url;
+    }
+    if (p.status_url_method.has_value()) {
+      params["status_url_method"] = *p.status_url_method;
+    }
+    if (p.track.has_value()) {
+      params["track"] = *p.track;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
+    }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
     }
     return execute("calling.stream", params, call_id, request_options);
   }
@@ -672,6 +823,9 @@ class Calling {
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
+    if (!params.contains("control_id")) {
+      params["control_id"] = signalwire::generate_uuid();
+    }
     return execute("calling.transcribe", params, call_id, request_options);
   }
   [[nodiscard]] json transcribe_stop(const std::string& call_id, const TranscribeStopParams& p,
@@ -686,11 +840,89 @@ class Calling {
   [[nodiscard]] json ai_stop(const std::string& call_id, const AiStopParams& p,
                              const RequestOptions& request_options = {}) const {
     json params = json::object();
-    params["control_id"] = p.control_id;
+    if (p.control_id.has_value()) {
+      params["control_id"] = *p.control_id;
+    }
     if (!p.extras.is_null()) {
       params.update(p.extras);
     }
     return execute("calling.ai.stop", params, call_id, request_options);
+  }
+  [[nodiscard]] json ai_sidecar(const std::string& call_id, const AiSidecarParams& p,
+                                const RequestOptions& request_options = {}) const {
+    json params = json::object();
+    params["lang"] = p.lang;
+    if (p.SWAIG.has_value()) {
+      params["SWAIG"] = *p.SWAIG;
+    }
+    if (p.action.has_value()) {
+      params["action"] = *p.action;
+    }
+    if (p.customer_role.has_value()) {
+      params["customer_role"] = *p.customer_role;
+    }
+    if (p.direction.has_value()) {
+      params["direction"] = *p.direction;
+    }
+    if (p.global_data.has_value()) {
+      params["global_data"] = *p.global_data;
+    }
+    if (p.hints.has_value()) {
+      params["hints"] = *p.hints;
+    }
+    if (p.model.has_value()) {
+      params["model"] = *p.model;
+    }
+    if (p.params.has_value()) {
+      params["params"] = *p.params;
+    }
+    if (p.permissions.has_value()) {
+      params["permissions"] = *p.permissions;
+    }
+    if (p.prompt.has_value()) {
+      params["prompt"] = *p.prompt;
+    }
+    if (p.url.has_value()) {
+      params["url"] = *p.url;
+    }
+    if (!p.extras.is_null()) {
+      params.update(p.extras);
+    }
+    return execute("calling.ai_sidecar", params, call_id, request_options);
+  }
+  [[nodiscard]] json ai_sidecar_ask(const std::string& call_id, const AiSidecarAskParams& p,
+                                    const RequestOptions& request_options = {}) const {
+    json params = json::object();
+    params["text"] = p.text;
+    if (!p.extras.is_null()) {
+      params.update(p.extras);
+    }
+    return execute("calling.ai_sidecar.ask", params, call_id, request_options);
+  }
+  [[nodiscard]] json ai_sidecar_poke(const std::string& call_id, const AiSidecarPokeParams& p,
+                                     const RequestOptions& request_options = {}) const {
+    json params = json::object();
+    params["text"] = p.text;
+    if (!p.extras.is_null()) {
+      params.update(p.extras);
+    }
+    return execute("calling.ai_sidecar.poke", params, call_id, request_options);
+  }
+  [[nodiscard]] json ai_sidecar_stop(const std::string& call_id, const AiSidecarStopParams& p,
+                                     const RequestOptions& request_options = {}) const {
+    json params = json::object();
+    if (!p.extras.is_null()) {
+      params.update(p.extras);
+    }
+    return execute("calling.ai_sidecar.stop", params, call_id, request_options);
+  }
+  [[nodiscard]] json ai_sidecar_status(const std::string& call_id, const AiSidecarStatusParams& p,
+                                       const RequestOptions& request_options = {}) const {
+    json params = json::object();
+    if (!p.extras.is_null()) {
+      params.update(p.extras);
+    }
+    return execute("calling.ai_sidecar.status", params, call_id, request_options);
   }
   [[nodiscard]] json send_fax_stop(const std::string& call_id, const SendFaxStopParams& p,
                                    const RequestOptions& request_options = {}) const {

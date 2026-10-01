@@ -25,13 +25,7 @@ using json = nlohmann::json;
 struct RingbackConfig {
   std::optional<std::string> url;
   std::optional<json> urls;
-  std::optional<double> volume;
-  std::optional<bool> auto_answer;
-  std::optional<std::string> say_voice;
-  std::optional<std::string> say_language;
-  std::optional<std::string> say_gender;
-  std::optional<std::string> status_url;
-  std::optional<int> loop;
+  std::optional<json> volume;
   json extras = json::object();
 };
 

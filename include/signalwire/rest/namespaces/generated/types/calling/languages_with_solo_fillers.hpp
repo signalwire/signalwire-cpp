@@ -27,15 +27,21 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct LanguagesWithSoloFillers {
-  std::optional<std::string> name;
-  std::optional<std::string> code;
-  std::optional<std::string> voice;
-  std::optional<std::string> model;
-  std::optional<std::string> emotion;
-  std::optional<std::string> speed;
+  std::optional<json> auto_emotion;
+  std::optional<json> auto_speed;
+  std::optional<json> code;
+  std::optional<json> double_turn_fillers;
   std::optional<std::string> engine;
-  std::optional<json> params;
   std::optional<json> fillers;
+  std::optional<json> function_fillers;
+  std::optional<json> listen_language;
+  std::optional<std::string> model;
+  std::optional<std::string> name;
+  std::optional<json> params;
+  std::optional<json> pronounce;
+  std::optional<json> speech_fillers;
+  std::optional<json> turn_fillers;
+  std::optional<std::string> voice;
   json extras = json::object();
 };
 

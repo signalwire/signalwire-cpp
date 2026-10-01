@@ -25,8 +25,8 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SWMLObject {
-  std::optional<std::string> version;
   std::optional<json> sections;
+  std::optional<std::string> version;
   json extras = json::object();
 };
 

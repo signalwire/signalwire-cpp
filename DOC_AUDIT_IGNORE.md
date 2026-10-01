@@ -26,7 +26,6 @@ at: nlohmann::json::at() / std::map::at() / std::vector::at() — vendored/stdli
 back: std::string::back() / std::vector::back() — stdlib container access
 begin: std::string::begin / std::vector::begin — stdlib iterator
 compare: std::string::compare() — stdlib string comparison
-c_str: std::string::c_str() — stdlib C-string accessor (swmlservice_ai_sidecar.cpp httplib route registration)
 erase: std::string::erase / std::vector::erase — stdlib container mutate
 find_first_not_of: std::string::find_first_not_of() — stdlib string scan
 find_last_not_of: std::string::find_last_not_of() — stdlib string scan
@@ -41,8 +40,9 @@ delete_: generated BaseResource/FabricResource DELETE verb — `delete` is a C++
 ## 2. C++ standard library — algorithms, chrono, and C runtime
 
 array: std::array / nlohmann::json::array() — stdlib/vendored
-atof: std::atof — C stdlib string-to-double
 atoi: std::atoi — C stdlib string-to-int
+stod: std::stod — C++ stdlib string-to-double (replaced std::atof, which could not report a bad value)
+stoi: std::stoi — C++ stdlib string-to-int (replaced std::atoi, which could not report a bad value)
 exit: std::exit — C stdlib process exit
 getline: std::getline — stdlib stream read
 hours: std::chrono::hours — stdlib duration literal

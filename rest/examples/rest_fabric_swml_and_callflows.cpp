@@ -1,40 +1,41 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // REST: Manage SWML scripts and call flows via Fabric API.
 
-#include <signalwire/rest/rest_client.hpp>
 #include <iostream>
+#include <signalwire/rest/rest_client.hpp>
 
 using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     try {
-        auto client = RestClient::from_env();
+      auto client = RestClient::from_env();
 
-        // Create a SWML script
-        auto script = client.fabric().swml_scripts.create({
-            {"name", "greeting-script"},
-            {"content", {
-                {"version", "1.0.0"},
-                {"sections", {{"main", json::array({
-                    {{"answer", json::object()}},
-                    {{"play", {{"url", "https://example.com/greeting.mp3"}}}},
-                    {{"hangup", json::object()}}
-                })}}}
-            }}
-        });
-        std::cout << "SWML script: " << script.dump(2) << "\n";
+      // Create a SWML script
+      auto script = client.fabric().swml_scripts.create(
+          {{"name", "greeting-script"},
+           {"content",
+            {{"version", "1.0.0"},
+             {"sections",
+              {{"main", json::array({{{"answer", json::object()}},
+                                     {{"play", {{"url", "https://example.com/greeting.mp3"}}}},
+                                     {{"hangup", json::object()}}})}}}}}});
+      std::cout << "SWML script: " << script.dump(2) << "\n";
 
-        // Create a call flow
-        auto flow = client.fabric().call_flows.create({
-            {"name", "main-flow"},
-            {"steps", json::array({
-                {{"type", "ai"}, {"prompt", "You are a helpful assistant."}}
-            })}
-        });
-        std::cout << "Call flow: " << flow.dump(2) << "\n";
+      // Create a call flow
+      auto flow = client.fabric().call_flows.create(
+          {{"name", "main-flow"},
+           {"steps", json::array({{{"type", "ai"}, {"prompt", "You are a helpful assistant."}}})}});
+      std::cout << "Call flow: " << flow.dump(2) << "\n";
 
     } catch (const SignalWireRestError& e) {
-        std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
+      std::cerr << "Error " << e.status_code() << ": " << e.what() << "\n";
     }
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

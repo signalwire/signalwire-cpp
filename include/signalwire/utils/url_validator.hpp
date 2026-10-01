@@ -16,8 +16,8 @@ namespace utils {
 namespace url_validator {
 
 /**
- * Cross-port SSRF block list.  Order matches the Python reference for
- * ease of cross-language review.
+ * SSRF block list: the CIDR networks a URL's resolved addresses may not
+ * fall into.
  */
 extern const std::array<const char*, 9> BLOCKED_NETWORKS;
 
@@ -36,9 +36,6 @@ void _set_resolver(ResolverFn resolver);
 
 /**
  * Validate that a URL is safe to fetch.
- *
- * Mirrors Python's
- * ``signalwire.utils.url_validator.validate_url(url, allow_private=False) -> bool``.
  *
  * @param url            URL to validate.
  * @param allow_private  When true, bypass the IP-blocklist check.

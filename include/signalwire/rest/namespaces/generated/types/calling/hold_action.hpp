@@ -25,7 +25,35 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct HoldAction {
+  std::optional<json> SWML;
+  std::optional<json> add_dynamic_hints;
+  std::optional<json> back_to_back_functions;
+  std::optional<std::string> change_context;
+  std::optional<std::string> change_step;
+  std::optional<json> change_voice;
+  std::optional<bool> clear_dynamic_hints;
+  std::optional<json> context_switch;
+  std::optional<int> end_of_speech_timeout;
+  std::optional<bool> extensive_data;
+  std::optional<bool> functions_on_speaker_timeout;
+  std::optional<bool> hangup;
   std::optional<json> hold;
+  std::optional<json> playback_bg;
+  std::optional<json> replace_in_history;
+  std::optional<std::string> say;
+  std::optional<json> set_global_data;
+  std::optional<json> set_meta_data;
+  std::optional<json> settings;
+  std::optional<int> speech_event_timeout;
+  std::optional<bool> stop;
+  std::optional<bool> stop_playback_bg;
+  std::optional<json> toggle_functions;
+  std::optional<json> transfer;
+  std::optional<json> unset_global_data;
+  std::optional<json> unset_meta_data;
+  std::optional<json> user_event;
+  std::optional<std::string> user_input;
+  std::optional<json> wait_for_user;
   json extras = json::object();
 };
 

@@ -28,7 +28,6 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CreateManagedCampaignRequest {
   std::optional<std::string> name;
-  std::optional<json> brand_id;
   std::optional<std::string> sms_use_case;
   std::optional<json> sub_use_cases;
   std::optional<std::string> campaign_verify_token;
@@ -55,6 +54,8 @@ struct CreateManagedCampaignRequest {
   std::optional<bool> lead_generation;
   std::optional<bool> terms_and_conditions;
   std::optional<std::string> status_callback_url;
+  std::optional<std::string> csp_campaign_reference;
+  std::optional<json> signalwire_contact_emails;
   json extras = json::object();
 };
 

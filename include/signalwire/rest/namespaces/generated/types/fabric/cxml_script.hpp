@@ -31,7 +31,7 @@ struct CXMLScript {
   std::optional<json> last_accessed_at;
   std::optional<std::string> request_url;
   std::optional<std::string> script_type;
-  std::optional<std::string> display_name;
+  std::optional<std::string> name;
   std::optional<json> status_callback_url;
   std::optional<json> status_callback_method;
   json extras = json::object();

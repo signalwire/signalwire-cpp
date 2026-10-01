@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -16,10 +18,9 @@ using json = nlohmann::json;
 
 // ── Errors ───────────────────────────────────────────────────────────
 //
-// Typed error family for the SignalWire AI Chat service, mirroring the python
-// reference (signalwire.ai_chat.client). Callers catch the one base type
-// (``AIChatError``) for every AI-Chat failure and can branch on ``code()`` or
-// the concrete subclass.
+// Typed error family for the SignalWire AI Chat service. Callers catch the one
+// base type (``AIChatError``) for every AI-Chat failure and can branch on
+// ``code()`` or the concrete subclass.
 //
 // Success/failure is decided by the JSON-RPC BODY, not the HTTP status (the
 // service's keepalive heartbeat commits 200 before the turn's outcome is
@@ -28,8 +29,8 @@ using json = nlohmann::json;
 /// Base error for AI Chat service failures. Carries the JSON-RPC error
 /// ``code`` (or a sentinel when the failure rode the SUCCESS envelope, as with
 /// ``SummaryError``) and the server ``message``. ``has_code()`` distinguishes a
-/// real JSON-RPC code from the no-code (success-envelope) case; python models
-/// that as ``code=None``, which C++ renders as ``has_code()==false``.
+/// real JSON-RPC code from the no-code (success-envelope) case, which renders
+/// as ``has_code()==false``.
 class AIChatError : public std::runtime_error {
  public:
   AIChatError(int code, const std::string& message)
@@ -46,7 +47,7 @@ class AIChatError : public std::runtime_error {
   /// The JSON-RPC error code. Only meaningful when ``has_code()`` is true.
   int code() const { return code_; }
   /// Whether a real JSON-RPC error code is carried (false == success-envelope
-  /// failure, python's ``code is None``).
+  /// failure, which has no code).
   bool has_code() const { return has_code_; }
   /// The server-provided error message (without the ``[code]`` prefix).
   const std::string& server_message() const { return message_; }
@@ -99,7 +100,8 @@ struct ConversationInfo {
   std::string id;
   /// Lifecycle status the service reported (e.g. ``"created"``).
   std::string status;
-  /// Whether an opening assistant message was produced (python ``None``).
+  /// Whether an opening assistant message was produced; false when the service
+  /// returned none.
   bool has_initial_message = false;
   /// The opening assistant message, when ``has_initial_message`` is true.
   std::string initial_message;
@@ -126,14 +128,13 @@ struct ChatLog {
 // ── Options ──────────────────────────────────────────────────────────
 
 /// Per-turn options common to ``create_conversation`` and ``chat``. Unset
-/// (empty / zero / false) fields are omitted from the wire params entirely,
-/// matching the python reference's truthiness guards.
+/// (empty / zero / false) fields are omitted from the wire params entirely.
 struct ConversationTurnOptions {
   /// Config URL locating the agent config (required on create; auto-creates on
   /// chat when present).
   std::string config_url;
   /// Conversation inactivity timeout in seconds (wire ``conversation_timeout``).
-  /// 0 == unset (omitted), mirroring python's ``if timeout``.
+  /// 0 == unset, and is omitted from the wire params.
   int timeout = 0;
   /// Reinitialize an existing conversation.
   bool reinit = false;
@@ -153,8 +154,8 @@ struct ChatOptions : ConversationTurnOptions {
 };
 
 /// Sampling / prompt options for ``summarize``. Every numeric field is optional
-/// (its ``has_*`` flag gates whether it is sent), matching python's
-/// ``**sampling`` filtered by ``v is not None``.
+/// (its ``has_*`` flag gates whether it is sent); unset fields are left out of
+/// the wire params.
 struct SummarizeOptions {
   /// Custom prompt steering the summary (wire ``summary_prompt``).
   std::string summary_prompt;
@@ -182,13 +183,16 @@ struct AIChatClientOptions {
   /// Fully-qualified endpoint URL, used verbatim (highest precedence).
   std::string url;
   /// Idle read timeout in seconds (byte-silence, NOT total turn length).
-  /// Mirrors the python reference's ``sock_read=60``. 0 disables it.
+  /// Defaults to 60; 0 disables it.
   int read_idle_timeout_seconds = 60;
-  /// Bounded connect timeout in seconds (python ``connect=10``).
+  /// Bounded connect timeout in seconds. Defaults to 10.
   int connect_timeout_seconds = 10;
 };
 
 // ── Client ───────────────────────────────────────────────────────────
+
+/// Receives a streamed response body chunk by chunk; return false to stop.
+using RawPostChunkHandler = std::function<bool(const char* data, size_t length)>;
 
 /// Synchronous client for the SignalWire AI Chat service.
 ///
@@ -203,11 +207,9 @@ struct AIChatClientOptions {
 /// byte-driven, not wall-clock: there is no total-request cap an idle-but-live
 /// turn could trip. cpp-httplib's ``set_read_timeout`` is a PER-READ (per
 /// socket recv) idle timeout — each keepalive whitespace read resets it — so it
-/// is exactly the ``sock_read=60`` semantics of the python reference, rather
-/// than a total transfer cap a heartbeat can't reset. Leading keepalive
-/// whitespace is valid JSON, so the buffered parse is unaffected.
-///
-/// Mirrors the python reference ``signalwire.ai_chat.AIChatClient``.
+/// bounds byte-silence rather than acting as a total transfer cap a heartbeat
+/// can't reset. Leading keepalive whitespace is valid JSON, so the buffered
+/// parse is unaffected.
 class AIChatClient {
  public:
   /// @throws std::invalid_argument when no project resolves, or no URL can be
@@ -223,10 +225,8 @@ class AIChatClient {
 
   /// Release any client-owned transport resources. cpp-httplib is stateless (a
   /// fresh ``httplib::Client`` is created per request), so there is no persistent
-  /// session to tear down -- this is a well-defined no-op that keeps the
-  /// python reference's explicit-release / context-manager-exit shape
-  /// (``client.close()`` / ``async with client:``) usable verbatim. Mirrors the
-  /// python reference ``AIChatClient.close`` (and the TS no-op ``close()``).
+  /// session to tear down -- this is a well-defined no-op, provided so callers
+  /// can write an explicit-release teardown without special-casing this client.
   /// Idempotent; safe to call more than once. The destructor needs no extra work.
   void close();
 
@@ -250,6 +250,17 @@ class AIChatClient {
 
   /// Return the full message history plus the call timeline.
   ChatLog log(const std::string& conversation_id);
+
+  /// Send one JSON-RPC call and hand the response body to ``on_chunk`` as it
+  /// arrives, unread and unbuffered -- for proxies that must stream the body
+  /// through. The service pads a slow response with keepalive whitespace so
+  /// intermediaries do not sever the connection mid-turn; a proxy that awaits
+  /// the whole body absorbs that padding and reintroduces the timeout it exists
+  /// to prevent. ``on_chunk`` returns false to stop reading. The caller owns
+  /// interpreting the result -- including that a JSON-RPC error arrives under
+  /// HTTP 200. Returns the HTTP status; throws AIChatError when no response
+  /// arrives. Prefer the typed methods unless you are relaying bytes.
+  int raw_post(const std::string& method, const json& params, const RawPostChunkHandler& on_chunk);
 
   /// Return an AI summary of the conversation (rate limited server-side).
   ///

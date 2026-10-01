@@ -71,7 +71,7 @@ using json = nlohmann::json;
           record_direction_value(RecordDirection::Both)};
 }
 [[nodiscard]] inline std::vector<std::string> tap_direction_values() {
-  return {tap_direction_value(TapDirection::Speak), tap_direction_value(TapDirection::Hear),
+  return {tap_direction_value(TapDirection::Speak), tap_direction_value(TapDirection::Listen),
           tap_direction_value(TapDirection::Both)};
 }
 [[nodiscard]] inline std::vector<std::string> codec_values() {

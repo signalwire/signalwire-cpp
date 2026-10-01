@@ -169,6 +169,82 @@ TEST(rest_mock_gen_phone_numbers_delete_err) {
   return true;
 }
 
+TEST(rest_mock_gen_phone_numbers_clear_cnam_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.clear_caller_id_name", 200, json::object());
+  (void)(client.phone_numbers().clear_cnam("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.clear_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_clear_cnam_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.clear_caller_id_name", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.phone_numbers().clear_cnam("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.clear_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_remove_e911_address_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.remove_e911_address", 200, json::object());
+  (void)(client.phone_numbers().remove_e911_address("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.remove_e911_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_remove_e911_address_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.remove_e911_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.phone_numbers().remove_e911_address("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.remove_e911_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_queues_delete_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.delete_queue", 200, json::object());
@@ -701,6 +777,44 @@ TEST(rest_mock_gen_phone_numbers_get_err) {
   return true;
 }
 
+TEST(rest_mock_gen_phone_numbers_get_cnam_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.retrieve_caller_id_name", 200, json::object());
+  (void)(client.phone_numbers().get_cnam("X", std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.retrieve_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_get_cnam_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.retrieve_caller_id_name", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.phone_numbers().get_cnam("X", std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.retrieve_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_queues_list_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.list_queues", 200, json::object());
@@ -923,6 +1037,43 @@ TEST(rest_mock_gen_recordings_list_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("relay-rest.list_recordings"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_recordings_download_ok) {
+  auto client = mocktest::make_client();
+  (void)(client.recordings().download("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.download_recording"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 300 && *j.response_status < 400);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_recordings_download_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.download_recording", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.recordings().download("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.download_recording"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }
@@ -1426,7 +1577,15 @@ TEST(rest_mock_gen_verified_callers_get_err) {
 TEST(rest_mock_gen_addresses_create_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_address", 200, json::object());
-  (void)(client.addresses().create({.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
+  (void)(client.addresses().create({.label = "X",
+                                    .country = "X",
+                                    .first_name = "X",
+                                    .last_name = "X",
+                                    .street_number = "X",
+                                    .street_name = "X",
+                                    .city = "X",
+                                    .state = "X",
+                                    .postal_code = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -1444,7 +1603,15 @@ TEST(rest_mock_gen_addresses_create_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.addresses().create({.label = "X", .country = "X", .first_name = "X", .last_name = "X", .street_number = "X", .street_name = "X", .city = "X", .state = "X", .postal_code = "X"}));
+    (void)(client.addresses().create({.label = "X",
+                                      .country = "X",
+                                      .first_name = "X",
+                                      .last_name = "X",
+                                      .street_number = "X",
+                                      .street_name = "X",
+                                      .city = "X",
+                                      .state = "X",
+                                      .postal_code = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -1727,6 +1894,82 @@ TEST(rest_mock_gen_phone_numbers_create_err) {
   return true;
 }
 
+TEST(rest_mock_gen_phone_numbers_request_cnam_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.request_caller_id_name", 200, json::object());
+  (void)(client.phone_numbers().request_cnam("X", {.name = "X"}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.request_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_request_cnam_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.request_caller_id_name", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.phone_numbers().request_cnam("X", {.name = "X"}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.request_caller_id_name"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_assign_e911_address_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.assign_e911_address", 200, json::object());
+  (void)(client.phone_numbers().assign_e911_address("X", {.e911_address_id = "X"}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.assign_e911_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_phone_numbers_assign_e911_address_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.assign_e911_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.phone_numbers().assign_e911_address("X", {.e911_address_id = "X"}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.assign_e911_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_queues_create_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.create_queue", 200, json::object());
@@ -1955,6 +2198,44 @@ TEST(rest_mock_gen_verified_callers_redial_verification_err) {
   return true;
 }
 
+TEST(rest_mock_gen_addresses_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.update_address", 200, json::object());
+  (void)(client.addresses().update("X", {}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PUT"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.update_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_addresses_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.update_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.addresses().update("X", {}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.update_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_number_groups_update_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("relay-rest.update_number_group", 200, json::object());
@@ -2063,6 +2344,44 @@ TEST(rest_mock_gen_queues_update_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("relay-rest.update_queue"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_registry_brands_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.update_brand", 200, json::object());
+  (void)(client.registry().brands.update("X", {}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PUT"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.update_brand"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_registry_brands_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("relay-rest.update_brand", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.registry().brands.update("X", {}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("relay-rest.update_brand"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }

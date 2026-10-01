@@ -25,14 +25,19 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct AIPromptText {
-  std::optional<int> max_tokens;
-  std::optional<json> temperature;
-  std::optional<json> top_p;
-  std::optional<json> confidence;
-  std::optional<json> presence_penalty;
-  std::optional<json> frequency_penalty;
-  std::optional<std::string> text;
   std::optional<json> contexts;
+  std::optional<json> frequency_penalty;
+  std::optional<double> max_completion_tokens;
+  std::optional<double> max_tokens;
+  std::optional<std::string> model;
+  std::optional<json> pom;
+  std::optional<json> presence_penalty;
+  std::optional<std::string> reasoning_effort;
+  std::optional<json> steps;
+  std::optional<double> temperature;
+  std::optional<std::string> text;
+  std::optional<double> top_p;
+  std::optional<std::string> verbosity;
   json extras = json::object();
 };
 

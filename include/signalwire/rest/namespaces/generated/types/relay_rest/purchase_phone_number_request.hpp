@@ -28,6 +28,7 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PurchasePhoneNumberRequest {
   std::optional<std::string> number;
+  std::optional<std::string> number_type;
   json extras = json::object();
 };
 

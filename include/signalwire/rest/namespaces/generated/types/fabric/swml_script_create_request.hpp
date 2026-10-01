@@ -30,6 +30,7 @@ struct SwmlScriptCreateRequest {
   std::optional<std::string> name;
   std::optional<std::string> contents;
   std::optional<std::string> status_callback_url;
+  std::optional<std::string> script_type;
   json extras = json::object();
 };
 

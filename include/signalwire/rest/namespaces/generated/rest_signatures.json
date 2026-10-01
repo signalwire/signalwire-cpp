@@ -11,7 +11,7 @@
       {
         "name": "country",
         "kind": "keyword",
-        "type": "string",
+        "type": "dict<string,any>",
         "required": true
       },
       {
@@ -64,6 +64,18 @@
       },
       {
         "name": "address_number",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "emergency_enabled",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "auto_correct_address",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -143,6 +155,113 @@
         "default": {}
       }
     ],
+    "Addresses::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "label",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "country",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "first_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "last_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "street_number",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "street_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "address_type",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "address_number",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "city",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "state",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "postal_code",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "emergency_enabled",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "auto_correct_address",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "AiAgents::create": [
       {
         "name": "request_options",
@@ -158,7 +277,96 @@
         "required": true
       }
     ],
+    "AiAgents::list_conversation_logs": [
+      {
+        "name": "ai_agent_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "AiAgents::list_voices": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "AiAgents::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "AliasAddresses::create": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "AliasAddresses::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "AliasAddresses::update": [
       {
         "name": "id",
         "kind": "positional",
@@ -288,13 +496,13 @@
         "required": true
       },
       {
-        "name": "timeout",
+        "name": "prompt",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "prompt",
+        "name": "timeout",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -322,7 +530,7 @@
         "required": true
       },
       {
-        "name": "role",
+        "name": "global_data",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -340,10 +548,204 @@
         "required": false
       },
       {
+        "name": "role",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "Calling::ai_sidecar": [
+      {
+        "name": "call_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "lang",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "SWAIG",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "action",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "customer_role",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "direction",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "global_data",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
+      },
+      {
+        "name": "hints",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "model",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "params",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "permissions",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "prompt",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "Calling::ai_sidecar_ask": [
+      {
+        "name": "call_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "text",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "Calling::ai_sidecar_poke": [
+      {
+        "name": "call_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "text",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "Calling::ai_sidecar_status": [
+      {
+        "name": "call_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "Calling::ai_sidecar_stop": [
+      {
+        "name": "call_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
       },
       {
         "name": "extras",
@@ -370,8 +772,8 @@
       {
         "name": "control_id",
         "kind": "keyword",
-        "type": "string",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "extras",
@@ -424,25 +826,7 @@
         "required": true
       },
       {
-        "name": "control_id",
-        "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
-      },
-      {
-        "name": "initial_timeout",
-        "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
-      },
-      {
-        "name": "digits",
-        "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
-      },
-      {
-        "name": "speech",
+        "name": "continue",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -454,7 +838,49 @@
         "required": false
       },
       {
+        "name": "control_id",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "digits",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "initial_timeout",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "partial_results",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_start_of_input",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "speech",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "start_input_timers",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -594,6 +1020,12 @@
         "required": false
       },
       {
+        "name": "status_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "timeout",
         "kind": "keyword",
         "type": "optional<any>",
@@ -652,8 +1084,8 @@
       {
         "name": "to",
         "kind": "keyword",
-        "type": "string",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "caller_id",
@@ -686,13 +1118,67 @@
         "required": false
       },
       {
-        "name": "url",
+        "name": "codecs",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "codecs",
+        "name": "to_script",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "timeout",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "max_price_per_minute",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_digits",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "region",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "username",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "password",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "headers",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "custom_variables",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -782,6 +1268,12 @@
         "required": true
       },
       {
+        "name": "hints",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "extras",
         "kind": "keyword",
         "type": "optional<dict<string,any>>",
@@ -850,13 +1342,19 @@
         "required": false
       },
       {
-        "name": "volume",
+        "name": "direction",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "direction",
+        "name": "gender",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "language",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -869,6 +1367,18 @@
       },
       {
         "name": "status_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "voice",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "volume",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -1048,13 +1558,19 @@
         "required": false
       },
       {
-        "name": "audio",
+        "name": "record",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
         "name": "status_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "audio",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -1086,6 +1602,12 @@
         "kind": "keyword",
         "type": "string",
         "required": true
+      },
+      {
+        "name": "behavior",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "extras",
@@ -1234,7 +1756,7 @@
         "required": true
       },
       {
-        "name": "control_id",
+        "name": "authorization_bearer_token",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -1246,19 +1768,37 @@
         "required": false
       },
       {
-        "name": "track",
-        "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
-      },
-      {
-        "name": "authorization_bearer_token",
+        "name": "control_id",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
         "name": "custom_parameters",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_url_method",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "track",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -1314,19 +1854,25 @@
         "required": true
       },
       {
-        "name": "tap",
-        "kind": "keyword",
-        "type": "dict<string,any>",
-        "required": true
-      },
-      {
         "name": "device",
         "kind": "keyword",
         "type": "dict<string,any>",
         "required": true
       },
       {
+        "name": "tap",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
         "name": "control_id",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -1748,85 +2294,79 @@
         "required": true
       },
       {
-        "name": "display_name",
+        "name": "name",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "account_sid",
+        "name": "call_request_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "voice_url",
+        "name": "call_request_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "voice_method",
+        "name": "call_fallback_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "voice_fallback_url",
+        "name": "call_fallback_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "voice_fallback_method",
+        "name": "call_status_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "status_callback",
+        "name": "call_status_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "status_callback_method",
+        "name": "message_request_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "sms_url",
+        "name": "message_request_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "sms_method",
+        "name": "message_fallback_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "sms_fallback_url",
+        "name": "message_fallback_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "sms_fallback_method",
+        "name": "message_status_url",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
       },
       {
-        "name": "sms_status_callback",
-        "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
-      },
-      {
-        "name": "sms_status_callback_method",
+        "name": "message_status_method",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -2118,6 +2658,21 @@
         "required": true
       }
     ],
+    "FabricAddresses::delete_": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
     "FabricAddresses::get": [
       {
         "name": "id",
@@ -2205,8 +2760,8 @@
       {
         "name": "allowed_addresses",
         "kind": "keyword",
-        "type": "list<any>",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "expire_at",
@@ -2215,36 +2770,61 @@
         "required": false
       },
       {
-        "name": "extras",
+        "name": "ch",
         "kind": "keyword",
-        "type": "optional<dict<string,any>>",
-        "required": false,
-        "default": null
+        "type": "optional<any>",
+        "required": false
       },
       {
-        "name": "request_options",
+        "name": "region",
         "kind": "keyword",
-        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
-        "required": false,
-        "default": null
+        "type": "optional<any>",
+        "required": false
       },
       {
-        "name": "kwargs",
-        "kind": "var_keyword",
-        "type": "any",
-        "required": false,
-        "default": {}
-      }
-    ],
-    "FabricTokens::create_invite_token": [
-      {
-        "name": "address_id",
+        "name": "email",
         "kind": "keyword",
-        "type": "dict<string,any>",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
-        "name": "expires_at",
+        "name": "first_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "last_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "display_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "job_title",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "time_zone",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "country",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "company_name",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -2277,6 +2857,12 @@
         "kind": "keyword",
         "type": "string",
         "required": true
+      },
+      {
+        "name": "ch",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "expire_at",
@@ -2340,6 +2926,18 @@
       },
       {
         "name": "company_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "scope",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "fingerprint",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -2529,6 +3127,82 @@
       },
       {
         "name": "phone_route_id",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
+        "name": "handler",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "GenericResources::assign_sip_endpoint": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "sip_endpoint_id",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "GenericResources::assign_whatsapp_number": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "whatsapp_number_id",
         "kind": "keyword",
         "type": "dict<string,any>",
         "required": true
@@ -2797,6 +3471,36 @@
         "required": false
       },
       {
+        "name": "message_type",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "template_id",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "header_template_parameters",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "body_template_parameters",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "button_template_parameters",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "extras",
         "kind": "keyword",
         "type": "optional<dict<string,any>>",
@@ -2828,8 +3532,8 @@
       {
         "name": "body",
         "kind": "keyword",
-        "type": "string",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "extras",
@@ -3163,6 +3867,107 @@
         "required": true
       }
     ],
+    "PhoneNumberAddresses::create": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "PhoneNumberAddresses::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "PhoneNumberAddresses::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "PhoneNumbers::assign_e911_address": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "e911_address_id",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "PhoneNumbers::clear_cnam": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
     "PhoneNumbers::create": [
       {
         "name": "request_options",
@@ -3191,6 +3996,78 @@
         "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
         "required": false,
         "default": null
+      }
+    ],
+    "PhoneNumbers::get_cnam": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "PhoneNumbers::remove_e911_address": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "PhoneNumbers::request_cnam": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "name",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
       }
     ],
     "PhoneNumbers::search": [
@@ -3465,6 +4342,12 @@
       },
       {
         "name": "subproject_id",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "project_id",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -3798,6 +4681,28 @@
         "default": null
       }
     ],
+    "Recordings::download": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "Recordings::get": [
       {
         "name": "id",
@@ -3932,6 +4837,113 @@
         "default": {}
       }
     ],
+    "RegistryBrands::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "company_name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "contact_email",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "contact_phone",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "ein_issuing_country",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "legal_entity_type",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "ein",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "company_vertical",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "company_website",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "company_address",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "csp_brand_reference",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_callback_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "signalwire_contact_emails",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "RegistryCampaigns::create_order": [
       {
         "name": "id",
@@ -3942,8 +4954,8 @@
       {
         "name": "phone_numbers",
         "kind": "keyword",
-        "type": "optional<any>",
-        "required": false
+        "type": "list<any>",
+        "required": true
       },
       {
         "name": "status_callback_url",
@@ -4048,6 +5060,18 @@
       },
       {
         "name": "name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "status_callback_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "signalwire_contact_emails",
         "kind": "keyword",
         "type": "optional<any>",
         "required": false
@@ -4195,14 +5219,14 @@
       {
         "name": "name",
         "kind": "keyword",
-        "type": "string",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "message_handler",
         "kind": "keyword",
-        "type": "dict<string,any>",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "message_request_url",
@@ -4260,6 +5284,57 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "SipAddresses::create": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SipAddresses::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "SipAddresses::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ],
     "SipEndpoints::create": [
@@ -4382,6 +5457,12 @@
         "required": false
       },
       {
+        "name": "default_outbound_policy",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
         "name": "extras",
         "kind": "keyword",
         "type": "optional<dict<string,any>>",
@@ -4397,6 +5478,593 @@
       },
       {
         "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBalance::create_top_up": [
+      {
+        "name": "idempotency_key",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "amount_in_microdollars",
+        "kind": "keyword",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "payment_method_id",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBalance::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingProfile::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingProfile::update": [
+      {
+        "name": "address_line1",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "address_city",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "address_state",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "address_zip",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "address_country",
+        "kind": "keyword",
+        "type": "dict<string,any>",
+        "required": true
+      },
+      {
+        "name": "company_name",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "contact_name",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "contact_email",
+        "kind": "keyword",
+        "type": "list<any>",
+        "required": true
+      },
+      {
+        "name": "contact_phone",
+        "kind": "keyword",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "address_line2",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "tax_id_number",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "monthly_invoices",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingStatements::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingStatements::get_csv": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingStatements::get_pdf": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceBillingStatements::list": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceGeographicPermissions::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceGeographicPermissions::update": [
+      {
+        "name": "countries",
+        "kind": "keyword",
+        "type": "list<any>",
+        "required": true
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceLowBalanceSetting::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceLowBalanceSetting::update": [
+      {
+        "name": "threshold_in_microdollars",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_email",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_webhook",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "webhook_url",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "webhook_method",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "send_topup",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "topup_amount_in_microdollars",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "topup_payment_method_id",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceMembers::create": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SpaceMembers::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "SpaceMembers::disable_project": [
+      {
+        "name": "member_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "project_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "SpaceMembers::enable_project": [
+      {
+        "name": "member_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "project_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "SpaceMembers::list_projects": [
+      {
+        "name": "member_id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceMembers::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "SpacePaymentHistory::list": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpacePaymentMethods::delete_": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "SpacePaymentMethods::list": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceSettings::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceSettings::update": [
+      {
+        "name": "name",
+        "kind": "keyword",
+        "type": "optional<any>",
+        "required": false
+      },
+      {
+        "name": "extras",
+        "kind": "keyword",
+        "type": "optional<dict<string,any>>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "kwargs",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "SpaceUsage::get": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
         "kind": "var_keyword",
         "type": "any",
         "required": false,
@@ -5013,6 +6681,28 @@
         "default": null
       }
     ],
+    "VideoRoomRecordings::download": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
     "VideoRoomRecordings::get": [
       {
         "name": "id",
@@ -5479,8 +7169,8 @@
       {
         "name": "url",
         "kind": "keyword",
-        "type": "string",
-        "required": true
+        "type": "optional<any>",
+        "required": false
       },
       {
         "name": "extras",
@@ -5578,6 +7268,127 @@
         "type": "any",
         "required": false,
         "default": {}
+      }
+    ],
+    "WhatsappBusinesses::list": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "WhatsappNumbers::get": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "WhatsappNumbers::list": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "WhatsappNumbers::paginate": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "params",
+        "kind": "var_keyword",
+        "type": "any",
+        "required": false,
+        "default": {}
+      }
+    ],
+    "WhatsappTemplates::create": [
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
+      }
+    ],
+    "WhatsappTemplates::delete": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      }
+    ],
+    "WhatsappTemplates::update": [
+      {
+        "name": "id",
+        "kind": "positional",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "request_options",
+        "kind": "keyword",
+        "type": "optional<class:signalwire.rest._request_options.RequestOptions>",
+        "required": false,
+        "default": null
+      },
+      {
+        "name": "body",
+        "kind": "positional",
+        "type": "dict<string,any>",
+        "required": true
       }
     ]
   }

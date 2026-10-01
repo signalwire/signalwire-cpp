@@ -12,8 +12,7 @@ namespace skills {
 
 /// Wikipedia search skill — issues a real GET against the Wikipedia API
 /// `/w/api.php` endpoint with `action=query&list=search`, parses the
-/// `query.search[]` results, and returns titles + snippets. Matches the
-/// Python `WikipediaSearchSkill` upstream call shape.
+/// `query.search[]` results, and returns titles + snippets.
 ///
 /// `WIKIPEDIA_BASE_URL` env var overrides the API root (used by
 /// `audit_skills_dispatch.py` to point the skill at its loopback fixture).
@@ -33,8 +32,8 @@ class WikipediaSearchSkill : public SkillBase {
   }
 
   /// Search Wikipedia for ``query`` and return a formatted titles+snippets
-  /// string (Corresponds to ``WikipediaSearchSkill.search_wiki``). Empty query
-  /// or no hits returns the configured no-results message.
+  /// string. An empty query, or no hits, returns the configured no-results
+  /// message.
   std::string search_wiki(const std::string& query) const {
     if (query.empty()) {
       return no_results_msg_;

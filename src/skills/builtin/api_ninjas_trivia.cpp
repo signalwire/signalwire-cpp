@@ -22,7 +22,7 @@ class ApiNinjasTriviaSkill : public SkillBase {
 
   std::vector<swaig::ToolDefinition> register_tools() override { return {}; }
 
-  /// Corresponds to ``get_tools`` — the SWAIG tool defs this skill contributes.
+  /// The SWAIG tool defs this skill contributes.
   std::vector<json> get_tools() const { return get_datamap_functions(); }
 
   std::vector<json> get_datamap_functions() const override {

@@ -34,10 +34,10 @@ struct VideoRoomSessionConference {
   std::optional<std::string> url;
   std::optional<json> room_name;
   std::optional<json> status;
-  std::optional<bool> locked;
+  std::optional<json> locked;
   std::optional<json> started_at;
   std::optional<json> ended_at;
-  std::optional<std::string> charge;
+  std::optional<double> charge;
   std::optional<json> charge_details;
   json extras = json::object();
 };

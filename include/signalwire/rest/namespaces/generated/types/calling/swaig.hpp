@@ -26,10 +26,12 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SWAIG {
   std::optional<json> defaults;
-  std::optional<json> native_functions;
-  std::optional<json> includes;
   std::optional<json> functions;
+  std::optional<json> hooks;
+  std::optional<json> includes;
   std::optional<json> internal_fillers;
+  std::optional<json> mcp_servers;
+  std::optional<json> native_functions;
   json extras = json::object();
 };
 

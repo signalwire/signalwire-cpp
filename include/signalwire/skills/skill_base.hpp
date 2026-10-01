@@ -32,12 +32,10 @@ class SkillManager;
 
 /// Abstract base class for all skills
 class SkillBase {
-  // The reference constructs a skill as `SkillClass(agent, params)`, so the
-  // agent + params are set BY THE LOADER, not by user code. C++ default-
-  // constructs the instance through the registry factory, so the loader injects
-  // them afterwards via `bind` — which is therefore private to SkillManager,
-  // keeping the construction contract identical (a skill cannot re-parent
-  // itself) rather than adding a public setter the reference lacks.
+  // A skill's agent + params are set BY THE LOADER, not by user code. The
+  // instance is default-constructed through the registry factory, so the loader
+  // injects them afterwards via `bind` — which is therefore private to
+  // SkillManager, so a skill cannot re-parent itself.
   friend class SkillManager;
 
  public:
@@ -86,11 +84,10 @@ class SkillBase {
   virtual void cleanup() {}
 
   // ========================================================================
-  // Public surface (signalwire.core.skill_base.SkillBase)
+  // Public surface
   // ========================================================================
 
   /// Check that every required env var (required_env_vars()) is set.
-  /// Corresponds to ``SkillBase.validate_env_vars``.
   [[nodiscard]] bool validate_env_vars() const {
     for (const auto& var : required_env_vars()) {
       const char* v = std::getenv(var.c_str());
@@ -103,11 +100,11 @@ class SkillBase {
 
   /// Check that every required package is available. C++ links its deps at
   /// build time (there is no runtime import), so a compiled skill's packages
-  /// are inherently present — return true. Corresponds to ``validate_packages``.
+  /// are inherently present — always returns true.
   [[nodiscard]] bool validate_packages() const { return true; }
 
   /// Read this skill instance's namespaced state from a SWAIG handler's raw
-  /// global_data. Corresponds to ``get_skill_data``.
+  /// global_data.
   [[nodiscard]] json get_skill_data(const json& raw_data) const {
     const std::string ns = skill_namespace();
     json global_data = raw_data.value("global_data", json::object());
@@ -115,24 +112,21 @@ class SkillBase {
   }
 
   /// Write this skill instance's namespaced state into a FunctionResult (under
-  /// the skill's namespace key). Corresponds to ``update_skill_data``.
+  /// the skill's namespace key).
   swaig::FunctionResult& update_skill_data(swaig::FunctionResult& result, const json& data) const {
     result.update_global_data(json::object({{skill_namespace(), data}}));
     return result;
   }
 
-  // Construction state the reference keeps as public instance attributes
-  // (`SkillBase.__init__(agent, params)` sets `self.agent` / `self.params`).
-  // The port binds them at load time via `bind` rather than through the ctor,
-  // because a C++ skill is default-constructed by the registry factory and
-  // then handed its agent + params — the values and their lifetime are the
-  // same, only the injection point differs.
+  // Construction state, bound at load time via `bind` rather than through the
+  // constructor: a skill is default-constructed by the registry factory and
+  // then handed its agent + params.
 
-  /// The agent this skill was loaded into (reference: ``self.agent``).
-  /// ``nullptr`` before ``bind``; ``SkillManager::load_skill`` always binds.
+  /// The agent this skill was loaded into. ``nullptr`` before ``bind``;
+  /// ``SkillManager::load_skill`` always binds.
   [[nodiscard]] agent::AgentBase* agent() const { return agent_; }
 
-  /// The parameters this skill was loaded with (reference: ``self.params``).
+  /// The parameters this skill was loaded with.
   [[nodiscard]] const json& params() const { return params_; }
 
   // ========================================================================
@@ -140,8 +134,7 @@ class SkillBase {
   // ========================================================================
 
   /// Define a tool (convenience for register_tools implementations).
-  /// ``secure`` defaults to TRUE — the reference's ``SkillBase.define_tool``
-  /// delegates to ``agent.define_tool``, whose default is ``secure=True``.
+  /// ``secure`` defaults to TRUE, matching ``AgentBase::define_tool``.
   [[nodiscard]] swaig::ToolDefinition define_tool(const std::string& name,
                                                   const std::string& description,
                                                   const json& parameters,
@@ -181,8 +174,8 @@ class SkillBase {
 
  protected:
   /// The global_data namespace for this skill instance: ``skill:<prefix>`` when
-  /// a ``prefix`` param is set, else ``skill:<instance_key>``. Protected — mirrors
-  /// Python's private ``_get_skill_namespace`` (off the public surface).
+  /// a ``prefix`` param is set, else ``skill:<instance_key>``. Protected — it is
+  /// an implementation detail, not part of the public surface.
   [[nodiscard]] std::string skill_namespace() const {
     if (params_.contains("prefix") && params_["prefix"].is_string()) {
       return "skill:" + params_["prefix"].get<std::string>();
@@ -199,8 +192,7 @@ class SkillBase {
   /// Bind the loading agent + params onto this instance. Called by
   /// ``SkillManager::load_skill`` before ``setup``, so a skill's own
   /// ``setup``/``register_tools`` can read ``agent()`` and ``params()``.
-  /// Private + friended to SkillManager: the reference sets both through the
-  /// constructor, so only the loader may do it here too.
+  /// Private + friended to SkillManager: only the loader may set them.
   void bind(agent::AgentBase* owner, const json& params) {
     agent_ = owner;
     params_ = params.is_object() ? params : json::object();

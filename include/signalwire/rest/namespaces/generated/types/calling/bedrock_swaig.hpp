@@ -25,10 +25,8 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct BedrockSWAIG {
-  std::optional<json> functions;
   std::optional<json> defaults;
-  std::optional<json> native_functions;
-  std::optional<json> includes;
+  std::optional<json> functions;
   json extras = json::object();
 };
 

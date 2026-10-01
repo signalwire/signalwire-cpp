@@ -3,12 +3,9 @@
 //
 // Unified security configuration for SignalWire services.
 //
-// C++ port of the Python reference
-// ``signalwire.core.security_config.SecurityConfig`` (cross-checked against the
-// Java ``com.signalwire.sdk.core.SecurityConfig``). Provides centralized
-// security settings (SSL, allowed hosts, CORS, security headers, basic auth)
-// consumed by the web/agent services so behavior stays consistent. Defaults are
-// applied first, then environment variables (backward compatibility), then a
+// Provides centralized security settings (SSL, allowed hosts, CORS, security
+// headers, basic auth) consumed by the web/agent services so behavior stays
+// consistent. Defaults are applied first, then environment variables, then a
 // config file if available (highest priority).
 #pragma once
 
@@ -23,15 +20,46 @@ namespace core {
 using json = nlohmann::json;
 
 /// Result of ``SecurityConfig::validate_ssl_config``: a validity flag plus an
-/// optional error message (Python returns ``(bool, str | None)``).
+/// error message that is set only when ``valid`` is false.
 struct SslValidationResult {
   bool valid = false;
   std::optional<std::string> error;
 };
 
+/// Centralized security settings for a SignalWire service — SSL, allowed
+/// hosts, CORS, response security headers, request limits, and basic-auth
+/// credentials.
+///
+/// The web/agent services read their security posture from one of these so the
+/// behaviour is consistent across them. Settings are resolved in three layers,
+/// each overriding the last: **built-in defaults**, then the ``SWML_*``
+/// **environment variables** named by the class constants below, then a
+/// **config file**'s ``security`` section (highest priority) — located either
+/// from an explicit path or from the service name.
+///
+/// Security-relevant behaviours worth knowing before you deploy:
+///   * ``get_basic_auth`` never returns an empty password. When none is
+///     configured it GENERATES a random one and warns once — that password
+///     lives only in this process, so external callers who do not know it get
+///     HTTP 401. Configure ``SWML_BASIC_AUTH_USER``/``_PASSWORD`` for anything
+///     a client must reach.
+///   * ``validate_ssl_config`` is always valid when SSL is disabled; with SSL
+///     enabled it requires cert and key paths that are set AND exist on disk,
+///     and ``get_ssl_context_kwargs`` returns an EMPTY object when SSL is off
+///     OR that validation fails (logging the reason) — so a caller that binds
+///     TLS only on a non-empty result will not silently serve plaintext.
+///   * ``should_allow_host`` treats ``*`` in the allowed list as allow-all.
+///   * ``get_security_headers`` adds ``Strict-Transport-Security`` only when
+///     the caller says the connection is HTTPS and HSTS is enabled — sending
+///     HSTS over plaintext is meaningless and can lock out a host.
+///   * ``log_config`` never logs a secret.
+///
+/// Defaults: SSL off, verify mode ``CERT_REQUIRED``, 10 MiB max request, 60
+/// requests/min rate limit, 30 s request timeout, HSTS on with a one-year
+/// max-age.
 class SecurityConfig {
  public:
-  // Security environment variable names (mirror the Python class constants).
+  // Security environment variable names.
   static constexpr const char* SSL_ENABLED = "SWML_SSL_ENABLED";
   static constexpr const char* SSL_CERT_PATH = "SWML_SSL_CERT_PATH";
   static constexpr const char* SSL_KEY_PATH = "SWML_SSL_KEY_PATH";
@@ -53,8 +81,8 @@ class SecurityConfig {
   explicit SecurityConfig(const std::optional<std::string>& config_file = std::nullopt,
                           const std::optional<std::string>& service_name = std::nullopt);
 
-  /// Load configuration from environment variables (public; part of the
-  /// Python surface — called by the ctor and re-callable).
+  /// Load configuration from environment variables. Called by the constructor,
+  /// and safe to call again to re-read the environment.
   void load_from_env();
 
   /// Validate SSL configuration. When SSL is disabled the result is always
@@ -62,10 +90,10 @@ class SecurityConfig {
   [[nodiscard]] SslValidationResult validate_ssl_config() const;
 
   /// SSL options for binding an HTTPS server. Empty when SSL is disabled or
-  /// validation fails; otherwise a language-neutral option object with keys
-  /// ``ssl_enabled``, ``cert_path``, ``key_path`` (Python returns uvicorn
-  /// ``ssl_certfile``/``ssl_keyfile`` kwargs; the C++/Java idiom is a neutral
-  /// map the web service consumes).
+  /// validation fails; otherwise EXACTLY two keys and nothing else —
+  /// ``ssl_certfile`` (the cert path) and ``ssl_keyfile`` (the key path). It is
+  /// deliberately NOT a ``{ssl_enabled, cert_path, key_path}`` map; the key
+  /// spelling is part of the contract and is pinned by a test.
   [[nodiscard]] json get_ssl_context_kwargs() const;
 
   /// Get basic auth credentials, generating a random URL-safe password when
@@ -88,7 +116,7 @@ class SecurityConfig {
   /// Log the current security configuration (never logs secrets).
   void log_config(const std::string& service_name) const;
 
-  // Accessors (matches the Python public attributes).
+  // Accessors.
   [[nodiscard]] bool ssl_enabled() const { return ssl_enabled_; }
   [[nodiscard]] const std::optional<std::string>& ssl_cert_path() const { return ssl_cert_path_; }
   [[nodiscard]] const std::optional<std::string>& ssl_key_path() const { return ssl_key_path_; }

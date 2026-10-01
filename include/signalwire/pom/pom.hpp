@@ -1,7 +1,7 @@
 // Copyright (c) 2025 SignalWire
 // SPDX-License-Identifier: MIT
 //
-// Prompt Object Model (POM) — C++ port of signalwire/pom/pom.py.
+// Prompt Object Model (POM).
 //
 // A structured data format for composing, organizing, and rendering prompt
 // instructions for large language models. The POM provides a tree-based
@@ -18,13 +18,13 @@
 //   * YAML  via ``to_yaml`` / ``from_yaml`` (minimal in-tree YAML I/O — POM
 //     content is always a list of dicts whose values are strings, bools, or
 //     lists; no anchors, tags, or free-form scalars to handle).
-//   * Markdown via ``render_markdown`` — exact byte-for-byte with Python's
-//     ``Section.render_markdown`` / ``PromptObjectModel.render_markdown``.
-//   * XML  via ``render_xml`` — exact byte-for-byte with Python's renderers.
+//   * Markdown via ``Section::render_markdown`` /
+//     ``PromptObjectModel::render_markdown``.
+//   * XML  via ``render_xml``.
 //
-// Rendering contract: output strings match the reference verbatim (including
-// trailing newlines, joiners, and section/bullet numbering rules). The C++
-// tests in ``tests/test_pom.cpp`` are written from those Python outputs.
+// Rendering contract: the rendered output is byte-exact — trailing newlines,
+// joiners, and section/bullet numbering rules are all part of the contract and
+// are pinned by the tests in ``tests/test_pom.cpp``.
 #pragma once
 
 #include <nlohmann/json.hpp>
@@ -42,14 +42,13 @@ class PromptObjectModel;  // fwd
 
 /// One section in the Prompt Object Model tree.
 ///
-/// Mirrors Python's ``signalwire.pom.pom.Section``. Fields are public to
-/// match the Python attribute access pattern ``section.body``,
+/// Fields are public and mutated directly: ``section.body``,
 /// ``section.bullets``, ``section.subsections``.
 class Section {
  public:
-  /// Section title. Optional only on the very first top-level section
-  /// (Python enforces "only the first section can have no title"); for
-  /// subsections a title is always required.
+  /// Section title. Optional only on the very first top-level section —
+  /// only the first section may have no title; for subsections a title is
+  /// always required.
   std::optional<std::string> title;
 
   /// Optional paragraph of body text.
@@ -62,7 +61,7 @@ class Section {
   std::vector<Section> subsections;
 
   /// Whether this section participates in section numbering. Three-state:
-  ///   * ``std::nullopt`` — not specified (Python ``None``); inherits.
+  ///   * ``std::nullopt`` — not specified; inherits.
   ///   * ``true``         — explicitly numbered.
   ///   * ``false``        — explicitly opted out of numbering.
   /// Numbering is "all-or-none per sibling group": if any sibling has
@@ -83,8 +82,7 @@ class Section {
                    std::vector<std::string> bs = {}, std::optional<bool> num = std::nullopt,
                    bool numbered_bullets = false);
 
-  /// Replace (NOT append) the body text. Mirrors Python's documented
-  /// "Add OR REPLACE the body text" contract.
+  /// Replace (NOT append) the body text.
   void add_body(const std::string& b);
 
   /// Append bullets to the existing list.
@@ -92,20 +90,24 @@ class Section {
 
   /// Add a child subsection. Returns a reference to the newly-created
   /// subsection so callers can chain further mutations.
-  /// Throws ``std::invalid_argument`` if ``title`` is empty (Python raises
-  /// ``ValueError("Subsections must have a title")``).
+  /// Throws ``std::invalid_argument`` if ``title`` is empty ("Subsections must
+  /// have a title").
+  /// ``numbered`` is BINARY here, not tri-state: it defaults to ``false`` and
+  /// is passed straight through, so a subsection built this way is never
+  /// unset. (The ``Section`` constructor and ``PromptObjectModel::add_section``
+  /// DO take the tri-state ``std::optional<bool>``.) The distinction is
+  /// load-bearing in ``render_markdown``: an UNSET sibling inherits numbering
+  /// from the group, while an explicit ``false`` opts out.
   Section& add_subsection(const std::string& title, const std::string& body = "",
-                          const std::vector<std::string>& bullets = {},
-                          std::optional<bool> numbered = std::nullopt,
+                          const std::vector<std::string>& bullets = {}, bool numbered = false,
                           bool numbered_bullets = false);
 
-  /// Convert the section (and its subtree) to a JSON object. Matches the
-  /// Python key order: title, body, bullets, subsections, numbered,
+  /// Convert the section (and its subtree) to a JSON object. Keys are emitted
+  /// in this order: title, body, bullets, subsections, numbered,
   /// numberedBullets.
   [[nodiscard]] json to_json() const;
 
-  /// Python-compatible alias for to_json — Python exposes ``to_dict``.
-  /// Returns the same JSON object.
+  /// Alias for ``to_json``. Returns the same JSON object.
   [[nodiscard]] json to_dict() const { return to_json(); }
 
   /// Render this section + subtree as Markdown. ``level`` is the heading
@@ -142,9 +144,8 @@ class PromptObjectModel {
   [[nodiscard]] static PromptObjectModel from_yaml(const std::string& yaml_text);
 
   /// Append a new top-level section. ``title`` may be empty *only* for
-  /// the very first section (Python enforces "Only the first section can
-  /// have no title"); subsequent calls without a title throw
-  /// ``std::invalid_argument``.
+  /// the very first section — only the first section may have no title;
+  /// subsequent calls without a title throw ``std::invalid_argument``.
   Section& add_section(const std::string& title = "", const std::string& body = "",
                        const std::vector<std::string>& bullets = {},
                        std::optional<bool> numbered = std::nullopt, bool numbered_bullets = false);
@@ -157,8 +158,8 @@ class PromptObjectModel {
   [[nodiscard]] Section* find_section(const std::string& title);
   [[nodiscard]] const Section* find_section(const std::string& title) const;
 
-  /// Whole-tree JSON serializer. Returns a pretty-printed (indent=2)
-  /// JSON array string, matching Python's ``json.dumps(..., indent=2)``.
+  /// Whole-tree JSON serializer. Returns a pretty-printed JSON array string
+  /// (2-space indent).
   [[nodiscard]] std::string to_json() const;
 
   /// Whole-tree YAML serializer. Returns a YAML document representing

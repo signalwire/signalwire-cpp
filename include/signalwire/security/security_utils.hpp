@@ -5,18 +5,13 @@
 #include <map>
 #include <string>
 
-/// Standalone security-hygiene utilities.
+/// Standalone security-hygiene utilities: keep credentials out of user
+/// callbacks and logs, plus a reusable character-level hostname check. Three
+/// pure free functions, no state, no I/O.
 ///
-/// Mirrors the Python reference module
-/// ``signalwire.core.security.security_utils`` (and the TypeScript SDK's
-/// ``SecurityUtils``): keep credentials out of user callbacks and logs, plus a
-/// reusable character-level hostname check. Three pure free functions, no
-/// state, no I/O.
-///
-/// Idiom note: the C++ port exposes these as PascalCase free functions in a
-/// dedicated ``security_utils`` namespace (same convention used for
-/// ``ValidateWebhookSignature`` in this module). The signature enumerator's
-/// free-function rename table maps them back to the Python snake_case names.
+/// These are PascalCase free functions in a dedicated ``security_utils``
+/// namespace — the same convention used for ``ValidateWebhookSignature`` in
+/// this module.
 namespace signalwire {
 namespace security {
 namespace security_utils {

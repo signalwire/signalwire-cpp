@@ -251,27 +251,34 @@ std::string drive_and_capture(const std::filesystem::path& capture_path) {
 }  // namespace
 
 int main() {
-  ix::initNetSystem();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    ix::initNetSystem();
 
-  const std::filesystem::path capture = scratch_dir() / "secret_scrub_capture.log";
-  const std::string captured = drive_and_capture(capture);
+    const std::filesystem::path capture = scratch_dir() / "secret_scrub_capture.log";
+    const std::string captured = drive_and_capture(capture);
 
-  // Forward the captured output to the real stderr so the differ's own
-  // subprocess-stderr capture sees the identical bytes; stdout stays pure JSON.
-  if (!captured.empty()) {
-    std::cerr << captured;
+    // Forward the captured output to the real stderr so the differ's own
+    // subprocess-stderr capture sees the identical bytes; stdout stays pure JSON.
+    if (!captured.empty()) {
+      std::cerr << captured;
+    }
+
+    json out = json::object();
+    out["project"] = json::object({{"leaked", captured.find(kProject) != std::string::npos}});
+    out["token"] = json::object({{"leaked", captured.find(kToken) != std::string::npos}});
+    out["authorization_state"] =
+        json::object({{"leaked", captured.find(kAuthorizationState) != std::string::npos}});
+
+    std::cout << out.dump() << '\n';
+
+    std::error_code ec;
+    std::filesystem::remove(capture, ec);
+    ix::uninitNetSystem();
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-
-  json out = json::object();
-  out["project"] = json::object({{"leaked", captured.find(kProject) != std::string::npos}});
-  out["token"] = json::object({{"leaked", captured.find(kToken) != std::string::npos}});
-  out["authorization_state"] =
-      json::object({{"leaked", captured.find(kAuthorizationState) != std::string::npos}});
-
-  std::cout << out.dump() << std::endl;
-
-  std::error_code ec;
-  std::filesystem::remove(capture, ec);
-  ix::uninitNetSystem();
-  return 0;
 }

@@ -1,6 +1,7 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Multi-agent server hosting several agents on one port.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 #include <signalwire/server/agent_server.hpp>
 
@@ -8,6 +9,9 @@ using namespace signalwire;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     // Create agents
     auto sales = std::make_shared<agent::AgentBase>("sales", "/sales");
     sales->prompt_add_section("Role", "You are a sales representative.");
@@ -31,4 +35,8 @@ int main() {
     std::cout << "Multi-agent server running on http://0.0.0.0:3000\n";
     std::cout << "  /sales, /support, /billing\n";
     srv.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -34,6 +34,11 @@ struct CreateMessageRequest {
   std::optional<bool> send_as_mms;
   std::optional<std::string> status_callback;
   std::optional<json> custom_variables;
+  std::optional<std::string> message_type;
+  std::optional<std::string> template_id;
+  std::optional<json> header_template_parameters;
+  std::optional<json> body_template_parameters;
+  std::optional<json> button_template_parameters;
   json extras = json::object();
 };
 

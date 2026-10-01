@@ -2,31 +2,72 @@
 // SPDX-License-Identifier: MIT
 #include <regex>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "signalwire/common.hpp"
 #include "signalwire/skills/skill_base.hpp"
 #include "signalwire/skills/skill_registry.hpp"
 #include "signalwire/skills/skills_http.hpp"
+#include "signalwire/utils/url_validator.hpp"
 
 namespace signalwire {
 namespace skills {
 
 namespace {
 
-/// Strip HTML tags from `html` and collapse repeated whitespace. Matches the
-/// "naive HTML strip" Python's spider skill does for its scrape_url tool.
-std::string strip_html(const std::string& html) {
+/// Drop each element matched by `xpaths` — tag AND its inner content —
+/// before any tag-stripping runs, so a ``<script>``/``<style>`` body never
+/// reaches the extracted text. Without this the naive tag-strip below turns
+/// script source and CSS into "scraped content".
+///
+/// Only plain ``//tag`` element selectors are supported (a full XPath engine is
+/// not vendored), which is the shape the default selector set uses. An entry the
+/// resolver does not understand is skipped rather than silently mangling the
+/// document.
+std::string drop_xpath_elements(const std::string& html, const std::vector<std::string>& xpaths) {
+  std::string out = html;
+  for (const auto& xp : xpaths) {
+    // "//tag" -> element name; anything richer is not resolvable here.
+    if (xp.rfind("//", 0) != 0) {
+      continue;
+    }
+    const std::string tag = xp.substr(2);
+    if (tag.empty() ||
+        tag.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789") !=
+            std::string::npos) {
+      continue;
+    }
+    // <tag ...> ... </tag>  (non-greedy body, case-insensitive), plus the
+    // self-closing / unpaired form so a stray "<noscript/>" also goes.
+    std::string pat;
+    pat.reserve(tag.size() * 2 + 32);
+    pat.append("<").append(tag).append(R"((\s[^>]*)?>[\s\S]*?</)").append(tag).append(R"(\s*>)");
+    out = std::regex_replace(out, std::regex(pat, std::regex::icase), " ");
+
+    std::string self_pat;
+    self_pat.reserve(tag.size() + 20);
+    self_pat.append("<").append(tag).append(R"((\s[^>]*)?/>)");
+    out = std::regex_replace(out, std::regex(self_pat, std::regex::icase), " ");
+  }
+  return out;
+}
+
+/// Strip HTML tags from `html` and collapse repeated whitespace, after first
+/// dropping every element named by `remove_xpaths` (tag + content).
+std::string strip_html(const std::string& html, const std::vector<std::string>& remove_xpaths) {
   static const std::regex tag_re(R"(<[^>]+>)");
   static const std::regex ws_re(R"(\s+)");
-  std::string no_tags = std::regex_replace(html, tag_re, " ");
+  std::string pruned = drop_xpath_elements(html, remove_xpaths);
+  std::string no_tags = std::regex_replace(pruned, tag_re, " ");
   return std::regex_replace(no_tags, ws_re, " ");
 }
 
 /// Apply the SPIDER_BASE_URL override (used by audit fixtures) by replacing
 /// the host portion of `url` with `base`. If `base` is empty or `url` has
-/// no parseable host, returns `url` untouched. This is how Python's port
-/// reroutes scrape requests to a loopback fixture for the audit while
-/// keeping the per-call URL the LLM passed in.
+/// no parseable host, returns `url` untouched. This reroutes scrape requests
+/// to a loopback fixture for the audit while keeping the per-call URL the LLM
+/// passed in.
 std::string apply_base_override(const std::string& url, const std::string& base) {
   if (base.empty()) {
     return url;
@@ -52,7 +93,6 @@ std::string apply_base_override(const std::string& url, const std::string& base)
 
 /// Spider scrape skill — issues a real GET against the URL the LLM passes
 /// in. Strips HTML tags from the response and returns the text payload.
-/// Matches Python `SpiderSkill`'s scrape_url behavior.
 ///
 /// `SPIDER_BASE_URL` env var overrides the host portion of the URL the
 /// caller passes in (used by `audit_skills_dispatch.py` to redirect
@@ -70,9 +110,21 @@ class SpiderSkill : public SkillBase {
     return true;
   }
 
+  /// XPath expressions for the elements stripped from a fetched page before
+  /// text extraction. PREFILLED at construction — deliberately not an empty
+  /// default. Callers read it to see what gets dropped;
+  /// ``set_remove_xpaths`` replaces the set.
+  [[nodiscard]] const std::vector<std::string>& remove_xpaths() const { return remove_xpaths_; }
+  void set_remove_xpaths(const std::vector<std::string>& xpaths) { remove_xpaths_ = xpaths; }
+
   std::vector<swaig::ToolDefinition> register_tools() override {
     std::string prefix = get_param<std::string>(params_, "prefix", "");
     std::vector<swaig::ToolDefinition> tools;
+    // shared_ptr, not a by-value vector: the capture must be nothrow-copyable
+    // (clang-tidy bugprone-exception-escape flags a handler whose CAPTURE can
+    // throw on copy), and a ToolDefinition outlives the skill instance that
+    // registered it, so capturing ``this`` would dangle.
+    const auto remove_xpaths = std::make_shared<const std::vector<std::string>>(remove_xpaths_);
 
     tools.push_back(define_tool(
         prefix + "scrape_url", "Scrape content from a URL",
@@ -81,13 +133,20 @@ class SpiderSkill : public SkillBase {
                        json::object({{"url", json::object({{"type", "string"},
                                                            {"description", "URL to scrape"}})}})},
                       {"required", json::array({"url"})}}),
-        [](const json& args, const json&) -> swaig::FunctionResult {
+        [remove_xpaths](const json& args, const json&) -> swaig::FunctionResult {
           std::string url = args.value("url", "");
           if (url.empty()) {
             return swaig::FunctionResult("No URL provided");
           }
 
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
 
           auto resp = http_get(effective);
@@ -106,15 +165,15 @@ class SpiderSkill : public SkillBase {
             try {
               json parsed = json::parse(resp.body);
               if (parsed.contains("_raw_html") && parsed["_raw_html"].is_string()) {
-                text = strip_html(parsed["_raw_html"].get<std::string>());
+                text = strip_html(parsed["_raw_html"].get<std::string>(), *remove_xpaths);
               } else {
-                text = strip_html(resp.body);
+                text = strip_html(resp.body, *remove_xpaths);
               }
             } catch (...) {
-              text = strip_html(resp.body);
+              text = strip_html(resp.body, *remove_xpaths);
             }
           } else {
-            text = strip_html(resp.body);
+            text = strip_html(resp.body, *remove_xpaths);
           }
 
           std::ostringstream out;
@@ -129,7 +188,7 @@ class SpiderSkill : public SkillBase {
                        json::object({{"start_url", json::object({{"type", "string"},
                                                                  {"description", "Start URL"}})}})},
                       {"required", json::array({"start_url"})}}),
-        [](const json& args, const json&) -> swaig::FunctionResult {
+        [remove_xpaths](const json& args, const json&) -> swaig::FunctionResult {
           // Crawl is implemented as a single-page scrape of the start
           // URL — the deeper crawl loop is a future feature; for now
           // we fetch the start page (real HTTP, real HTML strip) so
@@ -141,13 +200,20 @@ class SpiderSkill : public SkillBase {
           }
 
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
 
           auto resp = http_get(effective);
           if (resp.status == 0) {
             return swaig::FunctionResult("Spider transport error: " + resp.error);
           }
-          std::string text = strip_html(resp.body);
+          std::string text = strip_html(resp.body, *remove_xpaths);
           return swaig::FunctionResult("Crawl page " + effective + ":\n" + text);
         }));
 
@@ -165,6 +231,13 @@ class SpiderSkill : public SkillBase {
             return swaig::FunctionResult("No URL provided");
           }
           std::string base = get_env("SPIDER_BASE_URL");
+          // SSRF protection: a caller-supplied URL that resolves to a private
+          // or internal address is refused (SWML_ALLOW_PRIVATE_URLS turns the
+          // check off). An operator's SPIDER_BASE_URL replaces the host, so the
+          // caller's URL is not what gets fetched then.
+          if (base.empty() && !utils::url_validator::validate_url(url)) {
+            return swaig::FunctionResult("URL rejected: cannot access private or internal URLs");
+          }
           std::string effective = apply_base_override(url, base);
           auto resp = http_get(effective);
           if (resp.status == 0) {
@@ -179,6 +252,14 @@ class SpiderSkill : public SkillBase {
   std::vector<std::string> get_hints() const override {
     return {"scrape", "crawl", "extract", "web page", "website", "spider"};
   }
+
+ private:
+  /// PREFILLED at construction — deliberately NOT an empty default. These
+  /// seven selectors, in this order, are what a scrape strips before extracting
+  /// text.
+  std::vector<std::string> remove_xpaths_{
+      "//script", "//style", "//nav", "//header", "//footer", "//aside", "//noscript",
+  };
 };
 
 REGISTER_SKILL(SpiderSkill)

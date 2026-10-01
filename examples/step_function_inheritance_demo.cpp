@@ -36,41 +36,36 @@
 // Run this file to see the rendered SWML — there are no real webhook
 // endpoints behind the tools, this is purely a documentation example.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 #include <signalwire/swaig/function_result.hpp>
-#include <iostream>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("step_function_inheritance_demo", "/");
 
     // Register three SWAIG tools so we have something to whitelist.
     // In a real agent these would call out to webhooks; here they're
     // stubs.
-    agent.define_tool(
-        "lookup_account",
-        "Look up customer account details by account number",
-        {{"account_number", {{"type", "string"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("looked up");
-        });
+    agent.define_tool("lookup_account", "Look up customer account details by account number",
+                      {{"account_number", {{"type", "string"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("looked up");
+                      });
+
+    agent.define_tool("process_payment", "Process a payment for the current customer",
+                      {{"amount", {{"type", "number"}}}},
+                      [](const nlohmann::json&, const nlohmann::json&) {
+                        return swaig::FunctionResult("payment processed");
+                      });
 
     agent.define_tool(
-        "process_payment",
-        "Process a payment for the current customer",
-        {{"amount", {{"type", "number"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("payment processed");
-        });
-
-    agent.define_tool(
-        "send_receipt",
-        "Email a receipt to the customer",
-        {{"email", {{"type", "string"}}}},
-        [](const nlohmann::json&, const nlohmann::json&) {
-            return swaig::FunctionResult("sent");
-        });
+        "send_receipt", "Email a receipt to the customer", {{"email", {{"type", "string"}}}},
+        [](const nlohmann::json&, const nlohmann::json&) { return swaig::FunctionResult("sent"); });
 
     // Build the contexts.
     auto& cb = agent.define_contexts();
@@ -123,6 +118,10 @@ int main() {
     // exactly which steps have a `functions` key in the output and
     // which don't.
     auto swml = agent.render_swml();
-    std::cout << swml.dump(2) << std::endl;
+    std::cout << swml.dump(2) << '\n';
     return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

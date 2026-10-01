@@ -105,7 +105,9 @@ bool AuthHandler::bearer_ok(const Headers& headers) const {
   if (!starts_with(auth, "Bearer ")) {
     return false;
   }
-  return verify_bearer_token(BearerCredentials{auth.substr(7)});
+  // Split the header the way FastAPI's HTTPBearer does: the scheme token and
+  // the credential string are carried as two separate fields.
+  return verify_bearer_token(BearerCredentials{"Bearer", auth.substr(7)});
 }
 
 bool AuthHandler::api_key_ok(const Headers& headers) const {

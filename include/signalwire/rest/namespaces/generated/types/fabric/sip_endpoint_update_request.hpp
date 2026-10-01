@@ -35,6 +35,7 @@ struct SipEndpointUpdateRequest {
   std::optional<json> encryption;
   std::optional<json> call_handler;
   std::optional<json> calling_handler_resource_id;
+  std::optional<std::string> password;
   json extras = json::object();
 };
 

@@ -31,10 +31,9 @@ struct Subscriber {
   std::optional<std::string> last_name;
   std::optional<std::string> display_name;
   std::optional<std::string> job_title;
-  std::optional<std::string> timezone;
   std::optional<std::string> country;
-  std::optional<std::string> region;
   std::optional<std::string> company_name;
+  std::optional<std::string> time_zone;
   json extras = json::object();
 };
 

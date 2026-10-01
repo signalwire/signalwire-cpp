@@ -10,12 +10,11 @@
 namespace signalwire {
 namespace rest {
 
-/// RequestOptions — the REST request-options envelope (plan 4.2).
+/// RequestOptions — the REST request-options envelope.
 ///
 /// A single value object controlling per-request transport behavior: timeout,
 /// retries (with an idempotency-aware retry policy + exponential backoff), and
-/// cooperative cancellation. Mirrors Python's
-/// ``signalwire.rest._request_options.RequestOptions``.
+/// cooperative cancellation.
 ///
 /// Supplied at two levels:
 ///  - **Client default**: ``RestClient(..., request_options)`` stored on the
@@ -28,10 +27,10 @@ namespace rest {
 /// defaults (the contract floor) live on ``HttpClient`` and are resolved at
 /// apply-time (per-request over client-default over built-in).
 ///
-/// ``abort_signal`` fidelity is per-port idiom: in C++ (a synchronous httplib
-/// client) an in-flight blocking socket read cannot be interrupted without a
-/// thread, so cancellation is checked cooperatively *before* each attempt — the
-/// honest, portable minimum. It is a non-owning pointer to a caller-owned
+/// ``abort_signal`` is COOPERATIVE, not pre-emptive: this is a synchronous
+/// httplib client, so an in-flight blocking socket read cannot be interrupted
+/// without a thread. Cancellation is therefore checked *before* each attempt,
+/// never during one. It is a non-owning pointer to a caller-owned
 /// ``std::atomic<bool>``; a truthy value raises the transport error before the
 /// send. ``nullptr`` == no cancellation (the default).
 struct RequestOptions {
@@ -54,8 +53,7 @@ struct RequestOptions {
 
   /// Return ``*this`` with any set (non-empty) field of ``override_opts``
   /// applied. This is the per-request-over-client-default shallow merge: an
-  /// unset field on ``override_opts`` leaves this value intact. Mirrors Python's
-  /// ``RequestOptions.merge``.
+  /// unset field on ``override_opts`` leaves this value intact.
   RequestOptions merge(const RequestOptions& override_opts) const {
     RequestOptions out = *this;
     if (override_opts.timeout.has_value()) {

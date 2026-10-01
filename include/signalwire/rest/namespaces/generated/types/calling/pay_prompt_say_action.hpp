@@ -25,8 +25,8 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PayPromptSayAction {
-  std::optional<std::string> type;
-  std::optional<std::string> phrase;
+  std::optional<json> type;
+  std::optional<json> phrase;
   json extras = json::object();
 };
 

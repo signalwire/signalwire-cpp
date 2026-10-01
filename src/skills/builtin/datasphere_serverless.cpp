@@ -23,6 +23,8 @@ class DatasphereServerlessSkill : public SkillBase {
     token_ = get_param_or_env(params, "token", "SIGNALWIRE_API_TOKEN");
     doc_id_ = get_param<std::string>(params, "document_id", "");
     tool_name_ = get_param<std::string>(params, "tool_name", "search_knowledge");
+    count_ = get_param<int>(params, "count", 1);
+    distance_ = get_param<double>(params, "distance", 3.0);
     return !space_.empty() && !project_id_.empty() && !token_.empty();
   }
 
@@ -38,7 +40,15 @@ class DatasphereServerlessSkill : public SkillBase {
         .webhook("POST", url,
                  json::object(
                      {{"Content-Type", "application/json"}, {"Authorization", "Basic " + auth}}))
-        .body(json::object({{"query", "${args.query}"}, {"document_id", doc_id_}, {"count", 1}}))
+        .params(json::object({{"document_id", doc_id_},
+                              {"query_string", "${args.query}"},
+                              {"count", count_},
+                              {"distance", distance_}}))
+        .foreach (json::object(
+            {{"input_key", "chunks"},
+             {"output_key", "formatted_results"},
+             {"max", count_},
+             {"append", "=== RESULT ===\n${this.text}\n" + std::string(50, '=') + "\n\n"}}))
         .output(swaig::FunctionResult(
             "I found results for \"${args.query}\":\n\n${formatted_results}"));
 
@@ -59,6 +69,8 @@ class DatasphereServerlessSkill : public SkillBase {
 
  private:
   std::string space_, project_id_, token_, doc_id_, tool_name_;
+  int count_ = 1;
+  double distance_ = 3.0;
 };
 
 REGISTER_SKILL(DatasphereServerlessSkill)

@@ -25,8 +25,9 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct DataMap {
-  std::optional<json> output;
+  std::optional<json> contexts;
   std::optional<json> expressions;
+  std::optional<json> output;
   std::optional<json> webhooks;
   json extras = json::object();
 };

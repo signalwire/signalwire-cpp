@@ -1,8 +1,10 @@
 #pragma once
 
+#include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace signalwire {
@@ -87,31 +89,29 @@ enum class CallbackMethod { Get, Post };
 // normalization point — the enum overload routes its wire string into the
 // EXACT string method, so the emitted SWML is byte-identical.
 //
-// ★ Three direction vocabularies + two codec vocabularies that must NEVER be
-// unified (they are bug generators): record_call's direction is
-// {speak,listen,both}, tap's direction is {speak,hear,both} (`hear`, not
-// `listen`), and tap's codec is the 2-value SWAIG set {PCMU,PCMA} — NOT the
-// wider RELAY connect/stream codec superset. Each set gets its OWN enum,
-// faithfully mirroring the reference's separate validation lists.
+// ★ The direction and codec vocabularies each get their OWN enum, faithfully
+// mirroring the reference's separate validation lists: record_call's and tap's
+// direction are both {speak,listen,both} (the engine accepts no "hear"), and
+// tap's codec is the 2-value SWAIG set {PCMU,PCMA} — NOT the wider RELAY
+// connect/stream codec superset.
 // ===========================================================================
 
 /// Recording container format for `FunctionResult::record_call`.
-/// Mirrors the reference's `format in {"wav","mp3","mp4"}` validation.
+/// The validated set is `format in {"wav","mp3","mp4"}`.
 enum class RecordFormat { Wav, Mp3, Mp4 };
 
 /// Audio direction for `FunctionResult::record_call`.
-/// Mirrors the reference's `direction in {"speak","listen","both"}` validation.
-/// NOTE: differs from `TapDirection` — record_call uses `listen`, tap uses `hear`.
+/// The validated set is `direction in {"speak","listen","both"}`.
 enum class RecordDirection { Speak, Listen, Both };
 
 /// Audio direction for `FunctionResult::tap`.
-/// Mirrors the reference's `direction in {"speak","hear","both"}` validation.
-/// NOTE: differs from `RecordDirection` — tap uses `hear`, record_call uses `listen`.
-enum class TapDirection { Speak, Hear, Both };
+/// The validated set is `direction in {"speak","listen","both"}`: what the
+/// party says, what the party hears, or both.
+enum class TapDirection { Speak, Listen, Both };
 
 /// Media codec for `FunctionResult::tap` (SWAIG tap only).
-/// Mirrors the reference's `codec in {"PCMU","PCMA"}` validation. The wire
-/// strings are upper-case. Distinct from the wider RELAY codec set — do not unify.
+/// The validated set is `codec in {"PCMU","PCMA"}`. The wire strings are
+/// upper-case. Distinct from the wider RELAY codec set — do not unify.
 enum class Codec { Pcmu, Pcma };
 
 [[nodiscard]] inline std::string record_format_value(RecordFormat v) {
@@ -140,8 +140,8 @@ enum class Codec { Pcmu, Pcma };
   switch (v) {
     case TapDirection::Speak:
       return "speak";
-    case TapDirection::Hear:
-      return "hear";
+    case TapDirection::Listen:
+      return "listen";
     case TapDirection::Both:
       return "both";
   }
@@ -168,16 +168,26 @@ enum class Codec { Pcmu, Pcma };
 ///
 /// `JoinConferenceOptions::beep = ConferenceBeep::OnEnter;` and
 /// `... = "onEnter";` both compile and resolve to the same wire string; the
-/// open-string path matches Python's bare `str` (the validation in
-/// `join_conference` then rejects out-of-set strings exactly as Python does).
+/// open-string path keeps out-of-set values expressible, and the validation in
+/// `join_conference` then rejects out-of-set strings.
 /// Templated on the enum type plus its `*_value()` mapper so one definition
 /// covers all four sets.
 template <typename E, std::string (*Map)(E)>
+/// @tparam E   the closed-set enum this field accepts.
+/// @tparam Map the enum's `*_value()` mapper — the single point where an
+///   enumerator becomes its wire string, so the typed and the string path can
+///   never disagree.
 struct EnumOrString {
+  /// The resolved wire string. Normalized at construction: an enum operand is
+  /// mapped through `Map`, a string operand is stored verbatim.
   std::string value;
-  EnumOrString(E e) : value(Map(e)) {}              // NOLINT(google-explicit-constructor)
+  /// Implicit from the enum — mapped to its wire string.
+  EnumOrString(E e) : value(Map(e)) {}  // NOLINT(google-explicit-constructor)
+  /// Implicit from a string — stored as-is, unvalidated.
   EnumOrString(const std::string& s) : value(s) {}  // NOLINT
-  EnumOrString(const char* s) : value(s) {}         // NOLINT
+  /// Implicit from a string literal, so `= "onEnter"` needs no cast.
+  EnumOrString(const char* s) : value(s) {}  // NOLINT
+  /// The wire string this field serializes to.
   [[nodiscard]] const std::string& str() const { return value; }
 };
 
@@ -188,11 +198,10 @@ using MethodField = EnumOrString<CallbackMethod, &callback_method_value>;
 
 /// Options bag for `FunctionResult::join_conference`.
 ///
-/// Every field is `std::optional` and unset means "Python default" — so a
+/// Every field is `std::optional` and unset means "omit from the wire" — so a
 /// default-constructed `JoinConferenceOptions` collapses to the bare
-/// conference-name string form, matching the reference's simple case. Closed
-/// sets use the enum-or-string wrapper above; open fields are plain
-/// `std::optional`. `result` is a free-form `json` (Python's `Optional[Any]`).
+/// conference-name string form. Closed sets use the enum-or-string wrapper
+/// above; open fields are plain `std::optional`. `result` is a free-form `json`.
 struct JoinConferenceOptions {
   std::optional<bool> muted;
   std::optional<BeepField> beep;
@@ -217,21 +226,32 @@ struct JoinConferenceOptions {
 /// Every method returns *this for chaining.
 class FunctionResult {
  public:
-  explicit FunctionResult(const std::string& response = "", bool post_process = false);
+  /// `response` is a prompt for the model (not speech played to the caller).
+  /// `tool_result` / `tool_prompt`, when either is given, set the structured
+  /// response form instead (see set_tool_response).
+  explicit FunctionResult(const std::string& response = "", bool post_process = false,
+                          std::optional<std::string> tool_result = std::nullopt,
+                          std::optional<std::string> tool_prompt = std::nullopt);
 
   // ========================================================================
   // Core
   // ========================================================================
 
-  /// The spoken/returned text (reference: ``self.response``) — emitted as the
-  /// ``response`` key when non-empty. Readable back after construction or a
-  /// ``set_response`` call.
-  [[nodiscard]] const std::string& response() const { return response_; }
-  /// Whether the AI processes the result before speaking (reference:
-  /// ``self.post_process``) — emitted only alongside an action.
+  /// The response — a string, or the structured ``{tool_result, tool_prompt}``
+  /// object set by set_tool_response — emitted as the ``response`` key when
+  /// non-empty. Readable back after construction or a set call.
+  [[nodiscard]] const json& response() const { return response_; }
+  /// Whether the AI processes the result before speaking — emitted only
+  /// alongside an action.
   [[nodiscard]] bool post_process() const { return post_process_; }
 
   FunctionResult& set_response(const std::string& response);
+  /// Set the structured response form, separating outcome from instruction:
+  /// ``{"tool_result": <what the tool DID>, "tool_prompt": <what to SAY next>}``.
+  /// Either may be omitted (an omitted one is left out of the object). Keeps the
+  /// model from reading a status line aloud.
+  FunctionResult& set_tool_response(std::optional<std::string> tool_result = std::nullopt,
+                                    std::optional<std::string> tool_prompt = std::nullopt);
   FunctionResult& set_post_process(bool pp);
   FunctionResult& add_action(const std::string& name, const json& data);
   FunctionResult& add_actions(const std::vector<json>& actions);
@@ -245,7 +265,16 @@ class FunctionResult {
   FunctionResult& swml_transfer(const std::string& dest, const std::string& ai_response,
                                 bool final = true);
   FunctionResult& hangup();
-  FunctionResult& hold(int timeout = 300);
+  /// Put the call on hold, optionally announcing it and routing what happens next.
+  /// A string `prompt` becomes the structured response (tool_result "status: on
+  /// hold", tool_prompt = prompt) and turns on post_process, so the model speaks
+  /// before the hold lands; an int `prompt` is taken as `timeout`, so `hold(120)`
+  /// keeps working. `timeout` is clamped to 0..900. `step` / `timeout_step` name
+  /// the step to land in when the hold ends / times out; with neither, the bare
+  /// integer form is emitted.
+  FunctionResult& hold(std::optional<std::variant<std::string, int>> prompt = std::nullopt,
+                       int timeout = 300, std::optional<std::string> step = std::nullopt,
+                       std::optional<std::string> timeout_step = std::nullopt);
   FunctionResult& wait_for_user(std::optional<bool> enabled = std::nullopt,
                                 std::optional<int> timeout = std::nullopt,
                                 bool answer_first = false);
@@ -265,13 +294,22 @@ class FunctionResult {
   FunctionResult& switch_context(const std::string& system_prompt = "",
                                  const std::string& user_prompt = "", bool consolidate = false,
                                  bool full_reset = false);
-  FunctionResult& replace_in_history(const json& text);
+  /// After first send, replace the tool_call+result pair in conversation
+  /// history. ``text`` is a STRING (replace the tool_call with an assistant
+  /// message carrying this text) or ``true`` (remove the pair entirely).
+  /// Defaults to ``true``.
+  FunctionResult& replace_in_history(const json& text = true);
 
   // ========================================================================
   // Media
   // ========================================================================
 
   FunctionResult& say(const std::string& text);
+  /// Change the agent's voice for the rest of the call. `voice` is an
+  /// ``engine.voice:model`` spec (the ``engine.`` prefix and ``:model`` suffix are
+  /// optional); it replaces the voice of the language in use at the next speech
+  /// batch boundary.
+  FunctionResult& change_voice(const std::string& voice);
   FunctionResult& play_background_file(const std::string& filename, bool wait = false);
   FunctionResult& stop_background_file();
   FunctionResult& record_call(
@@ -316,18 +354,18 @@ class FunctionResult {
 
   FunctionResult& execute_swml(const json& swml_content, bool transfer = false);
 
-  /// Join an ad-hoc audio conference (SWML `join_conference`). Full support
-  /// with Python `core/function_result.py`: 18 optional params past `name`,
-  /// 7 validations, and simple (bare-name) vs full-object emission.
+  /// Join an ad-hoc audio conference (SWML `join_conference`). 18 optional
+  /// params past `name`, 7 validations, and simple (bare-name) vs full-object
+  /// emission.
   ///
-  /// Flat positional overload — mirrors the Python signature 1:1 so the
-  /// cross-language audit lines up on parameter count/types. The closed-set
-  /// params are bare `std::string` (Python uses bare `str`); the
-  /// options-struct overload below adds the typed `enum class` affordance.
+  /// Flat positional overload. The closed-set params are bare `std::string`
+  /// here; the options-struct overload below adds the typed `enum class`
+  /// affordance.
   FunctionResult& join_conference(
       const std::string& name, bool muted = false, const std::string& beep = "true",
       bool start_on_enter = true, bool end_on_exit = false,
-      std::optional<std::string> wait_url = std::nullopt, int max_participants = 250,
+      std::optional<std::string> wait_url = std::nullopt,
+      std::optional<int> max_participants = std::nullopt,
       const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt,
       const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt,
       std::optional<std::string> status_callback_event = std::nullopt,
@@ -354,7 +392,7 @@ class FunctionResult {
   /// string signature canonical; normalizes the enums via
   /// `tap_direction_value`/`codec_value` and delegates to the std::string
   /// `tap`, so the emitted SWML is byte-identical. NOTE the tap direction set
-  /// is {speak,hear,both} (`hear`, not record_call's `listen`).
+  /// is {speak,listen,both}.
   FunctionResult& tap(const std::string& uri, const std::string& control_id, TapDirection direction,
                       Codec codec, int rtp_ptime = 20, const std::string& status_url = "");
   FunctionResult& stop_tap(const std::string& control_id = "");
@@ -366,8 +404,8 @@ class FunctionResult {
                       const std::string& input_method = "dtmf", const std::string& status_url = "",
                       const std::string& payment_method = "credit-card", int timeout = 5,
                       int max_attempts = 1, bool security_code = true,
-                      const std::string& postal_code = "true", int min_postal_code_length = 0,
-                      const std::string& token_type = "reusable",
+                      const std::variant<bool, std::string>& postal_code = true,
+                      int min_postal_code_length = 0, const std::string& token_type = "reusable",
                       const std::string& charge_amount = "", const std::string& currency = "usd",
                       const std::string& language = "en-US", const std::string& voice = "woman",
                       const std::string& description = "",
@@ -386,8 +424,18 @@ class FunctionResult {
                               const std::string& call_id = "", const std::string& node_id = "");
   FunctionResult& rpc_dial(const std::string& to_number, const std::string& from_number,
                            const std::string& dest_swml, const std::string& device_type = "phone");
-  FunctionResult& rpc_ai_message(const std::string& call_id, const std::string& message_text,
-                                 const std::string& role = "system");
+  /// Send a message and/or global_data to an AI agent on another call: the
+  /// message lands as a conversation turn (with `role`); `global_data` is MERGED
+  /// into the other call's global_data. Throws std::invalid_argument when neither
+  /// is given.
+  FunctionResult& rpc_ai_message(const std::string& call_id,
+                                 std::optional<std::string> message_text = std::nullopt,
+                                 const std::string& role = "system",
+                                 std::optional<json> global_data = std::nullopt);
+  /// Merge `data` into another call's global_data, with no conversation turn
+  /// (rpc_ai_message with only global_data).
+  FunctionResult& rpc_ai_global_data(const std::string& call_id,
+                                     const std::map<std::string, json>& data);
   FunctionResult& rpc_ai_unhold(const std::string& call_id);
 
   // ========================================================================
@@ -417,7 +465,7 @@ class FunctionResult {
   [[nodiscard]] std::string to_string(int indent = -1) const;
 
  private:
-  std::string response_;
+  json response_;
   std::vector<json> actions_;
   bool post_process_;
 };

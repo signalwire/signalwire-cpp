@@ -50,6 +50,13 @@ class VideoRoomRecordings : public BaseResource {
     return client_.get(base_path_ + "/" + id + "/" + std::string("events"), params,
                        request_options);
   }
+
+  [[nodiscard]] std::string download(const std::string& id,
+                                     const std::map<std::string, std::string>& params = {},
+                                     const RequestOptions& request_options = {}) const {
+    return client_.get_redirect_location(base_path_ + "/" + id + std::string(".mp4"), params,
+                                         request_options);
+  }
 };
 
 }  // namespace generated

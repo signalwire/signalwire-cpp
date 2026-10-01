@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 #include "signalwire/rest/http_client.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <chrono>
 #include <cmath>
 #include <set>
+#include <stdexcept>
 #include <thread>
 
 #include "httplib.h"
@@ -281,9 +283,13 @@ static httplib::Headers make_headers(const std::string& auth,
 // on a transport failure retry (backoff) while attempts remain else raise the
 // transport error; on a non-2xx retry (Retry-After or backoff) only when the
 // method+status is retryable and attempts remain, else surface the typed error.
-json HttpClient::request(const std::string& method, const std::string& path, const json* body,
-                         const std::map<std::string, std::string>* params,
-                         const RequestOptions& per_request) const {
+HttpClient::RawResponse HttpClient::perform(
+    const std::string& method, const std::string& path, const json* body,
+    const std::map<std::string, std::string>* params, const RequestOptions& per_request,
+    const std::map<std::string, std::string>& extra_headers) const {
+  if (!missing_credential_.empty()) {
+    throw std::invalid_argument(missing_credential_);
+  }
   EffectiveOptions eff = resolve(request_options_, per_request);
 
   auto [scheme, host] = parse_url(base_url_);
@@ -309,6 +315,13 @@ json HttpClient::request(const std::string& method, const std::string& path, con
   client_url += "://";
   client_url += host;
 
+  // Per-call headers (e.g. Idempotency-Key, an Accept for a non-JSON body) ride
+  // over the client defaults for this request only.
+  std::map<std::string, std::string> merged_headers = headers_;
+  for (const auto& [k, v] : extra_headers) {
+    merged_headers[k] = v;
+  }
+
   int attempt = 0;
   while (true) {
     ++attempt;
@@ -320,9 +333,12 @@ json HttpClient::request(const std::string& method, const std::string& path, con
                                          method);
     }
 
+    // httplib does not follow redirects unless asked, so a 3xx comes back as-is
+    // (get_redirect_location reads its Location; every other call treats it as
+    // a non-2xx error, as before).
     httplib::Client cli(client_url);
     configure_client(cli, eff.timeout);
-    auto hdrs = make_headers(auth_header_, headers_);
+    auto hdrs = make_headers(auth_header_, merged_headers);
 
     httplib::Result res;
     if (method == "GET") {
@@ -360,25 +376,78 @@ json HttpClient::request(const std::string& method, const std::string& path, con
         sleep_backoff(delay);
         continue;
       }
-      // Not retryable / retries exhausted — fall through to handle_response,
-      // which throws the typed SignalWireRestError.
+      // Not retryable / retries exhausted — the caller's read surfaces the
+      // typed SignalWireRestError.
     }
 
     // §6.6 error-observability: carry the response headers into the typed
     // error so a non-2xx surfaces the platform request id to the caller.
-    std::map<std::string, std::string> response_headers(res->headers.begin(), res->headers.end());
-    return handle_response(res->status, res->body, path_for_error, method, response_headers);
+    return RawResponse{
+        res->status, res->body, path_for_error,
+        std::map<std::string, std::string>(res->headers.begin(), res->headers.end())};
   }
 }
 
+// The single funnel: resolve effective options, then run the retry/timeout/
+// abort loop, dispatching by method. Mirrors Python's _base.py retry loop —
+// total attempts = retries + 1; before each attempt check the abort signal;
+// on a transport failure retry (backoff) while attempts remain else raise the
+// transport error; on a non-2xx retry (Retry-After or backoff) only when the
+// method+status is retryable and attempts remain, else surface the typed error.
+json HttpClient::request(const std::string& method, const std::string& path, const json* body,
+                         const std::map<std::string, std::string>* params,
+                         const RequestOptions& per_request,
+                         const std::map<std::string, std::string>& extra_headers) const {
+  RawResponse r = perform(method, path, body, params, per_request, extra_headers);
+  return handle_response(r.status, r.body, r.url, method, r.headers);
+}
+
 json HttpClient::get(const std::string& path, const std::map<std::string, std::string>& params,
-                     const RequestOptions& request_options) const {
-  return request("GET", path, nullptr, &params, request_options);
+                     const RequestOptions& request_options,
+                     const std::map<std::string, std::string>& headers) const {
+  return request("GET", path, nullptr, &params, request_options, headers);
+}
+
+std::string HttpClient::get_text(const std::string& path,
+                                 const std::map<std::string, std::string>& params,
+                                 const RequestOptions& request_options,
+                                 const std::map<std::string, std::string>& headers) const {
+  RawResponse r = perform("GET", path, nullptr, &params, request_options, headers);
+  if (r.status < 200 || r.status >= 300) {
+    (void)handle_response(r.status, r.body, r.url, "GET", r.headers);  // throws
+  }
+  return r.body;
+}
+
+std::string HttpClient::get_redirect_location(const std::string& path,
+                                              const std::map<std::string, std::string>& params,
+                                              const RequestOptions& request_options) const {
+  RawResponse r = perform("GET", path, nullptr, &params, request_options, {});
+  if (r.status >= 400 || r.status < 200) {
+    (void)handle_response(r.status, r.body, r.url, "GET", r.headers);  // throws
+  }
+  if (r.status >= 300 && r.status < 400) {
+    for (const auto& [k, v] : r.headers) {
+      if (k.size() == 8 &&
+          std::equal(
+              k.begin(), k.end(), "location",
+              [](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) == b; }) &&
+          !v.empty()) {
+        return v;
+      }
+    }
+  }
+  // A success that is not the redirect the endpoint answers with.
+  throw SignalWireRestError(r.status,
+                            "GET " + r.url + " returned " + std::to_string(r.status) +
+                                ": expected a redirect with a Location header",
+                            r.body, r.url, "GET", r.headers);
 }
 
 json HttpClient::post(const std::string& path, const json& body,
-                      const RequestOptions& request_options) const {
-  return request("POST", path, &body, nullptr, request_options);
+                      const RequestOptions& request_options,
+                      const std::map<std::string, std::string>& headers) const {
+  return request("POST", path, &body, nullptr, request_options, headers);
 }
 
 json HttpClient::put(const std::string& path, const json& body,

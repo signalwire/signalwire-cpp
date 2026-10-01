@@ -215,7 +215,7 @@ result.tap("wss://example.com/tap");
 result.tap("rtp://192.168.1.100:5004", "monitoring_tap_001", "both", "PCMA", 30);
 ```
 
-A typed overload accepts the `TapDirection` and `Codec` enums. Note the tap direction set is `{speak, hear, both}` (`hear`, not `record_call`'s `listen`):
+A typed overload accepts the `TapDirection` and `Codec` enums. The tap direction set is `{speak, listen, both}`:
 
 ```cpp
 result.tap("wss://monitoring.example.com/audio", "compliance_tap",

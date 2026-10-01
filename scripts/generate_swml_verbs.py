@@ -31,6 +31,7 @@ Usage:
     python3 scripts/generate_swml_verbs.py --check    # GEN-FRESH: fail if stale
     python3 scripts/generate_swml_verbs.py --out DIR  # scratch: emit into DIR
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,7 +44,9 @@ from pathlib import Path
 
 def _load_rest_generator():
     here = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location("generate_rest", here / "generate_rest.py")
+    spec = importlib.util.spec_from_file_location(
+        "generate_rest", here / "generate_rest.py"
+    )
     if spec is None or spec.loader is None:  # pragma: no cover
         raise SystemExit("generate_swml_verbs.py: cannot load generate_rest.py")
     mod = importlib.util.module_from_spec(spec)
@@ -118,64 +121,132 @@ def _flatten_union(defs: dict, node) -> dict:
     return out
 
 
+def _load_reference_generator(psdk: Path):
+    """Load the reference generator (porting-sdk scripts/generate_python_rest_types.py)
+    BY PATH for its pure schema transforms. It imports only the stdlib plus its sibling
+    ``_yaml_load`` at module scope. The transforms that decide WHICH types exist
+    and what they are named — drop_deprecated_swml_verbs (deprecated verbs are not SDK
+    surface) and hoist_inline_objects (every inline property-bearing object becomes its
+    own named type, path-derived: AiConfig, AiParams, AiSWAIGFunctionsItem, ...) — are
+    taken from the reference rather than re-derived, so the C++ type set cannot drift
+    from the reference's by a reimplementation detail."""
+    path = psdk / "scripts" / "generate_python_rest_types.py"
+    spec = importlib.util.spec_from_file_location(
+        "_psdk_generate_python_rest_types", path
+    )
+    if spec is None or spec.loader is None:  # pragma: no cover
+        raise SystemExit(f"generate_swml_verbs.py: cannot load {path}")
+    mod = importlib.util.module_from_spec(spec)
+    # Its one sibling import (_yaml_load) resolves from the porting-sdk scripts dir.
+    scripts_dir = str(path.parent)
+    added = scripts_dir not in sys.path
+    if added:
+        sys.path.insert(0, scripts_dir)
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        if added:
+            sys.path.remove(scripts_dir)
+    return mod
+
+
 def build_outputs(psdk: Path) -> dict:
+    ref = _load_reference_generator(psdk)
     defs = _load_defs(psdk)
+    # Deprecated verbs (dial/eval/if) are not SDK surface: drop them before anything is
+    # emitted, so neither their wrapper nor their config types appear.
+    defs, _dropped = ref.drop_deprecated_swml_verbs(defs)
+    verb_roots: dict = {}
+    for arm in (defs.get("SWMLMethod") or {}).get("anyOf") or []:
+        wrapper = _ref_leaf(str(arm.get("$ref") or ""))
+        wprops = list(((defs.get(wrapper) or {}).get("properties") or {}).keys())
+        if wprops:
+            verb_roots[wrapper] = wprops[0]
+    defs, _hoisted = ref.hoist_inline_objects(defs, verb_roots)
+    # The SWAIG response envelope (SwaigAction / SwaigResponse) and the objects hoisted
+    # out of it are declared ONCE, by the SWAIG payload module; the SWML module does not
+    # declare a second copy.
+    envelope = [n for n in ref.SWAIG_ENVELOPE_TYPES if n in defs]
+
     outs: dict = {}
     emitted_names: set = set()
 
-    def emit(name: str, props: dict, desc: str, schema_name: "str | None" = None) -> None:
+    def emit(name: str, props: dict, desc: str, schema_name: str | None = None) -> None:
         if name in emitted_names:
             return
         emitted_names.add(name)
         fn = "/".join(SWML_VERBS_SUBDIR) + f"/{GR.snake(name)}.hpp"
-        outs[fn] = GR.emit_methodless_struct(SWML_VERBS_NS, name, props, desc,
-                                             "generate_swml_verbs.py",
-                                             schema_name=schema_name)
+        outs[fn] = GR.emit_methodless_struct(
+            SWML_VERBS_NS,
+            name,
+            props,
+            desc,
+            "generate_swml_verbs.py",
+            schema_name=schema_name,
+        )
 
-    # 1. One data struct per OBJECT $defs schema.
+    # 1. One data struct per OBJECT $defs schema (originals + hoisted).
     for raw_name, node in defs.items():
+        if raw_name in envelope or any(
+            raw_name.startswith(n) and raw_name[len(n) : len(n) + 1].isupper()
+            for n in envelope
+        ):
+            continue
         if not isinstance(node, dict) or not GR.is_object_schema(node):
             continue
-        emit(GR.type_name(raw_name), node.get("properties") or {},
-             f"schema.json $defs schema {raw_name!r}.", schema_name=raw_name)
+        emit(
+            GR.type_name(raw_name),
+            node.get("properties") or {},
+            f"schema.json $defs schema {raw_name!r}.",
+            schema_name=raw_name,
+        )
 
-    # 2. One <Verb>Config struct per flattenable SWMLMethod.anyOf verb.
-    sm = defs.get("SWMLMethod")
-    if sm:
-        for ref in sm.get("anyOf") or []:
-            wrapper = _ref_leaf(ref.get("$ref", ""))
-            wdef = defs.get(wrapper)
-            if not wdef or not (wdef.get("properties") or {}):
-                continue
-            verb = next(iter(wdef["properties"].keys()))
-            if verb in HAND_WRITTEN_VERBS:
-                continue
-            inner = wdef["properties"][verb]
-            if _type_str(inner) == "string" or inner.get("$ref"):
-                continue
-            has_inline = _type_str(inner) == "object" and bool(inner.get("properties"))
-            if not inner.get("oneOf") and not has_inline:
-                continue
-            props = _flatten_union(defs, inner)
-            if not props:
-                continue
-            emit(GR.type_name(_pascal(verb) + "Config"), props,
-                 f"flattened SWMLMethod verb {verb!r} config.")
+    # 2. One <Verb>Config struct per SWMLMethod.anyOf verb whose body has no single
+    #    object config of its own (a oneOf union): the flattened union of its variants.
+    doc = {"$defs": defs}
+    for arm in (defs.get("SWMLMethod") or {}).get("anyOf") or []:
+        wrapper = _ref_leaf(arm.get("$ref", ""))
+        wdef = defs.get(wrapper)
+        if not wdef or not (wdef.get("properties") or {}):
+            continue
+        verb = next(iter(wdef["properties"].keys()))
+        if verb in HAND_WRITTEN_VERBS:
+            continue
+        inner = wdef["properties"][verb]
+        if inner.get("type") == "string" or ref._verb_config_ref(defs, inner):
+            continue
+        if not (
+            inner.get("oneOf")
+            or (inner.get("type") == "object" and inner.get("properties"))
+        ):
+            continue
+        props, _req = ref._flatten_union(doc, inner)
+        if not props:
+            continue
+        emit(
+            GR.type_name(_pascal(verb) + "Config"),
+            props,
+            f"flattened SWMLMethod verb {verb!r} config.",
+        )
 
     return outs
 
 
 def main(argv: list) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--check", action="store_true", help="GEN-FRESH: exit non-zero if stale")
+    ap.add_argument(
+        "--check", action="store_true", help="GEN-FRESH: exit non-zero if stale"
+    )
     ap.add_argument("--out", default="", help="scratch: emit into this dir")
     args = ap.parse_args(argv)
 
     psdk = resolve_porting_sdk()
     outs = build_outputs(psdk)
     # Only C++ headers are formatted; any .json sidecars are emitted verbatim.
-    outs = {fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
-            for fn, src in outs.items()}
+    outs = {
+        fn: (format_generated_cpp(src) if fn.endswith((".hpp", ".h")) else src)
+        for fn, src in outs.items()
+    }
 
     out_dir = Path(args.out) if args.out else repo_root() / "include" / "signalwire"
 
@@ -193,11 +264,15 @@ def main(argv: list) -> int:
                 if rel not in expected:
                     stale.append(f"{p} (leftover — not in generator output)")
         if stale:
-            sys.stderr.write("GEN-FRESH FAIL: %d generated SWML-verb file(s) stale:\n" % len(stale))
+            sys.stderr.write(
+                f"GEN-FRESH FAIL: {len(stale)} generated SWML-verb file(s) stale:\n"
+            )
             for s in stale:
-                sys.stderr.write("  - %s\n" % s)
+                sys.stderr.write(f"  - {s}\n")
             return 1
-        print("GEN-FRESH: generated SWML-verb files match porting-sdk/schema.json ($defs).")
+        print(
+            "GEN-FRESH: generated SWML-verb files match porting-sdk/schema.json ($defs)."
+        )
         return 0
 
     for fn, src in outs.items():

@@ -19,42 +19,40 @@
 // Build:
 //     cmake --build build --target example_relay_answer_and_welcome
 
-#include <signalwire/relay/client.hpp>
 #include <iostream>
+#include <signalwire/relay/client.hpp>
 
 using namespace signalwire::relay;
 using json = nlohmann::json;
 
 int main() {
-    auto client = RelayClient::from_env();
+  auto client = RelayClient::from_env();
 
-    client.on_call([](Call& call) {
-        std::cout << "Inbound call from " << call.from() << "\n";
+  client.on_call([](Call& call) {
+    std::cout << "Inbound call from " << call.from() << "\n";
 
-        // Answer the call.
-        call.answer();
+    // Answer the call.
+    call.answer();
 
-        // Play a TTS greeting and wait for it to finish. wait() returns false
-        // if the call ends before playback completes.
-        auto action = call.play({
-            json{
-                {"type", "tts"},
-                {"params", json{{"text", "Welcome to SignalWire! How can I help you today?"}}},
-            }
-        });
-        if (!action.wait()) {
-            std::cout << "Greeting interrupted (caller hung up early)\n";
-        }
+    // Play a TTS greeting and wait for it to finish. wait() returns false
+    // if the call ends before playback completes.
+    auto action = call.play({json{
+        {"type", "tts"},
+        {"params", json{{"text", "Welcome to SignalWire! How can I help you today?"}}},
+    }});
+    if (!action.wait()) {
+      std::cout << "Greeting interrupted (caller hung up early)\n";
+    }
 
-        // Hang up cleanly. wait_for_ended() returns false on timeout.
-        call.hangup();
-        if (call.wait_for_ended(10000)) {
-            std::cout << "Call ended\n";
-        } else {
-            std::cout << "Timed out waiting for call end\n";
-        }
-    });
+    // Hang up cleanly. wait_for_ended() returns false on timeout.
+    call.hangup();
+    if (call.wait_for_ended(10000)) {
+      std::cout << "Call ended\n";
+    } else {
+      std::cout << "Timed out waiting for call end\n";
+    }
+  });
 
-    std::cout << "Waiting for inbound calls...\n";
-    client.run();
+  std::cout << "Waiting for inbound calls...\n";
+  client.run();
 }

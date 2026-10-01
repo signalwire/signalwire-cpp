@@ -49,7 +49,7 @@ struct RoomSessionSummary {
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
   std::optional<json> preview_url;
-  std::optional<json> prioritize_handraise;
+  std::optional<bool> prioritize_handraise;
   std::optional<json> sync_audio_video;
   json extras = json::object();
 };

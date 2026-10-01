@@ -48,6 +48,7 @@ struct CreateDomainApplicationRequest {
   std::optional<std::string> call_laml_application_id;
   std::optional<json> call_video_room_id;
   std::optional<std::string> call_relay_script_url;
+  std::optional<std::string> call_relay_script_url_method;
   std::optional<json> call_dialogflow_agent_id;
   std::optional<json> call_ai_agent_id;
   std::optional<json> call_flow_id;

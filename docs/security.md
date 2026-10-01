@@ -53,6 +53,21 @@ self-signed CA, point the transport at a PEM bundle. Certificate verification is
 | `SIGNALWIRE_RELAY_CA_FILE` | *system trust store* | Path to a PEM CA bundle the RELAY WebSocket client trusts for `wss://` connections. `SSL_CERT_FILE` is a secondary fallback. |
 | `SIGNALWIRE_RELAY_PING_INTERVAL_SECS` | `30` | RELAY WebSocket ping-heartbeat interval (seconds). The client pings the peer at this interval and, absent a pong, closes the socket so a half-open peer is detected and reconnection kicks in. A value ≤ 0 or malformed is ignored (keeps the default). |
 
+#### No silent downgrade to plaintext
+
+`SIGNALWIRE_RELAY_CA_FILE` is an explicit request to **verify** the RELAY peer,
+which a plaintext transport can never honour. If it is set while the RELAY
+transport resolves to plain `ws://` — a stale `SIGNALWIRE_RELAY_SCHEME`, a test
+harness export leaking into a real run, an operator who changed one setting and
+not the other — `RelayClient::connect()` **refuses and returns `false`**, logging
+which setting would otherwise have been silently ignored. It does not complete an
+unencrypted session behind a caller who asked for encryption.
+
+Plaintext *without* that variable is unaffected: `SIGNALWIRE_RELAY_SCHEME=ws`
+alone is an unambiguous request for a clear connection (the audit fixture and dev
+servers) and still works. Unset `SIGNALWIRE_RELAY_CA_FILE` to connect in the
+clear deliberately.
+
 ### Authentication
 
 | Variable | Default | Description |

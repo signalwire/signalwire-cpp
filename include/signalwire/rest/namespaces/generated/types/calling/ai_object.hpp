@@ -25,15 +25,21 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct AIObject {
+  std::optional<json> SWAIG;
+  std::optional<json> agent;
+  std::optional<json> engine;
   std::optional<json> global_data;
   std::optional<json> hints;
   std::optional<json> languages;
+  std::optional<json> multilingual;
   std::optional<json> params;
   std::optional<json> post_prompt;
-  std::optional<std::string> post_prompt_url;
-  std::optional<json> pronounce;
+  std::optional<json> post_prompt_auth_password;
+  std::optional<json> post_prompt_auth_user;
+  std::optional<json> post_prompt_url;
   std::optional<json> prompt;
-  std::optional<json> SWAIG;
+  std::optional<json> pronounce;
+  std::optional<json> voice;
   json extras = json::object();
 };
 

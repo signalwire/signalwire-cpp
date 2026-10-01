@@ -394,8 +394,11 @@ json drive_reconnect() {
   auto tp = Clock::now();
   try {
     (void)c.execute("calling.play", play_params());
+    // An error here is FINE and expected -- this probe measures only whether the
+    // call returns within a bounded window, not whether it succeeds. Swallowing
+    // is the intent; the elapsed time below is the assertion.
+    // NOLINTNEXTLINE(bugprone-empty-catch)
   } catch (const std::exception&) {
-    // an error is fine; boundedness is what matters
   }
   out["pending_faulted_not_hung"] =
       std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - tp).count() <
@@ -449,23 +452,30 @@ json drive_max_active_calls(int cap) {
 }  // namespace
 
 int main() {
-  if (!std::getenv("RELAY_DUMP_DEBUG")) {
-    signalwire::Logger::instance().suppress();
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
+    if (!std::getenv("RELAY_DUMP_DEBUG")) {
+      signalwire::Logger::instance().suppress();
+    }
+    ix::initNetSystem();
+
+    json out = json::object();
+    out["cred_missing_project"] = drive_cred_missing("project");
+    out["cred_missing_token"] = drive_cred_missing("token");
+    out["cred_auth_reject"] = drive_cred_auth_reject();
+    out["relay_contract_500"] = drive_relay_contract("500");
+    out["relay_contract_404"] = drive_relay_contract("404");
+    out["relay_contract_410"] = drive_relay_contract("410");
+    out["dead_peer_half_open"] = drive_dead_peer();
+    out["black_hole_silent_peer"] = drive_black_hole();
+    out["reconnect_after_drop"] = drive_reconnect();
+    out["max_active_calls_cap"] = drive_max_active_calls(2);
+
+    std::cout << out.dump() << "\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
   }
-  ix::initNetSystem();
-
-  json out = json::object();
-  out["cred_missing_project"] = drive_cred_missing("project");
-  out["cred_missing_token"] = drive_cred_missing("token");
-  out["cred_auth_reject"] = drive_cred_auth_reject();
-  out["relay_contract_500"] = drive_relay_contract("500");
-  out["relay_contract_404"] = drive_relay_contract("404");
-  out["relay_contract_410"] = drive_relay_contract("410");
-  out["dead_peer_half_open"] = drive_dead_peer();
-  out["black_hole_silent_peer"] = drive_black_hole();
-  out["reconnect_after_drop"] = drive_reconnect();
-  out["max_active_calls_cap"] = drive_max_active_calls(2);
-
-  std::cout << out.dump() << "\n";
-  return 0;
 }

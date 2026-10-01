@@ -29,6 +29,7 @@ struct AssignedNumber {
   std::optional<std::string> state;
   std::optional<json> campaign_id;
   std::optional<json> phone_number;
+  std::optional<std::string> status_callback_url;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
   json extras = json::object();

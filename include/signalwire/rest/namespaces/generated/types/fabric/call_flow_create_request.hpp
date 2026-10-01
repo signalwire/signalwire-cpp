@@ -27,6 +27,8 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CallFlowCreateRequest {
   std::optional<std::string> title;
+  std::optional<json> flow_data;
+  std::optional<json> relayml;
   json extras = json::object();
 };
 

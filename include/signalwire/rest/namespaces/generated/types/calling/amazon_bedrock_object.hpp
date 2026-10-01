@@ -25,12 +25,18 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct AmazonBedrockObject {
+  std::optional<json> SWAIG;
+  std::optional<std::string> app_name;
+  std::optional<std::string> assistant_name;
+  std::optional<std::string> assistant_prompt;
+  std::optional<std::string> conversation_id;
   std::optional<json> global_data;
+  std::optional<json> greeting_prompt;
   std::optional<json> params;
   std::optional<json> post_prompt;
   std::optional<std::string> post_prompt_url;
   std::optional<json> prompt;
-  std::optional<json> SWAIG;
+  std::optional<std::string> transcript_webhook_url;
   json extras = json::object();
 };
 

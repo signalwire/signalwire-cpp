@@ -28,11 +28,11 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PomSectionBodyContent {
   std::optional<std::string> title;
-  std::optional<json> subsections;
-  std::optional<json> numbered;
-  std::optional<json> numberedBullets;
   std::optional<std::string> body;
   std::optional<json> bullets;
+  std::optional<bool> numbered;
+  std::optional<bool> numberedBullets;
+  std::optional<json> subsections;
   json extras = json::object();
 };
 

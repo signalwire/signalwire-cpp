@@ -41,6 +41,7 @@ struct UpdatePhoneNumberRequest {
   std::optional<std::string> call_relay_topic;
   std::optional<std::string> call_relay_topic_status_callback_url;
   std::optional<std::string> call_relay_script_url;
+  std::optional<std::string> call_relay_script_url_method;
   std::optional<std::string> call_relay_context;
   std::optional<std::string> call_relay_context_status_callback_url;
   std::optional<std::string> call_relay_application;

@@ -38,6 +38,22 @@ std::string hmac_sha1_raw(std::string_view key, std::string_view message) {
   return std::string(reinterpret_cast<const char*>(out), out_len);
 }
 
+/// Lowercase-hex of HMAC-SHA256 over ``message`` keyed by ``key`` — the
+/// ``X-SignalWire-Sha256-Signature`` construction.
+std::string hex_hmac_sha256(std::string_view key, std::string_view message) {
+  unsigned char out[EVP_MAX_MD_SIZE];
+  unsigned int out_len = 0;
+  HMAC(EVP_sha256(), reinterpret_cast<const unsigned char*>(key.data()),
+       static_cast<int>(key.size()), reinterpret_cast<const unsigned char*>(message.data()),
+       message.size(), out, &out_len);
+  std::ostringstream ss;
+  ss << std::hex << std::setfill('0');
+  for (unsigned int i = 0; i < out_len; ++i) {
+    ss << std::setw(2) << static_cast<int>(out[i]);
+  }
+  return ss.str();
+}
+
 /// Lowercase-hex of the HMAC-SHA1 digest. Scheme A output.
 std::string hex_hmac_sha1(std::string_view key, std::string_view message) {
   auto raw = hmac_sha1_raw(key, message);
@@ -229,9 +245,7 @@ std::string build_url(const ParsedUrl& p, const std::string& port_override) {
   return out;
 }
 
-/// Return the URL variants to try for Scheme B port normalization.
-///
-/// Mirrors ``_candidate_urls`` in the Python reference:
+/// Return the URL variants to try for Scheme B port normalization:
 ///   - non-standard explicit port  -> just the input URL
 ///   - https + no port             -> input + url with :443
 ///   - http  + no port             -> input + url with :80
@@ -428,6 +442,19 @@ bool check_body_sha256(std::string_view url, std::string_view raw_body) {
 // Public API
 // ---------------------------------------------------------------------------
 
+bool ValidateWebhookSignatureSha256(std::string_view signing_key, std::string_view signature,
+                                    std::string_view url, std::string_view raw_body) {
+  if (signing_key.empty()) {
+    throw std::invalid_argument("signing_key is required");
+  }
+  if (signature.empty()) {
+    return false;
+  }
+  std::string msg(url);
+  msg.append(raw_body);
+  return safe_eq(hex_hmac_sha256(signing_key, msg), signature);
+}
+
 bool ValidateWebhookSignature(std::string_view signing_key, std::string_view signature,
                               std::string_view url, std::string_view raw_body) {
   if (signing_key.empty()) {
@@ -537,6 +564,18 @@ std::optional<std::tuple<int, std::map<std::string, std::string>, std::string>> 
   auto forbidden = []() -> ValidationResponse {
     return {403, {{"Content-Type", "text/plain"}}, "Forbidden"};
   };
+
+  // Prefer the stronger SHA-256 signature when the platform sends it
+  // (X-SignalWire-Sha256-Signature): same Scheme A message, SHA-256 hash. Fall
+  // back to the SHA-1 header below so older platform builds -- and the
+  // cXML/form Scheme B path -- keep validating.
+  // (signing_key was checked non-empty above, so the SHA-256 validator cannot
+  // throw here.)
+  std::string sha256_signature = find_header_ci("X-SignalWire-Sha256-Signature");
+  if (!sha256_signature.empty() &&
+      ValidateWebhookSignatureSha256(signing_key, sha256_signature, url, body)) {
+    return std::nullopt;
+  }
 
   std::string signature = find_header_ci("X-SignalWire-Signature");
   if (signature.empty()) {

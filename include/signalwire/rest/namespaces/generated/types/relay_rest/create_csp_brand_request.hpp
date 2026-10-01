@@ -31,6 +31,7 @@ struct CreateCspBrandRequest {
   std::optional<std::string> name;
   std::optional<std::string> csp_brand_reference;
   std::optional<std::string> status_callback_url;
+  std::optional<json> signalwire_contact_emails;
   json extras = json::object();
 };
 

@@ -68,9 +68,18 @@ Checks: >
   -readability-redundant-access-specifiers
 
 # Scope to first-party code only: vendored headers under deps/ (httplib.h,
-# json.hpp, nlohmann/) are NEVER linted. The filter matches both src/ and
-# include/ under the signalwire-cpp tree. (CI is Linux; on macOS Apple libc++
+# json.hpp, nlohmann/) are NEVER linted. (CI is Linux; on macOS Apple libc++
 # header drift can emit a trailing note — the header-filter keeps findings
 # scoped to our own headers regardless.)
-HeaderFilterRegex: 'signalwire-cpp/(src|include)/'
+#
+# Widened 2026-07-30 alongside scripts/run-lint.sh, from (src|include) to every
+# first-party tree, so headers pulled in from tools/, tests/ and the example
+# trees are analysed the same way. tests/ matters especially: 123 test .cpp files
+# are #included into test_main.cpp, so without tests/ here their findings would be
+# filtered out as "not the main file" and the gate would be VACUOUS over them. deps/ remains excluded because we do not own it — and
+# is now ALSO excluded at the compiler, via CMake marking it a SYSTEM include
+# directory, which is the only lever that works for clang-diagnostic-* entries
+# (those are compiler warnings surfaced through clang-tidy, so this regex never
+# applies to them).
+HeaderFilterRegex: 'signalwire-cpp/(src|include|tools|tests|examples|rest|relay)/'
 WarningsAsErrors: '*'

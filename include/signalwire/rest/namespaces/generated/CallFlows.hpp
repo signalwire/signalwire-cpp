@@ -31,20 +31,20 @@ class CallFlows : public FabricResource {
   [[nodiscard]] json list_addresses(const std::string& id,
                                     const std::map<std::string, std::string>& params = {},
                                     const RequestOptions& request_options = {}) const {
-    return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/addresses", params,
+    return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params,
                        request_options);
   }
 
   [[nodiscard]] json list_versions(const std::string& id,
                                    const std::map<std::string, std::string>& params = {},
                                    const RequestOptions& request_options = {}) const {
-    return client_.get(std::string("/api/fabric/resources/call_flow/") + id + "/versions", params,
+    return client_.get(base_path_ + "/" + id + "/" + std::string("versions"), params,
                        request_options);
   }
 
   [[nodiscard]] json deploy_version(const std::string& id, const json& body,
                                     const RequestOptions& request_options = {}) const {
-    return client_.post(std::string("/api/fabric/resources/call_flow/") + id + "/versions", body,
+    return client_.post(base_path_ + "/" + id + "/" + std::string("versions"), body,
                         request_options);
   }
 };

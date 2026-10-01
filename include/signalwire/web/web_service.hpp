@@ -3,17 +3,14 @@
 //
 // WebService — static-file serving service over an in-process HTTP server.
 //
-// Mirrors the Python reference signalwire.web.web_service.WebService and the
-// Java port com.signalwire.sdk.web.WebService. Maps URL route prefixes to local
-// directories and serves their files over HTTP with a file-allowed safety check
-// (size + extension/name filters), path-traversal protection, and optional
-// basic auth.
+// Maps URL route prefixes to local directories and serves their files over HTTP
+// with a file-allowed safety check (size + extension/name filters),
+// path-traversal protection, and optional basic auth.
 //
-// Idiom note: the Python reference builds a FastAPI/uvicorn app; C++ (an AOT
-// port, like Java) uses the vendored cpp-httplib server. start() launches the
-// server on a background thread (non-blocking) and returns the bound port, so
-// it is safe to start/stop in tests without hanging. Pass port 0 to bind an
-// OS-assigned ephemeral port.
+// Built on the vendored cpp-httplib server. start() launches the server on a
+// background thread (non-blocking) and returns the bound port, so it is safe to
+// start/stop in tests without hanging. Pass port 0 to bind an OS-assigned
+// ephemeral port.
 
 #pragma once
 
@@ -42,9 +39,9 @@ class WebService {
 
   /// Construct a WebService.
   ///
-  /// Mirrors the Python reference constructor surface. `config_file` is accepted
-  /// for signature compatibility; config-file loading (SecurityConfig / ConfigLoader)
-  /// is out of scope for this class and is a no-op here.
+  /// `config_file` is accepted but currently unused: config-file loading
+  /// (SecurityConfig / ConfigLoader) is out of scope for this class and is a
+  /// no-op here.
   explicit WebService(int port = 8002,
                       std::optional<std::map<std::string, std::string>> directories = std::nullopt,
                       std::optional<std::pair<std::string, std::string>> basic_auth = std::nullopt,
@@ -61,7 +58,7 @@ class WebService {
 
   /// Add a directory to serve at `route`. Remounts immediately if running.
   /// Throws std::invalid_argument when the path does not exist or is not a
-  /// directory (Python raises ValueError).
+  /// directory.
   void add_directory(const std::string& route, const std::string& directory);
 
   /// Remove the directory served at `route` (no-op when absent).
@@ -74,35 +71,31 @@ class WebService {
   /// Stop the service and release the socket. Safe to call when not running.
   void stop();
 
-  /// Whether a file may be served (size + extension/name filters). Mirrors the
-  /// Java fileAllowed / Python _is_file_allowed.
+  /// Whether a file may be served (size + extension/name filters).
   [[nodiscard]] bool file_allowed(const std::string& file_path) const;
 
   // ---- Accessors ----
-  // Every construction parameter the reference keeps as a public instance
-  // attribute is readable here. A caller hands these in, so a caller must be
-  // able to read them back (the reference's `self.max_file_size`,
-  // `self.enable_cors`, … are plain public attributes).
+  // Every construction parameter is readable back. A caller hands these in, so
+  // a caller must be able to read them back.
   [[nodiscard]] int port() const { return port_; }
   [[nodiscard]] const std::map<std::string, std::string>& directories() const {
     return directories_;
   }
-  /// reference: ``self.enable_directory_browsing`` — whether a directory URL
-  /// renders a listing instead of 404ing.
+  /// Whether a directory URL renders a listing instead of 404ing.
   [[nodiscard]] bool enable_directory_browsing() const { return enable_directory_browsing_; }
-  /// reference: ``self.allowed_extensions`` — when set, ONLY these extensions
-  /// are servable (nullopt = no allow-list, all-but-blocked are servable).
+  /// When set, ONLY these extensions are servable (nullopt = no allow-list,
+  /// all-but-blocked are servable).
   [[nodiscard]] const std::optional<std::vector<std::string>>& allowed_extensions() const {
     return allowed_extensions_;
   }
-  /// reference: ``self.blocked_extensions`` — never servable; defaulted to the
-  /// reference's built-in list when the caller passes none.
+  /// Never servable; defaults to a built-in list (``.env``, ``.git``, ``.key``,
+  /// ``.pem``, …) when the caller passes none.
   [[nodiscard]] const std::vector<std::string>& blocked_extensions() const {
     return blocked_extensions_;
   }
-  /// reference: ``self.max_file_size`` — bytes; a larger file is refused.
+  /// Maximum servable file size in bytes; a larger file is refused.
   [[nodiscard]] std::int64_t max_file_size() const { return max_file_size_; }
-  /// reference: ``self.enable_cors`` — whether CORS headers are emitted.
+  /// Whether CORS headers are emitted.
   [[nodiscard]] bool enable_cors() const { return enable_cors_; }
 
  private:

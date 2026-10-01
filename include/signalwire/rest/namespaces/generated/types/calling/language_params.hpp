@@ -25,8 +25,15 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct LanguageParams {
-  std::optional<json> stability;
+  std::optional<std::string> emotion;
+  std::optional<json> pitch;
   std::optional<json> similarity;
+  std::optional<json> speakingRate;
+  std::optional<json> speed;
+  std::optional<json> stability;
+  std::optional<json> streaming;
+  std::optional<json> temperature;
+  std::optional<json> vol;
   json extras = json::object();
 };
 

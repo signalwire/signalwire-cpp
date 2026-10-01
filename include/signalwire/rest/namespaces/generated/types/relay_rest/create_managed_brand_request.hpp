@@ -38,6 +38,8 @@ struct CreateManagedBrandRequest {
   std::optional<json> company_vertical;
   std::optional<std::string> company_website;
   std::optional<std::string> status_callback_url;
+  std::optional<std::string> csp_brand_reference;
+  std::optional<json> signalwire_contact_emails;
   json extras = json::object();
 };
 

@@ -39,6 +39,7 @@ struct CallLeg {
   std::optional<json> duration_ms;
   std::optional<json> billing_ms;
   std::optional<json> type;
+  std::optional<json> qos_metrics;
   std::optional<json> parent_id;
   json extras = json::object();
 };

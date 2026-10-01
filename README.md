@@ -28,7 +28,7 @@ _Build AI voice agents, control live calls over WebSocket, and manage every Sign
 |-----------|-------------|------------|
 | **AI Agents** | Build voice agents that handle calls autonomously -- the platform runs the AI pipeline, your code defines the persona, tools, and call flow | [Agent Guide](#ai-agents) |
 | **RELAY Client** | Control live calls and SMS/MMS in real time over WebSocket -- answer, play, record, collect DTMF, conference, transfer, and more | [RELAY docs](relay/README.md) |
-| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 22 API namespaces | [REST docs](rest/README.md) |
+| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 24 API namespaces | [REST docs](rest/README.md) |
 
 ```bash
 # Requirements: C++20 compiler, CMake 3.16+, OpenSSL
@@ -45,32 +45,40 @@ Each agent is a self-contained microservice that generates [SWML](docs/swml_serv
 
 <!-- include: examples/quickstart_agent.cpp#agent -->
 ```cpp
-#include <signalwire/agent/agent_base.hpp>
 #include <ctime>
+#include <iostream>
+#include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 using json = nlohmann::json;
 
 class MyAgent : public agent::AgentBase {
-public:
-    MyAgent() : AgentBase("my-agent", "/agent") {
-        add_language({"English", "en-US", "inworld.Mark"});
-        prompt_add_section("Role", "You are a helpful assistant.");
+ public:
+  MyAgent() : AgentBase("my-agent", "/agent") {
+    add_language({"English", "en-US", "inworld.Mark"});
+    prompt_add_section("Role", "You are a helpful assistant.");
 
-        define_tool("get_time", "Get the current time",
-            {{"type", "object"}, {"properties", json::object()}},
-            [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
-                auto now = std::time(nullptr);
-                char buf[32];
-                std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
-                return swaig::FunctionResult(std::string("The time is ") + buf);
-            });
-    }
+    define_tool("get_time", "Get the current time",
+                {{"type", "object"}, {"properties", json::object()}},
+                [](const json& /*args*/, const json& /*raw*/) -> swaig::FunctionResult {
+                  auto now = std::time(nullptr);
+                  char buf[32];
+                  std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
+                  return swaig::FunctionResult(std::string("The time is ") + buf);
+                });
+  }
 };
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     MyAgent agent;
     agent.run();  // Serves on http://0.0.0.0:3000/agent
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 ```
 
@@ -124,27 +132,24 @@ Real-time call control and messaging over WebSocket. The RELAY client connects t
 
 <!-- include: examples/quickstart_relay.cpp#relay -->
 ```cpp
-#include <signalwire/relay/client.hpp>
-
 #include <iostream>
+#include <signalwire/relay/client.hpp>
 
 using namespace signalwire::relay;
 
 int main() {
-    auto client = RelayClient::from_env();
+  auto client = RelayClient::from_env();
 
-    client.on_call([](Call& call) {
-        call.answer();
-        auto action = call.play({
-            {{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}
-        });
-        if (!action.wait()) {  // false = call ended before playback finished
-            std::cerr << "playback interrupted\n";
-        }
-        call.hangup();
-    });
+  client.on_call([](Call& call) {
+    call.answer();
+    auto action = call.play({{{"type", "tts"}, {"params", {{"text", "Welcome to SignalWire!"}}}}});
+    if (!action.wait()) {  // false = call ended before playback finished
+      std::cerr << "playback interrupted\n";
+    }
+    call.hangup();
+  });
 
-    client.run();
+  client.run();
 }
 ```
 
@@ -163,27 +168,36 @@ Synchronous REST client for managing SignalWire resources and controlling calls 
 
 <!-- include: examples/quickstart_rest.cpp#rest -->
 ```cpp
+#include <iostream>
 #include <signalwire/rest/rest_client.hpp>
 
 using namespace signalwire::rest;
 using json = nlohmann::json;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     auto client = RestClient::from_env();
 
     auto agents = client.fabric().ai_agents.list();
-    auto call   = client.calling().dial({
-        .from = "+15559876543", .to = "+15551234567",
+    auto call = client.calling().dial({
+        .from = "+15559876543",
+        .to = "+15551234567",
         .url = "https://example.com/handler",
     });
     auto numbers = client.phone_numbers().search({{"areacode", "512"}});
     auto results = client.datasphere().documents.search({
         .query_string = "billing policy",
     });
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }
 ```
 
-- 22 namespaced API surfaces: Fabric (13 resource types), Calling (37 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
+- 24 namespaced API surfaces: Fabric (13 resource types), Calling (42 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
 - Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - JSON dict returns via nlohmann/json -- no wrapper objects
 
@@ -313,6 +327,9 @@ Guides are also available in the [`docs/`](docs/) directory:
 |----------|---------|-------------|
 | `SIGNALWIRE_PROJECT_ID` | RELAY, REST | Project identifier |
 | `SIGNALWIRE_API_TOKEN` | RELAY, REST | API token |
+| `SIGNALWIRE_PERSONAL_ACCESS_TOKEN` | REST | Personal Access Token (`pat_...`) for the Space Administration API (`client.space()`); may stand in for the project/token pair on a space-administration-only client |
+| `SIGNALWIRE_CHAT_GATEWAY_KEY` | AI Chat | Publishable key a browser presents to `ai_chat::ChatGateway` when the gateway is constructed without one (otherwise a `pk_...` key is generated) |
+| `SIGNALWIRE_CHAT_GATEWAY_SECRET` | AI Chat | HMAC key `ai_chat::ChatGateway` signs conversation handles with when constructed without one (otherwise random per process, so handles stop verifying across restarts and replicas) |
 | `SIGNALWIRE_JWT_TOKEN` | RELAY | JWT for RELAY auth. An **alternative** to the project/token pair, not an addition — when set (or `jwt_token` is passed), the connect frame authenticates with the JWT alone and `SIGNALWIRE_PROJECT_ID` / `SIGNALWIRE_API_TOKEN` are not required. |
 | `SIGNALWIRE_SPACE` | RELAY, REST | Space hostname (e.g. `example.signalwire.com`) |
 | `SWML_BASIC_AUTH_USER` | Agents | Basic auth username (default: auto-generated) |

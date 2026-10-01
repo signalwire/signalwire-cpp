@@ -1,0 +1,38 @@
+# clang-tidy overrides for tests/ ONLY. Inherits the repo-root .clang-tidy and
+# subtracts exactly one check. Library code under src/ and include/ keeps the
+# full curated set — nothing here weakens the gate where it catches real bugs.
+#
+# -bugprone-unchecked-optional-access
+#   The analyzer cannot see through this suite's own assertion macro. Every test
+#   here is a `bool` function and ASSERT_TRUE is (test_main.cpp:36):
+#
+#       #define ASSERT_TRUE(x) do { if (!(x)) { ...; return false; } } while (0)
+#
+#   so `ASSERT_TRUE(opt.has_value());` genuinely guards the `opt.value()` on the
+#   next line — the function has already returned if the optional was empty.
+#   clang-tidy's dataflow model does not treat the macro's `return false` as a
+#   narrowing of the optional's state, so it reports every such access as
+#   unchecked.
+#
+#   Verified before disabling, NOT assumed: all 13 findings in the 2026-07-30 CI
+#   run (test_agent.cpp:263, test_config_loader.cpp:57, and 11 in
+#   test_relay_states_mock.cpp) were each checked against their enclosing TEST
+#   block. Every one has an `ASSERT_TRUE(...has_value())` on the immediately
+#   preceding line, or a single guard covering its small block. ZERO were real
+#   unchecked accesses.
+#
+#   The alternatives are all worse: `*opt` instead of `.value()` hides the throw
+#   without adding a check; `if (!opt) return false;` duplicates the assertion and
+#   drops the failure message naming the expectation; per-line NOLINT on 13 sites
+#   is noise that every newly-added assertion re-earns. Per RULES.md §3, a check
+#   that fails correct, wire-neutral code is mis-scoped for that context — fix the
+#   scope, not the code.
+#
+#   Scoped to tests/ precisely so a REAL unchecked optional access in shipping
+#   code still reds the LINT gate.
+#   InheritParentConfig is REQUIRED. Without it a nested .clang-tidy REPLACES the
+#   parent's check list rather than extending it, so this file would leave tests/
+#   with "Error: no checks enabled" — every rule silently off, while appearing to
+#   disable exactly one. Caught by RUNNING the gate, not by reading the config.
+InheritParentConfig: true
+Checks: '-bugprone-unchecked-optional-access'

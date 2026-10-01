@@ -32,7 +32,7 @@ int main() {
 ## Features
 
 - Single `RestClient` with namespaced sub-objects for every API
-- 22 API namespaces: Fabric, Calling, Phone Numbers, Datasphere, Video, Messages, Projects, and more
+- 24 API namespaces: Fabric, Calling, Phone Numbers, Datasphere, Video, Messages, Projects, and more
 - Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - Specialized methods per namespace (dial, search, lookup, publish, etc.)
 - Environment variable configuration (`RestClient::from_env()`)
@@ -64,6 +64,7 @@ int main() {
 |----------|-------------|
 | `SIGNALWIRE_PROJECT_ID` | Project ID for authentication |
 | `SIGNALWIRE_API_TOKEN` | API token for authentication |
+| `SIGNALWIRE_PERSONAL_ACCESS_TOKEN` | Personal Access Token for the Space Administration API (`client.space()`) |
 | `SIGNALWIRE_SPACE` | Space hostname (e.g. `example.signalwire.com`) |
 
 ## Documentation

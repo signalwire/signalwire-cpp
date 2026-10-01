@@ -33,6 +33,8 @@ struct PhoneNumberResponse {
   std::optional<json> capabilities;
   std::optional<json> number_type;
   std::optional<json> e911_address_id;
+  std::optional<json> e911_status;
+  std::optional<std::string> cnam;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
   std::optional<json> next_billed_at;

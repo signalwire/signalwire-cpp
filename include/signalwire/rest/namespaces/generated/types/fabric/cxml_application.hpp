@@ -40,6 +40,9 @@ struct CxmlApplication {
   std::optional<json> sms_fallback_method;
   std::optional<json> sms_status_callback;
   std::optional<json> sms_status_callback_method;
+  std::optional<std::string> message_status_callback;
+  std::optional<std::string> api_version;
+  std::optional<std::string> uri;
   json extras = json::object();
 };
 

@@ -19,7 +19,10 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cerrno>
 #include <chrono>
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <thread>
 
@@ -36,15 +39,31 @@ namespace {
 
 int tier2_pick_free_port() {
   int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (fd < 0) {
+    std::cerr << "pick_free_port: socket() failed: " << std::strerror(errno) << "\n";
+    return -1;
+  }
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
   addr.sin_port = 0;
-  ::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
+    std::cerr << "pick_free_port: bind() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   socklen_t len = sizeof(addr);
-  ::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len);
+  if (::getsockname(fd, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+    std::cerr << "pick_free_port: getsockname() failed: " << std::strerror(errno) << "\n";
+    ::close(fd);
+    return -1;
+  }
   int port = ntohs(addr.sin_port);
   ::close(fd);
+  if (port <= 0) {
+    std::cerr << "pick_free_port: kernel assigned no port\n";
+    return -1;
+  }
   return port;
 }
 
@@ -120,14 +139,14 @@ TEST(tier2_info_gatherer_submit_answer_advances_state) {
   });
 
   // Simulate the SWAIG runtime handing back global_data at index 0.
-  json raw = json({{"global_data",
-                    json({{"questions",
-                           json::array({json({{"key_name", "name"},
-                                              {"question_text", "What is your name?"}}),
-                                        json({{"key_name", "city"},
-                                              {"question_text", "What city are you in?"}})})},
-                          {"question_index", 0},
-                          {"answers", json::array()}})}});
+  json raw = json(
+      {{"global_data",
+        json({{"questions",
+               json::array(
+                   {json({{"key_name", "name"}, {"question_text", "What is your name?"}}),
+                    json({{"key_name", "city"}, {"question_text", "What city are you in?"}})})},
+              {"question_index", 0},
+              {"answers", json::array()}})}});
 
   auto result = agent.submit_answer(json({{"answer", "Ada"}}), raw).to_json();
 
@@ -169,12 +188,15 @@ TEST(tier2_native_vector_search_remote_http_post) {
     try {
       json body = json::parse(req.body);
       captured_query = body.value("query", "");
-    } catch (...) {
+    } catch (const json::exception& e) {
+      // Swallowing this left captured_query empty and the assertion below
+      // failed with no hint that the body had simply not parsed.
+      std::cerr << "mock /search: body did not parse as JSON (" << e.what() << ")\n";
     }
-    json out = json({{"results",
-                      json::array({json({{"content", "The capital of France is Paris."},
-                                         {"score", 0.97},
-                                         {"metadata", json({{"filename", "geo.md"}})}})})}});
+    json out =
+        json({{"results", json::array({json({{"content", "The capital of France is Paris."},
+                                             {"score", 0.97},
+                                             {"metadata", json({{"filename", "geo.md"}})}})})}});
     res.set_content(out.dump(), "application/json");
   });
 
@@ -189,7 +211,9 @@ TEST(tier2_native_vector_search_remote_http_post) {
     std::thread& t;
     ~Guard() {
       s.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
     }
   } guard{srv, server_thread};
 
@@ -298,6 +322,7 @@ TEST(tier2_sip_routing_served_dispatch) {
   ::unsetenv("PORT");
 
   int port = tier2_pick_free_port();
+  ASSERT_TRUE(port > 0);
 
   signalwire::agent::AgentBase agent("support", "/");
   agent.set_host("127.0.0.1").set_port(port);
@@ -310,7 +335,9 @@ TEST(tier2_sip_routing_served_dispatch) {
     std::thread& t;
     ~Guard() {
       a.stop();
-      if (t.joinable()) t.join();
+      if (t.joinable()) {
+        t.join();
+      }
       ::unsetenv("SWML_BASIC_AUTH_USER");
       ::unsetenv("SWML_BASIC_AUTH_PASSWORD");
     }

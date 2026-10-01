@@ -7,10 +7,37 @@
 #include <string>
 #include <string_view>
 
+// For the control-char scrub applied on the emission path below. logging_config
+// includes signalwire/logging/logger.hpp (a DIFFERENT header from this one), so
+// this does not close an include cycle.
+#include "signalwire/core/logging_config.hpp"
+
 namespace signalwire {
 
 enum class LogLevel { Debug = 0, Info = 1, Warn = 2, Error = 3, Off = 4 };
 
+/// The SDK's process-wide logging singleton.
+///
+/// One instance per process, reached through ``Logger::instance()`` (or the
+/// ``get_logger()`` free function); non-copyable. Every operation is guarded by
+/// an internal mutex, so concurrent logging from the agent's HTTP threads and
+/// the RELAY reader thread is safe. Records at or above ``level()`` are
+/// emitted, with ``Warn`` and ``Error`` going to ``stderr`` and the rest to
+/// ``stdout``; ``suppress()`` silences output entirely without disturbing the
+/// configured level (``unsuppress()`` restores it).
+///
+/// Initial state comes from the environment at first use:
+/// ``SIGNALWIRE_LOG_LEVEL`` (``debug``/``info``/``warn``/``error``, default
+/// ``Info``) and ``SIGNALWIRE_LOG_MODE=off``, which starts the logger
+/// suppressed.
+///
+/// Every message is scrubbed of control characters ON THE EMISSION PATH before
+/// it is written. This is log-injection defence: without it a caller-supplied
+/// ``\x00`` or ``\x1b[`` escape reaches the terminal verbatim and can forge log
+/// lines.
+///
+/// Distinct from ``signalwire::logging::Logger`` (``signalwire/logging/
+/// logger.hpp``), which is a per-component NAMED logger created by value.
 class Logger {
  public:
   static Logger& instance() {
@@ -64,10 +91,17 @@ class Logger {
         break;
     }
 
+    // Scrub control characters BEFORE emitting — log-injection defence. Merely
+    // EXPOSING the scrub without putting it on the emission path offers no
+    // protection at all: a caller-supplied `\x00` or a `\x1b[` escape reaches
+    // the terminal verbatim and can forge log lines.
+    const std::string safe =
+        ::signalwire::core::logging_config::strip_control_chars_str(std::string(message));
+
     if (level >= LogLevel::Warn) {
-      std::cerr << prefix << message << "\n";
+      std::cerr << prefix << safe << "\n";
     } else {
-      std::cout << prefix << message << "\n";
+      std::cout << prefix << safe << "\n";
     }
   }
 

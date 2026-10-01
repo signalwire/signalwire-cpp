@@ -1,11 +1,15 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Skills system demo: one-liner skill injection.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("Multi-Skill Assistant", "/assistant");
     agent.add_language({"English", "en-US", "inworld.Mark"});
 
@@ -14,17 +18,21 @@ int main() {
     agent.add_skill("math");
 
     // Web search with custom params
-    agent.add_skill("web_search", {
-        {"api_key", "your-google-api-key"},
-        {"search_engine_id", "your-engine-id"},
-        {"num_results", 1}
-    });
+    agent.add_skill("web_search", {{"api_key", "your-google-api-key"},
+                                   {"search_engine_id", "your-engine-id"},
+                                   {"num_results", 1}});
 
     auto skills = agent.list_skills();
     std::cout << "Loaded skills:";
-    for (const auto& s : skills) std::cout << " " << s;
+    for (const auto& s : skills) {
+      std::cout << " " << s;
+    }
     std::cout << "\n";
 
     std::cout << "Skills demo at http://0.0.0.0:3000/assistant\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

@@ -286,7 +286,8 @@ TEST(rest_mock_gen_video_conferences_get_err) {
 TEST(rest_mock_gen_video_conferences_list_conference_tokens_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("video.list_conference_tokens", 200, json::object());
-  (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
+  (void)(client.video().conferences.list_conference_tokens("X",
+                                                           std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -304,7 +305,8 @@ TEST(rest_mock_gen_video_conferences_list_conference_tokens_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.video().conferences.list_conference_tokens("X", std::map<std::string, std::string>{}));
+    (void)(client.video().conferences.list_conference_tokens("X",
+                                                             std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -391,6 +393,43 @@ TEST(rest_mock_gen_video_room_recordings_list_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("video.list_room_recordings"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_video_room_recordings_download_ok) {
+  auto client = mocktest::make_client();
+  (void)(client.video().room_recordings.download("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("video.download_room_recording"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 300 && *j.response_status < 400);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_video_room_recordings_download_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("video.download_room_recording", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.video().room_recordings.download("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("video.download_room_recording"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }

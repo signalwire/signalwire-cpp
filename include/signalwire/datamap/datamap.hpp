@@ -20,10 +20,9 @@ class DataMap {
  public:
   explicit DataMap(const std::string& function_name);
 
-  /// The SWAIG function name this data-map defines (reference:
-  /// ``self.function_name``) — emitted as the ``function`` key and used as the
-  /// fallback description. The caller names it at construction, so the caller
-  /// can read it back.
+  /// The SWAIG function name this data-map defines — emitted as the
+  /// ``function`` key and used as the fallback description. The caller names it
+  /// at construction, so the caller can read it back.
   [[nodiscard]] const std::string& function_name() const { return function_name_; }
 
   /// Set the LLM-facing tool description (the "purpose"). PROMPT
@@ -83,11 +82,13 @@ class DataMap {
   /// Add expressions that run after the most recent webhook
   DataMap& webhook_expressions(const std::vector<json>& expressions);
 
-  /// Set request body for the last added webhook
-  DataMap& body(const json& data);
-
-  /// Set request params for the last added webhook (alias for body)
+  /// Set request params for the last added webhook (POST/PUT request data too)
   DataMap& params(const json& data);
+
+  /// Set the JSON request body for the last added webhook; the same as params().
+  /// The platform reads a webhook's body from its ``params`` field and has no
+  /// ``body`` field, so this sets ``params``.
+  DataMap& body(const std::map<std::string, json>& data);
 
   /// Set foreach configuration for the last webhook
   DataMap& foreach (const json& foreach_config);

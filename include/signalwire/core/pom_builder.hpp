@@ -3,20 +3,16 @@
 //
 // PomBuilder — standalone builder for structured POM prompts.
 //
-// C++ port of the Python reference
-// ``signalwire.core.pom_builder.PomBuilder`` (cross-checked against the Java
-// ``com.signalwire.sdk.core.PomBuilder``). A flexible wrapper around the
-// existing ``signalwire::pom::PromptObjectModel`` (see
-// ``include/signalwire/pom/pom.hpp``) that allows dynamic creation of sections
+// A flexible wrapper around the existing ``signalwire::pom::PromptObjectModel``
+// (see ``include/signalwire/pom/pom.hpp``) that allows dynamic creation of sections
 // on demand, adding content to existing sections, nesting subsections, and
 // rendering to Markdown or XML. There are no predefined section types. All
 // mutator methods return ``*this`` for fluent chaining.
 //
 // Section lookup: rather than caching ``Section*`` (which vector growth would
 // invalidate), sections are resolved by title through
-// ``PromptObjectModel::find_section`` on each access — that recursive search
-// resolves top-level sections, matching the Python ``_sections`` map for the
-// operations this builder performs (all keyed by top-level section title).
+// ``PromptObjectModel::find_section`` on each access. Every operation this
+// builder performs is keyed by top-level section title.
 #pragma once
 
 #include <nlohmann/json.hpp>
@@ -31,6 +27,25 @@ namespace core {
 
 using json = nlohmann::json;
 
+/// Standalone fluent builder for a structured POM prompt.
+///
+/// A thin, section-oriented wrapper over ``signalwire::pom::PromptObjectModel``
+/// for callers who want to assemble a prompt tree outside an agent — there are
+/// no predefined section types, sections are created on demand by title, and
+/// every mutator returns ``*this`` for chaining. The finished prompt renders to
+/// Markdown (``render_markdown``), XML (``render_xml``), or the section-array
+/// JSON the SWML ``ai.prompt`` field takes (``to_dict`` / ``to_json``);
+/// ``from_sections`` reconstructs a builder from that array.
+///
+/// ``add_to_section`` and ``add_subsection`` AUTO-VIVIFY: naming a section that
+/// does not exist creates it rather than failing, so prompt assembly need not
+/// be ordered. Bodies appended to an existing section are separated from the
+/// prior body by a blank line.
+///
+/// Sections are resolved by title on each access rather than cached, so a
+/// ``pom::Section*`` handed back by ``get_section`` follows the usual
+/// container-invalidation contract — it is invalidated by any later mutation
+/// that grows the section list (the same rule as ``std::vector::data()``).
 class PomBuilder {
  public:
   /// Initialize a new POM builder with an empty POM.

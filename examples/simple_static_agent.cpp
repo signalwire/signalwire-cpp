@@ -1,11 +1,15 @@
 // Copyright (c) 2025 SignalWire — MIT License
 // Simple static agent: no tools, just a prompt-driven conversation.
 
+#include <iostream>
 #include <signalwire/agent/agent_base.hpp>
 
 using namespace signalwire;
 
 int main() {
+  // exception-escape guard: main() must not let an exception escape
+  // (that is std::terminate, with no message). Report and exit nonzero.
+  try {
     agent::AgentBase agent("static-agent", "/static");
 
     agent.set_prompt_text(
@@ -20,4 +24,8 @@ int main() {
 
     std::cout << "Static agent at http://0.0.0.0:3000/static\n";
     agent.run();
+  } catch (const std::exception& e) {
+    std::cerr << "fatal: " << e.what() << "\n";
+    return 1;
+  }
 }

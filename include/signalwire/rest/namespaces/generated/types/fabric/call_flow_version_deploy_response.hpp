@@ -31,8 +31,8 @@ struct CallFlowVersionDeployResponse {
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
   std::optional<int> document_version;
-  std::optional<std::string> flow_data;
-  std::optional<std::string> relayml;
+  std::optional<json> flow_data;
+  std::optional<json> relayml;
   json extras = json::object();
 };
 

@@ -17,6 +17,44 @@ using namespace signalwire::rest;
 using nlohmann::json;
 }  // namespace
 
+TEST(rest_mock_gen_whatsapp_templates_delete_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.delete_whatsapp_template", 200, json::object());
+  (void)(client.whatsapp().templates.delete_("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.delete_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_delete_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.delete_whatsapp_template", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().templates.delete_("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.delete_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_logs_messages_list_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("message.list_message_logs", 200, json::object());
@@ -87,6 +125,272 @@ TEST(rest_mock_gen_logs_messages_get_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("message.get_message_log"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_businesses_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_businesses", 200, json::object());
+  (void)(client.whatsapp().businesses.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_businesses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_businesses_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_businesses", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().businesses.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_businesses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_numbers_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_numbers", 200, json::object());
+  (void)(client.whatsapp().numbers.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_numbers"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_numbers_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_numbers", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().numbers.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_numbers"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_numbers_get_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.retrieve_whatsapp_number", 200, json::object());
+  (void)(client.whatsapp().numbers.get("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.retrieve_whatsapp_number"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_numbers_get_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.retrieve_whatsapp_number", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().numbers.get("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.retrieve_whatsapp_number"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_templates", 200, json::object());
+  (void)(client.whatsapp().templates.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_templates"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.list_whatsapp_templates", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().templates.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.list_whatsapp_templates"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_get_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.retrieve_whatsapp_template", 200, json::object());
+  (void)(client.whatsapp().templates.get("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.retrieve_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_get_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.retrieve_whatsapp_template", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().templates.get("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.retrieve_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.update_whatsapp_template", 200, json::object());
+  (void)(client.whatsapp().templates.update("X", json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PATCH"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.update_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.update_whatsapp_template", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().templates.update("X", json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.update_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_create_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.create_whatsapp_template", 200, json::object());
+  (void)(client.whatsapp().templates.create(json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.create_whatsapp_template"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_whatsapp_templates_create_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("message.create_whatsapp_template", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.whatsapp().templates.create(json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("message.create_whatsapp_template"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }

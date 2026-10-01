@@ -27,7 +27,6 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SipEndpointCreateRequest {
-  std::optional<json> id;
   std::optional<std::string> username;
   std::optional<std::string> caller_id;
   std::optional<std::string> send_as;
@@ -36,6 +35,7 @@ struct SipEndpointCreateRequest {
   std::optional<json> encryption;
   std::optional<json> call_handler;
   std::optional<json> calling_handler_resource_id;
+  std::optional<std::string> password;
   json extras = json::object();
 };
 

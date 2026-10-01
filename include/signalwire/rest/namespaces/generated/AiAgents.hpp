@@ -27,6 +27,18 @@ class AiAgents : public FabricResource {
  public:
   explicit AiAgents(const HttpClient& client)
       : FabricResource(client, "/api/fabric/resources/ai_agents", "PATCH") {}
+
+  [[nodiscard]] json list_voices(const std::map<std::string, std::string>& params = {},
+                                 const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + std::string("voices"), params, request_options);
+  }
+
+  [[nodiscard]] json list_conversation_logs(const std::string& ai_agent_id,
+                                            const std::map<std::string, std::string>& params = {},
+                                            const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + ai_agent_id + "/" + std::string("conversation_logs"),
+                       params, request_options);
+  }
 };
 
 }  // namespace generated

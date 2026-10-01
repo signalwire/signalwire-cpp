@@ -16,6 +16,7 @@
 
 #include "signalwire/rest/base_resource.hpp"
 #include "signalwire/rest/namespaces/generated/AiAgents.hpp"
+#include "signalwire/rest/namespaces/generated/AliasAddresses.hpp"
 #include "signalwire/rest/namespaces/generated/CallFlows.hpp"
 #include "signalwire/rest/namespaces/generated/ConferenceRooms.hpp"
 #include "signalwire/rest/namespaces/generated/CxmlApplications.hpp"
@@ -25,7 +26,9 @@
 #include "signalwire/rest/namespaces/generated/FabricTokens.hpp"
 #include "signalwire/rest/namespaces/generated/FreeswitchConnectors.hpp"
 #include "signalwire/rest/namespaces/generated/GenericResources.hpp"
+#include "signalwire/rest/namespaces/generated/PhoneNumberAddresses.hpp"
 #include "signalwire/rest/namespaces/generated/RelayApplications.hpp"
+#include "signalwire/rest/namespaces/generated/SipAddresses.hpp"
 #include "signalwire/rest/namespaces/generated/SipEndpoints.hpp"
 #include "signalwire/rest/namespaces/generated/SipGateways.hpp"
 #include "signalwire/rest/namespaces/generated/Subscribers.hpp"
@@ -42,7 +45,10 @@ using json = nlohmann::json;
 class FabricNamespace {
  public:
   explicit FabricNamespace(const HttpClient& http)
-      : addresses(http),
+      : alias_addresses(http),
+        sip_addresses(http),
+        phone_number_addresses(http),
+        addresses(http),
         resources(http),
         ai_agents(http),
         call_flows(http),
@@ -59,6 +65,9 @@ class FabricNamespace {
         swml_webhooks(http),
         tokens(http) {}
 
+  AliasAddresses alias_addresses;
+  SipAddresses sip_addresses;
+  PhoneNumberAddresses phone_number_addresses;
   FabricAddresses addresses;
   GenericResources resources;
   AiAgents ai_agents;

@@ -38,6 +38,9 @@ struct Address {
   std::optional<std::string> state;
   std::optional<std::string> postal_code;
   std::optional<std::string> zip_code;
+  std::optional<bool> emergency_enabled;
+  std::optional<bool> validated;
+  std::optional<std::string> validated_at;
   json extras = json::object();
 };
 

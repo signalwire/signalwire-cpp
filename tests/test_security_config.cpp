@@ -1,6 +1,10 @@
 // SecurityConfig tests (signalwire::core::SecurityConfig)
 
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <set>
+#include <string>
 
 #include "signalwire/core/security_config.hpp"
 
@@ -19,6 +23,29 @@ void clear_security_env() {
   for (const char* k : keys) {
     unsetenv(k);
   }
+}
+
+// Materialise a cert/key PAIR on disk under a repo-local scratch dir. The
+// files must really exist: validate_ssl_config() stats them, and
+// get_ssl_context_kwargs() returns {} unless validation passes -- so a test
+// that skips this never reaches the populated branch at all and would pass
+// for ANY key naming. Returns the two absolute paths.
+struct SslFixture {
+  std::string cert_path;
+  std::string key_path;
+};
+
+SslFixture make_ssl_fixture(const std::string& tag) {
+  namespace fs = std::filesystem;
+  fs::path base = fs::path(".sw-tmp") / ("security_config_ssl_" + tag + "_" +
+                                         std::to_string(static_cast<long>(::getpid())));
+  std::error_code ec;
+  fs::create_directories(base, ec);
+  fs::path cert = base / "server.crt";
+  fs::path key = base / "server.key";
+  { std::ofstream(cert) << "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n"; }
+  { std::ofstream(key) << "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n"; }
+  return {fs::absolute(cert).string(), fs::absolute(key).string()};
 }
 
 }  // namespace
@@ -93,6 +120,88 @@ TEST(security_config_ssl_context_kwargs_empty_when_disabled) {
   auto kwargs = cfg.get_ssl_context_kwargs();
   ASSERT_TRUE(kwargs.is_object());
   ASSERT_TRUE(kwargs.empty());
+  return true;
+}
+
+// --- get_ssl_context_kwargs() vs the Python reference -----------------------
+//
+// Reference: signalwire-python signalwire/core/security_config.py
+//   def get_ssl_context_kwargs(self) -> dict[str, Any]:
+//       if not self.ssl_enabled:            return {}
+//       is_valid, error = self.validate_ssl_config()
+//       if not is_valid:                    log error; return {}
+//       return {"ssl_certfile": self.ssl_cert_path,
+//               "ssl_keyfile":  self.ssl_key_path}
+//
+// The C++ contract is the SAME object -- same two keys, same spelling, same
+// string values, and NOTHING else. A doc comment in security_config.hpp once
+// claimed C++ diverged to a "neutral" {ssl_enabled, cert_path, key_path} map;
+// it does not, and these tests pin that so the claim cannot be re-asserted
+// (or accidentally implemented) without a test going red.
+//
+// Deliberately NOT a `contains("ssl_certfile")` spot-check: the assertion is
+// on the EXACT key SET, so renaming a key, adding a third key, or swapping
+// the cert/key values all fail.
+
+TEST(security_config_ssl_context_kwargs_matches_python_when_enabled) {
+  clear_security_env();
+  SslFixture f = make_ssl_fixture("enabled");
+  setenv("SWML_SSL_ENABLED", "true", 1);
+  setenv("SWML_SSL_CERT_PATH", f.cert_path.c_str(), 1);
+  setenv("SWML_SSL_KEY_PATH", f.key_path.c_str(), 1);
+  SecurityConfig cfg;
+
+  // Guard: if validation does not pass we would be asserting on the
+  // empty-dict branch and the key assertions below would be vacuous.
+  ASSERT_TRUE(cfg.ssl_enabled());
+  ASSERT_TRUE(cfg.validate_ssl_config().valid);
+
+  auto kwargs = cfg.get_ssl_context_kwargs();
+  ASSERT_TRUE(kwargs.is_object());
+
+  // Exact key set == Python's two uvicorn kwarg names, nothing more.
+  std::set<std::string> keys;
+  for (auto it = kwargs.begin(); it != kwargs.end(); ++it) {
+    keys.insert(it.key());
+  }
+  const std::set<std::string> expected = {"ssl_certfile", "ssl_keyfile"};
+  ASSERT_EQ(keys.size(), expected.size());
+  ASSERT_TRUE(keys == expected);
+
+  // Values are the configured paths, as strings, not swapped.
+  ASSERT_TRUE(kwargs["ssl_certfile"].is_string());
+  ASSERT_TRUE(kwargs["ssl_keyfile"].is_string());
+  ASSERT_EQ(kwargs["ssl_certfile"].get<std::string>(), f.cert_path);
+  ASSERT_EQ(kwargs["ssl_keyfile"].get<std::string>(), f.key_path);
+
+  // The names Python does NOT emit must be absent -- this is the specific
+  // divergence that was once documented and is hereby refuted.
+  ASSERT_FALSE(kwargs.contains("ssl_enabled"));
+  ASSERT_FALSE(kwargs.contains("cert_path"));
+  ASSERT_FALSE(kwargs.contains("key_path"));
+
+  clear_security_env();
+  return true;
+}
+
+TEST(security_config_ssl_context_kwargs_empty_when_validation_fails) {
+  // Python returns {} (after logging) when SSL is on but validation fails.
+  // Enabled + a cert path that does not exist on disk.
+  clear_security_env();
+  SslFixture f = make_ssl_fixture("invalid");
+  setenv("SWML_SSL_ENABLED", "true", 1);
+  std::string missing = f.cert_path + ".does-not-exist";
+  setenv("SWML_SSL_CERT_PATH", missing.c_str(), 1);
+  setenv("SWML_SSL_KEY_PATH", f.key_path.c_str(), 1);
+  SecurityConfig cfg;
+
+  ASSERT_TRUE(cfg.ssl_enabled());
+  ASSERT_FALSE(cfg.validate_ssl_config().valid);
+
+  auto kwargs = cfg.get_ssl_context_kwargs();
+  ASSERT_TRUE(kwargs.is_object());
+  ASSERT_TRUE(kwargs.empty());
+  clear_security_env();
   return true;
 }
 

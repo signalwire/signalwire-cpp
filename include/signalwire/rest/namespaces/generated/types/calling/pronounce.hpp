@@ -25,9 +25,9 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Pronounce {
+  std::optional<json> ignore_case;
   std::optional<std::string> replace;
   std::optional<std::string> with;
-  std::optional<json> ignore_case;
   json extras = json::object();
 };
 

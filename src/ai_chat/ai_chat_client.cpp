@@ -175,6 +175,42 @@ json AIChatClient::request(const std::string& method, const json& params) {
   return json::object();
 }
 
+int AIChatClient::raw_post(const std::string& method, const json& params,
+                           const RawPostChunkHandler& on_chunk) {
+  ++request_counter_;
+  json payload = {
+      {"jsonrpc", "2.0"},
+      {"method", method},
+      {"params", params},
+      {"id", "req-" + std::to_string(request_counter_)},
+  };
+
+  httplib::Client cli(host_);
+  cli.set_connection_timeout(connect_timeout_seconds_, 0);
+  if (read_idle_timeout_seconds_ > 0) {
+    cli.set_read_timeout(read_idle_timeout_seconds_, 0);
+  }
+  cli.set_keep_alive(false);
+
+  httplib::Request req;
+  req.method = "POST";
+  req.path = path_;
+  req.headers = {
+      {"Authorization", auth_header_},
+      {"Content-Type", "application/json"},
+      {"Accept", "application/json"},
+      {"User-Agent", user_agent_},
+  };
+  req.body = payload.dump();
+  req.content_receiver = [&on_chunk](const char* data, size_t length, uint64_t /*offset*/,
+                                     uint64_t /*total*/) { return on_chunk(data, length); };
+  httplib::Result res = cli.send(req);
+  if (!res) {
+    throw AIChatError(0, "transport failure: no response from " + host_);
+  }
+  return res->status;
+}
+
 ConversationInfo AIChatClient::create_conversation(const std::string& conversation_id,
                                                    const CreateConversationOptions& options) {
   json params = {{"id", conversation_id}, {"config_url", options.config_url}};

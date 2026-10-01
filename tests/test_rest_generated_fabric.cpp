@@ -17,6 +17,158 @@ using namespace signalwire::rest;
 using nlohmann::json;
 }  // namespace
 
+TEST(rest_mock_gen_fabric_alias_addresses_delete_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_alias_address", 200, json::object());
+  (void)(client.fabric().alias_addresses.delete_("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_delete_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_alias_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().alias_addresses.delete_("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_delete_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_phone_number_address", 200, json::object());
+  (void)(client.fabric().phone_number_addresses.delete_("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_delete_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_phone_number_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().phone_number_addresses.delete_("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_delete_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_sip_address", 200, json::object());
+  (void)(client.fabric().sip_addresses.delete_("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_delete_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_sip_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().sip_addresses.delete_("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_addresses_delete_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_fabric_address", 200, json::object());
+  (void)(client.fabric().addresses.delete_("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("DELETE"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_fabric_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_addresses_delete_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.delete_fabric_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().addresses.delete_("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.delete_fabric_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_fabric_ai_agents_delete_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.delete_ai_agent", 200, json::object());
@@ -625,6 +777,234 @@ TEST(rest_mock_gen_fabric_addresses_list_err) {
   return true;
 }
 
+TEST(rest_mock_gen_fabric_alias_addresses_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_alias_addresses", 200, json::object());
+  (void)(client.fabric().alias_addresses.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_alias_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_alias_addresses", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().alias_addresses.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_alias_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_get_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_alias_address", 200, json::object());
+  (void)(client.fabric().alias_addresses.get("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_get_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_alias_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().alias_addresses.get("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_phone_number_addresses", 200, json::object());
+  (void)(client.fabric().phone_number_addresses.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_phone_number_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_phone_number_addresses", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().phone_number_addresses.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_phone_number_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_get_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_phone_number_address", 200, json::object());
+  (void)(client.fabric().phone_number_addresses.get("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_get_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_phone_number_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().phone_number_addresses.get("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_list_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_sip_addresses", 200, json::object());
+  (void)(client.fabric().sip_addresses.list(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_sip_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_list_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_sip_addresses", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().sip_addresses.list(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_sip_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_get_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_sip_address", 200, json::object());
+  (void)(client.fabric().sip_addresses.get("X"));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_get_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.get_sip_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().sip_addresses.get("X"));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.get_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_fabric_addresses_get_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.get_fabric_address", 200, json::object());
@@ -739,6 +1119,44 @@ TEST(rest_mock_gen_fabric_ai_agents_list_err) {
   return true;
 }
 
+TEST(rest_mock_gen_fabric_ai_agents_list_voices_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_ai_agent_voices", 200, json::object());
+  (void)(client.fabric().ai_agents.list_voices(std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_ai_agent_voices"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_ai_agents_list_voices_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_ai_agent_voices", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().ai_agents.list_voices(std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_ai_agent_voices"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_fabric_ai_agents_get_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.get_ai_agent", 200, json::object());
@@ -815,28 +1233,30 @@ TEST(rest_mock_gen_fabric_ai_agents_list_addresses_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_call_flows_list_addresses_ok) {
+TEST(rest_mock_gen_fabric_ai_agents_list_conversation_logs_ok) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_call_flow_addresses", 200, json::object());
-  (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
+  mocktest::scenario_set("fabric.list_ai_agent_conversation_logs", 200, json::object());
+  (void)(client.fabric().ai_agents.list_conversation_logs("X",
+                                                          std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_addresses"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_ai_agent_conversation_logs"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
   }
   return true;
 }
 
-TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
+TEST(rest_mock_gen_fabric_ai_agents_list_conversation_logs_err) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_call_flow_addresses", 500, json{{"error", "x"}});
+  mocktest::scenario_set("fabric.list_ai_agent_conversation_logs", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().ai_agents.list_conversation_logs("X",
+                                                            std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -846,45 +1266,7 @@ TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
   {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_addresses"));
-    ASSERT_TRUE(j.response_status.has_value());
-    ASSERT_EQ(*j.response_status, 500);
-  }
-  return true;
-}
-
-TEST(rest_mock_gen_fabric_call_flows_list_versions_ok) {
-  auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_call_flow_versions", 200, json::object());
-  (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
-  {
-    auto j = mocktest::journal_last();
-    ASSERT_EQ(j.method, std::string("GET"));
-    ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_versions"));
-    ASSERT_TRUE(j.response_status.has_value());
-    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
-  }
-  return true;
-}
-
-TEST(rest_mock_gen_fabric_call_flows_list_versions_err) {
-  auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_call_flow_versions", 500, json{{"error", "x"}});
-  bool threw = false;
-  int status = 0;
-  try {
-    (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
-  } catch (const SignalWireRestError& e) {
-    threw = true;
-    status = e.status_code();
-  }
-  ASSERT_TRUE(threw);
-  ASSERT_EQ(status, 500);
-  {
-    auto j = mocktest::journal_last();
-    ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_versions"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_ai_agent_conversation_logs"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }
@@ -967,28 +1349,28 @@ TEST(rest_mock_gen_fabric_call_flows_get_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_ok) {
+TEST(rest_mock_gen_fabric_call_flows_list_addresses_ok) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_conference_room_addresses", 200, json::object());
-  (void)(client.fabric().conference_rooms.list_addresses("X", std::map<std::string, std::string>{}));
+  mocktest::scenario_set("fabric.list_call_flow_addresses", 200, json::object());
+  (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_conference_room_addresses"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_addresses"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
   }
   return true;
 }
 
-TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_err) {
+TEST(rest_mock_gen_fabric_call_flows_list_addresses_err) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.list_conference_room_addresses", 500, json{{"error", "x"}});
+  mocktest::scenario_set("fabric.list_call_flow_addresses", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().conference_rooms.list_addresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().call_flows.list_addresses("X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -998,7 +1380,45 @@ TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_err) {
   {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.list_conference_room_addresses"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_call_flows_list_versions_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_call_flow_versions", 200, json::object());
+  (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_versions"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_call_flows_list_versions_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_call_flow_versions", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().call_flows.list_versions("X", std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_call_flow_versions"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }
@@ -1075,6 +1495,46 @@ TEST(rest_mock_gen_fabric_conference_rooms_get_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("fabric.get_conference_room"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_conference_room_addresses", 200, json::object());
+  (void)(client.fabric().conference_rooms.list_addresses("X",
+                                                         std::map<std::string, std::string>{}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("GET"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_conference_room_addresses"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_conference_rooms_list_addresses_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.list_conference_room_addresses", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().conference_rooms.list_addresses("X",
+                                                           std::map<std::string, std::string>{}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.list_conference_room_addresses"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }
@@ -1160,7 +1620,8 @@ TEST(rest_mock_gen_fabric_cxml_applications_get_err) {
 TEST(rest_mock_gen_fabric_cxml_applications_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_cxml_application_addresses", 200, json::object());
-  (void)(client.fabric().cxml_applications.list_addresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().cxml_applications.list_addresses("X",
+                                                          std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -1178,7 +1639,8 @@ TEST(rest_mock_gen_fabric_cxml_applications_list_addresses_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().cxml_applications.list_addresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().cxml_applications.list_addresses("X",
+                                                            std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -1502,7 +1964,8 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_get_err) {
 TEST(rest_mock_gen_fabric_freeswitch_connectors_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_freeswitch_connector_addresses", 200, json::object());
-  (void)(client.fabric().freeswitch_connectors.list_addresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().freeswitch_connectors.list_addresses(
+      "X", std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -1520,7 +1983,8 @@ TEST(rest_mock_gen_fabric_freeswitch_connectors_list_addresses_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().freeswitch_connectors.list_addresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().freeswitch_connectors.list_addresses(
+        "X", std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -1616,7 +2080,8 @@ TEST(rest_mock_gen_fabric_relay_applications_get_err) {
 TEST(rest_mock_gen_fabric_relay_applications_list_addresses_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.list_relay_application_addresses", 200, json::object());
-  (void)(client.fabric().relay_applications.list_addresses("X", std::map<std::string, std::string>{}));
+  (void)(client.fabric().relay_applications.list_addresses("X",
+                                                           std::map<std::string, std::string>{}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("GET"));
@@ -1634,7 +2099,8 @@ TEST(rest_mock_gen_fabric_relay_applications_list_addresses_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().relay_applications.list_addresses("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().relay_applications.list_addresses("X",
+                                                             std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -2014,7 +2480,8 @@ TEST(rest_mock_gen_fabric_subscribers_list_sip_endpoints_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.list_sip_endpoints("X", std::map<std::string, std::string>{}));
+    (void)(client.fabric().subscribers.list_sip_endpoints("X",
+                                                          std::map<std::string, std::string>{}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -2373,6 +2840,120 @@ TEST(rest_mock_gen_fabric_resources_list_addresses_err) {
   return true;
 }
 
+TEST(rest_mock_gen_fabric_alias_addresses_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_alias_address", 200, json::object());
+  (void)(client.fabric().alias_addresses.update("X", json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PATCH"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_alias_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().alias_addresses.update("X", json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_phone_number_address", 200, json::object());
+  (void)(client.fabric().phone_number_addresses.update("X", json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PATCH"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_phone_number_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().phone_number_addresses.update("X", json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_update_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_sip_address", 200, json::object());
+  (void)(client.fabric().sip_addresses.update("X", json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("PATCH"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_update_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.update_sip_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().sip_addresses.update("X", json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.update_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_fabric_ai_agents_update_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.update_ai_agent", 200, json::object());
@@ -2563,6 +3144,120 @@ TEST(rest_mock_gen_fabric_swml_webhooks_update_err) {
   return true;
 }
 
+TEST(rest_mock_gen_fabric_alias_addresses_create_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_alias_address", 200, json::object());
+  (void)(client.fabric().alias_addresses.create(json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_alias_addresses_create_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_alias_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().alias_addresses.create(json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_alias_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_create_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_phone_number_address", 200, json::object());
+  (void)(client.fabric().phone_number_addresses.create(json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_phone_number_addresses_create_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_phone_number_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().phone_number_addresses.create(json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_phone_number_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_create_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_sip_address", 200, json::object());
+  (void)(client.fabric().sip_addresses.create(json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_sip_addresses_create_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.create_sip_address", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().sip_addresses.create(json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.create_sip_address"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
 TEST(rest_mock_gen_fabric_tokens_create_embed_token_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_embeds_token", 200, json::object());
@@ -2677,44 +3372,6 @@ TEST(rest_mock_gen_fabric_ai_agents_create_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_call_flows_deploy_version_ok) {
-  auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.deploy_call_flow_version", 200, json::object());
-  (void)(client.fabric().call_flows.deploy_version("X", json::object()));
-  {
-    auto j = mocktest::journal_last();
-    ASSERT_EQ(j.method, std::string("POST"));
-    ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.deploy_call_flow_version"));
-    ASSERT_TRUE(j.response_status.has_value());
-    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
-  }
-  return true;
-}
-
-TEST(rest_mock_gen_fabric_call_flows_deploy_version_err) {
-  auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.deploy_call_flow_version", 500, json{{"error", "x"}});
-  bool threw = false;
-  int status = 0;
-  try {
-    (void)(client.fabric().call_flows.deploy_version("X", json::object()));
-  } catch (const SignalWireRestError& e) {
-    threw = true;
-    status = e.status_code();
-  }
-  ASSERT_TRUE(threw);
-  ASSERT_EQ(status, 500);
-  {
-    auto j = mocktest::journal_last();
-    ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.deploy_call_flow_version"));
-    ASSERT_TRUE(j.response_status.has_value());
-    ASSERT_EQ(*j.response_status, 500);
-  }
-  return true;
-}
-
 TEST(rest_mock_gen_fabric_call_flows_create_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.create_call_flow", 200, json::object());
@@ -2747,6 +3404,44 @@ TEST(rest_mock_gen_fabric_call_flows_create_err) {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("fabric.create_call_flow"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_call_flows_deploy_version_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.deploy_call_flow_version", 200, json::object());
+  (void)(client.fabric().call_flows.deploy_version("X", json::object()));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.deploy_call_flow_version"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_call_flows_deploy_version_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.deploy_call_flow_version", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().call_flows.deploy_version("X", json::object()));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.deploy_call_flow_version"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }
@@ -3078,7 +3773,8 @@ TEST(rest_mock_gen_fabric_subscribers_create_sip_endpoint_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().subscribers.create_sip_endpoint("X", {.username = "X", .password = "X"}));
+    (void)(client.fabric().subscribers.create_sip_endpoint("X",
+                                                           {.username = "X", .password = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -3192,7 +3888,8 @@ TEST(rest_mock_gen_fabric_resources_assign_domain_application_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().resources.assign_domain_application("X", {.domain_application_id = "X"}));
+    (void)(client.fabric().resources.assign_domain_application("X",
+                                                               {.domain_application_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -3212,7 +3909,8 @@ TEST(rest_mock_gen_fabric_resources_assign_domain_application_err) {
 TEST(rest_mock_gen_fabric_resources_assign_phone_route_ok) {
   auto client = mocktest::make_client();
   mocktest::scenario_set("fabric.assign_resource_phone_route", 200, json::object());
-  (void)(client.fabric().resources.assign_phone_route("X", {.phone_route_id = "X", .handler = "X"}));
+  (void)(client.fabric().resources.assign_phone_route("X",
+                                                      {.phone_route_id = "X", .handler = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
@@ -3230,7 +3928,8 @@ TEST(rest_mock_gen_fabric_resources_assign_phone_route_err) {
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().resources.assign_phone_route("X", {.phone_route_id = "X", .handler = "X"}));
+    (void)(client.fabric().resources.assign_phone_route("X",
+                                                        {.phone_route_id = "X", .handler = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -3247,28 +3946,28 @@ TEST(rest_mock_gen_fabric_resources_assign_phone_route_err) {
   return true;
 }
 
-TEST(rest_mock_gen_fabric_tokens_create_invite_token_ok) {
+TEST(rest_mock_gen_fabric_resources_assign_sip_endpoint_ok) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.create_subscriber_invite_token", 200, json::object());
-  (void)(client.fabric().tokens.create_invite_token({.address_id = "X"}));
+  mocktest::scenario_set("fabric.assign_resource_sip_endpoint", 200, json::object());
+  (void)(client.fabric().resources.assign_sip_endpoint("X", {.sip_endpoint_id = "X"}));
   {
     auto j = mocktest::journal_last();
     ASSERT_EQ(j.method, std::string("POST"));
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.create_subscriber_invite_token"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.assign_resource_sip_endpoint"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
   }
   return true;
 }
 
-TEST(rest_mock_gen_fabric_tokens_create_invite_token_err) {
+TEST(rest_mock_gen_fabric_resources_assign_sip_endpoint_err) {
   auto client = mocktest::make_client();
-  mocktest::scenario_set("fabric.create_subscriber_invite_token", 500, json{{"error", "x"}});
+  mocktest::scenario_set("fabric.assign_resource_sip_endpoint", 500, json{{"error", "x"}});
   bool threw = false;
   int status = 0;
   try {
-    (void)(client.fabric().tokens.create_invite_token({.address_id = "X"}));
+    (void)(client.fabric().resources.assign_sip_endpoint("X", {.sip_endpoint_id = "X"}));
   } catch (const SignalWireRestError& e) {
     threw = true;
     status = e.status_code();
@@ -3278,7 +3977,47 @@ TEST(rest_mock_gen_fabric_tokens_create_invite_token_err) {
   {
     auto j = mocktest::journal_last();
     ASSERT_TRUE(j.matched_route.has_value());
-    ASSERT_EQ(*j.matched_route, std::string("fabric.create_subscriber_invite_token"));
+    ASSERT_EQ(*j.matched_route, std::string("fabric.assign_resource_sip_endpoint"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_EQ(*j.response_status, 500);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_resources_assign_whatsapp_number_ok) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.assign_resource_whatsapp_number", 200, json::object());
+  (void)(client.fabric().resources.assign_whatsapp_number(
+      "X", {.whatsapp_number_id = "X", .handler = "X"}));
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_EQ(j.method, std::string("POST"));
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.assign_resource_whatsapp_number"));
+    ASSERT_TRUE(j.response_status.has_value());
+    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+  }
+  return true;
+}
+
+TEST(rest_mock_gen_fabric_resources_assign_whatsapp_number_err) {
+  auto client = mocktest::make_client();
+  mocktest::scenario_set("fabric.assign_resource_whatsapp_number", 500, json{{"error", "x"}});
+  bool threw = false;
+  int status = 0;
+  try {
+    (void)(client.fabric().resources.assign_whatsapp_number(
+        "X", {.whatsapp_number_id = "X", .handler = "X"}));
+  } catch (const SignalWireRestError& e) {
+    threw = true;
+    status = e.status_code();
+  }
+  ASSERT_TRUE(threw);
+  ASSERT_EQ(status, 500);
+  {
+    auto j = mocktest::journal_last();
+    ASSERT_TRUE(j.matched_route.has_value());
+    ASSERT_EQ(*j.matched_route, std::string("fabric.assign_resource_whatsapp_number"));
     ASSERT_TRUE(j.response_status.has_value());
     ASSERT_EQ(*j.response_status, 500);
   }

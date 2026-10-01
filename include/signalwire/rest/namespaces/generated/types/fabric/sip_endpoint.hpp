@@ -31,8 +31,8 @@ struct SipEndpoint {
   std::optional<std::string> send_as;
   std::optional<json> ciphers;
   std::optional<json> codecs;
-  std::optional<json> encryption;
-  std::optional<json> call_handler;
+  std::optional<std::string> encryption;
+  std::optional<std::string> call_handler;
   std::optional<json> calling_handler_resource_id;
   json extras = json::object();
 };

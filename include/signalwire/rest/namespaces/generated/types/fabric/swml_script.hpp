@@ -26,11 +26,12 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SwmlScript {
   std::optional<json> id;
-  std::optional<std::string> contents;
+  std::optional<json> contents;
   std::optional<std::string> request_url;
   std::optional<std::string> display_name;
   std::optional<std::string> status_callback_url;
   std::optional<std::string> status_callback_method;
+  std::optional<std::string> script_type;
   json extras = json::object();
 };
 

@@ -22,81 +22,80 @@
 // WebSocketClient with an EMPTY trust store and asserts the handshake is
 // rejected, proving the cert is actually verified.
 
-#include "tls_mocktest.hpp"
+#include <cstdlib>
+
 #include "signalwire/relay/client.hpp"
 #include "signalwire/relay/websocket.hpp"
-
-#include <cstdlib>
+#include "tls_mocktest.hpp"
 
 // #included into the single test_main.cpp TU -> avoid file-scope
 // `using namespace`; use targeted declarations instead.
 namespace tt = signalwire::tlstest;
-using signalwire::relay::RelayConfig;
-using signalwire::relay::RelayClient;
-using signalwire::relay::WebSocketClient;
 using nlohmann::json;
+using signalwire::relay::RelayClient;
+using signalwire::relay::RelayConfig;
+using signalwire::relay::WebSocketClient;
 
 TEST(tls_relay_client_wss_connect_authenticate) {
-    if (tt::ca_cert_path().empty() || !tt::relay_tls_available()) {
-        // TLS mock not reachable / certs missing -> skip cleanly (infra), the
-        // same discipline as the conftest mock-discovery skip. CI runs the
-        // --tls mock so the assertions below actually execute.
-        std::cerr << "(skipped: mock_relay --tls not reachable on "
-                  << tt::relay_tls_http_url() << ") ";
-        return true;
-    }
-
-    tt::trust_test_ca();              // SSL_CERT_FILE -> test CA, before any dial
-    tt::relay_journal_reset();
-
-    // Production TLS path: leave SIGNALWIRE_RELAY_SCHEME UNSET so connect()
-    // routes through WebSocketClient::connect() (wss://), not connect_plain().
-    ::unsetenv("SIGNALWIRE_RELAY_SCHEME");
-
-    RelayConfig cfg;
-    cfg.project = "test_proj";
-    cfg.token = "test_tok";
-    // Connect by the DNS name the test cert was issued for (SAN DNS:localhost,
-    // resolves to 127.0.0.1 via /etc/hosts). TLS hostname verification matches
-    // against DNS SANs, not bare IP literals — this is the production pattern
-    // (you reach a TLS endpoint by its certificate name, not its IP).
-    cfg.host = "localhost";
-    cfg.port = tt::relay_tls_ws_port();
-    cfg.contexts = {"default"};
-
-    RelayClient client(cfg);
-    bool ok = client.connect();
-    ASSERT_TRUE(ok);                    // connect+authenticate completed over TLS
-    ASSERT_TRUE(client.is_connected());
-
-    // Behavioral proof the TLS session carried a real RELAY handshake: the
-    // mock only issues a protocol string on a successful credential exchange.
-    std::string proto = client.relay_protocol();
-    ASSERT_FALSE(proto.empty());
-    ASSERT_TRUE(proto.find("signalwire") != std::string::npos);
-
-    // Wire proof: the mock journaled the inbound signalwire.connect frame on
-    // the same (TLS) WebSocket, carrying our credentials.
-    auto recvs = tt::relay_journal_recv("signalwire.connect");
-    ASSERT_FALSE(recvs.empty());
-    json auth = recvs.back()["frame"]["params"]["authentication"];
-    ASSERT_EQ(auth.value("project", std::string("x")), std::string("test_proj"));
-    ASSERT_EQ(auth.value("token", std::string("x")), std::string("test_tok"));
-
-    client.disconnect();
-    ASSERT_FALSE(client.is_connected());
-
-    // Negative control: the same wss:// endpoint must reject a client that does
-    // NOT trust the test CA, proving real certificate verification is in force.
-    // Point SSL_CERT_FILE at a path with no valid CA (the server cert itself is
-    // not a CA for itself under default verification) so the chain can't build.
-    {
-        ::setenv("SSL_CERT_FILE", "/dev/null", 1);  // empty/invalid trust store
-        WebSocketClient raw;
-        bool neg_ok = raw.connect("localhost", tt::relay_tls_ws_port());
-        ASSERT_FALSE(neg_ok);                 // handshake must fail (cert unverifiable)
-        ASSERT_FALSE(raw.is_connected());
-        tt::trust_test_ca();                  // restore trust for any later tests
-    }
+  if (tt::ca_cert_path().empty() || !tt::relay_tls_available()) {
+    // TLS mock not reachable / certs missing -> skip cleanly (infra), the
+    // same discipline as the conftest mock-discovery skip. CI runs the
+    // --tls mock so the assertions below actually execute.
+    std::cerr << "(skipped: mock_relay --tls not reachable on " << tt::relay_tls_http_url() << ") ";
     return true;
+  }
+
+  tt::trust_test_ca();  // SSL_CERT_FILE -> test CA, before any dial
+  tt::relay_journal_reset();
+
+  // Production TLS path: leave SIGNALWIRE_RELAY_SCHEME UNSET so connect()
+  // routes through WebSocketClient::connect() (wss://), not connect_plain().
+  ::unsetenv("SIGNALWIRE_RELAY_SCHEME");
+
+  RelayConfig cfg;
+  cfg.project = "test_proj";
+  cfg.token = "test_tok";
+  // Connect by the DNS name the test cert was issued for (SAN DNS:localhost,
+  // resolves to 127.0.0.1 via /etc/hosts). TLS hostname verification matches
+  // against DNS SANs, not bare IP literals — this is the production pattern
+  // (you reach a TLS endpoint by its certificate name, not its IP).
+  cfg.host = "localhost";
+  cfg.port = tt::relay_tls_ws_port();
+  cfg.contexts = {"default"};
+
+  RelayClient client(cfg);
+  bool ok = client.connect();
+  ASSERT_TRUE(ok);  // connect+authenticate completed over TLS
+  ASSERT_TRUE(client.is_connected());
+
+  // Behavioral proof the TLS session carried a real RELAY handshake: the
+  // mock only issues a protocol string on a successful credential exchange.
+  std::string proto = client.relay_protocol();
+  ASSERT_FALSE(proto.empty());
+  ASSERT_TRUE(proto.find("signalwire") != std::string::npos);
+
+  // Wire proof: the mock journaled the inbound signalwire.connect frame on
+  // the same (TLS) WebSocket, carrying our credentials.
+  auto recvs = tt::relay_journal_recv("signalwire.connect");
+  ASSERT_FALSE(recvs.empty());
+  json auth = recvs.back()["frame"]["params"]["authentication"];
+  ASSERT_EQ(auth.value("project", std::string("x")), std::string("test_proj"));
+  ASSERT_EQ(auth.value("token", std::string("x")), std::string("test_tok"));
+
+  client.disconnect();
+  ASSERT_FALSE(client.is_connected());
+
+  // Negative control: the same wss:// endpoint must reject a client that does
+  // NOT trust the test CA, proving real certificate verification is in force.
+  // Point SSL_CERT_FILE at a path with no valid CA (the server cert itself is
+  // not a CA for itself under default verification) so the chain can't build.
+  {
+    ::setenv("SSL_CERT_FILE", "/dev/null", 1);  // empty/invalid trust store
+    WebSocketClient raw;
+    bool neg_ok = raw.connect("localhost", tt::relay_tls_ws_port());
+    ASSERT_FALSE(neg_ok);  // handshake must fail (cert unverifiable)
+    ASSERT_FALSE(raw.is_connected());
+    tt::trust_test_ca();  // restore trust for any later tests
+  }
+  return true;
 }

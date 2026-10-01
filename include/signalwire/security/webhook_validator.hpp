@@ -34,10 +34,9 @@ namespace security {
 /// the raw body string.
 using FormParams = std::vector<std::pair<std::string, std::vector<std::string>>>;
 
-/// Drop-in shape for ``ValidateRequest`` mirroring
-/// ``@signalwire/compatibility-api``'s ``RestClient.validateRequest``:
-/// either a raw body string (delegates to the combined validator) or a
-/// pre-parsed form-params list (runs Scheme B directly).
+/// The request payload accepted by ``ValidateRequest``: either a raw body
+/// string (delegates to the combined validator) or a pre-parsed form-params
+/// list (runs Scheme B directly).
 using ParamsOrBody = std::variant<std::string, FormParams>;
 
 /// Validate a SignalWire webhook signature against both schemes.
@@ -68,6 +67,28 @@ using ParamsOrBody = std::variant<std::string, FormParams>;
 bool ValidateWebhookSignature(std::string_view signing_key, std::string_view signature,
                               std::string_view url, std::string_view raw_body);
 
+/// Validate the SHA-256 webhook signature (Scheme A with a stronger hash).
+///
+/// SignalWire sends ``X-SignalWire-Sha256-Signature`` alongside the SHA-1
+/// ``X-SignalWire-Signature`` on signed webhooks; it is
+/// ``hex(HMAC-SHA256(signing_key, url + raw_body))``. Only Scheme A
+/// (RELAY/SWML/JSON) is defined for this header — the cXML/form Scheme B stays
+/// on SHA-1 (see ``ValidateWebhookSignature``).
+///
+/// @param signing_key The customer's Signing Key. Empty throws
+///                    ``std::invalid_argument``.
+/// @param signature   The ``X-SignalWire-Sha256-Signature`` header value
+///                    (64-char lowercase hex). Empty returns ``false``.
+/// @param url         Full URL SignalWire POSTed to, exactly as the platform
+///                    saw it.
+/// @param raw_body    Raw request body as a UTF-8 string, BEFORE any parsing.
+///
+/// @return ``true`` if the SHA-256 signature matches, ``false`` otherwise.
+///
+/// @throws std::invalid_argument when ``signing_key`` is empty.
+bool ValidateWebhookSignatureSha256(std::string_view signing_key, std::string_view signature,
+                                    std::string_view url, std::string_view raw_body);
+
 /// Legacy ``@signalwire/compatibility-api`` drop-in entry point.
 ///
 /// If ``params_or_raw_body`` holds a ``std::string``, delegates to
@@ -81,18 +102,15 @@ bool ValidateRequest(std::string_view signing_key, std::string_view signature, s
                      const ParamsOrBody& params_or_raw_body);
 
 /// Response triple returned by ``Validate`` when a request must be
-/// rejected: ``(status, headers, body)`` — the framework-free decision
-/// core all ports share (Python ``webhook_middleware.validate``, dotnet
-/// ``WebhookValidationMiddleware.Validate``, Rack/PSGI middleware). Status
-/// is the HTTP status code, headers the response headers, body the
-/// response body text.
+/// rejected: ``(status, headers, body)``. Status is the HTTP status code,
+/// headers the response headers, body the response body text.
 using ValidationResponse = std::tuple<int, std::map<std::string, std::string>, std::string>;
 
 /// Framework-free webhook-validation decision core. This is the decomposed
 /// shape the SDK exposes so users can validate a signed inbound
 /// request WITHOUT depending on a specific HTTP framework — the
 /// cpp-httplib ``WrapWithSignatureValidation`` middleware is a thin
-/// PORT_ADDITION idiom built on top of this.
+/// convenience built on top of this.
 ///
 /// Pulls ``X-SignalWire-Signature`` (or the legacy ``X-Twilio-Signature``
 /// alias) out of ``headers``, then runs ``ValidateWebhookSignature``

@@ -157,7 +157,7 @@ You can also nest a subsection under an existing section, or append to a section
 ```cpp
 agent.prompt_add_subsection("Instructions", "Escalation",
     "When to escalate to a human agent.",
-    {"After two failed attempts", "On explicit request"});
+    std::vector<std::string>{"After two failed attempts", "On explicit request"});
 
 agent.prompt_add_to_section("Instructions", "Always confirm the caller's identity first.");
 ```
@@ -939,7 +939,7 @@ AgentBase(const std::string& name = "agent",
 - `set_prompt_text(text)` / `set_use_pom(bool)` / `set_prompt_pom(vector<json>)`
 - `set_post_prompt(text)` / `set_post_prompt_url(url)`
 - `prompt_add_section(title, body = "", bullets = {})`
-- `prompt_add_subsection(parent_title, title, body = "", bullets = {})`
+- `prompt_add_subsection(parent_title, title, body = "", bullets = std::nullopt)`
 - `prompt_add_to_section(title, body = "", bullets = {})`
 
 ### SWAIG / Tool Methods

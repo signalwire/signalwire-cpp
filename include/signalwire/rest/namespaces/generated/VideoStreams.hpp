@@ -26,7 +26,7 @@ using json = nlohmann::json;
 class VideoStreams : public BaseResource {
  public:
   struct UpdateParams {
-    std::string url;
+    std::optional<std::string> url;
     json extras = json::object();
   };
 
@@ -41,7 +41,9 @@ class VideoStreams : public BaseResource {
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
                             const RequestOptions& request_options = {}) const {
     json body = json::object();
-    body["url"] = p.url;
+    if (p.url.has_value()) {
+      body["url"] = *p.url;
+    }
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }

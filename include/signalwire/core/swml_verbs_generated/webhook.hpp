@@ -23,16 +23,17 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Webhook {
-  std::optional<json> expressions;
   std::optional<json> error_keys;
-  std::optional<std::string> url;
+  std::optional<json> expressions;
   std::optional<json> foreach;
+  std::optional<std::string> form_param;
   std::optional<json> headers;
-  std::optional<json> method;
-  std::optional<json> input_args_as_params;
+  std::optional<bool> input_args_as_params;
+  std::optional<std::string> method;
+  std::optional<json> output;
   std::optional<json> params;
   std::optional<json> require_args;
-  std::optional<json> output;
+  std::optional<std::string> url;
   json extras = json::object();
 };
 

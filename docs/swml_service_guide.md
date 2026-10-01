@@ -268,8 +268,10 @@ class VipVoiceService : public signalwire::swml::Service {
 protected:
     std::optional<json> on_swml_request(
         const std::optional<json>& request_data = std::nullopt,
-        const std::optional<std::string>& callback_path = std::nullopt) override {
+        const std::optional<std::string>& callback_path = std::nullopt,
+        const std::optional<json>& request = std::nullopt) override {
         (void)callback_path;
+        (void)request;
         if (!request_data) {
             return std::nullopt;
         }
@@ -520,7 +522,7 @@ returns `Service&` for chaining):
 - `serve()`: Start the HTTP server (blocking)
 - `stop()`: Stop the HTTP server
 - `get_basic_auth_credentials()` / `get_basic_auth_credentials_with_source()`: Get the basic-auth credentials
-- `on_swml_request(request_data, callback_path)`: Called when SWML is requested
+- `on_swml_request(request_data, callback_path, request)`: Called when SWML is requested
 - `register_routing_callback(callback_fn, path)`: Register a callback for request routing
 
 ### Verb Helper Methods
@@ -597,8 +599,10 @@ class CallRouterService : public signalwire::swml::Service {
 protected:
     std::optional<json> on_swml_request(
         const std::optional<json>& request_data = std::nullopt,
-        const std::optional<std::string>& callback_path = std::nullopt) override {
+        const std::optional<std::string>& callback_path = std::nullopt,
+        const std::optional<json>& request = std::nullopt) override {
         (void)callback_path;
+        (void)request;
         // If there's no request data, use default routing.
         if (!request_data) {
             get_logger().debug("no_request_data_using_default");

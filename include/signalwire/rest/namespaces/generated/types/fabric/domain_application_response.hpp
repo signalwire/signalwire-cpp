@@ -34,8 +34,8 @@ struct DomainApplicationResponse {
   std::optional<std::string> preview_url;
   std::optional<bool> locked;
   std::optional<json> channels;
-  std::optional<std::string> created_at;
   std::optional<std::string> type;
+  std::optional<std::string> resource_id;
   json extras = json::object();
 };
 

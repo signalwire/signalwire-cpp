@@ -36,9 +36,8 @@ struct TlsServerConfig {
   bool usable() const { return enabled && !cert_path.empty() && !key_path.empty(); }
 };
 
-/// Resolve TLS config from the SWML_SSL_* environment variables, mirroring
-/// signalwire-python's SecurityConfig.load_from_env(). Returns enabled=false
-/// when SWML_SSL_ENABLED is unset/false.
+/// Resolve TLS config from the SWML_SSL_* environment variables. Returns
+/// enabled=false when SWML_SSL_ENABLED is unset/false.
 inline TlsServerConfig resolve_tls_config_from_env() {
   TlsServerConfig cfg;
   std::string enabled = get_env("SWML_SSL_ENABLED", "");

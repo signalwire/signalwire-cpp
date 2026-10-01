@@ -28,7 +28,7 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CreateAddressRequest {
   std::optional<std::string> label;
-  std::optional<std::string> country;
+  std::optional<json> country;
   std::optional<std::string> first_name;
   std::optional<std::string> last_name;
   std::optional<std::string> street_number;
@@ -38,6 +38,8 @@ struct CreateAddressRequest {
   std::optional<std::string> city;
   std::optional<std::string> state;
   std::optional<std::string> postal_code;
+  std::optional<bool> emergency_enabled;
+  std::optional<bool> auto_correct_address;
   json extras = json::object();
 };
 

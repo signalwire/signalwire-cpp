@@ -25,11 +25,12 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct EnterQueueObject {
-  std::optional<std::string> queue_name;
-  std::optional<json> transfer_after_bridge;
-  std::optional<std::string> status_url;
-  std::optional<json> wait_url;
+  std::optional<json> execute_after_queue;
+  std::optional<json> queue_name;
+  std::optional<json> status_url;
   std::optional<json> wait_time;
+  std::optional<json> wait_url;
+  std::optional<json> whisper_url;
   json extras = json::object();
 };
 

@@ -29,6 +29,16 @@ using json = nlohmann::json;
 struct SubscriberGuestTokenCreateRequest {
   std::optional<json> allowed_addresses;
   std::optional<int> expire_at;
+  std::optional<std::string> ch;
+  std::optional<std::string> region;
+  std::optional<std::string> email;
+  std::optional<std::string> first_name;
+  std::optional<std::string> last_name;
+  std::optional<std::string> display_name;
+  std::optional<std::string> job_title;
+  std::optional<std::string> time_zone;
+  std::optional<std::string> country;
+  std::optional<std::string> company_name;
   json extras = json::object();
 };
 

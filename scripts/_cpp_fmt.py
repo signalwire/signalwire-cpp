@@ -244,8 +244,10 @@ def _reflow_comments(lines: list[str]) -> list[str]:
 
 def _align_trailing_comments(lines: list[str]) -> list[str]:
     """Align trailing ``//`` comments (AlignTrailingComments) within runs of consecutive
-    non-blank lines: the comment column is 2 past the widest CODE portion among the
-    comment-bearing lines in the run (non-comment lines don't push it)."""
+    comment-bearing lines: the comment column is 2 past the widest CODE portion in the
+    run. A line without a trailing comment (or a blank line) ends the run, exactly as
+    clang-format 18 does: ``const_; // ...`` / ``enum_; // ...`` align together, while
+    a ``not_; // ...`` separated from them by uncommented members is aligned alone."""
     out: list[str] = []
     run: list[tuple[str, str]] = []
 
@@ -268,7 +270,8 @@ def _align_trailing_comments(lines: list[str]) -> list[str]:
         if m and not ln.lstrip().startswith("//"):
             run.append((m.group(1), m.group(3)))
         else:
-            run.append((ln, ""))
+            flush()
+            out.append(ln)
     flush()
     return out
 

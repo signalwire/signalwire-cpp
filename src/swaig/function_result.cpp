@@ -360,7 +360,7 @@ std::string strip(const std::string& s) {
 
 FunctionResult& FunctionResult::join_conference(
     const std::string& name, bool muted, const std::string& beep, bool start_on_enter,
-    bool end_on_exit, std::optional<std::string> wait_url, int max_participants,
+    bool end_on_exit, std::optional<std::string> wait_url, std::optional<int> max_participants,
     const std::string& record, std::optional<std::string> region, const std::string& trim,
     std::optional<std::string> coach, std::optional<std::string> status_callback_event,
     std::optional<std::string> status_callback, const std::string& status_callback_method,
@@ -372,8 +372,12 @@ FunctionResult& FunctionResult::join_conference(
   if (!contains(valid_beep, beep)) {
     throw std::invalid_argument("beep must be one of " + render_choices(valid_beep));
   }
-  if (max_participants <= 0 || max_participants > 250) {
-    throw std::invalid_argument("max_participants must be a positive integer <= 250");
+  // The platform requires a positive number, and its conference refuses fewer
+  // than 2; it sets no upper limit. Unset leaves it out so the platform default
+  // applies.
+  if (max_participants.has_value() && *max_participants < 2) {
+    throw std::invalid_argument("max_participants must be an integer of at least 2, got " +
+                                std::to_string(*max_participants));
   }
   static const std::vector<std::string> valid_record = {"do-not-record", "record-from-start"};
   if (!contains(valid_record, record)) {
@@ -399,7 +403,7 @@ FunctionResult& FunctionResult::join_conference(
   // --- Emission: simple bare-name string when all params are at default --
   bool all_default =
       !muted && beep == "true" && start_on_enter && !end_on_exit && !wait_url.has_value() &&
-      max_participants == 250 && record == "do-not-record" && !region.has_value() &&
+      !max_participants.has_value() && record == "do-not-record" && !region.has_value() &&
       trim == "trim-silence" && !coach.has_value() && !status_callback_event.has_value() &&
       !status_callback.has_value() && status_callback_method == "POST" &&
       !recording_status_callback.has_value() && recording_status_callback_method == "POST" &&
@@ -427,8 +431,8 @@ FunctionResult& FunctionResult::join_conference(
     if (wait_url.has_value()) {
       obj["wait_url"] = *wait_url;
     }
-    if (max_participants != 250) {
-      obj["max_participants"] = max_participants;
+    if (max_participants.has_value()) {
+      obj["max_participants"] = *max_participants;
     }
     if (record != "do-not-record") {
       obj["record"] = record;
@@ -479,9 +483,9 @@ FunctionResult& FunctionResult::join_conference(const std::string& name,
   return join_conference(
       name, o.muted.value_or(false), o.beep ? o.beep->str() : std::string("true"),
       o.start_on_enter.value_or(true), o.end_on_exit.value_or(false), o.wait_url,
-      o.max_participants.value_or(250), o.record ? o.record->str() : std::string("do-not-record"),
-      o.region, o.trim ? o.trim->str() : std::string("trim-silence"), o.coach,
-      o.status_callback_event, o.status_callback,
+      o.max_participants, o.record ? o.record->str() : std::string("do-not-record"), o.region,
+      o.trim ? o.trim->str() : std::string("trim-silence"), o.coach, o.status_callback_event,
+      o.status_callback,
       o.status_callback_method ? o.status_callback_method->str() : std::string("POST"),
       o.recording_status_callback,
       o.recording_status_callback_method ? o.recording_status_callback_method->str()

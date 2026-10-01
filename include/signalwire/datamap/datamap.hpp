@@ -85,6 +85,11 @@ class DataMap {
   /// Set request params for the last added webhook (POST/PUT request data too)
   DataMap& params(const json& data);
 
+  /// Set the JSON request body for the last added webhook; the same as params().
+  /// The platform reads a webhook's body from its ``params`` field and has no
+  /// ``body`` field, so this sets ``params``.
+  DataMap& body(const json& data);
+
   /// Set foreach configuration for the last webhook
   DataMap& foreach (const json& foreach_config);
 

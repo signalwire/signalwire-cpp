@@ -28,6 +28,7 @@ struct CreateTokenRequest {
   std::optional<std::string> name;
   std::optional<json> permissions;
   std::optional<std::string> subproject_id;
+  std::optional<std::string> project_id;
   json extras = json::object();
 };
 

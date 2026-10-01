@@ -37,6 +37,25 @@ class Addresses : public BaseResource {
     std::string postal_code;
     std::optional<std::string> address_type;
     std::optional<std::string> address_number;
+    std::optional<bool> emergency_enabled;
+    std::optional<bool> auto_correct_address;
+    json extras = json::object();
+  };
+
+  struct UpdateParams {
+    std::optional<std::string> label;
+    std::optional<std::string> country;
+    std::optional<std::string> first_name;
+    std::optional<std::string> last_name;
+    std::optional<std::string> street_number;
+    std::optional<std::string> street_name;
+    std::optional<std::string> address_type;
+    std::optional<std::string> address_number;
+    std::optional<std::string> city;
+    std::optional<std::string> state;
+    std::optional<std::string> postal_code;
+    std::optional<bool> emergency_enabled;
+    std::optional<bool> auto_correct_address;
     json extras = json::object();
   };
 
@@ -66,6 +85,12 @@ class Addresses : public BaseResource {
     if (p.address_number.has_value()) {
       body["address_number"] = *p.address_number;
     }
+    if (p.emergency_enabled.has_value()) {
+      body["emergency_enabled"] = *p.emergency_enabled;
+    }
+    if (p.auto_correct_address.has_value()) {
+      body["auto_correct_address"] = *p.auto_correct_address;
+    }
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
@@ -76,6 +101,54 @@ class Addresses : public BaseResource {
                          const std::map<std::string, std::string>& params = {},
                          const RequestOptions& request_options = {}) const {
     return client_.get(base_path_ + "/" + id, params, request_options);
+  }
+
+  [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    if (p.label.has_value()) {
+      body["label"] = *p.label;
+    }
+    if (p.country.has_value()) {
+      body["country"] = *p.country;
+    }
+    if (p.first_name.has_value()) {
+      body["first_name"] = *p.first_name;
+    }
+    if (p.last_name.has_value()) {
+      body["last_name"] = *p.last_name;
+    }
+    if (p.street_number.has_value()) {
+      body["street_number"] = *p.street_number;
+    }
+    if (p.street_name.has_value()) {
+      body["street_name"] = *p.street_name;
+    }
+    if (p.address_type.has_value()) {
+      body["address_type"] = *p.address_type;
+    }
+    if (p.address_number.has_value()) {
+      body["address_number"] = *p.address_number;
+    }
+    if (p.city.has_value()) {
+      body["city"] = *p.city;
+    }
+    if (p.state.has_value()) {
+      body["state"] = *p.state;
+    }
+    if (p.postal_code.has_value()) {
+      body["postal_code"] = *p.postal_code;
+    }
+    if (p.emergency_enabled.has_value()) {
+      body["emergency_enabled"] = *p.emergency_enabled;
+    }
+    if (p.auto_correct_address.has_value()) {
+      body["auto_correct_address"] = *p.auto_correct_address;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id, body, request_options);
   }
 
   [[nodiscard]] json delete_(const std::string& id,

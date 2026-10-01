@@ -4,6 +4,12 @@
 # release floor (port_signatures.baseline.json -> baseline_version) is pinned at
 # 3.0.0 with the recorded surface payload overwritten to match today's surface.
 #
+# Re-checked 2026-10-01 against the owner's "declare what main has PUBLISHED" rule:
+# `git ls-remote --tags origin` tops out at v2.0.1 and the only GitHub release is
+# v1.1.0; main's CMakeLists declares 3.2.1, which was never published. Nothing at or
+# above 3.0.0 is published, so this branch keeps 3.0.0 and the 3.0.0 floor until the
+# wave6 work lands on main.
+#
 # THIS FILE IS DOCUMENTATION ONLY (owner ruling, 2026-07-28). No gate reads it and
 # nothing fails if it is present. It exists so that neither a person nor a future
 # session has to re-derive why the versions look the way they do — and so nobody

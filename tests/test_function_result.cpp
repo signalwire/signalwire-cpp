@@ -624,9 +624,22 @@ TEST(function_result_join_conference_invalid_beep) {
 }
 
 TEST(function_result_join_conference_max_participants_over) {
+  // The platform sets no upper limit: a value above the old 250 cap is sent.
   FunctionResult r("test");
   JoinConferenceOptions opts;
   opts.max_participants = 251;
+  r.join_conference("conf", opts);
+  auto verb = jc_verb(r);
+  ASSERT_TRUE(verb.is_object());
+  ASSERT_EQ(verb["max_participants"].get<int>(), 251);
+  return true;
+}
+
+TEST(function_result_join_conference_max_participants_one) {
+  // The conference refuses fewer than 2 participants.
+  FunctionResult r("test");
+  JoinConferenceOptions opts;
+  opts.max_participants = 1;
   ASSERT_THROWS(r.join_conference("conf", opts));
   return true;
 }
@@ -648,12 +661,22 @@ TEST(function_result_join_conference_max_participants_negative) {
 }
 
 TEST(function_result_join_conference_max_participants_boundary) {
-  // 250 is the inclusive upper bound — must NOT throw (and equals default,
-  // so it collapses to the simple name form).
+  // 2 is the inclusive lower bound — must NOT throw; an explicit value is
+  // always sent (there is no SDK-side default to collapse into).
   FunctionResult r("test");
   JoinConferenceOptions opts;
-  opts.max_participants = 250;
+  opts.max_participants = 2;
   r.join_conference("edge", opts);
+  auto verb = jc_verb(r);
+  ASSERT_TRUE(verb.is_object());
+  ASSERT_EQ(verb["max_participants"].get<int>(), 2);
+  return true;
+}
+
+TEST(function_result_join_conference_max_participants_unset_omitted) {
+  // Unset leaves it out, so the platform default applies (bare-name form).
+  FunctionResult r("test");
+  r.join_conference("edge");
   auto verb = jc_verb(r);
   ASSERT_TRUE(verb.is_string());
   ASSERT_EQ(verb.get<std::string>(), "edge");

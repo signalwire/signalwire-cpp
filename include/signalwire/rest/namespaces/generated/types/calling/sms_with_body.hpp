@@ -25,11 +25,13 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SMSWithBody {
-  std::optional<std::string> to_number;
-  std::optional<std::string> from_number;
-  std::optional<std::string> region;
+  std::optional<json> body;
+  std::optional<json> from_number;
+  std::optional<json> media;
+  std::optional<json> region;
+  std::optional<json> status_callback;
   std::optional<json> tags;
-  std::optional<std::string> body;
+  std::optional<json> to_number;
   json extras = json::object();
 };
 

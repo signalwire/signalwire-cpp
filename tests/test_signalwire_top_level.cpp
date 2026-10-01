@@ -57,6 +57,7 @@ TEST(signalwire_top_level_rest_client_throws_on_missing_credentials) {
   unsetenv("SIGNALWIRE_PROJECT_ID");
   unsetenv("SIGNALWIRE_API_TOKEN");
   unsetenv("SIGNALWIRE_SPACE");
+  unsetenv("SIGNALWIRE_PERSONAL_ACCESS_TOKEN");
   bool threw = false;
   try {
     auto client = signalwire::RestClient({}, {});

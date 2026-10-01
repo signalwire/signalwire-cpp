@@ -36,12 +36,14 @@ struct BrandResponse {
   std::optional<std::string> ein;
   std::optional<std::string> company_address;
   std::optional<std::string> company_vertical;
-  std::optional<std::string> company_website;
   std::optional<std::string> csp_brand_reference;
   std::optional<bool> csp_self_registered;
   std::optional<std::string> status_callback_url;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
+  std::optional<json> signalwire_contact_emails;
+  std::optional<std::string> large_message_limit;
+  std::optional<std::string> number_pooling_for_company;
   json extras = json::object();
 };
 

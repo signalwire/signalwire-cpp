@@ -32,6 +32,7 @@ struct SwaigAction {
   std::optional<json> back_to_back_functions;
   std::optional<std::string> change_context;
   std::optional<std::string> change_step;
+  std::optional<json> change_voice;
   std::optional<bool> clear_dynamic_hints;
   std::optional<json> context_switch;
   std::optional<int> end_of_speech_timeout;

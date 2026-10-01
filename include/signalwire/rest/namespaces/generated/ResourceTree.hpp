@@ -35,8 +35,10 @@
 #include "signalwire/rest/namespaces/generated/RegistryNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/ShortCodes.hpp"
 #include "signalwire/rest/namespaces/generated/SipProfile.hpp"
+#include "signalwire/rest/namespaces/generated/SpaceNamespace.hpp"
 #include "signalwire/rest/namespaces/generated/VerifiedCallers.hpp"
 #include "signalwire/rest/namespaces/generated/VideoNamespace.hpp"
+#include "signalwire/rest/namespaces/generated/WhatsappNamespace.hpp"
 
 namespace signalwire {
 namespace rest {
@@ -47,8 +49,10 @@ using json = nlohmann::json;
 /// ResourceTree — flat resources plus namespace containers.
 /// Groups every REST resource under its API namespace so the
 /// RestClient can expose them as a single accessor tree.
+/// `http` carries the project token; `pat_http` the Personal Access Token
+/// (the namespaces whose spec security requires it, e.g. space).
 struct ResourceTree {
-  explicit ResourceTree(const HttpClient& http)
+  explicit ResourceTree(const HttpClient& http, const HttpClient& pat_http)
       : addresses(http),
         imported_numbers(http),
         lookup(http),
@@ -70,7 +74,9 @@ struct ResourceTree {
         video(http),
         datasphere(http),
         logs(http),
-        project(http) {}
+        whatsapp(http),
+        project(http),
+        space(pat_http) {}
 
   Addresses addresses;
   ImportedNumbers imported_numbers;
@@ -93,7 +99,9 @@ struct ResourceTree {
   VideoNamespace video;
   DatasphereNamespace datasphere;
   LogsNamespace logs;
+  WhatsappNamespace whatsapp;
   ProjectNamespace project;
+  SpaceNamespace space;
 };
 
 }  // namespace generated

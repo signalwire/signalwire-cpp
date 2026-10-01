@@ -27,7 +27,7 @@ using json = nlohmann::json;
 struct CXMLScriptResponse {
   std::optional<json> id;
   std::optional<json> project_id;
-  std::optional<std::string> name;
+  std::optional<std::string> display_name;
   std::optional<std::string> type;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;

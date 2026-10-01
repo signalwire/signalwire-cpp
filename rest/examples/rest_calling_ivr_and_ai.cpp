@@ -24,8 +24,8 @@ int main() {
       // Collect DTMF
       auto collected =
           client.calling().collect(call_id, {
-                                                .initial_timeout = 10,
                                                 .digits = json{{"max", 1}, {"terminators", "#"}},
+                                                .initial_timeout = 10,
                                             });
       std::cout << "Collected: " << collected.dump() << "\n";
 

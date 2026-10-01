@@ -37,7 +37,6 @@ struct Campaign {
   std::optional<std::string> sample3;
   std::optional<std::string> sample4;
   std::optional<std::string> sample5;
-  std::optional<std::string> dynamic_templates;
   std::optional<std::string> message_flow;
   std::optional<std::string> opt_in_message;
   std::optional<std::string> opt_out_message;
@@ -45,7 +44,6 @@ struct Campaign {
   std::optional<std::string> opt_in_keywords;
   std::optional<std::string> opt_out_keywords;
   std::optional<std::string> help_keywords;
-  std::optional<bool> number_pooling_required;
   std::optional<std::string> number_pooling_per_campaign;
   std::optional<bool> direct_lending;
   std::optional<bool> embedded_link;
@@ -56,6 +54,12 @@ struct Campaign {
   std::optional<std::string> status_callback_url;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
+  std::optional<std::string> dynamic_messages;
+  std::optional<std::string> requested_throughput;
+  std::optional<std::string> daily_messages_per_number;
+  std::optional<std::string> privacy_policy_link;
+  std::optional<std::string> purchase_or_port_numbers;
+  std::optional<json> signalwire_contact_emails;
   json extras = json::object();
 };
 

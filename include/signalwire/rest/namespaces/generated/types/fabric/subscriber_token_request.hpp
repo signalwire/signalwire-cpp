@@ -27,6 +27,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SubscriberTokenRequest {
+  std::optional<std::string> ch;
   std::optional<std::string> reference;
   std::optional<int> expire_at;
   std::optional<json> application_id;
@@ -39,6 +40,8 @@ struct SubscriberTokenRequest {
   std::optional<std::string> country;
   std::optional<std::string> region;
   std::optional<std::string> company_name;
+  std::optional<std::string> scope;
+  std::optional<std::string> fingerprint;
   json extras = json::object();
 };
 

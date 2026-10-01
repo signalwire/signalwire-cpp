@@ -29,6 +29,7 @@ class ProjectTokens : public BaseResource {
     std::string name;
     json permissions;
     std::optional<std::string> subproject_id;
+    std::optional<std::string> project_id;
     json extras = json::object();
   };
 
@@ -47,6 +48,9 @@ class ProjectTokens : public BaseResource {
     body["permissions"] = p.permissions;
     if (p.subproject_id.has_value()) {
       body["subproject_id"] = *p.subproject_id;
+    }
+    if (p.project_id.has_value()) {
+      body["project_id"] = *p.project_id;
     }
     if (!p.extras.is_null()) {
       body.update(p.extras);

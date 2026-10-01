@@ -26,20 +26,19 @@ using json = nlohmann::json;
 class CxmlApplications : public BaseResource {
  public:
   struct UpdateParams {
-    std::optional<std::string> display_name;
-    std::optional<std::string> account_sid;
-    std::optional<std::string> voice_url;
-    std::optional<json> voice_method;
-    std::optional<std::string> voice_fallback_url;
-    std::optional<json> voice_fallback_method;
-    std::optional<std::string> status_callback;
-    std::optional<json> status_callback_method;
-    std::optional<std::string> sms_url;
-    std::optional<json> sms_method;
-    std::optional<std::string> sms_fallback_url;
-    std::optional<json> sms_fallback_method;
-    std::optional<std::string> sms_status_callback;
-    std::optional<json> sms_status_callback_method;
+    std::optional<std::string> name;
+    std::optional<std::string> call_request_url;
+    std::optional<std::string> call_request_method;
+    std::optional<std::string> call_fallback_url;
+    std::optional<std::string> call_fallback_method;
+    std::optional<std::string> call_status_url;
+    std::optional<std::string> call_status_method;
+    std::optional<std::string> message_request_url;
+    std::optional<std::string> message_request_method;
+    std::optional<std::string> message_fallback_url;
+    std::optional<std::string> message_fallback_method;
+    std::optional<std::string> message_status_url;
+    std::optional<std::string> message_status_method;
     json extras = json::object();
   };
 
@@ -60,47 +59,44 @@ class CxmlApplications : public BaseResource {
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
                             const RequestOptions& request_options = {}) const {
     json body = json::object();
-    if (p.display_name.has_value()) {
-      body["display_name"] = *p.display_name;
+    if (p.name.has_value()) {
+      body["name"] = *p.name;
     }
-    if (p.account_sid.has_value()) {
-      body["account_sid"] = *p.account_sid;
+    if (p.call_request_url.has_value()) {
+      body["call_request_url"] = *p.call_request_url;
     }
-    if (p.voice_url.has_value()) {
-      body["voice_url"] = *p.voice_url;
+    if (p.call_request_method.has_value()) {
+      body["call_request_method"] = *p.call_request_method;
     }
-    if (p.voice_method.has_value()) {
-      body["voice_method"] = *p.voice_method;
+    if (p.call_fallback_url.has_value()) {
+      body["call_fallback_url"] = *p.call_fallback_url;
     }
-    if (p.voice_fallback_url.has_value()) {
-      body["voice_fallback_url"] = *p.voice_fallback_url;
+    if (p.call_fallback_method.has_value()) {
+      body["call_fallback_method"] = *p.call_fallback_method;
     }
-    if (p.voice_fallback_method.has_value()) {
-      body["voice_fallback_method"] = *p.voice_fallback_method;
+    if (p.call_status_url.has_value()) {
+      body["call_status_url"] = *p.call_status_url;
     }
-    if (p.status_callback.has_value()) {
-      body["status_callback"] = *p.status_callback;
+    if (p.call_status_method.has_value()) {
+      body["call_status_method"] = *p.call_status_method;
     }
-    if (p.status_callback_method.has_value()) {
-      body["status_callback_method"] = *p.status_callback_method;
+    if (p.message_request_url.has_value()) {
+      body["message_request_url"] = *p.message_request_url;
     }
-    if (p.sms_url.has_value()) {
-      body["sms_url"] = *p.sms_url;
+    if (p.message_request_method.has_value()) {
+      body["message_request_method"] = *p.message_request_method;
     }
-    if (p.sms_method.has_value()) {
-      body["sms_method"] = *p.sms_method;
+    if (p.message_fallback_url.has_value()) {
+      body["message_fallback_url"] = *p.message_fallback_url;
     }
-    if (p.sms_fallback_url.has_value()) {
-      body["sms_fallback_url"] = *p.sms_fallback_url;
+    if (p.message_fallback_method.has_value()) {
+      body["message_fallback_method"] = *p.message_fallback_method;
     }
-    if (p.sms_fallback_method.has_value()) {
-      body["sms_fallback_method"] = *p.sms_fallback_method;
+    if (p.message_status_url.has_value()) {
+      body["message_status_url"] = *p.message_status_url;
     }
-    if (p.sms_status_callback.has_value()) {
-      body["sms_status_callback"] = *p.sms_status_callback;
-    }
-    if (p.sms_status_callback_method.has_value()) {
-      body["sms_status_callback_method"] = *p.sms_status_callback_method;
+    if (p.message_status_method.has_value()) {
+      body["message_status_method"] = *p.message_status_method;
     }
     if (!p.extras.is_null()) {
       body.update(p.extras);

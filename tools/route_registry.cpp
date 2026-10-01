@@ -78,6 +78,18 @@ class CaptureServer {
             std::lock_guard<std::mutex> lock(mutex_);
             captured_.emplace_back(method, req.path);
           }
+          // An endpoint whose success IS a redirect (a recording .mp3/.mp4, a
+          // statement .pdf) answers 302 + Location, so get_redirect_location()
+          // completes instead of throwing on a non-redirect success.
+          const std::string& p = req.path;
+          auto ends_with = [&p](const std::string& sfx) {
+            return p.size() >= sfx.size() && p.compare(p.size() - sfx.size(), sfx.size(), sfx) == 0;
+          };
+          if (method == "GET" && (ends_with(".mp3") || ends_with(".mp4") || ends_with(".pdf"))) {
+            res.status = 302;
+            res.set_header("Location", "https://example.invalid/download");
+            return;
+          }
           res.status = 200;
           res.set_content("{}", "application/json");
         } catch (...) {
@@ -190,8 +202,6 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.fabric().tokens.create_subscriber_token({.reference = SENTINEL}));
   CALL("fabric.tokens.refresh_subscriber_token",
        c.fabric().tokens.refresh_subscriber_token({.refresh_token = SENTINEL}));
-  CALL("fabric.tokens.create_invite_token",
-       c.fabric().tokens.create_invite_token({.address_id = SENTINEL}));
   CALL("fabric.tokens.create_guest_token",
        c.fabric().tokens.create_guest_token({.allowed_addresses = json::array()}));
   CALL("fabric.tokens.create_embed_token",
@@ -256,9 +266,9 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.cxml_webhooks.delete_", c.fabric().cxml_webhooks.delete_(id));
   CALL("fabric.cxml_webhooks.list_addresses", c.fabric().cxml_webhooks.list_addresses(id, q));
 
-  // conference_rooms: CRUD + a SINGULARISED sibling addresses path. The
-  // generated resource overrides list_addresses to that singular path (hiding
-  // the plural base member), so there is ONE canonical list_addresses route.
+  // conference_rooms: CRUD + addresses. The markup declares list_addresses, so
+  // the generated resource overrides (hides) the base member with the same
+  // route: ONE canonical list_addresses route.
   CALL("fabric.conference_rooms.list", c.fabric().conference_rooms.list(q));
   CALL("fabric.conference_rooms.create", c.fabric().conference_rooms.create(body));
   CALL("fabric.conference_rooms.get", c.fabric().conference_rooms.get(id));
@@ -266,7 +276,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("fabric.conference_rooms.delete_", c.fabric().conference_rooms.delete_(id));
   CALL("fabric.conference_rooms.list_addresses", c.fabric().conference_rooms.list_addresses(id, q));
 
-  // call_flows: CRUD + addresses + versions/deploy (singular sub-paths).
+  // call_flows: CRUD + addresses + versions/deploy (nested under the collection).
   CALL("fabric.call_flows.list", c.fabric().call_flows.list(q));
   CALL("fabric.call_flows.create", c.fabric().call_flows.create(body));
   CALL("fabric.call_flows.get", c.fabric().call_flows.get(id));
@@ -315,9 +325,37 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.fabric().resources.assign_phone_route(id,
                                                {.phone_route_id = SENTINEL, .handler = SENTINEL}));
 
-  // fabric addresses (list/get only).
+  // fabric addresses (list/get/delete).
   CALL("fabric.addresses.list", c.fabric().addresses.list(q));
   CALL("fabric.addresses.get", c.fabric().addresses.get(id));
+  CALL("fabric.addresses.delete_", c.fabric().addresses.delete_(id));
+
+  // fabric typed address collections (alias / sip / phone): CRUD.
+  CALL("fabric.alias_addresses.list", c.fabric().alias_addresses.list(q));
+  CALL("fabric.alias_addresses.create", c.fabric().alias_addresses.create(body));
+  CALL("fabric.alias_addresses.get", c.fabric().alias_addresses.get(id));
+  CALL("fabric.alias_addresses.update", c.fabric().alias_addresses.update(id, body));
+  CALL("fabric.alias_addresses.delete_", c.fabric().alias_addresses.delete_(id));
+  CALL("fabric.sip_addresses.list", c.fabric().sip_addresses.list(q));
+  CALL("fabric.sip_addresses.create", c.fabric().sip_addresses.create(body));
+  CALL("fabric.sip_addresses.get", c.fabric().sip_addresses.get(id));
+  CALL("fabric.sip_addresses.update", c.fabric().sip_addresses.update(id, body));
+  CALL("fabric.sip_addresses.delete_", c.fabric().sip_addresses.delete_(id));
+  CALL("fabric.phone_number_addresses.list", c.fabric().phone_number_addresses.list(q));
+  CALL("fabric.phone_number_addresses.create", c.fabric().phone_number_addresses.create(body));
+  CALL("fabric.phone_number_addresses.get", c.fabric().phone_number_addresses.get(id));
+  CALL("fabric.phone_number_addresses.update", c.fabric().phone_number_addresses.update(id, body));
+  CALL("fabric.phone_number_addresses.delete_", c.fabric().phone_number_addresses.delete_(id));
+
+  // fabric resource assignment (sip endpoint / whatsapp number) + ai agent extras.
+  CALL("fabric.resources.assign_sip_endpoint",
+       c.fabric().resources.assign_sip_endpoint(id, {.sip_endpoint_id = SENTINEL}));
+  CALL("fabric.resources.assign_whatsapp_number",
+       c.fabric().resources.assign_whatsapp_number(
+           id, {.whatsapp_number_id = SENTINEL, .handler = SENTINEL}));
+  CALL("fabric.ai_agents.list_voices", c.fabric().ai_agents.list_voices(q));
+  CALL("fabric.ai_agents.list_conversation_logs",
+       c.fabric().ai_agents.list_conversation_logs(id, q));
 
   // ---- calling (command dispatch: all POST /api/calling/calls) ----
   CALL("calling.dial", c.calling().dial({.from = SENTINEL, .to = SENTINEL}));
@@ -340,7 +378,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
        c.calling().collect_start_input_timers(id, {.control_id = SENTINEL}));
   CALL("calling.detect", c.calling().detect(id, {.detect = json::object()}));
   CALL("calling.detect_stop", c.calling().detect_stop(id, {.control_id = SENTINEL}));
-  CALL("calling.tap", c.calling().tap(id, {.tap = json::object(), .device = json::object()}));
+  CALL("calling.tap", c.calling().tap(id, {.device = json::object(), .tap = json::object()}));
   CALL("calling.tap_stop", c.calling().tap_stop(id, {.control_id = SENTINEL}));
   CALL("calling.stream", c.calling().stream(id, {.url = SENTINEL}));
   CALL("calling.stream_stop", c.calling().stream_stop(id, {.control_id = SENTINEL}));
@@ -358,6 +396,11 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("calling.receive_fax_stop", c.calling().receive_fax_stop(id, {.control_id = SENTINEL}));
   CALL("calling.refer", c.calling().refer(id, {.device = json::object()}));
   CALL("calling.user_event", c.calling().user_event(id, {.event = json::object()}));
+  CALL("calling.ai_sidecar", c.calling().ai_sidecar(id, {.lang = SENTINEL}));
+  CALL("calling.ai_sidecar_ask", c.calling().ai_sidecar_ask(id, {.text = SENTINEL}));
+  CALL("calling.ai_sidecar_poke", c.calling().ai_sidecar_poke(id, {.text = SENTINEL}));
+  CALL("calling.ai_sidecar_stop", c.calling().ai_sidecar_stop(id, {}));
+  CALL("calling.ai_sidecar_status", c.calling().ai_sidecar_status(id, {}));
 
   // ---- phone_numbers (CRUD + search + set_* handler wrappers) ----
   CALL("phone_numbers.list", c.phone_numbers().list(q));
@@ -366,6 +409,12 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("phone_numbers.update", c.phone_numbers().update(id, body));
   CALL("phone_numbers.delete_", c.phone_numbers().delete_(id));
   CALL("phone_numbers.search", c.phone_numbers().search(q));
+  CALL("phone_numbers.assign_e911_address",
+       c.phone_numbers().assign_e911_address(id, {.e911_address_id = SENTINEL}));
+  CALL("phone_numbers.remove_e911_address", c.phone_numbers().remove_e911_address(id));
+  CALL("phone_numbers.get_cnam", c.phone_numbers().get_cnam(id, q));
+  CALL("phone_numbers.request_cnam", c.phone_numbers().request_cnam(id, {.name = SENTINEL}));
+  CALL("phone_numbers.clear_cnam", c.phone_numbers().clear_cnam(id));
 
   // ---- datasphere (documents) ----
   CALL("datasphere.documents.list", c.datasphere().documents.list(q));
@@ -396,6 +445,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("video.room_recordings.get", c.video().room_recordings.get(id));
   CALL("video.room_recordings.delete_", c.video().room_recordings.delete_(id));
   CALL("video.room_recordings.list_events", c.video().room_recordings.list_events(id, q));
+  CALL("video.room_recordings.download", c.video().room_recordings.download(id));
   CALL("video.conferences.list", c.video().conferences.list(q));
   CALL("video.conferences.create", c.video().conferences.create(body));
   CALL("video.conferences.get", c.video().conferences.get(id));
@@ -452,6 +502,7 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
   CALL("registry.brands.get", c.registry().brands.get(id));
   CALL("registry.brands.list_campaigns", c.registry().brands.list_campaigns(id, q));
   CALL("registry.brands.create_campaign", c.registry().brands.create_campaign(id, body));
+  CALL("registry.brands.update", c.registry().brands.update(id, {}));
   CALL("registry.campaigns.get", c.registry().campaigns.get(id));
   CALL("registry.campaigns.update", c.registry().campaigns.update(id, {}));
   CALL("registry.campaigns.list_numbers", c.registry().campaigns.list_numbers(id, q));
@@ -514,16 +565,69 @@ std::vector<std::pair<std::string, std::string>> invoke_all(RestClient& c) {
                                                  .state = SENTINEL,
                                                  .postal_code = SENTINEL}));
   CALL("addresses.get", c.addresses().get(id));
+  CALL("addresses.update", c.addresses().update(id, {}));
   CALL("addresses.delete_", c.addresses().delete_(id));
   CALL("recordings.list", c.recordings().list(q));
   CALL("recordings.get", c.recordings().get(id));
   CALL("recordings.delete_", c.recordings().delete_(id));
+  CALL("recordings.download", c.recordings().download(id));
   CALL("short_codes.list", c.short_codes().list(q));
   CALL("short_codes.get", c.short_codes().get(id));
   CALL("short_codes.update",
        c.short_codes().update(id, {.name = SENTINEL, .message_handler = SENTINEL}));
   CALL("imported_numbers.create",
        c.imported_numbers().create({.number = SENTINEL, .number_type = SENTINEL}));
+
+  // ---- whatsapp (/api/messaging/whatsapp) ----
+  CALL("whatsapp.numbers.list", c.whatsapp().numbers.list(q));
+  CALL("whatsapp.numbers.get", c.whatsapp().numbers.get(id));
+  CALL("whatsapp.businesses.list", c.whatsapp().businesses.list(q));
+  CALL("whatsapp.templates.list", c.whatsapp().templates.list(q));
+  CALL("whatsapp.templates.create", c.whatsapp().templates.create(body));
+  CALL("whatsapp.templates.get", c.whatsapp().templates.get(id));
+  CALL("whatsapp.templates.update", c.whatsapp().templates.update(id, body));
+  CALL("whatsapp.templates.delete_", c.whatsapp().templates.delete_(id));
+
+  // ---- space (/api/space, Personal Access Token) ----
+  CALL("space.settings.get", c.space().settings.get(q));
+  CALL("space.settings.update", c.space().settings.update({}));
+  CALL("space.geographic_permissions.get", c.space().geographic_permissions.get(q));
+  CALL("space.geographic_permissions.update",
+       c.space().geographic_permissions.update({.countries = json::array()}));
+  CALL("space.billing_profile.get", c.space().billing_profile.get(q));
+  CALL("space.billing_profile.update",
+       c.space().billing_profile.update({.address_line1 = SENTINEL,
+                                         .address_city = SENTINEL,
+                                         .address_state = SENTINEL,
+                                         .address_zip = SENTINEL,
+                                         .address_country = SENTINEL,
+                                         .company_name = SENTINEL,
+                                         .contact_name = SENTINEL,
+                                         .contact_email = SENTINEL,
+                                         .contact_phone = SENTINEL}));
+  CALL("space.billing_statements.list", c.space().billing_statements.list(q));
+  CALL("space.billing_statements.get", c.space().billing_statements.get(q));
+  CALL("space.billing_statements.get_csv", c.space().billing_statements.get_csv(q));
+  CALL("space.billing_statements.get_pdf", c.space().billing_statements.get_pdf(q));
+  CALL("space.usage.get", c.space().usage.get(q));
+  CALL("space.payment_history.list", c.space().payment_history.list(q));
+  CALL("space.members.list", c.space().members.list(q));
+  CALL("space.members.create", c.space().members.create(body));
+  CALL("space.members.get", c.space().members.get(id));
+  CALL("space.members.update", c.space().members.update(id, body));
+  CALL("space.members.delete_", c.space().members.delete_(id));
+  CALL("space.members.list_projects", c.space().members.list_projects(id, q));
+  CALL("space.members.enable_project", c.space().members.enable_project(id, id));
+  CALL("space.members.disable_project", c.space().members.disable_project(id, id));
+  CALL("space.balance.get", c.space().balance.get(q));
+  CALL("space.balance.create_top_up",
+       c.space().balance.create_top_up({.idempotency_key = SENTINEL,
+                                        .amount_in_microdollars = 1,
+                                        .payment_method_id = SENTINEL}));
+  CALL("space.low_balance_setting.get", c.space().low_balance_setting.get(q));
+  CALL("space.low_balance_setting.update", c.space().low_balance_setting.update({}));
+  CALL("space.payment_methods.list", c.space().payment_methods.list(q));
+  CALL("space.payment_methods.delete_", c.space().payment_methods.delete_(id));
 
   return skipped;
 }
@@ -536,7 +640,7 @@ int main() {
   try {
     CaptureServer srv;
     g_srv = &srv;
-    RestClient client = RestClient::with_base_url(srv.base_url(), SENTINEL, "tok");
+    RestClient client = RestClient::with_base_url(srv.base_url(), SENTINEL, "tok", {}, "pat");
 
     std::vector<std::pair<std::string, std::string>> skipped;
     json errors = json::array();

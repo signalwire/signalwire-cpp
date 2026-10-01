@@ -31,7 +31,7 @@ struct ConferenceRoom {
   std::optional<std::string> display_name;
   std::optional<int> max_members;
   std::optional<std::string> quality;
-  std::optional<double> fps;
+  std::optional<int> fps;
   std::optional<json> join_from;
   std::optional<json> join_until;
   std::optional<json> remove_at;

@@ -34,6 +34,15 @@ struct CallCreateParamsSWML {
   std::optional<json> status_events;
   std::optional<std::string> url_method;
   std::optional<json> codecs;
+  std::optional<json> to_script;
+  std::optional<int> timeout;
+  std::optional<double> max_price_per_minute;
+  std::optional<std::string> send_digits;
+  std::optional<json> region;
+  std::optional<std::string> username;
+  std::optional<std::string> password;
+  std::optional<json> headers;
+  std::optional<json> custom_variables;
   std::optional<json> swml;
   json extras = json::object();
 };

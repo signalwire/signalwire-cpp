@@ -27,6 +27,7 @@ class FabricTokens : public BaseResource {
  public:
   struct CreateSubscriberTokenParams {
     std::string reference;
+    std::optional<std::string> ch;
     std::optional<int> expire_at;
     std::optional<std::string> application_id;
     std::optional<std::string> password;
@@ -38,6 +39,8 @@ class FabricTokens : public BaseResource {
     std::optional<std::string> country;
     std::optional<std::string> region;
     std::optional<std::string> company_name;
+    std::optional<std::string> scope;
+    std::optional<std::string> fingerprint;
     json extras = json::object();
   };
 
@@ -46,15 +49,19 @@ class FabricTokens : public BaseResource {
     json extras = json::object();
   };
 
-  struct CreateInviteTokenParams {
-    std::string address_id;
-    std::optional<int> expires_at;
-    json extras = json::object();
-  };
-
   struct CreateGuestTokenParams {
-    json allowed_addresses;
+    std::optional<json> allowed_addresses;
     std::optional<int> expire_at;
+    std::optional<std::string> ch;
+    std::optional<std::string> region;
+    std::optional<std::string> email;
+    std::optional<std::string> first_name;
+    std::optional<std::string> last_name;
+    std::optional<std::string> display_name;
+    std::optional<std::string> job_title;
+    std::optional<std::string> time_zone;
+    std::optional<std::string> country;
+    std::optional<std::string> company_name;
     json extras = json::object();
   };
 
@@ -69,6 +76,9 @@ class FabricTokens : public BaseResource {
                                              const RequestOptions& request_options = {}) const {
     json body = json::object();
     body["reference"] = p.reference;
+    if (p.ch.has_value()) {
+      body["ch"] = *p.ch;
+    }
     if (p.expire_at.has_value()) {
       body["expire_at"] = *p.expire_at;
     }
@@ -102,6 +112,12 @@ class FabricTokens : public BaseResource {
     if (p.company_name.has_value()) {
       body["company_name"] = *p.company_name;
     }
+    if (p.scope.has_value()) {
+      body["scope"] = *p.scope;
+    }
+    if (p.fingerprint.has_value()) {
+      body["fingerprint"] = *p.fingerprint;
+    }
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
@@ -119,25 +135,44 @@ class FabricTokens : public BaseResource {
                         request_options);
   }
 
-  [[nodiscard]] json create_invite_token(const CreateInviteTokenParams& p,
-                                         const RequestOptions& request_options = {}) const {
-    json body = json::object();
-    body["address_id"] = p.address_id;
-    if (p.expires_at.has_value()) {
-      body["expires_at"] = *p.expires_at;
-    }
-    if (!p.extras.is_null()) {
-      body.update(p.extras);
-    }
-    return client_.post(std::string("/api/fabric/subscriber/invites"), body, request_options);
-  }
-
   [[nodiscard]] json create_guest_token(const CreateGuestTokenParams& p,
                                         const RequestOptions& request_options = {}) const {
     json body = json::object();
-    body["allowed_addresses"] = p.allowed_addresses;
+    if (p.allowed_addresses.has_value()) {
+      body["allowed_addresses"] = *p.allowed_addresses;
+    }
     if (p.expire_at.has_value()) {
       body["expire_at"] = *p.expire_at;
+    }
+    if (p.ch.has_value()) {
+      body["ch"] = *p.ch;
+    }
+    if (p.region.has_value()) {
+      body["region"] = *p.region;
+    }
+    if (p.email.has_value()) {
+      body["email"] = *p.email;
+    }
+    if (p.first_name.has_value()) {
+      body["first_name"] = *p.first_name;
+    }
+    if (p.last_name.has_value()) {
+      body["last_name"] = *p.last_name;
+    }
+    if (p.display_name.has_value()) {
+      body["display_name"] = *p.display_name;
+    }
+    if (p.job_title.has_value()) {
+      body["job_title"] = *p.job_title;
+    }
+    if (p.time_zone.has_value()) {
+      body["time_zone"] = *p.time_zone;
+    }
+    if (p.country.has_value()) {
+      body["country"] = *p.country;
+    }
+    if (p.company_name.has_value()) {
+      body["company_name"] = *p.company_name;
     }
     if (!p.extras.is_null()) {
       body.update(p.extras);

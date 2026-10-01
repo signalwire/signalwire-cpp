@@ -464,6 +464,7 @@ _TYPES_NS_KEY = {
     "Projects": "projects",
     "Chat": "chat",
     "PubSub": "pubsub",
+    "Space": "space",
     "SwmlWebhooks": "swml_webhooks",
 }
 GENERATED_PAYLOAD_NS = {
@@ -1614,10 +1615,29 @@ def parse_header(path: Path) -> list[tuple[str, str, list[str], list[str]]]:
     # a public field is only surface where the reference records the attribute).
     fields: dict[tuple[str, str], list[str]] = {}
 
+    # Inside a constructor's mem-initializer list (``: a_(x),`` / ``b_(y) {}`` on
+    # continuation lines): those ``name(args)`` entries are member INITIALISATIONS,
+    # not method declarations, and must never surface as methods.
+    in_init_list = False
+
     lines = text.split("\n")
     for raw_line in lines:
         line = strip_line_comments(raw_line)
         code_line = strip_attributes(strip_strings(line))
+
+        if (
+            scopes
+            and scopes[-1].kind in ("class", "struct")
+            and brace_depth == scopes[-1].brace_depth + 1
+            and (in_init_list or code_line.lstrip().startswith(":"))
+            and not code_line.lstrip().startswith("::")
+        ):
+            # The list ends at the line that opens the constructor body.
+            in_init_list = "{" not in code_line
+            brace_depth += code_line.count("{") - code_line.count("}")
+            while scopes and brace_depth <= scopes[-1].brace_depth:
+                scopes.pop()
+            continue
 
         # --- Namespace opener
         m = NAMESPACE_RE.match(code_line)

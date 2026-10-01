@@ -64,6 +64,7 @@ if not PSDK.is_dir():
 # Import the mock's own spec loader so our matched_route resolution is identical
 # to what the mock journals at runtime.
 sys.path.insert(0, str(PSDK / "test_harness" / "mock_signalwire"))
+from mock_signalwire.auth import AUTH_PAT  # type: ignore  # noqa: E402
 from mock_signalwire.specs import SpecLoader  # type: ignore  # noqa: E402
 
 # The generated tests must be clang-format-clean AT EMIT. Otherwise GEN-FRESH-TESTS
@@ -103,23 +104,54 @@ def load_spec_routes() -> list:
     return SpecLoader(spec_root=PSDK / "rest-apis").load_all().routes
 
 
+def resolve_route(method: str, path_template: str, routes: list):
+    """The mock RouteEntry this dispatch matches, or None — the mock's own
+    find_route order: an exact literal template (no ``{...}``) wins outright
+    (``GET /api/fabric/addresses/sip`` is list_sip_addresses, not get_fabric_address
+    with id="sip"), then the templated routes by (longest template, most literal
+    segments)."""
+    concrete = path_template.replace("{id}", CONCRETE)
+    same_method = [r for r in routes if r.method == method.upper()]
+    norm = concrete.rstrip("/") or "/"
+    for r in same_method:
+        if "{" not in r.path_template and (r.path_template.rstrip("/") or "/") == norm:
+            return r
+    templated = sorted(
+        (r for r in same_method if "{" in r.path_template),
+        key=lambda r: (
+            -len(r.path_template),
+            -sum(
+                1
+                for seg in r.path_template.split("/")
+                if seg and not seg.startswith("{")
+            ),
+        ),
+    )
+    for r in templated:
+        if r.match(concrete) is not None:
+            return r
+    return None
+
+
+def is_redirect_op(route) -> bool:
+    """True when the operation's only success IS a redirect (3xx + Location): the mock
+    answers it by default, and a 200 scenario would not be the endpoint's answer."""
+    responses = (route.operation or {}).get("responses") or {}
+    if any(str(c).startswith("2") for c in responses):
+        return False
+    return any(
+        str(c).startswith("3") and "Location" in ((r or {}).get("headers") or {})
+        for c, r in responses.items()
+    )
+
+
 def resolve_matched_route(
     method: str, path_template: str, routes: list
 ) -> tuple[str, str] | None:
-    """Return (spec_name, endpoint_id) the mock would journal for this dispatch.
-
-    Mirrors the mock: substitute {id}->CONCRETE, match against every spec route
-    of the same method, pick the LONGEST template (most specific) on collision.
-    """
-    concrete = path_template.replace("{id}", CONCRETE)
-    candidates = [
-        r
-        for r in routes
-        if r.method == method.upper() and r.match(concrete) is not None
-    ]
-    if not candidates:
+    """Return (spec_name, endpoint_id) the mock would journal for this dispatch."""
+    best = resolve_route(method, path_template, routes)
+    if best is None:
         return None
-    best = max(candidates, key=lambda r: len(r.path_template))
     return best.spec_name, best.endpoint_id
 
 
@@ -150,8 +182,7 @@ using nlohmann::json;
 
 SUCCESS_TMPL = """
 TEST({test_name}) {{
-  auto client = mocktest::make_client();
-  mocktest::scenario_set("{endpoint}", 200, json::object());
+  auto client = mocktest::{make_client}();{scenario}
   (void)({call});
   {{
     auto j = mocktest::journal_last();
@@ -159,7 +190,7 @@ TEST({test_name}) {{
     ASSERT_TRUE(j.matched_route.has_value());
     ASSERT_EQ(*j.matched_route, std::string("{endpoint}"));
     ASSERT_TRUE(j.response_status.has_value());
-    ASSERT_TRUE(*j.response_status >= 200 && *j.response_status < 300);
+    ASSERT_TRUE(*j.response_status >= {lo} && *j.response_status < {hi});
   }}
   return true;
 }}
@@ -167,7 +198,7 @@ TEST({test_name}) {{
 
 ERROR_TMPL = """
 TEST({test_name}) {{
-  auto client = mocktest::make_client();
+  auto client = mocktest::{make_client}();
   mocktest::scenario_set("{endpoint}", 500, json{{{{"error", "x"}}}});
   bool threw = false;
   int status = 0;
@@ -245,6 +276,17 @@ def generate(plan: dict, routes: list) -> dict[str, str]:
         parts = [HEADER.format(ns=ns)]
         for r, endpoint in entries:
             call = rewrite_call(r["call"])
+            route = resolve_route(r["method"], r["path_template"], routes)
+            # A Personal-Access-Token route (client.space) needs the PAT client.
+            make = "make_pat_client" if route.auth_mode == AUTH_PAT else "make_client"
+            # A redirect endpoint's success is the mock's default 302 + Location.
+            redirect = is_redirect_op(route)
+            scenario = (
+                ""
+                if redirect
+                else f'\n  mocktest::scenario_set("{endpoint}", 200, json::object());'
+            )
+            lo, hi = (300, 400) if redirect else (200, 300)
             # The 'rest_mock_' prefix is load-bearing: the REST-COVERAGE gate
             # selects tests by that substring, and the parallel runner treats
             # that prefix as session-isolated (make_client's random-project auth
@@ -256,10 +298,19 @@ def generate(plan: dict, routes: list) -> dict[str, str]:
                     endpoint=endpoint,
                     call=call,
                     method=r["method"],
+                    make_client=make,
+                    scenario=scenario,
+                    lo=lo,
+                    hi=hi,
                 )
             )
             parts.append(
-                ERROR_TMPL.format(test_name=f"{base}_err", endpoint=endpoint, call=call)
+                ERROR_TMPL.format(
+                    test_name=f"{base}_err",
+                    endpoint=endpoint,
+                    call=call,
+                    make_client=make,
+                )
             )
         fname = f"{GEN_PREFIX}{ns.replace('-', '_')}.cpp"
         out[fname] = clang_format_source(

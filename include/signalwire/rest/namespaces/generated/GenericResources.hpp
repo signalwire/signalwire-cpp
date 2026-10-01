@@ -36,6 +36,17 @@ class GenericResources : public BaseResource {
     json extras = json::object();
   };
 
+  struct AssignSipEndpointParams {
+    std::string sip_endpoint_id;
+    json extras = json::object();
+  };
+
+  struct AssignWhatsappNumberParams {
+    std::string whatsapp_number_id;
+    std::string handler;
+    json extras = json::object();
+  };
+
   explicit GenericResources(const HttpClient& client)
       : BaseResource(client, "/api/fabric/resources") {}
 
@@ -83,6 +94,30 @@ class GenericResources : public BaseResource {
       body.update(p.extras);
     }
     return client_.post(base_path_ + "/" + id + "/" + std::string("domain_applications"), body,
+                        request_options);
+  }
+
+  [[nodiscard]] json assign_sip_endpoint(const std::string& id, const AssignSipEndpointParams& p,
+                                         const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    body["sip_endpoint_id"] = p.sip_endpoint_id;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("sip_endpoints"), body,
+                        request_options);
+  }
+
+  [[nodiscard]] json assign_whatsapp_number(const std::string& id,
+                                            const AssignWhatsappNumberParams& p,
+                                            const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    body["whatsapp_number_id"] = p.whatsapp_number_id;
+    body["handler"] = p.handler;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("whatsapp_numbers"), body,
                         request_options);
   }
 };

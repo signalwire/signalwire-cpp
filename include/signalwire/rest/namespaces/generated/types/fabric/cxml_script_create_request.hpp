@@ -27,10 +27,11 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CXMLScriptCreateRequest {
-  std::optional<std::string> display_name;
   std::optional<std::string> contents;
   std::optional<std::string> status_callback_url;
   std::optional<json> status_callback_method;
+  std::optional<std::string> name;
+  std::optional<std::string> script_type;
   json extras = json::object();
 };
 

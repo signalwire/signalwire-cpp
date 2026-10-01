@@ -26,10 +26,12 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct PayPrompts {
   std::optional<json> actions;
-  std::optional<std::string> for_;  // wire key: for
-  std::optional<std::string> attempts;
-  std::optional<std::string> card_type;
-  std::optional<std::string> error_type;
+  std::optional<json> attempt;
+  std::optional<json> card_type;
+  std::optional<json> error_type;
+  std::optional<json> for_;  // wire key: for
+  std::optional<json> play;
+  std::optional<json> require_matching_inputs;
   json extras = json::object();
 };
 

@@ -27,6 +27,7 @@ struct CallingDialParams {
   std::optional<double> max_price_per_minute;
   std::optional<std::string> node_id;
   std::optional<std::string> region;
+  std::optional<std::string> send_digits;
   std::optional<std::string> tag;
   json extras = json::object();
 };

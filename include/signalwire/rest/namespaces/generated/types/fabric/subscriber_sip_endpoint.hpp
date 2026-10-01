@@ -32,7 +32,7 @@ struct SubscriberSIPEndpoint {
   std::optional<std::string> send_as;
   std::optional<json> ciphers;
   std::optional<json> codecs;
-  std::optional<json> encryption;
+  std::optional<std::string> encryption;
   json extras = json::object();
 };
 

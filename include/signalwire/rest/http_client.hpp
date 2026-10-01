@@ -100,11 +100,27 @@ class HttpClient {
   /// GET request
   [[nodiscard]] json get(const std::string& path,
                          const std::map<std::string, std::string>& params = {},
-                         const RequestOptions& request_options = {}) const;
+                         const RequestOptions& request_options = {},
+                         const std::map<std::string, std::string>& headers = {}) const;
+
+  /// GET whose success body is NOT JSON (e.g. ``text/csv``): returned as text.
+  /// Pass the media type as the ``Accept`` header. Errors raise exactly as get().
+  [[nodiscard]] std::string get_text(const std::string& path,
+                                     const std::map<std::string, std::string>& params = {},
+                                     const RequestOptions& request_options = {},
+                                     const std::map<std::string, std::string>& headers = {}) const;
+
+  /// GET whose success IS a redirect: returns its ``Location`` (e.g. a signed
+  /// download URL) without following it. Throws SignalWireRestError for an error
+  /// status or a success that is not a redirect.
+  [[nodiscard]] std::string get_redirect_location(
+      const std::string& path, const std::map<std::string, std::string>& params = {},
+      const RequestOptions& request_options = {}) const;
 
   /// POST request
   [[nodiscard]] json post(const std::string& path, const json& body = json::object(),
-                          const RequestOptions& request_options = {}) const;
+                          const RequestOptions& request_options = {},
+                          const std::map<std::string, std::string>& headers = {}) const;
 
   /// PUT request
   [[nodiscard]] json put(const std::string& path, const json& body = json::object(),
@@ -136,15 +152,37 @@ class HttpClient {
   /// options (per-request over client-default over built-in), then runs the
   /// retry/timeout/abort loop, dispatching the HTTP method. ``body`` is null
   /// for GET/DELETE; ``params`` is null for the body verbs.
+  /// One request's settled outcome after the retry loop (status, body, the url
+  /// reported on an error, response headers) — read by request()/get_text()/
+  /// get_redirect_location() per their response kind.
+  struct RawResponse {
+    int status;
+    std::string body;
+    std::string url;
+    std::map<std::string, std::string> headers;
+  };
+
+  RawResponse perform(const std::string& method, const std::string& path, const json* body,
+                      const std::map<std::string, std::string>* params,
+                      const RequestOptions& per_request,
+                      const std::map<std::string, std::string>& extra_headers) const;
+
   json request(const std::string& method, const std::string& path, const json* body,
-               const std::map<std::string, std::string>* params,
-               const RequestOptions& per_request) const;
+               const std::map<std::string, std::string>* params, const RequestOptions& per_request,
+               const std::map<std::string, std::string>& extra_headers = {}) const;
 
   json handle_response(int status, const std::string& body, const std::string& url,
                        const std::string& method,
                        const std::map<std::string, std::string>& headers = {}) const;
   std::string build_query_string(const std::map<std::string, std::string>& params) const;
   void configure_client(httplib::Client& cli, double timeout_seconds) const;
+
+  // RestClient wires a credential-less placeholder for the side (project token or
+  // Personal Access Token) the caller did not supply: every request on it raises
+  // std::invalid_argument naming the missing credential instead of sending an
+  // unauthenticated call (the reference's _MissingCredentialHttp).
+  friend class RestClient;
+  std::string missing_credential_;
 
   std::string base_url_;
   std::string auth_header_;

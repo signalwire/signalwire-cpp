@@ -27,20 +27,19 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CxmlApplicationUpdateRequest {
-  std::optional<std::string> display_name;
-  std::optional<json> account_sid;
-  std::optional<std::string> voice_url;
-  std::optional<json> voice_method;
-  std::optional<std::string> voice_fallback_url;
-  std::optional<json> voice_fallback_method;
-  std::optional<std::string> status_callback;
-  std::optional<json> status_callback_method;
-  std::optional<std::string> sms_url;
-  std::optional<json> sms_method;
-  std::optional<std::string> sms_fallback_url;
-  std::optional<json> sms_fallback_method;
-  std::optional<std::string> sms_status_callback;
-  std::optional<json> sms_status_callback_method;
+  std::optional<std::string> name;
+  std::optional<std::string> call_request_url;
+  std::optional<std::string> call_request_method;
+  std::optional<std::string> call_fallback_url;
+  std::optional<std::string> call_fallback_method;
+  std::optional<std::string> call_status_url;
+  std::optional<std::string> call_status_method;
+  std::optional<std::string> message_request_url;
+  std::optional<std::string> message_request_method;
+  std::optional<std::string> message_fallback_url;
+  std::optional<std::string> message_fallback_method;
+  std::optional<std::string> message_status_url;
+  std::optional<std::string> message_status_method;
   json extras = json::object();
 };
 

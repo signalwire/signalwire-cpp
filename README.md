@@ -28,7 +28,7 @@ _Build AI voice agents, control live calls over WebSocket, and manage every Sign
 |-----------|-------------|------------|
 | **AI Agents** | Build voice agents that handle calls autonomously -- the platform runs the AI pipeline, your code defines the persona, tools, and call flow | [Agent Guide](#ai-agents) |
 | **RELAY Client** | Control live calls and SMS/MMS in real time over WebSocket -- answer, play, record, collect DTMF, conference, transfer, and more | [RELAY docs](relay/README.md) |
-| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 22 API namespaces | [REST docs](rest/README.md) |
+| **REST Client** | Manage SignalWire resources over HTTP -- phone numbers, SIP endpoints, Fabric AI agents, video rooms, messaging, and 24 API namespaces | [REST docs](rest/README.md) |
 
 ```bash
 # Requirements: C++20 compiler, CMake 3.16+, OpenSSL
@@ -197,7 +197,7 @@ int main() {
 }
 ```
 
-- 22 namespaced API surfaces: Fabric (13 resource types), Calling (37 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
+- 24 namespaced API surfaces: Fabric (13 resource types), Calling (42 commands), Video, Datasphere, Phone Numbers, SIP, Queues, Recordings, and more
 - Generic CRUD resources with `list()`, `create()`, `get()`, `update()`, `delete_()`
 - JSON dict returns via nlohmann/json -- no wrapper objects
 
@@ -327,6 +327,7 @@ Guides are also available in the [`docs/`](docs/) directory:
 |----------|---------|-------------|
 | `SIGNALWIRE_PROJECT_ID` | RELAY, REST | Project identifier |
 | `SIGNALWIRE_API_TOKEN` | RELAY, REST | API token |
+| `SIGNALWIRE_PERSONAL_ACCESS_TOKEN` | REST | Personal Access Token (`pat_...`) for the Space Administration API (`client.space()`); may stand in for the project/token pair on a space-administration-only client |
 | `SIGNALWIRE_JWT_TOKEN` | RELAY | JWT for RELAY auth. An **alternative** to the project/token pair, not an addition — when set (or `jwt_token` is passed), the connect frame authenticates with the JWT alone and `SIGNALWIRE_PROJECT_ID` / `SIGNALWIRE_API_TOKEN` are not required. |
 | `SIGNALWIRE_SPACE` | RELAY, REST | Space hostname (e.g. `example.signalwire.com`) |
 | `SWML_BASIC_AUTH_USER` | Agents | Basic auth username (default: auto-generated) |

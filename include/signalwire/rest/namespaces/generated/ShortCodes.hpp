@@ -26,8 +26,8 @@ using json = nlohmann::json;
 class ShortCodes : public BaseResource {
  public:
   struct UpdateParams {
-    std::string name;
-    std::string message_handler;
+    std::optional<std::string> name;
+    std::optional<std::string> message_handler;
     std::optional<std::string> message_request_url;
     std::optional<std::string> message_request_method;
     std::optional<std::string> message_fallback_url;
@@ -54,8 +54,12 @@ class ShortCodes : public BaseResource {
   [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
                             const RequestOptions& request_options = {}) const {
     json body = json::object();
-    body["name"] = p.name;
-    body["message_handler"] = p.message_handler;
+    if (p.name.has_value()) {
+      body["name"] = *p.name;
+    }
+    if (p.message_handler.has_value()) {
+      body["message_handler"] = *p.message_handler;
+    }
     if (p.message_request_url.has_value()) {
       body["message_request_url"] = *p.message_request_url;
     }

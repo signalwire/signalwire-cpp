@@ -25,15 +25,15 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SWAIGInternalFiller {
-  std::optional<json> hangup;
+  std::optional<json> adjust_response_latency;
+  std::optional<json> change_context;
   std::optional<json> check_time;
+  std::optional<json> get_ideal_strategy;
+  std::optional<json> get_visual_input;
+  std::optional<json> next_step;
+  std::optional<json> pause_conversation;
   std::optional<json> wait_for_user;
   std::optional<json> wait_seconds;
-  std::optional<json> adjust_response_latency;
-  std::optional<json> next_step;
-  std::optional<json> change_context;
-  std::optional<json> get_visual_input;
-  std::optional<json> get_ideal_strategy;
   json extras = json::object();
 };
 

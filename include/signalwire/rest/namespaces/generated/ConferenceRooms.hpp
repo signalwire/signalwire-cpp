@@ -31,8 +31,8 @@ class ConferenceRooms : public FabricResource {
   [[nodiscard]] json list_addresses(const std::string& id,
                                     const std::map<std::string, std::string>& params = {},
                                     const RequestOptions& request_options = {}) const {
-    return client_.get(std::string("/api/fabric/resources/conference_room/") + id + "/addresses",
-                       params, request_options);
+    return client_.get(base_path_ + "/" + id + "/" + std::string("addresses"), params,
+                       request_options);
   }
 };
 

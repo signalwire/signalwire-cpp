@@ -33,6 +33,7 @@ struct SipProfileResponse {
   std::optional<json> default_ciphers;
   std::optional<std::string> default_encryption;
   std::optional<std::string> default_send_as;
+  std::optional<std::string> default_outbound_policy;
   json extras = json::object();
 };
 

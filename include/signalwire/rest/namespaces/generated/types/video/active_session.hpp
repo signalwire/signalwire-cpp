@@ -28,12 +28,12 @@ struct ActiveSession {
   std::optional<std::string> id;
   std::optional<std::string> room_id;
   std::optional<std::string> name;
-  std::optional<std::string> display_name;
-  std::optional<std::string> join_from;
-  std::optional<std::string> join_until;
-  std::optional<std::string> remove_at;
-  std::optional<int> remove_after_seconds_elapsed;
-  std::optional<std::string> layout;
+  std::optional<json> display_name;
+  std::optional<json> join_from;
+  std::optional<json> join_until;
+  std::optional<json> remove_at;
+  std::optional<json> remove_after_seconds_elapsed;
+  std::optional<json> layout;
   std::optional<int> max_members;
   std::optional<json> fps;
   std::optional<json> quality;
@@ -43,8 +43,17 @@ struct ActiveSession {
   std::optional<json> status;
   std::optional<bool> record_on_start;
   std::optional<bool> enable_room_previews;
-  std::optional<std::string> preview_url;
-  std::optional<bool> audio_video_sync;
+  std::optional<json> preview_url;
+  std::optional<bool> sync_audio_video;
+  std::optional<bool> tone_on_entry_and_exit;
+  std::optional<bool> room_join_video_off;
+  std::optional<bool> user_join_video_off;
+  std::optional<bool> locked;
+  std::optional<double> cost_in_dollars;
+  std::optional<std::string> created_at;
+  std::optional<std::string> updated_at;
+  std::optional<std::string> locked_cover;
+  std::optional<json> prioritize_handraise;
   json extras = json::object();
 };
 

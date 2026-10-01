@@ -27,9 +27,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct ConferenceRoomUpdateRequest {
-  std::optional<std::string> name;
   std::optional<std::string> display_name;
-  std::optional<std::string> description;
   std::optional<std::string> join_from;
   std::optional<std::string> join_until;
   std::optional<int> max_members;
@@ -41,9 +39,6 @@ struct ConferenceRoomUpdateRequest {
   std::optional<bool> enable_room_previews;
   std::optional<json> meta;
   std::optional<bool> sync_audio_video;
-  std::optional<bool> tone_on_entry_and_exit;
-  std::optional<bool> room_join_video_off;
-  std::optional<bool> user_join_video_off;
   json extras = json::object();
 };
 

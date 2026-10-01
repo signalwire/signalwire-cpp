@@ -481,6 +481,28 @@ RestClient make_client() {
   return RestClient::with_base_url(url, project, token);
 }
 
+RestClient make_pat_client() {
+  std::string url = ensure_server();
+  static std::random_device rd;
+  static std::mt19937_64 gen(rd());
+  static std::mutex gen_mutex;
+  uint64_t a, b;
+  {
+    std::lock_guard<std::mutex> lk(gen_mutex);
+    a = gen();
+    b = gen();
+  }
+  char hex[13];
+  std::snprintf(hex, sizeof(hex), "%06x%06x", static_cast<unsigned>(a & 0xFFFFFF),
+                static_cast<unsigned>(b & 0xFFFFFF));
+  std::string project = std::string("test_proj_") + hex;
+  std::string pat = std::string("pat_") + hex;
+  // A Personal Access Token is HTTP Basic with an EMPTY username.
+  std::string auth_header = "Basic " + signalwire::base64_encode(":" + pat);
+  set_active_scope(project, auth_header);
+  return RestClient::with_base_url(url, project, "test_tok", {}, pat);
+}
+
 }  // namespace mocktest
 }  // namespace rest
 }  // namespace signalwire

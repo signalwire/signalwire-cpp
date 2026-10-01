@@ -31,6 +31,7 @@ class SipProfile : public BaseResource {
     std::optional<json> default_ciphers;
     std::optional<std::string> default_encryption;
     std::optional<std::string> default_send_as;
+    std::optional<std::string> default_outbound_policy;
     json extras = json::object();
   };
 
@@ -59,6 +60,9 @@ class SipProfile : public BaseResource {
     }
     if (p.default_send_as.has_value()) {
       body["default_send_as"] = *p.default_send_as;
+    }
+    if (p.default_outbound_policy.has_value()) {
+      body["default_outbound_policy"] = *p.default_outbound_policy;
     }
     if (!p.extras.is_null()) {
       body.update(p.extras);

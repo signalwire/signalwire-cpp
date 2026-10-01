@@ -1800,7 +1800,7 @@ Join a SignalWire room.
 result.join_room("support_room_1");
 ```
 
-##### `join_conference(const std::string& name, bool muted = false, const std::string& beep = "true", bool start_on_enter = true, bool end_on_exit = false, std::optional<std::string> wait_url = std::nullopt, int max_participants = 250, const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt, const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt, std::optional<std::string> status_callback_event = std::nullopt, std::optional<std::string> status_callback = std::nullopt, const std::string& status_callback_method = "POST", std::optional<std::string> recording_status_callback = std::nullopt, const std::string& recording_status_callback_method = "POST", const std::string& recording_status_callback_event = "completed", std::optional<json> result = std::nullopt) -> FunctionResult&`
+##### `join_conference(const std::string& name, bool muted = false, const std::string& beep = "true", bool start_on_enter = true, bool end_on_exit = false, std::optional<std::string> wait_url = std::nullopt, std::optional<int> max_participants = std::nullopt, const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt, const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt, std::optional<std::string> status_callback_event = std::nullopt, std::optional<std::string> status_callback = std::nullopt, const std::string& status_callback_method = "POST", std::optional<std::string> recording_status_callback = std::nullopt, const std::string& recording_status_callback_method = "POST", const std::string& recording_status_callback_event = "completed", std::optional<json> result = std::nullopt) -> FunctionResult&`
 Join a conference call.
 
 **Parameters:**
@@ -1810,7 +1810,7 @@ Join a conference call.
 - `start_on_enter` (`bool`): Start conference when this participant enters (default: `true`)
 - `end_on_exit` (`bool`): End conference when this participant exits (default: `false`)
 - `wait_url` (`std::optional<std::string>`): URL for hold music/content
-- `max_participants` (`int`): Maximum participants (default: 250)
+- `max_participants` (`std::optional<int>`): Maximum participants, 2 or more (default: unset, which leaves it out so the platform's default applies)
 - `record` (`std::string`): Recording setting (default: "do-not-record")
 - `region` (`std::optional<std::string>`): SignalWire region
 - `trim` (`std::string`): Trim setting for recordings (default: "trim-silence")
@@ -2175,6 +2175,11 @@ data_map.webhook(
     "https://api.service.com/customer/${global_data.customer_id}/orders",
     json{{"Authorization", "Bearer YOUR_API_TOKEN"}});  // Use static credentials
 ```
+
+##### `body(const json& data) -> DataMap&`
+Set the JSON request body for the last-added webhook; the same as `params()`.
+The platform reads a webhook's body from its `params` field and has no `body`
+field, so this sets `params`. Throws if no webhook has been added yet.
 
 ##### `params(const json& data) -> DataMap&`
 Set request params for the last-added webhook — including the data sent with

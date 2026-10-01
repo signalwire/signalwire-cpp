@@ -73,8 +73,10 @@ TEST(schema_utils_get_verb_properties_known) {
   auto props = su.get_verb_properties("answer");
   ASSERT_TRUE(props.is_object());
   ASSERT_FALSE(props.empty());
-  ASSERT_TRUE(props.contains("type"));
-  ASSERT_EQ(props["type"].get<std::string>(), std::string("object"));
+  // The verb body as the schema declares it: the answer body is an anyOf of its
+  // body forms (named-parameter object, positional array, bare-scalar shorthand).
+  ASSERT_TRUE(props.contains("anyOf"));
+  ASSERT_TRUE(props["anyOf"].is_array());
   return true;
 }
 

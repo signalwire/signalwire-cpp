@@ -28,20 +28,23 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct StartUpHookSWAIGFunction {
   std::optional<std::string> description;
-  std::optional<std::string> purpose;
-  std::optional<json> parameters;
-  std::optional<json> fillers;
-  std::optional<json> argument;
   std::optional<json> active;
+  std::optional<json> argument;
+  std::optional<json> data_map;
+  std::optional<json> fillers;
+  std::optional<std::string> function;
   std::optional<json> meta_data;
   std::optional<std::string> meta_data_token;
-  std::optional<json> data_map;
+  std::optional<json> parameters;
+  std::optional<std::string> purpose;
   std::optional<json> skip_fillers;
-  std::optional<std::string> web_hook_url;
   std::optional<std::string> wait_file;
   std::optional<json> wait_file_loops;
   std::optional<json> wait_for_fillers;
-  std::optional<std::string> function;
+  std::optional<std::string> web_hook_auth_pass;
+  std::optional<std::string> web_hook_auth_password;
+  std::optional<std::string> web_hook_auth_user;
+  std::optional<std::string> web_hook_url;
   json extras = json::object();
 };
 

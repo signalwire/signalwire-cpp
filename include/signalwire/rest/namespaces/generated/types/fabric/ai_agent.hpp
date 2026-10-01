@@ -36,6 +36,7 @@ struct AIAgent {
   std::optional<json> SWAIG;
   std::optional<json> agent_id;
   std::optional<std::string> name;
+  std::optional<json> multilingual;
   json extras = json::object();
 };
 

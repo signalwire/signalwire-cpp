@@ -35,6 +35,7 @@ struct CarrierLookupInfo {
   std::optional<std::string> jurisdiction;
   std::optional<std::string> lec;
   std::optional<std::string> linetype;
+  std::optional<std::string> dnc;
   json extras = json::object();
 };
 

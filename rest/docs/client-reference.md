@@ -25,9 +25,17 @@ auto from_env_client = signalwire::rest::RestClient::from_env();
 
 // Explicit base URL (e.g. pointing at a loopback fixture in tests)
 auto with_url = signalwire::rest::RestClient::with_base_url("http://127.0.0.1:8080", "project-id", "token");
+
+// The Space Administration API (client.space()) authenticates with a user's
+// Personal Access Token; it can stand alone or ride alongside the project token.
+signalwire::rest::RestClient admin("example.signalwire.com", "", "", {}, "pat_...");
 ```
 
-Authentication uses HTTP Basic Auth (`project_id:token`). The read-only
+Authentication uses HTTP Basic Auth (`project_id:token`). `space()` uses the
+Personal Access Token instead (HTTP Basic with an empty username); pass it as
+the fifth constructor argument, or set `SIGNALWIRE_PERSONAL_ACCESS_TOKEN` for
+`from_env()`. A call on a resource whose credential the client was not given
+throws `std::invalid_argument`. The read-only
 accessors `project_id()` and `http_client()` expose the project ID and the
 underlying `HttpClient` (useful for raw requests against routes the typed
 namespaces don't cover).
@@ -35,7 +43,7 @@ namespaces don't cover).
 ## Namespaces
 
 Every API surface is available as a namespace accessor method on the client
-(e.g. `client.fabric()`). There are 22 namespaces.
+(e.g. `client.fabric()`). There are 24 namespaces.
 
 ### Fabric API — `client.fabric()`
 
@@ -55,8 +63,11 @@ Every API surface is available as a namespace accessor method on the client
 | `cxml_webhooks` | cXML webhook resources (auto-materialized; read-only) |
 | `cxml_applications` | cXML application resources (no create) |
 | `resources` | Generic resource operations |
-| `addresses` | Fabric addresses (list/get only) |
-| `tokens` | Subscriber/guest/invite/embed token creation |
+| `addresses` | Fabric addresses (list/get/delete) |
+| `alias_addresses` | Alias addresses (CRUD) |
+| `sip_addresses` | SIP addresses (CRUD) |
+| `phone_number_addresses` | Phone number addresses (CRUD) |
+| `tokens` | Subscriber/guest/embed token creation |
 
 The 13 standard resource types live under `/api/fabric/resources/<type>`;
 `resources`, `addresses`, and `tokens` use their own bases. See
@@ -66,7 +77,7 @@ The 13 standard resource types live under `/api/fabric/resources/<type>`;
 
 | Accessor | Description |
 |----------|-------------|
-| `client.calling()` | REST call control -- 37 commands via POST |
+| `client.calling()` | REST call control -- 42 commands via POST |
 
 See **[calling.md](calling.md)**.
 
@@ -97,6 +108,24 @@ See **[calling.md](calling.md)**.
 | `client.project()` | API token management |
 | `client.pubsub()` | PubSub token creation |
 | `client.chat()` | Chat token creation |
+| `client.whatsapp()` | WhatsApp numbers, businesses and message templates |
+
+### Space Administration API — `client.space()`
+
+Authenticated with the Personal Access Token (see Construction).
+
+| Member | Description |
+|--------|-------------|
+| `settings` | Space settings (get/update) |
+| `geographic_permissions` | Geographic calling permissions (get/update) |
+| `billing_profile` | Billing profile (get/update) |
+| `billing_statements` | Billing statements (list/get; `get_csv` returns the CSV text, `get_pdf` the PDF's URL) |
+| `usage` | Space usage |
+| `payment_history` | Payment history |
+| `members` | Space members (CRUD + project access) |
+| `balance` | Balance (get + `create_top_up`, which takes an idempotency key) |
+| `low_balance_setting` | Low-balance notification setting (get/update) |
+| `payment_methods` | Payment methods (list/delete) |
 
 ## Error Handling
 

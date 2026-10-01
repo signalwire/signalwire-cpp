@@ -25,8 +25,9 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Output {
-  std::optional<std::string> response;
   std::optional<json> action;
+  std::optional<bool> post_process;
+  std::optional<json> response;
   json extras = json::object();
 };
 

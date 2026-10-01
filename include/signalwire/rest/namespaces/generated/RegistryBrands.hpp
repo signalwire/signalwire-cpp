@@ -25,6 +25,23 @@ using json = nlohmann::json;
 /// RegistryBrands — REST resource for the 'relay-rest' API (base BaseResource).
 class RegistryBrands : public BaseResource {
  public:
+  struct UpdateParams {
+    std::optional<std::string> name;
+    std::optional<std::string> company_name;
+    std::optional<std::string> contact_email;
+    std::optional<std::string> contact_phone;
+    std::optional<std::string> ein_issuing_country;
+    std::optional<std::string> legal_entity_type;
+    std::optional<std::string> ein;
+    std::optional<std::string> company_vertical;
+    std::optional<std::string> company_website;
+    std::optional<std::string> company_address;
+    std::optional<std::string> csp_brand_reference;
+    std::optional<std::string> status_callback_url;
+    std::optional<json> signalwire_contact_emails;
+    json extras = json::object();
+  };
+
   explicit RegistryBrands(const HttpClient& client)
       : BaseResource(client, "/api/relay/rest/registry/beta/brands") {}
 
@@ -41,6 +58,54 @@ class RegistryBrands : public BaseResource {
                          const std::map<std::string, std::string>& params = {},
                          const RequestOptions& request_options = {}) const {
     return client_.get(base_path_ + "/" + id, params, request_options);
+  }
+
+  [[nodiscard]] json update(const std::string& id, const UpdateParams& p,
+                            const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    if (p.name.has_value()) {
+      body["name"] = *p.name;
+    }
+    if (p.company_name.has_value()) {
+      body["company_name"] = *p.company_name;
+    }
+    if (p.contact_email.has_value()) {
+      body["contact_email"] = *p.contact_email;
+    }
+    if (p.contact_phone.has_value()) {
+      body["contact_phone"] = *p.contact_phone;
+    }
+    if (p.ein_issuing_country.has_value()) {
+      body["ein_issuing_country"] = *p.ein_issuing_country;
+    }
+    if (p.legal_entity_type.has_value()) {
+      body["legal_entity_type"] = *p.legal_entity_type;
+    }
+    if (p.ein.has_value()) {
+      body["ein"] = *p.ein;
+    }
+    if (p.company_vertical.has_value()) {
+      body["company_vertical"] = *p.company_vertical;
+    }
+    if (p.company_website.has_value()) {
+      body["company_website"] = *p.company_website;
+    }
+    if (p.company_address.has_value()) {
+      body["company_address"] = *p.company_address;
+    }
+    if (p.csp_brand_reference.has_value()) {
+      body["csp_brand_reference"] = *p.csp_brand_reference;
+    }
+    if (p.status_callback_url.has_value()) {
+      body["status_callback_url"] = *p.status_callback_url;
+    }
+    if (p.signalwire_contact_emails.has_value()) {
+      body["signalwire_contact_emails"] = *p.signalwire_contact_emails;
+    }
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.put(base_path_ + "/" + id, body, request_options);
   }
 
   [[nodiscard]] json list_campaigns(const std::string& id,

@@ -574,6 +574,17 @@ run_gate "SIGNATURES-FRESH" "committed port_signatures.json matches a fresh rege
 run_gate "GEN" "generated-code freshness suite (GEN-FRESH/-SWML/-RELAY/-SWAIG/-TESTS)" \
     python3 "$PORTING_SDK_DIR/scripts/suites/gen.py" --port cpp --repo "$PORT_ROOT"
 
+# SCHEMA-BUNDLE — the fleet-shared schema.json round-trip gate
+# (porting-sdk/docs/SCHEMA_ROUND_TRIP.md): the bundled src/swml/schema.json (the copy
+# the SWML validator loads) is byte-identical to porting-sdk's schema.json at the
+# coordinated pin, its schema.json.sha256 record names those bytes, and psdk's copy
+# matches the ARS output it was re-stamped from. --selftest runs the tool's own
+# negative controls. Cheap, per-PR. Re-bundle with:
+#   python3 ../porting-sdk/scripts/port_schema_bundle.py sync --port signalwire-cpp --port-root .
+run_gate "SCHEMA-BUNDLE" "bundled schema.json == porting-sdk's == ARS output (record matches)" \
+    python3 "$PORTING_SDK_DIR/scripts/port_schema_bundle.py" check \
+        --port signalwire-cpp --port-root "$PORT_ROOT" --selftest
+
 # BEHAVIORAL (one Layer-D pass per rule): the per-PR rules. WAIT-LIVENESS (nightly)
 # is the separate line below. cpp's RELAY behavioral rule keeps cpp's HYPHEN
 # spelling BEHAVIORAL-WIRE-RELAY. The suite drives cpp's dump binaries (built in

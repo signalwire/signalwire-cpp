@@ -30,6 +30,7 @@ struct ProjectCreate {
   std::optional<bool> protect_message_media;
   std::optional<bool> protect_fax_media;
   std::optional<bool> force_https_requests;
+  std::optional<std::string> parent_project_id;
   json extras = json::object();
 };
 

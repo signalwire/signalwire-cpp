@@ -25,7 +25,7 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Label {
-  std::optional<std::string> label;
+  std::optional<json> label;
   json extras = json::object();
 };
 

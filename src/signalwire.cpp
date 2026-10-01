@@ -72,13 +72,22 @@ rest::RestClient RestClient(const std::vector<std::string>& args,
     }
   }
 
-  if (project.empty() || token.empty() || space.empty()) {
+  // The Personal Access Token authenticates client.space (the Space Administration
+  // API); it may stand alone or ride alongside the project credentials.
+  std::string pat = lookup(kwargs, {"personal_access_token"});
+  if (pat.empty()) {
+    pat = env_or_empty("SIGNALWIRE_PERSONAL_ACCESS_TOKEN");
+  }
+
+  if (space.empty() || ((project.empty() || token.empty()) && pat.empty())) {
     throw std::invalid_argument(
         "project, token, and space are required. "
         "Provide them as args/kwargs or set SIGNALWIRE_PROJECT_ID, "
-        "SIGNALWIRE_API_TOKEN, and SIGNALWIRE_SPACE environment variables.");
+        "SIGNALWIRE_API_TOKEN, and SIGNALWIRE_SPACE environment variables "
+        "(or, for client.space only, space and personal_access_token / "
+        "SIGNALWIRE_PERSONAL_ACCESS_TOKEN).");
   }
-  return rest::RestClient(space, project, token);
+  return rest::RestClient(space, project, token, {}, pat);
 }
 
 void register_skill(skills::SkillFactory factory) {

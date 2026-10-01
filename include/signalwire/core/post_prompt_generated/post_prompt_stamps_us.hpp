@@ -25,7 +25,6 @@ using json = nlohmann::json;
 struct PostPromptStampsUs {
   std::optional<int> speech_start;
   std::optional<int> last_word_end;
-  std::optional<int> suspected_end;
   std::optional<int> turn_decided;
   std::optional<int> status_pushed;
   std::optional<int> request_detect;

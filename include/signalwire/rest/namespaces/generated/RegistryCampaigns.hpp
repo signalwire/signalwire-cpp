@@ -27,11 +27,13 @@ class RegistryCampaigns : public BaseResource {
  public:
   struct UpdateParams {
     std::optional<std::string> name;
+    std::optional<std::string> status_callback_url;
+    std::optional<json> signalwire_contact_emails;
     json extras = json::object();
   };
 
   struct CreateOrderParams {
-    std::optional<json> phone_numbers;
+    json phone_numbers;
     std::optional<std::string> status_callback_url;
     json extras = json::object();
   };
@@ -50,6 +52,12 @@ class RegistryCampaigns : public BaseResource {
     json body = json::object();
     if (p.name.has_value()) {
       body["name"] = *p.name;
+    }
+    if (p.status_callback_url.has_value()) {
+      body["status_callback_url"] = *p.status_callback_url;
+    }
+    if (p.signalwire_contact_emails.has_value()) {
+      body["signalwire_contact_emails"] = *p.signalwire_contact_emails;
     }
     if (!p.extras.is_null()) {
       body.update(p.extras);
@@ -74,9 +82,7 @@ class RegistryCampaigns : public BaseResource {
   [[nodiscard]] json create_order(const std::string& id, const CreateOrderParams& p,
                                   const RequestOptions& request_options = {}) const {
     json body = json::object();
-    if (p.phone_numbers.has_value()) {
-      body["phone_numbers"] = *p.phone_numbers;
-    }
+    body["phone_numbers"] = p.phone_numbers;
     if (p.status_callback_url.has_value()) {
       body["status_callback_url"] = *p.status_callback_url;
     }

@@ -27,6 +27,11 @@ class FabricAddresses : public ReadResource {
  public:
   explicit FabricAddresses(const HttpClient& client)
       : ReadResource(client, "/api/fabric/addresses") {}
+
+  [[nodiscard]] json delete_(const std::string& id,
+                             const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id, request_options);
+  }
 };
 
 }  // namespace generated

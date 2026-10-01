@@ -25,9 +25,54 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct FunctionParameters {
-  std::optional<std::string> type;
+  std::optional<std::string> title;
+  std::optional<std::string> description;
+  std::optional<json> type;
+  std::optional<json> const_;  // wire key: const
+  std::optional<json> enum_;   // wire key: enum
+  std::optional<std::string> format;
+  std::optional<std::string> pattern;
+  std::optional<double> minimum;
+  std::optional<double> maximum;
+  std::optional<double> exclusiveMinimum;
+  std::optional<double> exclusiveMaximum;
+  std::optional<int> minLength;
+  std::optional<int> maxLength;
+  std::optional<int> minItems;
+  std::optional<int> maxItems;
+  std::optional<int> minProperties;
+  std::optional<int> maxProperties;
+  std::optional<json> default_;  // wire key: default
+  std::optional<json> examples;
+  std::optional<bool> deprecated;
+  std::optional<bool> nullable;
   std::optional<json> properties;
   std::optional<json> required;
+  std::optional<json> prefixItems;
+  std::optional<json> items;
+  std::optional<json> propertyNames;
+  std::optional<json> additionalProperties;
+  std::optional<json> unevaluatedProperties;
+  std::optional<json> oneOf;
+  std::optional<json> anyOf;
+  std::optional<json> allOf;
+  std::optional<json> not_;  // wire key: not
+  std::optional<json> contains;
+  std::optional<json> dependentRequired;
+  std::optional<json> dependentSchemas;
+  std::optional<json> else_;  // wire key: else
+  std::optional<json> example;
+  std::optional<json> if_;  // wire key: if
+  std::optional<int> maxContains;
+  std::optional<int> minContains;
+  std::optional<double> multipleOf;
+  std::optional<json> patternProperties;
+  std::optional<json> propertyOrdering;
+  std::optional<bool> readOnly;
+  std::optional<json> then;
+  std::optional<json> unevaluatedItems;
+  std::optional<bool> uniqueItems;
+  std::optional<bool> writeOnly;
   json extras = json::object();
 };
 

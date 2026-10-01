@@ -45,10 +45,10 @@ TEST(rest_mock_fabric_addresses_get_uses_address_id) {
 }
 
 // ---------------------------------------------------------------------------
-// CallFlowsResource.list_addresses -- singular 'call_flow' subpath
+// CallFlowsResource.list_addresses -- nested under the plural collection
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
+TEST(rest_mock_fabric_call_flows_list_addresses_uses_collection_path) {
   auto client = mocktest::make_client();
   auto body = client.fabric().call_flows.list_addresses("cf-1");
   ASSERT_TRUE(body.is_object());
@@ -56,24 +56,25 @@ TEST(rest_mock_fabric_call_flows_list_addresses_uses_singular_path) {
   ASSERT_TRUE(body["data"].is_array());
   auto j = mocktest::journal_last();
   ASSERT_EQ(j.method, std::string("GET"));
-  // singular ``call_flow`` (NOT ``call_flows``) in the addresses sub-path.
-  ASSERT_EQ(j.path, std::string("/api/fabric/resources/call_flow/cf-1/addresses"));
+  // Nested under the plural ``call_flows`` collection (prime-rails config/routes.rb,
+  // per the porting-sdk fabric spec's list_call_flow_addresses).
+  ASSERT_EQ(j.path, std::string("/api/fabric/resources/call_flows/cf-1/addresses"));
   ASSERT_TRUE(j.matched_route.has_value());
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// ConferenceRoomsResource.list_addresses -- singular 'conference_room' subpath
+// ConferenceRoomsResource.list_addresses -- nested under the plural collection
 // ---------------------------------------------------------------------------
 
-TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_singular_path) {
+TEST(rest_mock_fabric_conference_rooms_list_addresses_uses_collection_path) {
   auto client = mocktest::make_client();
   auto body = client.fabric().conference_rooms.list_addresses("cr-1");
   ASSERT_TRUE(body.is_object());
   ASSERT_TRUE(body.contains("data"));
   auto j = mocktest::journal_last();
   ASSERT_EQ(j.method, std::string("GET"));
-  ASSERT_EQ(j.path, std::string("/api/fabric/resources/conference_room/cr-1/addresses"));
+  ASSERT_EQ(j.path, std::string("/api/fabric/resources/conference_rooms/cr-1/addresses"));
   ASSERT_TRUE(j.matched_route.has_value());
   return true;
 }
@@ -120,28 +121,6 @@ TEST(rest_mock_fabric_subscribers_delete_sip_endpoint) {
 // ---------------------------------------------------------------------------
 // FabricTokens
 // ---------------------------------------------------------------------------
-
-TEST(wire_regression_pin_fabric_tokens_create_invite_token_extras) {
-  // create_subscriber_invite_token (POST /api/fabric/subscriber/invites) accepts
-  // ONLY address_id (required) + expires_at -- per the vendored REST spec
-  // SubscriberInviteTokenCreateRequest (no additionalProperties), which is the
-  // strict mock's request-schema oracle. `email` is NOT accepted here (it is real
-  // on the sibling create_subscriber endpoint, not this one), so there is no
-  // invented extra to forward. Pin the two typed fields the spec declares.
-  auto client = mocktest::make_client();
-  auto body = client.fabric().tokens.create_invite_token(
-      {.address_id = "addr-invite-1", .expires_at = 1725513600});
-  ASSERT_TRUE(body.is_object());
-  auto j = mocktest::journal_last();
-  ASSERT_EQ(j.method, std::string("POST"));
-  // subscriber/invites uses the singular 'subscriber' path segment.
-  ASSERT_EQ(j.path, std::string("/api/fabric/subscriber/invites"));
-  ASSERT_TRUE(j.body.is_object());
-  ASSERT_EQ(j.body.value("address_id", std::string()), std::string("addr-invite-1"));
-  ASSERT_EQ(j.body.value("expires_at", 0), 1725513600);
-  ASSERT_FALSE(j.body.contains("email"));
-  return true;
-}
 
 TEST(wire_regression_pin_fabric_tokens_create_embed_token_base_body) {
   // create_embed_token (POST /api/fabric/embeds/tokens) accepts ONLY `token` --

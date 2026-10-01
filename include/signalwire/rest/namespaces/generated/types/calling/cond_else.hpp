@@ -26,6 +26,8 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CondElse {
   std::optional<json> else_;  // wire key: else
+  std::optional<json> then;
+  std::optional<std::string> when;
   json extras = json::object();
 };
 

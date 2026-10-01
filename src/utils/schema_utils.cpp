@@ -340,16 +340,34 @@ bool schema_validate(const json& schema_root, const json& frag, const json& valu
     return schema_validate(schema_root, deref(schema_root, frag), value);
   }
 
+  // allOf: every subschema must hold (the bundled schema's bare-scalar shorthand
+  // arms are `allOf: [{type: number}, {<param schema>}]`; ignoring allOf made such
+  // an arm accept ANY value, so the union it sits in accepted everything).
+  auto all_it = frag.find("allOf");
+  if (all_it != frag.end() && all_it->is_array()) {
+    for (const auto& sub : *all_it) {
+      if (!schema_validate(schema_root, sub, value)) {
+        return false;
+      }
+    }
+  }
+
+  // anyOf / oneOf: at least one branch must hold (oneOf treated as anyOf — for
+  // strict-render "matches at least one" suffices). Conjunctive with the node's
+  // other keywords, as JSON Schema specifies.
   for (const char* union_key : {"anyOf", "oneOf"}) {
     auto it = frag.find(union_key);
     if (it != frag.end() && it->is_array()) {
+      bool any = false;
       for (const auto& alt : *it) {
         if (schema_validate(schema_root, alt, value)) {
-          return true;  // matches a branch (oneOf treated as anyOf — for
-                        // strict-render "matches at least one" suffices)
+          any = true;
+          break;
         }
       }
-      return false;
+      if (!any) {
+        return false;
+      }
     }
   }
 
@@ -479,78 +497,41 @@ bool body_closes(const json& body) {
 // (verb body -> $ref -> union branch -> $ref).
 constexpr int kMaxSchemaResolveDepth = 8;
 
-// Resolve ONE schema node to the set of top-level property names it closes over,
-// returning std::nullopt when the node has no such enumerable closed key-set.
-//
-// Three node shapes are handled, and the union case is the one that matters:
-//
-//   - ``$ref`` — followed into $defs and resolved recursively (ai -> AIObject).
-//   - ``anyOf`` / ``oneOf`` — resolved BRANCH BY BRANCH and UNIONED. Without this
-//     the resolver bailed on the first ``type != "object"`` test, because a union
-//     node carries no ``type`` of its own. That bail silently DISENGAGED the
-//     closed-key check: validate_verb_top_level_keys reads std::nullopt as
-//     "nothing to enforce" and reports valid for any key whatsoever. Five verbs
-//     in the shipped schema are union-shaped — connect, play, send_sms, sleep,
-//     unset — so the check would do nothing for all of them. A union's known-key
-//     set is the union of its object branches' keys: a config satisfying the
-//     union satisfies SOME branch, so a key belonging to no branch belongs to no
-//     valid document. Non-object branches (sleep's bare ``integer``, SWMLVar)
-//     contribute no keys and are skipped — they constrain the config to not be an
-//     object at all, a different question from which keys an object config may
-//     carry.
-//   - a plain closed object — its own ``properties``.
-std::optional<std::set<std::string>> closed_key_set(const json& schema, const json& body,
-                                                    int depth) {
-  if (!body.is_object() || depth > kMaxSchemaResolveDepth) {
-    return std::nullopt;
-  }
-
-  // Follow a $ref (ai -> AIObject) to the node that declares the properties.
-  auto rit = body.find("$ref");
-  if (rit != body.end() && rit->is_string()) {
+// Follow a node's $ref chain (bounded) to the node that declares its shape.
+json deref_chain(const json& schema, const json& node) {
+  json cur = node;
+  for (int i = 0; i <= kMaxSchemaResolveDepth; ++i) {
+    if (!cur.is_object()) {
+      break;
+    }
+    auto rit = cur.find("$ref");
+    if (rit == cur.end() || !rit->is_string()) {
+      break;
+    }
     const std::string ref = rit->get<std::string>();
     const std::string name = ref.substr(ref.find_last_of('/') + 1);
     auto dit = schema.find("$defs");
     if (dit == schema.end() || !dit->is_object() || !dit->contains(name)) {
-      return std::nullopt;
+      return json();
     }
-    return closed_key_set(schema, (*dit)[name], depth + 1);
+    cur = (*dit)[name];
   }
+  return cur;
+}
 
-  // A union node: resolve every branch and union the ones that yield a set.
-  auto bit = body.find("anyOf");
-  if (bit == body.end() || !bit->is_array()) {
-    bit = body.find("oneOf");
-  }
-  if (bit != body.end() && bit->is_array()) {
-    std::set<std::string> merged;
-    bool found = false;
-    for (const auto& branch : *bit) {
-      auto keys = closed_key_set(schema, branch, depth + 1);
-      if (!keys.has_value()) {
-        continue;
-      }
-      found = true;
-      merged.insert(keys->begin(), keys->end());
-    }
-    // No branch is a closed object (e.g. unset: string | array-of-string). There
-    // is no key-set to enforce; the deep validator owns this shape.
-    if (!found) {
-      return std::nullopt;
-    }
-    return merged;
-  }
-
-  if (body.value("type", "") != "object") {
+// The property names of a CLOSED object node (additionalProperties:false /
+// unevaluatedProperties disallowed) that declares at least one property;
+// std::nullopt for anything else.
+std::optional<std::set<std::string>> closed_object_keys(const json& node) {
+  if (!node.is_object() || !body_closes(node)) {
     return std::nullopt;
   }
-  auto pit = body.find("properties");
-  if (pit == body.end() || !pit->is_object()) {
+  auto t = node.find("type");
+  if (t != node.end() && !(t->is_string() && t->get<std::string>() == "object")) {
     return std::nullopt;
   }
-  // Only meaningful as a closed-key check when the schema itself closes the
-  // object (additionalProperties:false or unevaluatedProperties disallowed).
-  if (!body_closes(body)) {
+  auto pit = node.find("properties");
+  if (pit == node.end() || !pit->is_object() || pit->empty()) {
     return std::nullopt;
   }
   std::set<std::string> keys;
@@ -558,6 +539,59 @@ std::optional<std::set<std::string>> closed_key_set(const json& schema, const js
     keys.insert(p.key());
   }
   return keys;
+}
+
+// Resolve a verb body to the set of top-level property names the shallow
+// closed-key check enforces, or std::nullopt to DISENGAGE (nothing shallow to
+// enforce; validate_verb_top_level_keys then reports valid).
+//
+// This is the settled #223 contract (porting-sdk docs/legacy-census/DISC-g-d21.md
+// §1.4/§4): EXACTLY ONE CLOSED ARM, ELSE DISENGAGE.
+//
+//   - ``$ref`` — followed into $defs (ai -> its config) before anything else.
+//   - ``anyOf`` / ``oneOf`` — the C grammar admits a verb body as an object, a
+//     string, a number or an array (mod_infrastructure swml_schema.c
+//     check_method_type_and_unknown_params: "Allowed types are object, string,
+//     number, or array"), and the schema encodes each form as an arm. Only the
+//     arms that are CLOSED objects-with-properties name a key set. Exactly one such
+//     arm -> its keys are the verb's object form, enforced. Zero -> no object form
+//     to check. More than one -> no single key set describes a valid object
+//     config, so the check disengages rather than union the arms (a union admits a
+//     document mixing keys from two arms that no single arm accepts) or pick one
+//     (which would reject the other arm's valid documents). The deep validator
+//     (validate_verb_full) still evaluates every arm.
+//   - a plain closed object — its own ``properties``.
+std::optional<std::set<std::string>> closed_key_set(const json& schema, const json& body,
+                                                    int depth) {
+  if (!body.is_object() || depth > kMaxSchemaResolveDepth) {
+    return std::nullopt;
+  }
+  json node = deref_chain(schema, body);
+  if (!node.is_object()) {
+    return std::nullopt;
+  }
+
+  auto bit = node.find("anyOf");
+  if (bit == node.end() || !bit->is_array()) {
+    bit = node.find("oneOf");
+  }
+  if (bit != node.end() && bit->is_array()) {
+    std::optional<std::set<std::string>> only;
+    int closed_arms = 0;
+    for (const auto& arm : *bit) {
+      auto keys = closed_object_keys(deref_chain(schema, arm));
+      if (keys.has_value()) {
+        ++closed_arms;
+        only = std::move(keys);
+      }
+    }
+    if (closed_arms == 1) {
+      return only;
+    }
+    return std::nullopt;
+  }
+
+  return closed_object_keys(node);
 }
 
 }  // namespace

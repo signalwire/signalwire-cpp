@@ -103,6 +103,7 @@ _NS_ORDER = [
     "projects",
     "chat",
     "pubsub",
+    "space",
     "swml-webhooks",
 ]
 
@@ -402,10 +403,18 @@ class Spec:
         self.namespace_attr = (doc.get("x-sdk-namespace") or {}).get("attr") or ""
         self.ops: dict[str, tuple[str, str, bool]] = {}
         self.op_body: dict[str, dict] = {}
+        # The raw operation object + its path-item-level parameters, for the
+        # response-kind (json / text / redirect) and header-parameter reads.
+        self.op_obj: dict[str, dict] = {}
+        self.op_path_params: dict[str, list] = {}
         for path, item in (doc.get("paths") or {}).items():
             for verb in ("get", "post", "put", "patch", "delete"):
                 o = item.get(verb)
                 if o and o.get("operationId"):
+                    self.op_obj[o["operationId"]] = o
+                    self.op_path_params[o["operationId"]] = list(
+                        item.get("parameters") or []
+                    )
                     self.ops[o["operationId"]] = (
                         verb,
                         path,
@@ -846,10 +855,15 @@ def _params_struct(
     cls: str,
     method: str,
     leading_records: list[dict],
+    header_params: list[tuple[str, str, bool]] | None = None,
 ) -> tuple[str, list[str], list[str]]:
     """Emit a named options-struct with a member per ordered spec field
     (required → plain member, optional → std::optional<T>) + a trailing
-    ``json extras`` map. Returns (struct_src, body_build_lines, records)."""
+    ``json extras`` map. Returns (struct_src, body_build_lines, records).
+
+    ``header_params`` (``(wire, ident, required)``) become leading string members
+    that the build lines collect into a ``headers`` map (sent as request headers,
+    never written into the body)."""
     # Struct members at 2-space base indent; the struct is nested one more level
     # (inside the resource class) by _indent(s, "  ") at the call site, so the final
     # member indent is 4 — matching clang-format (IndentWidth 2). Method-body build
@@ -857,6 +871,25 @@ def _params_struct(
     lines = [f"struct {struct_name} {{"]
     build: list[str] = ["    json body = json::object();"]
     records: list[dict] = list(leading_records)
+    if header_params:
+        build.append("    std::map<std::string, std::string> headers;")
+    for wire_name, ident, required in header_params or []:
+        records.append(
+            {
+                "name": ident,
+                "kind": "keyword",
+                "type": "string" if required else "optional<string>",
+                "required": required,
+            }
+        )
+        if required:
+            lines.append(f"  std::string {ident};")
+            build.append(f"    headers[{cpp_str(wire_name)}] = p.{ident};")
+        else:
+            lines.append(f"  std::optional<std::string> {ident};")
+            build.append(f"    if (p.{ident}.has_value()) {{")
+            build.append(f"      headers[{cpp_str(wire_name)}] = *p.{ident};")
+            build.append("    }")
     for wire_name, schema, required in ordered_fields(fields):
         ident = snake_ident(wire_name)
         if ident != snake_to_camel(wire_name) and ident.rstrip("_") != wire_name:
@@ -926,12 +959,15 @@ def method_call_path(spec: Spec, anchor: str, markup: dict, op_path: str):
     id_args: list[str] = []
     pieces: list[str] = []
     for s in segs:
-        if s.startswith("{") and s.endswith("}"):
-            arg = arg_for(s[1:-1])
+        # A path param fills a whole segment (``{id}``) or sits beside a literal in
+        # one (``{id}.mp3`` -- a Rails format suffix); the literal stays in the segment.
+        m = re.fullmatch(r"([^{}]*)\{([^}]+)\}([^{}]*)", s)
+        if m:
+            arg = arg_for(m.group(2))
             while arg in id_args:
                 arg += "2"
             id_args.append(arg)
-            pieces.append(("VAR", arg))
+            pieces.append(("VAR", (m.group(1), arg, m.group(3))))
         else:
             pieces.append(("LIT", s))
     if sibling:
@@ -944,7 +980,13 @@ def method_call_path(spec: Spec, anchor: str, markup: dict, op_path: str):
             if kind == "LIT":
                 expr += f' + "/" + std::string({cpp_str(val)})'
             else:
-                expr += f' + "/" + {val}'
+                pre, arg, post = val
+                expr += ' + "/"'
+                if pre:
+                    expr += f" + std::string({cpp_str(pre)})"
+                expr += f" + {arg}"
+                if post:
+                    expr += f" + std::string({cpp_str(post)})"
     return id_args, expr
 
 
@@ -998,6 +1040,50 @@ def _verb_call(
     return f"return {recv}.{fn}({path_expr}, {body_arg}, {_RO_ARG});"
 
 
+def op_response_kind(spec: Spec, op_id: str) -> tuple[str, str | None]:
+    """How an operation's success is read, mirroring the reference generator:
+    ``("json", None)`` (the default); ``("text", media)`` when the 2xx body is another
+    media type only (rest-apis/space ``GET /space/billing_statement.csv`` -> ``text/csv``);
+    ``("redirect", None)`` when the only success IS a 3xx carrying ``Location`` (a
+    recording ``.mp3`` / statement ``.pdf``) -- the method returns that URL instead of
+    following it."""
+    op = spec.op_obj.get(op_id) or {}
+    responses = op.get("responses") or {}
+    ok = responses.get("200") or responses.get("201") or responses.get("2XX") or {}
+    ok_content = ok.get("content") or {}
+    text_media = next((m for m in ok_content if m != "application/json"), None)
+    if ok and "application/json" not in ok_content and text_media is not None:
+        return "text", text_media
+    if not ok:
+        for code, r in sorted(responses.items()):
+            if str(code).startswith("3") and "Location" in (
+                (r or {}).get("headers") or {}
+            ):
+                return "redirect", None
+    return "json", None
+
+
+def op_header_params(spec: Spec, op_id: str) -> list[tuple[str, str, bool]]:
+    """The operation's ``in: header`` parameters (path-item + operation level) as
+    ``(wire name, C++ ident, required)`` -- e.g. the top-up ``Idempotency-Key`` the
+    server answers 400 without. Each is sent as that header, never in the body."""
+    out: list[tuple[str, str, bool]] = []
+    op = spec.op_obj.get(op_id) or {}
+    for raw in [*(spec.op_path_params.get(op_id) or []), *(op.get("parameters") or [])]:
+        prm = raw
+        if isinstance(raw, dict) and "$ref" in raw:
+            leaf = raw["$ref"].rsplit("/", 1)[-1]
+            prm = ((spec.doc.get("components") or {}).get("parameters") or {}).get(
+                leaf
+            ) or {}
+        if not isinstance(prm, dict) or prm.get("in") != "header":
+            continue
+        flat = re.sub(r"[^0-9A-Za-z]+", "_", prm["name"])
+        flat = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", flat).lower().strip("_")
+        out.append((prm["name"], snake_ident(flat), bool(prm.get("required"))))
+    return out
+
+
 def emit_method(
     spec: Spec, anchor: str, markup: dict, base: str, method_snake: str, op_id: str
 ) -> tuple[list[str], list[str]]:
@@ -1021,6 +1107,17 @@ def emit_method(
     write_verb = verb in ("post", "put", "patch")
     structs: list[str] = []
     lines: list[str] = []
+    kind, text_media = op_response_kind(spec, op_id)
+    headers = op_header_params(spec, op_id)
+    if kind != "json" and verb != "get":
+        raise SystemExit(
+            f"{cls}.{name} ({op_id}): a {kind} success on {verb.upper()}; only GET is supported"
+        )
+    if headers and not (write_verb and has_body):
+        raise SystemExit(
+            f"{cls}.{name} ({op_id}): header parameter(s) {[h[0] for h in headers]} on an op "
+            "without an object body; only a body op's options-struct carries headers"
+        )
 
     if write_verb and has_body:
         body_schema = spec.op_body.get(op_id) or {}
@@ -1030,15 +1127,22 @@ def emit_method(
             # _params_struct already threads request_options into the sidecar
             # records (before the kwargs door); add the C++ param to the signature.
             struct_src, build, _ = _params_struct(
-                struct_name, fields, spec, cls, name, id_records
+                struct_name, fields, spec, cls, name, id_records, headers
             )
             structs.append(struct_src)
             sig = ", ".join([*id_params, f"const {struct_name}& p", _RO_SIG])
             lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
             lines.extend("  " + b for b in build)
-            lines.append("  " + _verb_call(recv, verb, path_expr, "body", None))
+            call = _verb_call(recv, verb, path_expr, "body", None)
+            if headers:
+                call = call[: -len(");")] + ", headers);"
+            lines.append("  " + call)
             lines.append("  }")
         else:
+            if headers:
+                raise SystemExit(
+                    f"{cls}.{name} ({op_id}): header parameter(s) on a union body op"
+                )
             # §5.2 union body → a single positional ``json body`` param.
             _register_sidecar(
                 cls,
@@ -1090,8 +1194,23 @@ def emit_method(
                 _RO_SIG,
             ]
         )
-        lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
-        lines.append("  " + _verb_call(recv, verb, path_expr, None, "params"))
+        if kind == "text":
+            # A non-JSON success body (text/csv): returned as text, the media type
+            # sent as the Accept header.
+            lines.append(f"  [[nodiscard]] std::string {name}({sig}) const {{")
+            lines.append(
+                f"    return {recv}.get_text({path_expr}, params, {_RO_ARG}, "
+                f'{{{{"Accept", {cpp_str(text_media)}}}}});'
+            )
+        elif kind == "redirect":
+            # The success IS a redirect: return its Location URL, never follow it.
+            lines.append(f"  [[nodiscard]] std::string {name}({sig}) const {{")
+            lines.append(
+                f"    return {recv}.get_redirect_location({path_expr}, params, {_RO_ARG});"
+            )
+        else:
+            lines.append(f"  [[nodiscard]] json {name}({sig}) const {{")
+            lines.append("  " + _verb_call(recv, verb, path_expr, None, "params"))
         lines.append("  }")
     else:  # delete
         _register_sidecar(cls, name, [*id_records, _ro_record()])
@@ -1270,6 +1389,7 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
 
     structs: list[str] = []
     methods: list[str] = []
+    uses_autofill = False
     mapping = (spec.schemas.get(request).get("discriminator") or {}).get(
         "mapping"
     ) or {}
@@ -1279,6 +1399,56 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
         cmd_leaf = cmd_ref.rsplit("/", 1)[-1] if cmd_ref else ""
         cmd_schema = spec.schemas.get(cmd_leaf, {})
         fields, with_id = command_param_fields(spec, cmd_schema)
+        # x-sdk-autofill: uuid4 -- a server-required id (control_id) the SDK generates
+        # when the caller omits it, so the member stays optional.
+        autofill_keys: list[str] = []
+        for wire_name, schema, _req in fields:
+            af = (
+                (schema or {}).get("x-sdk-autofill")
+                if isinstance(schema, dict)
+                else None
+            )
+            if af not in (None, "uuid4"):
+                raise SystemExit(
+                    f"{name}.{mname}: {wire_name}: x-sdk-autofill {af!r} is not a known "
+                    "generator (uuid4)"
+                )
+            if af == "uuid4":
+                autofill_keys.append(wire_name)
+        # x-sdk-compat-kwargs (on the ``params`` schema): an SDK kwarg kept for
+        # compatibility that is sent INTO a nested wire key (calling.record ``audio`` ->
+        # params.record.audio). The nested root it fills stays optional.
+        cs = resolve_schema(spec, cmd_schema)
+        pnode = resolve_schema(spec, (cs.get("properties") or {}).get("params") or {})
+        compat = pnode.get("x-sdk-compat-kwargs") or {}
+        field_schemas = {w: sc for w, sc, _r in fields}
+        compat_kw: list[
+            tuple[str, str, str, dict]
+        ] = []  # (arg, root, leaf, leaf schema)
+        for carg, cspec in compat.items():
+            into = (cspec or {}).get("into", "") if isinstance(cspec, dict) else ""
+            parts = into.split(".")
+            if (
+                len(parts) != 2
+                or carg in field_schemas
+                or parts[0] not in field_schemas
+            ):
+                raise SystemExit(
+                    f"{name}.{mname}: x-sdk-compat-kwargs.{carg} into {into!r} must name "
+                    "<existing param>.<key> and must not shadow a param"
+                )
+            root = resolve_schema(spec, field_schemas[parts[0]])
+            leaf = (root.get("properties") or {}).get(parts[1])
+            if leaf is None:
+                raise SystemExit(
+                    f"{name}.{mname}: x-sdk-compat-kwargs.{carg}: {into!r} not found"
+                )
+            compat_kw.append((carg, parts[0], parts[1], leaf))
+        compat_roots = {root for _a, root, _l, _s in compat_kw}
+        fields = [
+            (w, sc, r and w not in autofill_keys and w not in compat_roots)
+            for w, sc, r in fields
+        ]
 
         records: list[dict] = []
         if with_id:
@@ -1319,9 +1489,31 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
                 build.append(
                     f"    if (p.{ident}.has_value()) {{ params[{cpp_str(wire_name)}] = *p.{ident}; }}"
                 )
+        for carg, root, leaf, leaf_schema in compat_kw:
+            ident = snake_ident(carg)
+            base_t = cpp_field_type(spec, leaf_schema)
+            records.append(
+                {
+                    "name": carg,
+                    "kind": "keyword",
+                    "type": _canon_type(spec, leaf_schema, False),
+                    "required": False,
+                }
+            )
+            slines.append(f"    std::optional<{base_t}> {ident};")
+            build.append(
+                f"    if (p.{ident}.has_value()) {{ params[{cpp_str(root)}][{cpp_str(leaf)}] = "
+                f"*p.{ident}; }}"
+            )
         slines.append("    json extras = json::object();")
         slines.append("};")
         build.append("    if (!p.extras.is_null()) { params.update(p.extras); }")
+        for key in autofill_keys:
+            uses_autofill = True
+            build.append(
+                f"    if (!params.contains({cpp_str(key)})) {{ params[{cpp_str(key)}] = "
+                "signalwire::generate_uuid(); }"
+            )
         records.append(
             {
                 "name": "extras",
@@ -1358,7 +1550,8 @@ def emit_command_dispatch(spec: Spec, anchor: str, markup: dict) -> str:
     lines = []
     lines.append(
         gen_header(
-            f"Generated command-dispatch resource for the {spec.name!r} namespace."
+            f"Generated command-dispatch resource for the {spec.name!r} namespace.",
+            ['#include "signalwire/common.hpp"'] if uses_autofill else None,
         )
     )
     lines.append("")
@@ -1434,14 +1627,12 @@ def emit_resource(spec: Spec, anchor: str, markup: dict) -> str:
         op_id = spec_ref.get("op")
         if not op_id:
             raise SystemExit(f"{name}.{method_snake}: method markup missing op")
-        if method_snake in provided:
-            if method_snake == "list_addresses":
-                verb, op_path, _ = spec.ops[op_id]
-                _, sibling = relative_tail(spec, anchor, markup, op_path)
-                if not sibling:
-                    continue
-            else:
-                continue
+        # A base-provided op is inherited -- except list_addresses, which a resource's
+        # markup declares only to override the base (CallFlows / ConferenceRooms); the
+        # reference emits that override on the subclass, so emit it here too (same
+        # canonical name, hiding the base member).
+        if method_snake in provided and method_snake != "list_addresses":
+            continue
         structs, mlines = emit_method(spec, anchor, markup, base, method_snake, op_id)
         all_structs.extend(structs)
         if all_methods:
@@ -1603,7 +1794,39 @@ CONTAINERS = {
     "registry": "RegistryNamespace",
     "project": "ProjectNamespace",
     "datasphere": "DatasphereNamespace",
+    "space": "SpaceNamespace",
+    "whatsapp": "WhatsappNamespace",
 }
+
+#: The security scheme a Personal-Access-Token spec declares (rest-apis/space) — the
+#: same name the reference generator (generate_python_rest_types.PAT_SECURITY_SCHEME)
+#: and the mock (mock_signalwire/auth.py) route by.
+PAT_SECURITY_SCHEME = "SignalWirePersonalAccessToken"
+
+
+def is_pat_spec(spec: Spec) -> bool:
+    """True when the spec's root ``security`` accepts ONLY the Personal Access Token:
+    its resources are wired to the client's PAT credential, never the project token."""
+    security = spec.doc.get("security") or []
+    names = [n for req in security if isinstance(req, dict) for n in req]
+    return bool(names) and all(n == PAT_SECURITY_SCHEME for n in names)
+
+
+def pat_placements(placed) -> set:
+    """The placement containers ("" = flat) whose resources ALL come from a PAT spec.
+    Fails loud on a container mixing PAT and project-token resources (one container is
+    handed one HttpClient) — mirrors the reference's _pat_containers."""
+    kinds: dict = {}
+    for spec, _anchor, _markup, container in placed:
+        kinds.setdefault(container, set()).add(is_pat_spec(spec))
+    mixed = sorted(c or "<flat>" for c, k in kinds.items() if len(k) > 1)
+    if mixed:
+        raise SystemExit(
+            f"placement container(s) {mixed} mix Personal-Access-Token and project-token "
+            "resources; a container is wired to one credential"
+        )
+    return {c for c, k in kinds.items() if k == {True}}
+
 
 ATTR_OVERRIDE = {
     "GenericResources": "resources",
@@ -1707,10 +1930,23 @@ def emit_resource_tree(placed) -> str:
     lines.append("/// ResourceTree — flat resources plus namespace containers.")
     lines.append("/// Groups every REST resource under its API namespace so the")
     lines.append("/// RestClient can expose them as a single accessor tree.")
+    lines.append(
+        "/// `http` carries the project token; `pat_http` the Personal Access Token"
+    )
+    lines.append("/// (the namespaces whose spec security requires it, e.g. space).")
     lines.append("struct ResourceTree {")
+    pat = pat_placements(placed)
+    if "" in pat:
+        raise SystemExit(
+            "a Personal-Access-Token spec must declare x-sdk-namespace (a container)"
+        )
     ctor_inits = [f"{acc}(http)" for acc, _cls in flats]
-    ctor_inits.extend(f"{c}(http)" for c in containers_seen)
-    lines.append("  explicit ResourceTree(const HttpClient& http)")
+    ctor_inits.extend(
+        f"{c}({'pat_http' if c in pat else 'http'})" for c in containers_seen
+    )
+    lines.append(
+        "  explicit ResourceTree(const HttpClient& http, const HttpClient& pat_http)"
+    )
     lines.append("      : " + ", ".join(ctor_inits) + " {}")
     lines.append("")
     for acc, cls in flats:

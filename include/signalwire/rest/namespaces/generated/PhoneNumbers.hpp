@@ -25,6 +25,16 @@ using json = nlohmann::json;
 /// PhoneNumbers — REST resource for the 'relay-rest' API (base CrudResource).
 class PhoneNumbers : public CrudResource {
  public:
+  struct AssignE911AddressParams {
+    std::string e911_address_id;
+    json extras = json::object();
+  };
+
+  struct RequestCnamParams {
+    std::string name;
+    json extras = json::object();
+  };
+
   struct SetSwmlWebhookParams {
     std::string url;
     json extra = json::object();
@@ -70,6 +80,43 @@ class PhoneNumbers : public CrudResource {
   [[nodiscard]] json search(const std::map<std::string, std::string>& params = {},
                             const RequestOptions& request_options = {}) const {
     return client_.get(base_path_ + "/" + std::string("search"), params, request_options);
+  }
+
+  [[nodiscard]] json assign_e911_address(const std::string& id, const AssignE911AddressParams& p,
+                                         const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    body["e911_address_id"] = p.e911_address_id;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("e911_address"), body,
+                        request_options);
+  }
+
+  [[nodiscard]] json remove_e911_address(const std::string& id,
+                                         const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id + "/" + std::string("e911_address"), request_options);
+  }
+
+  [[nodiscard]] json get_cnam(const std::string& id,
+                              const std::map<std::string, std::string>& params = {},
+                              const RequestOptions& request_options = {}) const {
+    return client_.get(base_path_ + "/" + id + "/" + std::string("cnam"), params, request_options);
+  }
+
+  [[nodiscard]] json request_cnam(const std::string& id, const RequestCnamParams& p,
+                                  const RequestOptions& request_options = {}) const {
+    json body = json::object();
+    body["name"] = p.name;
+    if (!p.extras.is_null()) {
+      body.update(p.extras);
+    }
+    return client_.post(base_path_ + "/" + id + "/" + std::string("cnam"), body, request_options);
+  }
+
+  [[nodiscard]] json clear_cnam(const std::string& id,
+                                const RequestOptions& request_options = {}) const {
+    return client_.del(base_path_ + "/" + id + "/" + std::string("cnam"), request_options);
   }
 
   [[nodiscard]] json set_swml_webhook(const std::string& resource_id, const SetSwmlWebhookParams& p,

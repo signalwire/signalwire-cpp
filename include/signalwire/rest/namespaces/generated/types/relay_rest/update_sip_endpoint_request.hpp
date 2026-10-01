@@ -53,6 +53,7 @@ struct UpdateSipEndpointRequest {
   std::optional<std::string> call_flow_version;
   std::optional<std::string> call_ai_agent_id;
   std::optional<std::string> call_relay_script_url;
+  std::optional<std::string> call_relay_script_url_method;
   json extras = json::object();
 };
 

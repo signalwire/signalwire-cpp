@@ -43,6 +43,13 @@ class Recordings : public BaseResource {
                              const RequestOptions& request_options = {}) const {
     return client_.del(base_path_ + "/" + id, request_options);
   }
+
+  [[nodiscard]] std::string download(const std::string& id,
+                                     const std::map<std::string, std::string>& params = {},
+                                     const RequestOptions& request_options = {}) const {
+    return client_.get_redirect_location(base_path_ + "/" + id + std::string(".mp3"), params,
+                                         request_options);
+  }
 };
 
 }  // namespace generated

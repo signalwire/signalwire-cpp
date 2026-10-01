@@ -23,9 +23,11 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Expression {
-  std::optional<std::string> string;
   std::optional<std::string> pattern;
+  std::optional<std::string> expr;
+  std::optional<json> nomatch_output;  // wire key: nomatch-output
   std::optional<json> output;
+  std::optional<std::string> string;
   json extras = json::object();
 };
 

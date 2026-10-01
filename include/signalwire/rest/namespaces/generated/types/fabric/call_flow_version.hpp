@@ -26,11 +26,11 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct CallFlowVersion {
   std::optional<json> id;
-  std::optional<std::string> version;
+  std::optional<int> document_version;
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
-  std::optional<std::string> flow_data;
-  std::optional<std::string> relayml;
+  std::optional<json> flow_data;
+  std::optional<json> relayml;
   json extras = json::object();
 };
 

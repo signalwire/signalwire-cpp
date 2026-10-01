@@ -37,7 +37,9 @@ namespace signalwire {
 /// A thin factory over ``rest::RestClient``. Supports both positional
 /// credentials (``args = {project, token, space}``) and keyword
 /// credentials (``kwargs["project"]`` etc.) with environment-variable
-/// fallback.
+/// fallback. ``kwargs["personal_access_token"]`` (or
+/// ``SIGNALWIRE_PERSONAL_ACCESS_TOKEN``) authenticates ``space()``, and may
+/// stand in for the project credentials on a space-administration-only client.
 ///
 /// @throws std::invalid_argument when credentials cannot be derived
 ///         from either ``args``, ``kwargs``, or the standard

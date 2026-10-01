@@ -113,6 +113,12 @@ void scenario_set(const std::string& endpoint_id, int status, const json& body);
 // the scoped (auth-filtered) journal view starts empty.
 RestClient make_client();
 
+// Like make_client(), but for the Personal-Access-Token namespaces (client.space):
+// the client also carries a UNIQUE RANDOM personal access token (`pat_<hex>`, the
+// prefix the mock requires) and this thread's active scope is that token's auth
+// header (Basic with an EMPTY username), since the PAT routes authenticate with it.
+RestClient make_pat_client();
+
 }  // namespace mocktest
 }  // namespace rest
 }  // namespace signalwire

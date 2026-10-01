@@ -31,6 +31,9 @@ struct OrderResponse {
   std::optional<std::string> created_at;
   std::optional<std::string> updated_at;
   std::optional<std::string> status_callback_url;
+  std::optional<std::string> campaign_id;
+  std::optional<std::string> brand_id;
+  std::optional<json> phone_numbers;
   json extras = json::object();
 };
 

@@ -38,6 +38,8 @@ struct LogRetrieveResponse {
   std::optional<double> charge;
   std::optional<json> charge_details;
   std::optional<std::string> created_at;
+  std::optional<json> error_code;
+  std::optional<json> error_message;
   json extras = json::object();
 };
 

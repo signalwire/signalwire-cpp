@@ -1779,6 +1779,19 @@ def collect(
                     _bparams[_ro_idx - 1],
                 )
 
+    # ``HttpClient`` per-call ``headers``: the reference takes it KEYWORD-ONLY
+    # (``get(path, params=None, request_options=None, *, headers=None)``). C++ has no
+    # keyword-only parameters; the idiom for an optional trailing argument is a
+    # defaulted trailing parameter, and an empty map sends no extra headers exactly
+    # as ``None`` does. Record it in the reference's shape (keyword, default None) —
+    # call-site idiom reconciled by the enumerator (RULES §2), not an omission.
+    _hc = _bm.get("classes", {}).get("HttpClient", {})
+    for _hsig in _hc.get("methods", {}).values():
+        for _hp in _hsig.get("params", []):
+            if _hp.get("name") == "headers" and _hp.get("default") == {}:
+                _hp["kind"] = "keyword"
+                _hp["default"] = None
+
     # Python-shape projection: when the Python reference uses ``**kwargs``
     # (kind=var_keyword) for a method's last param, and the C++ port has a
     # corresponding trailing positional ``nlohmann::json``-typed (i.e.

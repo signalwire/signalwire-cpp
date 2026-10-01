@@ -40,6 +40,25 @@ struct RelayVoiceLog {
   std::optional<json> duration_ms;
   std::optional<json> billing_ms;
   std::optional<json> parent_id;
+  std::optional<json> audio_in_mos;
+  std::optional<json> audio_in_jitter_min;
+  std::optional<json> audio_in_jitter_max;
+  std::optional<json> audio_out_jitter_min;
+  std::optional<json> audio_out_jitter_max;
+  std::optional<json> audio_out_jitter_avg;
+  std::optional<json> audio_rtt_avg;
+  std::optional<json> audio_rtt_min;
+  std::optional<json> audio_rtt_max;
+  std::optional<json> audio_in_media_packet_count;
+  std::optional<json> audio_out_packet_count;
+  std::optional<json> audio_out_media_packet_count;
+  std::optional<json> audio_out_lost;
+  std::optional<json> audio_in_mean_interval;
+  std::optional<json> audio_in_dtmf_packet_count;
+  std::optional<json> audio_out_dtmf_packet_count;
+  std::optional<json> audio_in_skip_packet_count;
+  std::optional<json> audio_in_flush_packet_count;
+  std::optional<json> audio_in_largest_jb_size;
   json extras = json::object();
 };
 

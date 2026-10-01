@@ -26,12 +26,14 @@ using json = nlohmann::json;
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct BedrockParams {
   std::optional<json> attention_timeout;
-  std::optional<json> hard_stop_time;
-  std::optional<json> inactivity_timeout;
-  std::optional<std::string> video_listening_file;
-  std::optional<std::string> video_idle_file;
-  std::optional<std::string> video_talking_file;
+  std::optional<std::string> compact_conversation_time;
+  std::optional<std::string> compact_strategy;
   std::optional<std::string> hard_stop_prompt;
+  std::optional<std::string> hard_stop_time;
+  std::optional<json> inactivity_timeout;
+  std::optional<std::string> video_idle_file;
+  std::optional<std::string> video_listening_file;
+  std::optional<std::string> video_talking_file;
   json extras = json::object();
 };
 

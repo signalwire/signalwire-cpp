@@ -339,7 +339,8 @@ class FunctionResult {
   FunctionResult& join_conference(
       const std::string& name, bool muted = false, const std::string& beep = "true",
       bool start_on_enter = true, bool end_on_exit = false,
-      std::optional<std::string> wait_url = std::nullopt, int max_participants = 250,
+      std::optional<std::string> wait_url = std::nullopt,
+      std::optional<int> max_participants = std::nullopt,
       const std::string& record = "do-not-record", std::optional<std::string> region = std::nullopt,
       const std::string& trim = "trim-silence", std::optional<std::string> coach = std::nullopt,
       std::optional<std::string> status_callback_event = std::nullopt,

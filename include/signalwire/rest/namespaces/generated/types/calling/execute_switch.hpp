@@ -25,9 +25,9 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct ExecuteSwitch {
-  std::optional<std::string> variable;
-  std::optional<json> case_;     // wire key: case
   std::optional<json> default_;  // wire key: default
+  std::optional<json> case_;     // wire key: case
+  std::optional<json> variable;
   json extras = json::object();
 };
 

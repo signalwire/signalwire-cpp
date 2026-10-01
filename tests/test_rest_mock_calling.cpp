@@ -31,8 +31,8 @@ TEST(rest_mock_calling_dial_forwards_codecs_array) {
   auto client = mocktest::make_client();
   auto body = client.calling().dial({
       .to = "+15551234567",
-      .url = "https://example.com/swml",
       .codecs = json::array({"OPUS", "G729", "VP8", "PCMA"}),
+      .url = "https://example.com/swml",
   });
   ASSERT_TRUE(body.is_object());
   ASSERT_TRUE(body.contains("id"));
@@ -60,8 +60,8 @@ TEST(rest_mock_calling_dial_forwards_codecs_string) {
   auto client = mocktest::make_client();
   auto body = client.calling().dial({
       .to = "+15551234567",
-      .url = "https://example.com/swml",
       .codecs = "OPUS,G729,VP8,PCMA",
+      .url = "https://example.com/swml",
   });
   ASSERT_TRUE(body.is_object());
   auto j = mocktest::journal_last();
@@ -218,7 +218,7 @@ TEST(rest_mock_calling_record_resume) {
 TEST(rest_mock_calling_collect) {
   auto client = mocktest::make_client();
   auto body = client.calling().collect(
-      "call-1", {.initial_timeout = 5, .digits = json::object({{"max", 4}})});
+      "call-1", {.digits = json::object({{"max", 4}}), .initial_timeout = 5});
   ASSERT_TRUE(body.is_object());
   ASSERT_TRUE(body.contains("id"));
   auto j = mocktest::journal_last();
@@ -288,8 +288,8 @@ TEST(rest_mock_calling_detect_stop) {
 
 TEST(rest_mock_calling_tap) {
   auto client = mocktest::make_client();
-  auto body = client.calling().tap("call-1", {.tap = json::object({{"type", "audio"}}),
-                                              .device = json::object({{"type", "rtp"}})});
+  auto body = client.calling().tap("call-1", {.device = json::object({{"type", "rtp"}}),
+                                              .tap = json::object({{"type", "audio"}})});
   ASSERT_TRUE(body.is_object());
   ASSERT_TRUE(body.contains("id"));
   auto j = mocktest::journal_last();

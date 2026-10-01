@@ -1,35 +1,33 @@
 // The shallow closed-key check and anyOf/oneOf-shaped verb configs.
 //
-// verb_top_level_property_names used to test `body.value("type", "") != "object"`
-// on the verb's config node and return std::nullopt otherwise. A union node
-// (`{"anyOf": [...]}`) carries no `type` of its own, so that test failed and the
-// resolver bailed — and validate_verb_top_level_keys reads std::nullopt as "no
-// key-set to enforce" and reports valid for ANY key. The check did not report a
-// problem; it stopped checking and reported success, which is strictly worse
-// than failing.
+// The C grammar admits a SWML verb body in four forms — an object, a string, a
+// number or an array (mod_infrastructure swml_schema.c
+// check_method_type_and_unknown_params: "Allowed types are object, string,
+// number, or array") — and the bundled schema.json encodes each form as an arm of
+// the verb body's anyOf: the named-parameter OBJECT arm (closed with
+// unevaluatedProperties), the positional ARRAY arm, and the bare-scalar
+// shorthand arms.
 //
-// Five verbs in the SHIPPED schema.json are union-shaped: connect and play
-// (oneOf of $refs), send_sms (anyOf of $refs), sleep (anyOf of an
-// object-with-duration / integer / SWMLVar), and unset (anyOf of string /
-// array-of-string). Four of the five have object branches whose keys are
-// perfectly enumerable, and the shallow check accepted arbitrary keys for all
-// four. Engaged verbs go 30 -> 34.
+// verb_top_level_property_names resolves a verb body to the key set the shallow
+// check enforces, under the settled #223 contract (porting-sdk
+// docs/legacy-census/DISC-g-d21.md §1.4/§4): EXACTLY ONE CLOSED ARM, ELSE
+// DISENGAGE. One closed object arm -> its keys are enforced. Zero -> there is no
+// object form to check. Several -> no single key set describes a valid object
+// config, so the check disengages instead of unioning the arms (a union admits a
+// document mixing keys from two arms that no single arm accepts). The deep
+// validator (validate_verb_full) still evaluates every arm.
 //
-// In THIS port the defect is LATENT rather than live through Service::add_verb:
-// that entry point routes a verb to the shallow resolver only when the verb has a
-// registered handler, and `ai` is the only registered handler (a plain closed
-// object, not a union) — everything else goes to the deep validator. But
-// SchemaUtils::validate_verb_top_level_keys is PUBLIC API, so a caller reaching
-// it directly got the disengaged behaviour, and any future handler registration
-// for a union-shaped verb would make it live. These tests drive that public
-// entry point.
+// An earlier resolver bailed on any union node (it carries no `type` of its own)
+// and validate_verb_top_level_keys read that as "no key set" and accepted ANY key;
+// the forbidden-key tests below are the negative control for that regression.
 //
-// The semantic: a config satisfying a union satisfies SOME branch, so the known
-// keys are the UNION of the object branches' keys, and a key belonging to no
-// branch belongs to no valid document. Non-object branches contribute nothing —
-// they constrain the config to not be an object at all, a different question.
-// unset has no object branch, so it correctly stays disengaged.
+// In THIS port the shallow check is reached through Service::add_verb only for a
+// verb with a registered handler (`ai`), but SchemaUtils::validate_verb_top_level_keys
+// is PUBLIC API, so these tests drive that entry point directly.
 
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -39,16 +37,13 @@ using signalwire::utils::SchemaUtils;
 
 namespace anyof_test {
 
-// A verb config the shipped schema expresses as an anyOf/oneOf: the verb, a
-// legitimate config that must keep passing, and the number of keys the resolved
-// union must contain (probed key-by-key below, since the resolver is private).
+// A union-shaped verb in the bundled schema with exactly one closed object arm:
+// the verb, a legitimate config that must keep passing, and every key of that
+// arm (probed key-by-key below, since the resolver is private).
 struct UnionVerb {
   std::string verb;
   nlohmann::json legit;
-  // Every key the union must ACCEPT. For connect these span all four
-  // ConnectDevice branches, which differ only in their discriminating key — an
-  // INTERSECTION would reject three of the four.
-  std::vector<std::string> branch_keys;
+  std::vector<std::string> arm_keys;
 };
 
 inline std::vector<UnionVerb> union_verbs() {
@@ -56,36 +51,15 @@ inline std::vector<UnionVerb> union_verbs() {
       {"sleep", nlohmann::json{{"duration", 5000}}, {"duration"}},
       {"play",
        nlohmann::json{{"url", "https://example.test/a.mp3"}},
-       {"url", "urls", "volume", "auto_answer", "say_voice", "say_language", "say_gender",
-        "status_url"}},
+       {"auto_answer", "loop", "say_gender", "say_language", "say_voice", "status_url", "url",
+        "urls", "volume"}},
       {"send_sms",
        nlohmann::json{
            {"to_number", "+15551110000"}, {"from_number", "+15552220000"}, {"body", "hi"}},
-       {"body", "media", "to_number", "from_number", "region", "tags"}},
-      {"connect",
-       nlohmann::json{{"to", "sip:alice@example.test"}},
-       {"to",
-        "serial",
-        "parallel",
-        "serial_parallel",
-        "from",
-        "headers",
-        "codecs",
-        "timeout",
-        "max_duration",
-        "session_timeout",
-        "confirm",
-        "confirm_timeout",
-        "ringback",
-        "encryption",
-        "webrtc_media",
-        "call_state_url",
-        "call_state_events",
-        "result",
-        "username",
-        "password",
-        "answer_on_bridge",
-        "transfer_after_bridge"}},
+       {"body", "from_number", "media", "region", "status_callback", "tags", "to_number"}},
+      {"answer", nlohmann::json{{"max_duration", 60}}, {"max_duration"}},
+      {"hangup", nlohmann::json{{"reason", "busy"}}, {"reason"}},
+      {"label", nlohmann::json{{"label", "start"}}, {"label"}},
   };
 }
 
@@ -98,15 +72,39 @@ inline bool errors_mention(const std::vector<std::string>& errors, const std::st
   return false;
 }
 
+// Write a minimal schema whose one verb `v` has the given body, so the contract's
+// arm-counting rule can be pinned against a body SHAPE the test controls (the
+// bundled schema has no verb with two closed object arms today, so without a
+// fixture the multi-arm branch would be proven by nothing).
+inline std::string write_fixture_schema(const nlohmann::json& body, const std::string& tag) {
+  nlohmann::json schema = {
+      {"$defs",
+       {{"SWMLMethod", {{"anyOf", nlohmann::json::array({{{"$ref", "#/$defs/V"}}})}}},
+        {"V", {{"type", "object"}, {"properties", {{"v", body}}}}}}},
+  };
+  auto path = std::filesystem::temp_directory_path() /
+              ("sw-cpp-anyof-" + tag + "-" + std::to_string(std::rand()) + ".json");
+  std::ofstream(path) << schema.dump();
+  return path.string();
+}
+
+inline nlohmann::json closed_arm(const std::vector<std::string>& keys) {
+  nlohmann::json props = nlohmann::json::object();
+  for (const auto& k : keys) {
+    props[k] = {{"type", "string"}};
+  }
+  return {{"type", "object"},
+          {"properties", props},
+          {"unevaluatedProperties", {{"not", nlohmann::json::object()}}}};
+}
+
 }  // namespace anyof_test
 
-// Forbidden-key direction, and the direct negative control: every one of these
-// was ACCEPTED before the fix, because the resolver returned std::nullopt on a
-// union node and the check disengaged.
+// Forbidden-key direction, and the negative control for the union-node bail: a
+// key in the verb's single closed object arm is enforced through the anyOf.
 TEST(schema_anyof_union_verbs_reject_key_in_no_branch) {
   SchemaUtils su("", true);
-  // Reports EVERY failing verb, not just the first — the negative control is
-  // per-verb, so a run must show which of the four are disengaged.
+  // Reports EVERY failing verb, not just the first.
   bool ok = true;
   for (const auto& tc : anyof_test::union_verbs()) {
     nlohmann::json cfg = tc.legit;
@@ -114,8 +112,8 @@ TEST(schema_anyof_union_verbs_reject_key_in_no_branch) {
     auto [valid, errors] = su.validate_verb_top_level_keys(tc.verb, cfg);
     if (valid) {
       std::cerr << "  FAIL: " << tc.verb
-                << ": a key present in no branch was ACCEPTED -- the closed-key "
-                   "check is disengaged on this union-shaped config\n";
+                << ": a key in no arm was ACCEPTED -- the closed-key check is "
+                   "disengaged on this union-shaped config\n";
       ok = false;
       continue;
     }
@@ -128,7 +126,7 @@ TEST(schema_anyof_union_verbs_reject_key_in_no_branch) {
   return ok;
 }
 
-// The other direction — the fix must not start rejecting valid documents.
+// The other direction — legitimate documents keep passing.
 TEST(schema_anyof_union_verbs_accept_legitimate_config) {
   SchemaUtils su("", true);
   for (const auto& tc : anyof_test::union_verbs()) {
@@ -141,21 +139,18 @@ TEST(schema_anyof_union_verbs_accept_legitimate_config) {
   return true;
 }
 
-// Every key of every object branch must be accepted, which is what distinguishes
-// a UNION from an intersection or from picking one branch. Probing key-by-key
-// also enumerates the resolved set through the public API: a key is known iff a
-// config carrying only it is accepted.
-TEST(schema_anyof_union_is_union_not_intersection) {
+// Every key of the closed object arm is accepted (a key is known iff a config
+// carrying only it is accepted, which enumerates the resolved set).
+TEST(schema_anyof_closed_arm_keys_all_accepted) {
   SchemaUtils su("", true);
   bool ok = true;
   for (const auto& tc : anyof_test::union_verbs()) {
-    for (const auto& key : tc.branch_keys) {
+    for (const auto& key : tc.arm_keys) {
       nlohmann::json cfg = nlohmann::json::object();
       cfg[key] = "x";
       auto [valid, errors] = su.validate_verb_top_level_keys(tc.verb, cfg);
       if (!valid) {
-        std::cerr << "  FAIL: " << tc.verb << ": branch key '" << key
-                  << "' fell out of the union\n";
+        std::cerr << "  FAIL: " << tc.verb << ": arm key '" << key << "' was rejected\n";
         ok = false;
       }
     }
@@ -163,20 +158,19 @@ TEST(schema_anyof_union_is_union_not_intersection) {
   return ok;
 }
 
-// The resolved key set is EXACTLY the union of the object branches' keys —
-// nothing extra crept in. Probed through the public API by asserting a
-// deliberately-adjacent misspelling of each branch key is rejected.
-TEST(schema_anyof_union_set_is_exact) {
+// The resolved key set is EXACTLY the closed arm's keys — nothing extra crept in.
+// Probed by asserting a deliberately-adjacent misspelling of each key is rejected.
+TEST(schema_anyof_closed_arm_set_is_exact) {
   SchemaUtils su("", true);
   bool ok = true;
   for (const auto& tc : anyof_test::union_verbs()) {
-    for (const auto& key : tc.branch_keys) {
+    for (const auto& key : tc.arm_keys) {
       nlohmann::json cfg = nlohmann::json::object();
       cfg[key + "_zz"] = "x";
       auto [valid, errors] = su.validate_verb_top_level_keys(tc.verb, cfg);
       if (valid) {
         std::cerr << "  FAIL: " << tc.verb << ": '" << key
-                  << "_zz' is in no branch yet was ACCEPTED\n";
+                  << "_zz' is in no arm yet was ACCEPTED\n";
         ok = false;
         break;  // one report per verb is enough
       }
@@ -185,18 +179,12 @@ TEST(schema_anyof_union_set_is_exact) {
   return ok;
 }
 
-// Shapes that genuinely have no closed key-set, pinned so the fix is not read as
-// "always enforce something":
-//
-//   - set   -- an OPEN object (unevaluatedProperties:{} with no `not`, zero
-//              declared properties): a free-form variable bag by design.
-//   - unset -- a union with NO object branch (string | array-of-string).
-//   - cond / label / return -- array / string / untyped, not objects at all.
-//
-// For these the check must be a NO-OP (pass), not a rejection.
+// Shapes that genuinely have no closed key-set, pinned so the check is not read
+// as "always enforce something": set (an OPEN variable bag), unset (no object
+// arm), cond / return (not objects). For these the check must PASS.
 TEST(schema_anyof_non_enumerable_configs_stay_disengaged) {
   SchemaUtils su("", true);
-  for (const std::string& verb : {"set", "unset", "cond", "label", "return"}) {
+  for (const std::string& verb : {"set", "unset", "cond", "return"}) {
     nlohmann::json cfg = nlohmann::json{{"anything_at_all", 1}};
     auto [valid, errors] = su.validate_verb_top_level_keys(verb, cfg);
     if (!valid) {
@@ -209,8 +197,56 @@ TEST(schema_anyof_non_enumerable_configs_stay_disengaged) {
   return true;
 }
 
-// Guards the shape the resolver already handled — a single $ref (ai -> AIObject)
-// — since the fix rewrote that path into the shared recursive resolver.
+// #223: EXACTLY ONE closed arm engages — pinned against a fixture body shaped
+// like the bundled schema's (closed object arm + positional array arm + a bare
+// scalar arm).
+TEST(schema_anyof_contract_single_closed_arm_engages) {
+  nlohmann::json body = {
+      {"anyOf",
+       nlohmann::json::array({anyof_test::closed_arm({"a", "b"}),
+                              {{"type", "array"}},
+                              {{"allOf", nlohmann::json::array({{{"type", "string"}}})}}})}};
+  auto path = anyof_test::write_fixture_schema(body, "one");
+  SchemaUtils su(path, true);
+  std::remove(path.c_str());
+  auto [ok_valid, ok_errors] = su.validate_verb_top_level_keys("v", nlohmann::json{{"a", "x"}});
+  ASSERT_TRUE(ok_valid);
+  auto [bad_valid, bad_errors] =
+      su.validate_verb_top_level_keys("v", nlohmann::json{{"a", "x"}, {"zz", "y"}});
+  ASSERT_FALSE(bad_valid);
+  ASSERT_TRUE(anyof_test::errors_mention(bad_errors, "zz"));
+  return true;
+}
+
+// #223: MORE THAN ONE closed arm disengages — never the union of the arms. Under a
+// union, {"a", "c"} (a key from each arm, a document NO single arm accepts) would
+// pass while {"zz"} failed; under the contract the shallow check enforces nothing.
+TEST(schema_anyof_contract_multiple_closed_arms_disengage) {
+  nlohmann::json body = {{"anyOf", nlohmann::json::array({anyof_test::closed_arm({"a", "b"}),
+                                                          anyof_test::closed_arm({"c"})})}};
+  auto path = anyof_test::write_fixture_schema(body, "two");
+  SchemaUtils su(path, true);
+  std::remove(path.c_str());
+  auto [valid, errors] = su.validate_verb_top_level_keys("v", nlohmann::json{{"zz", "y"}});
+  ASSERT_TRUE(valid);
+  ASSERT_TRUE(errors.empty());
+  return true;
+}
+
+// #223: ZERO closed arms (only non-object forms) disengage.
+TEST(schema_anyof_contract_no_closed_arm_disengages) {
+  nlohmann::json body = {
+      {"anyOf", nlohmann::json::array({{{"type", "string"}}, {{"type", "array"}}})}};
+  auto path = anyof_test::write_fixture_schema(body, "zero");
+  SchemaUtils su(path, true);
+  std::remove(path.c_str());
+  auto [valid, errors] = su.validate_verb_top_level_keys("v", nlohmann::json{{"zz", "y"}});
+  ASSERT_TRUE(valid);
+  return true;
+}
+
+// Guards the handler-verb path — `ai`, the one verb Service::add_verb routes to
+// the shallow check — a misspelled top-level key is rejected.
 TEST(schema_anyof_ref_following_still_resolves_ai) {
   SchemaUtils su("", true);
 

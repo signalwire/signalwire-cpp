@@ -34,8 +34,10 @@ struct AIAgentUpdateRequest {
   std::optional<json> pronounce;
   std::optional<json> prompt;
   std::optional<json> SWAIG;
-  std::optional<json> agent_id;
   std::optional<std::string> name;
+  std::optional<std::string> post_prompt_auth_user;
+  std::optional<std::string> post_prompt_auth_password;
+  std::optional<json> multilingual;
   json extras = json::object();
 };
 

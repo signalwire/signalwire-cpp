@@ -25,6 +25,11 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct SWAIGDefaults {
+  std::optional<json> meta_data;
+  std::optional<std::string> meta_data_token;
+  std::optional<std::string> web_hook_auth_pass;
+  std::optional<std::string> web_hook_auth_password;
+  std::optional<std::string> web_hook_auth_user;
   std::optional<std::string> web_hook_url;
   json extras = json::object();
 };

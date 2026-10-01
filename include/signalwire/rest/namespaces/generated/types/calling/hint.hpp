@@ -25,10 +25,10 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct Hint {
-  std::optional<std::string> hint;
   std::optional<std::string> pattern;
-  std::optional<std::string> replace;
+  std::optional<std::string> hint;
   std::optional<json> ignore_case;
+  std::optional<std::string> replace;
   json extras = json::object();
 };
 

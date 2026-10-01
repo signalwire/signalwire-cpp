@@ -33,11 +33,16 @@ class Messages : public BaseResource {
     std::optional<bool> send_as_mms;
     std::optional<std::string> status_callback;
     std::optional<json> custom_variables;
+    std::optional<std::string> message_type;
+    std::optional<std::string> template_id;
+    std::optional<json> header_template_parameters;
+    std::optional<json> body_template_parameters;
+    std::optional<json> button_template_parameters;
     json extras = json::object();
   };
 
   struct UpdateParams {
-    std::string body;
+    std::optional<std::string> body;
     json extras = json::object();
   };
 
@@ -63,6 +68,21 @@ class Messages : public BaseResource {
     if (p.custom_variables.has_value()) {
       body["custom_variables"] = *p.custom_variables;
     }
+    if (p.message_type.has_value()) {
+      body["message_type"] = *p.message_type;
+    }
+    if (p.template_id.has_value()) {
+      body["template_id"] = *p.template_id;
+    }
+    if (p.header_template_parameters.has_value()) {
+      body["header_template_parameters"] = *p.header_template_parameters;
+    }
+    if (p.body_template_parameters.has_value()) {
+      body["body_template_parameters"] = *p.body_template_parameters;
+    }
+    if (p.button_template_parameters.has_value()) {
+      body["button_template_parameters"] = *p.button_template_parameters;
+    }
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }
@@ -72,7 +92,9 @@ class Messages : public BaseResource {
   [[nodiscard]] json update(const std::string& message_id, const UpdateParams& p,
                             const RequestOptions& request_options = {}) const {
     json body = json::object();
-    body["body"] = p.body;
+    if (p.body.has_value()) {
+      body["body"] = *p.body;
+    }
     if (!p.extras.is_null()) {
       body.update(p.extras);
     }

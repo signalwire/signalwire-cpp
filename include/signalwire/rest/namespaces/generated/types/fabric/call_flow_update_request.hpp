@@ -28,6 +28,8 @@ using json = nlohmann::json;
 struct CallFlowUpdateRequest {
   std::optional<std::string> title;
   std::optional<int> document_version;
+  std::optional<json> flow_data;
+  std::optional<json> relayml;
   json extras = json::object();
 };
 

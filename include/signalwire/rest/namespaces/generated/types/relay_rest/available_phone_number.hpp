@@ -27,12 +27,13 @@ using json = nlohmann::json;
 ///
 /// Method-less DTO: one typed member per snake wire key + open `extras`.
 struct AvailablePhoneNumber {
-  std::optional<std::string> number;
   std::optional<std::string> region;
-  std::optional<std::string> city;
   std::optional<std::string> rate_center;
-  std::optional<std::string> lata;
   std::optional<json> capabilities;
+  std::optional<std::string> e164;
+  std::optional<std::string> national_number_formatted;
+  std::optional<std::string> international_number_formatted;
+  std::optional<std::string> country_code;
   json extras = json::object();
 };
 

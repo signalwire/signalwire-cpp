@@ -1892,7 +1892,7 @@ Start call tapping/monitoring.
 **Parameters:**
 - `uri` (`std::string`): URI to send tapped audio to
 - `control_id` (`std::string`): Unique identifier for this tap
-- `direction` (`std::string`): Tap direction: "speak", "hear", "both" (default: "both")
+- `direction` (`std::string`): Tap direction: "speak", "listen", "both" (default: "both")
 - `codec` (`std::string`): Audio codec: "PCMU", "PCMA" (default: "PCMU")
 - `rtp_ptime` (`int`): RTP packet time in milliseconds (default: 20)
 - `status_url` (`std::string`): Status webhook URL

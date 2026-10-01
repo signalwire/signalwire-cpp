@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "signalwire/agent/agent_base.hpp"
+#include "signalwire/agents/bedrock.hpp"
 #include "signalwire/swaig/function_result.hpp"
 #include "signalwire/swaig/tool_definition.hpp"
 
@@ -83,10 +84,9 @@ json pick(const json& frag, const std::vector<std::string>& keys) {
     return frag;
   }
   json out = json::object();
+  // The oracle's pick is ``{k: frag.get(k)}``: an absent key is null, not omitted.
   for (const auto& k : keys) {
-    if (frag.contains(k)) {
-      out[k] = frag[k];
-    }
+    out[k] = frag.contains(k) ? frag[k] : json(nullptr);
   }
   return out;
 }
@@ -99,6 +99,8 @@ int main() {
   // exception-escape guard: main() must not let an exception escape
   // (that is std::terminate, with no message). Report and exit nonzero.
   try {
+    // The dump's stdout is the JSON document; keep SDK log lines off it.
+    signalwire::Logger::instance().suppress();
     json out = json::object();
 
     // swml_set_prompt_llm_params: two set_prompt_llm_params calls MERGE.
@@ -184,6 +186,61 @@ int main() {
         }
       }
       out["swml_define_tool_complete_schema"] = params;
+    }
+
+    // swml_contexts_in_prompt: contexts render inside ai.prompt, not ai.contexts.
+    {
+      AgentBase a("demo", "/demo");
+      a.prompt_add_section("Role", "You take orders.", {});
+      auto& ctx = a.define_contexts().add_context("default");
+      ctx.add_step("greet").set_text("Greet the caller.");
+      out["swml_contexts_in_prompt"] = pick(extract(render(a), "ai.prompt"), {"contexts"});
+    }
+
+    // swml_on_call_end_hook / _post_conversation: on_call_end registers the
+    // reserved hangup_hook and turns on ai.params.swaig_post_conversation.
+    {
+      AgentBase a("demo", "/demo");
+      a.on_call_end([](const json&, const json&) {});
+      json doc = render(a);
+      json funcs = extract(doc, "ai.SWAIG.functions");
+      json desc = json(nullptr);
+      if (funcs.is_array()) {
+        for (const auto& f : funcs) {
+          if (f.is_object() && f.value("function", "") == "hangup_hook" &&
+              f.contains("description")) {
+            desc = f["description"];
+            break;
+          }
+        }
+      }
+      out["swml_on_call_end_hook"] = desc;
+      out["swml_on_call_end_post_conversation"] =
+          pick(extract(doc, "ai.params"), {"swaig_post_conversation"});
+    }
+
+    // swml_bedrock_prompt: BedrockAgent's amazon_bedrock prompt.
+    {
+      signalwire::agents::BedrockAgent b("bedrock", "/bedrock", "", "tiffany", 0.7, 0.9, 512);
+      b.set_prompt_text("You are a helpful assistant.");
+      b.set_prompt_llm_params(json{{"presence_penalty", 0.3},
+                                   {"frequency_penalty", 0.2},
+                                   {"confidence", 0.5},
+                                   {"barge_confidence", 0.4}});
+      json doc = b.render_swml();
+      json prompt = json(nullptr);
+      if (doc.contains("sections") && doc["sections"].contains("main")) {
+        for (const auto& verb : doc["sections"]["main"]) {
+          if (verb.is_object() && verb.contains("amazon_bedrock") &&
+              verb["amazon_bedrock"].contains("prompt")) {
+            prompt = verb["amazon_bedrock"]["prompt"];
+            break;
+          }
+        }
+      }
+      out["swml_bedrock_prompt"] =
+          pick(prompt, {"voice_id", "max_tokens", "temperature", "top_p", "presence_penalty",
+                        "frequency_penalty", "confidence", "barge_confidence"});
     }
 
     std::cout << out.dump() << "\n";

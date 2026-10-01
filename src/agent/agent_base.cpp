@@ -994,7 +994,32 @@ std::vector<std::string> AgentBase::list_skills() const { return loaded_skills_;
 // ============================================================================
 
 AgentBase& AgentBase::set_dynamic_config_callback(DynamicConfigCallback cb) {
-  dynamic_config_callback_ = std::move(cb);
+  // Assigning replaces the whole chain; an empty callback clears it.
+  per_call_configs_.clear();
+  if (cb) {
+    per_call_configs_.push_back(std::move(cb));
+  }
+  return *this;
+}
+
+AgentBase& AgentBase::mount(server::Router router, const std::string& prefix,
+                            const std::optional<std::string>& name) {
+  std::string clean = prefix;
+  while (!clean.empty() && clean.back() == '/') {
+    clean.pop_back();
+  }
+  if (router) {
+    mounts_.emplace_back(clean, std::move(router));
+  }
+  get_logger().info("agent_route_mounted prefix=" + (clean.empty() ? std::string("/") : clean) +
+                    (name ? " name=" + *name : std::string()));
+  return *this;
+}
+
+AgentBase& AgentBase::add_per_call_config(DynamicConfigCallback cb) {
+  if (cb) {
+    per_call_configs_.push_back(std::move(cb));
+  }
   return *this;
 }
 
@@ -1381,6 +1406,52 @@ AgentBase& AgentBase::on_summary(SummaryCallback cb) {
   return *this;
 }
 
+CallEndHandler AgentBase::on_call_end(CallEndHandler handler) {
+  if (call_end_handlers_) {
+    call_end_handlers_->push_back(handler);
+    return handler;
+  }
+  call_end_handlers_ = std::make_shared<std::vector<CallEndHandler>>();
+  call_end_handlers_->push_back(handler);
+
+  // swaig_post_conversation gates the call_log on the hook's request: without it
+  // the hook still fires, but with no transcript.
+  if (ai_params_.is_object() && ai_params_.contains("swaig_post_conversation") &&
+      ai_params_["swaig_post_conversation"] == json(false)) {
+    get_logger().warn(
+        "[signalwire] on_call_end handlers are registered but swaig_post_conversation is "
+        "explicitly False -- they will receive an empty call_log");
+  } else if (!ai_params_.is_object() || !ai_params_.contains("swaig_post_conversation")) {
+    ai_params_["swaig_post_conversation"] = true;
+  }
+
+  auto handlers = call_end_handlers_;
+  define_tool("hangup_hook", "Internal: fires when the call ends.", json::object(),
+              [handlers](const json& /*args*/, const json& raw_data) {
+                const json raw = raw_data.is_object() ? raw_data : json::object();
+                // Both spellings are seen in the wild depending on engine.
+                json call_log = json::array();
+                for (const char* key : {"call_log", "raw_call_log"}) {
+                  if (raw.contains(key) && !raw[key].is_null() && !raw[key].empty()) {
+                    call_log = raw[key];
+                    break;
+                  }
+                }
+                for (const auto& cb : *handlers) {
+                  // Isolate each handler so one failure cannot stop the others.
+                  try {
+                    cb(call_log, raw);
+                  } catch (const std::exception& e) {
+                    get_logger().error(std::string("call_end_handler_failed error=") + e.what());
+                  } catch (...) {
+                    get_logger().error("call_end_handler_failed error=unknown");
+                  }
+                }
+                return swaig::FunctionResult("");
+              });
+  return handler;
+}
+
 AgentBase& AgentBase::on_debug_event(DebugEventCallback cb) {
   debug_event_callback_ = std::move(cb);
   return *this;
@@ -1757,9 +1828,11 @@ json AgentBase::render_swml_for_request(const std::map<std::string, std::string>
   }
 
   // If dynamic config callback is set, use cloned agent
-  if (dynamic_config_callback_) {
+  if (!per_call_configs_.empty()) {
     auto copy = clone();
-    dynamic_config_callback_(query_params, body_params, headers, *copy);
+    for (const auto& cb : per_call_configs_) {
+      cb(query_params, body_params, headers, *copy);
+    }
     return copy->render_swml_internal(headers, call_id);
   }
 
@@ -2354,6 +2427,11 @@ void AgentBase::setup_routes(httplib::Server& server) {
       json response = handle_mcp_request(body);
       res.set_content(response.dump(), "application/json");
     });
+  }
+
+  // Route sets mounted via mount(), under their prefixes.
+  for (const auto& [prefix, router] : mounts_) {
+    router(server, prefix);
   }
 
   // Debug routes

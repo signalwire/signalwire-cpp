@@ -518,6 +518,7 @@ def _is_generated_type_ns(ns_path: str) -> bool:
 # matching is sufficient and keeps the rule decoupled from the typedef's
 # specific signature).
 CALLBACK_TYPEDEFS_AS_CALLABLE: set[str] = {
+    "CallEndHandler",
     "DebugEventCallback",
     "DynamicConfigCallback",
     "SummaryCallback",
@@ -572,6 +573,10 @@ FREE_FUNCTION_RENAMES: dict[tuple[str, str], tuple[str, str]] = {
     ("signalwire::security", "ValidateRequest"): (
         "signalwire.core.security.webhook_validator",
         "validate_request",
+    ),
+    ("signalwire::security", "ValidateWebhookSignatureSha256"): (
+        "signalwire.core.security.webhook_validator",
+        "validate_webhook_signature_sha256",
     ),
     # The framework-free webhook-validation decision core (porting-sdk
     # webhooks.md + HIDDEN_SURFACE_AUDIT Pass 1). Python exposes it as a
@@ -780,6 +785,8 @@ MIXIN_PROJECTIONS: dict[tuple[str, str], list[str]] = {
         "run",
         "serve",
         "set_dynamic_config_callback",
+        "add_per_call_config",
+        "mount",
         "on_request",
         "on_swml_request",
         "register_routing_callback",
@@ -1126,6 +1133,11 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
             "ValidateRequest",
             "validate_request",
         ),
+        (
+            "include/signalwire/security/webhook_validator.hpp",
+            "ValidateWebhookSignatureSha256",
+            "validate_webhook_signature_sha256",
+        ),
     ],
     # Framework-free webhook-validation decision core (webhooks.md +
     # HIDDEN_SURFACE_AUDIT Pass 1). C++ ships it as the ``Validate`` free
@@ -1169,6 +1181,45 @@ MODULE_FUNCTION_PROJECTIONS: dict[str, list[tuple[str, str, str]]] = {
             "include/signalwire/swaig/type_inference.hpp",
             "create_typed_handler_wrapper",
             "create_typed_handler_wrapper",
+        ),
+    ],
+    # Client-capability readers (capabilities.py). C++ implements them as free
+    # functions in ``signalwire::core::capabilities`` (same snake_case names).
+    "signalwire.core.capabilities": [
+        (
+            "include/signalwire/core/capabilities.hpp",
+            "declared_capabilities",
+            "declared_capabilities",
+        ),
+        (
+            "include/signalwire/core/capabilities.hpp",
+            "has_capability",
+            "has_capability",
+        ),
+        (
+            "include/signalwire/core/capabilities.hpp",
+            "user_variables",
+            "user_variables",
+        ),
+    ],
+    # Post-prompt normalization (post_prompt.py). C++ free functions in
+    # ``signalwire::core::post_prompt`` (same snake_case names).
+    "signalwire.core.post_prompt": [
+        ("include/signalwire/core/post_prompt.hpp", "dialogue_turns", "dialogue_turns"),
+        (
+            "include/signalwire/core/post_prompt.hpp",
+            "normalize_post_prompt",
+            "normalize_post_prompt",
+        ),
+        (
+            "include/signalwire/core/post_prompt.hpp",
+            "parse_post_prompt_data",
+            "parse_post_prompt_data",
+        ),
+        (
+            "include/signalwire/core/post_prompt.hpp",
+            "strip_json_fence",
+            "strip_json_fence",
         ),
     ],
     # Logging-config module-level helpers. C++ implements them as free functions
@@ -2449,6 +2500,15 @@ def _project_credential_carrier_fields(modules: dict, repo: Path) -> None:
     _emit_oracle_gated_fields(modules, "signalwire.core.auth_handler", header)
 
 
+def _project_post_prompt_fields(modules: dict, repo: Path) -> None:
+    """Emit NormalizedPostPrompt's public data-member fields (medium /
+    conversation_id / summary / dialogue / call_id / raw) as surface members,
+    gated on the oracle's ``signalwire.core.post_prompt`` set — the reference
+    spells the normalized leg as a frozen @dataclass, C++ as an aggregate."""
+    header = repo / "include/signalwire/core/post_prompt.hpp"
+    _emit_oracle_gated_fields(modules, "signalwire.core.post_prompt", header)
+
+
 def build_native_names(include_dir: Path) -> dict:
     """Return the port's REAL declared member names, verbatim, BEFORE any fold.
 
@@ -2787,6 +2847,7 @@ def build_snapshot(repo: Path, include_dir: Path) -> dict:
     # Credential carriers: project their public data-member fields as surface
     # members (intersected with the oracle's signalwire.core.auth_handler set).
     _project_credential_carrier_fields(modules, repo)
+    _project_post_prompt_fields(modules, repo)
 
     # Remove empty modules (shouldn't happen in practice but be tidy)
     modules = {k: v for k, v in modules.items() if v["classes"] or v["functions"]}

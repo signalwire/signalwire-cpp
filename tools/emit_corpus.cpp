@@ -233,8 +233,8 @@ std::vector<Entry> corpus() {
       {"tap.defaults", [] { return fr("").tap("rtp://10.0.0.1:5004"); }},
       {"tap.speak_pcma",
        [] { return fr("").tap("ws://ex.com/tap", "", TapDirection::Speak, Codec::Pcma); }},
-      {"tap.hear_pcmu",
-       [] { return fr("").tap("wss://ex.com/tap", "", TapDirection::Hear, Codec::Pcmu); }},
+      {"tap.listen_pcmu",
+       [] { return fr("").tap("wss://ex.com/tap", "", TapDirection::Listen, Codec::Pcmu); }},
       {"tap.both_full",
        [] {
          return fr("").tap("rtp://10.0.0.1:5004", "tap1", TapDirection::Both, Codec::Pcma, 40,
@@ -344,6 +344,44 @@ std::vector<Entry> corpus() {
          // wrapping; C++ does the same. Pass the raw JSON text.
          return fr("").execute_swml(
              json("{\"version\": \"1.0.0\", \"sections\": {\"main\": [{\"hangup\": {}}]}}"));
+       }},
+
+      // ---- structured tool response (tool_result / tool_prompt) -----------
+      {"tool_response.ctor",
+       [] {
+         return FunctionResult("", false, std::string("Order 1042 placed."),
+                               std::string("Tell the caller their order number."));
+       }},
+      {"tool_response.set",
+       [] {
+         return fr("").set_tool_response(std::string("Balance is $12.50."),
+                                         std::string("Read the balance to the caller."));
+       }},
+      {"tool_response.result_only", [] { return fr("").set_tool_response(std::string("Saved.")); }},
+
+      // ---- hold with a prompt and step routing ----------------------------
+      {"hold.prompt", [] { return fr("").hold(std::string("Please hold while I check.")); }},
+      {"hold.routing",
+       [] {
+         return fr("").hold(std::string("One moment."), 60, std::string("resume"),
+                            std::string("timed_out"));
+       }},
+
+      // ---- RPC global data ------------------------------------------------
+      {"rpc_ai_message.global_data",
+       [] {
+         return fr("").rpc_ai_message("call-abc", std::string("The caller is back."), "system",
+                                      json::object({{"status", "returned"}}));
+       }},
+      {"rpc_ai_message.data_only",
+       [] {
+         return fr("").rpc_ai_message("call-abc", std::nullopt, "system",
+                                      json::object({{"order_id", "1042"}}));
+       }},
+      {"rpc_ai_global_data",
+       [] {
+         return fr("").rpc_ai_global_data("call-abc",
+                                          json::object({{"order_id", "1042"}, {"paid", true}}));
        }},
   };
 }

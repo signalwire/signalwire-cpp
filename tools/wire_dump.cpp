@@ -36,6 +36,7 @@
 using json = nlohmann::json;
 using signalwire::security::SessionManager;
 using signalwire::security::ValidateWebhookSignature;
+using signalwire::security::ValidateWebhookSignatureSha256;
 using signalwire::security::security_utils::FilterSensitiveHeaders;
 using signalwire::security::security_utils::RedactUrl;
 
@@ -110,6 +111,13 @@ std::string oracle_token(const std::string& call_id, const std::string& fn) {
 // oracle_sig: hex(HMAC-SHA1(key, url+body)) — the correct webhook signature.
 std::string oracle_sig(const std::string& url, const std::string& body, const std::string& key) {
   return hmac_hex(EVP_sha1(), key, url + body);
+}
+
+// oracle_sig_sha256: hex(HMAC-SHA256(key, url+body)) — the correct
+// X-SignalWire-Sha256-Signature.
+std::string oracle_sig_sha256(const std::string& url, const std::string& body,
+                              const std::string& key) {
+  return hmac_hex(EVP_sha256(), key, url + body);
 }
 
 }  // namespace
@@ -218,6 +226,14 @@ int main() {
       out["token_interop"] = json{{"valid", sm.validate_token(tok, "oracle_fn", "oracle_call")}};
     }
 
+    // token_interop_dotted_call_id: a call_id may contain dots ("root.2"); an
+    // oracle-format token minted for it must validate (split from the right).
+    {
+      std::string tok = oracle_token("root.2", "oracle_fn");
+      out["token_interop_dotted_call_id"] =
+          json{{"valid", sm.validate_token(tok, "oracle_fn", "root.2")}};
+    }
+
     // token_tamper_rejected: a one-byte-flipped signature must fail. Build the
     // oracle token, decode, flip the first byte of the signature (after the last
     // '.'), re-encode — the mirror of Go's tamperedToken / _tampered_token.
@@ -289,6 +305,15 @@ int main() {
       out["wire_validate_webhook_signature_bad"] =
           json{{"valid", ValidateWebhookSignature(kSecret, bad, wh_url, wh_body)}};
     }
+
+    // wire_validate_webhook_signature_sha256: hex(HMAC-SHA256(key, url+body))
+    // -> valid; a correct SHA-1 signature in its place -> invalid.
+    out["wire_validate_webhook_signature_sha256"] =
+        json{{"valid", ValidateWebhookSignatureSha256(
+                           kSecret, oracle_sig_sha256(wh_url, wh_body, kSecret), wh_url, wh_body)}};
+    out["wire_validate_webhook_signature_sha256_bad"] =
+        json{{"valid", ValidateWebhookSignatureSha256(kSecret, oracle_sig(wh_url, wh_body, kSecret),
+                                                      wh_url, wh_body)}};
 
     // wire_redact_url: credentials + token redacted, structure preserved.
     out["wire_redact_url"] =

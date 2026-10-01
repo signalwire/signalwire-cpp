@@ -1779,6 +1779,29 @@ def collect(
                     _bparams[_ro_idx - 1],
                 )
 
+    # Trailing keyword-only parameters. The reference declares these after a bare
+    # ``*`` (keyword-only); C++ has no keyword-only parameters, so the idiom is a
+    # trailing defaulted parameter with the SAME default. Record them in the
+    # reference's shape: (module, class or None for a free function, method) ->
+    # {param: default as the reference records it}.
+    _KEYWORD_ONLY_TRAILING = {
+        ("signalwire.core.mixins.web_mixin", "WebMixin", "mount"): {
+            "prefix": "",
+            "name": None,
+        },
+    }
+    for (_kmod, _kcls, _kmeth), _kparams in _KEYWORD_ONLY_TRAILING.items():
+        _kentry = out_modules.get(_kmod, {})
+        _ksig = (
+            _kentry.get("classes", {}).get(_kcls, {}).get("methods", {}).get(_kmeth)
+            if _kcls
+            else _kentry.get("functions", {}).get(_kmeth)
+        )
+        for _kp in (_ksig or {}).get("params", []):
+            if _kp.get("name") in _kparams:
+                _kp["kind"] = "keyword"
+                _kp["default"] = _kparams[_kp["name"]]
+
     # ``HttpClient`` per-call ``headers``: the reference takes it KEYWORD-ONLY
     # (``get(path, params=None, request_options=None, *, headers=None)``). C++ has no
     # keyword-only parameters; the idiom for an optional trailing argument is a
@@ -1926,6 +1949,14 @@ def collect(
         out_modules,
         "signalwire.rest._request_options",
         PORT_ROOT / "include" / "signalwire" / "rest" / "request_options.hpp",
+    )
+
+    # NormalizedPostPrompt (signalwire.core.post_prompt): the reference
+    # @dataclass's fields as zero-arg getters, gated on the oracle the same way.
+    _project_named_struct_getters(
+        out_modules,
+        "signalwire.core.post_prompt",
+        PORT_ROOT / "include" / "signalwire" / "core" / "post_prompt.hpp",
     )
 
     sorted_modules = {}

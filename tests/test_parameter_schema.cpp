@@ -164,16 +164,15 @@ TEST(parameter_schema_enum_from_tier1_codec) {
   return true;
 }
 
-// The three direction/codec helpers stay distinct (the never-unify rule):
-// tap uses "hear", record uses "listen"; tap codec != RELAY codecs.
-TEST(parameter_schema_tier1_direction_vocabularies_distinct) {
+// The direction helpers name the engine's set: record_call and tap both use
+// {speak, listen, both} (the engine accepts no "hear").
+TEST(parameter_schema_tier1_direction_vocabularies) {
   json rec =
       sw_swaig::ParameterSchema{}.enum_of("d", sw_swaig::record_direction_values()).to_json();
   json tap = sw_swaig::ParameterSchema{}.enum_of("d", sw_swaig::tap_direction_values()).to_json();
 
   ASSERT_EQ(rec["properties"]["d"]["enum"], json::array({"speak", "listen", "both"}));
-  ASSERT_EQ(tap["properties"]["d"]["enum"], json::array({"speak", "hear", "both"}));
-  ASSERT_NE(rec["properties"]["d"]["enum"], tap["properties"]["d"]["enum"]);
+  ASSERT_EQ(tap["properties"]["d"]["enum"], json::array({"speak", "listen", "both"}));
   return true;
 }
 

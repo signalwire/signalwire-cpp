@@ -67,6 +67,28 @@ using ParamsOrBody = std::variant<std::string, FormParams>;
 bool ValidateWebhookSignature(std::string_view signing_key, std::string_view signature,
                               std::string_view url, std::string_view raw_body);
 
+/// Validate the SHA-256 webhook signature (Scheme A with a stronger hash).
+///
+/// SignalWire sends ``X-SignalWire-Sha256-Signature`` alongside the SHA-1
+/// ``X-SignalWire-Signature`` on signed webhooks; it is
+/// ``hex(HMAC-SHA256(signing_key, url + raw_body))``. Only Scheme A
+/// (RELAY/SWML/JSON) is defined for this header — the cXML/form Scheme B stays
+/// on SHA-1 (see ``ValidateWebhookSignature``).
+///
+/// @param signing_key The customer's Signing Key. Empty throws
+///                    ``std::invalid_argument``.
+/// @param signature   The ``X-SignalWire-Sha256-Signature`` header value
+///                    (64-char lowercase hex). Empty returns ``false``.
+/// @param url         Full URL SignalWire POSTed to, exactly as the platform
+///                    saw it.
+/// @param raw_body    Raw request body as a UTF-8 string, BEFORE any parsing.
+///
+/// @return ``true`` if the SHA-256 signature matches, ``false`` otherwise.
+///
+/// @throws std::invalid_argument when ``signing_key`` is empty.
+bool ValidateWebhookSignatureSha256(std::string_view signing_key, std::string_view signature,
+                                    std::string_view url, std::string_view raw_body);
+
 /// Legacy ``@signalwire/compatibility-api`` drop-in entry point.
 ///
 /// If ``params_or_raw_body`` holds a ``std::string``, delegates to

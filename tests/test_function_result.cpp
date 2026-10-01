@@ -413,7 +413,9 @@ TEST(function_result_execute_swml_transfer) {
   json swml = {{"version", "1.0.0"}, {"sections", {{"main", json::array()}}}};
   r.execute_swml(swml, true);
   auto j = r.to_json();
-  ASSERT_TRUE(j["action"][0]["SWML"].contains("transfer"));
+  // transfer rides beside the SWML document, not inside it.
+  ASSERT_FALSE(j["action"][0]["SWML"].contains("transfer"));
+  ASSERT_EQ(j["action"][0]["transfer"], json("true"));
   return true;
 }
 
@@ -439,14 +441,16 @@ TEST(function_result_execute_swml_string_parses_to_object) {
 }
 
 TEST(function_result_execute_swml_string_with_transfer) {
-  // String content + transfer=true: parse, then add transfer:"true" as a
-  // SIBLING key on the parsed object.
+  // String content + transfer=true: parse, then add transfer:"true" BESIDE the
+  // SWML document (a sibling of the SWML key, as connect / swml_transfer emit),
+  // never inside it — inside the document it is not a SWML key.
   FunctionResult r("test");
   r.execute_swml(json("{\"version\": \"1.0.0\", \"sections\": {\"main\": []}}"), true);
-  auto swml = r.to_json()["action"][0]["SWML"];
-  ASSERT_TRUE(swml.is_object());
-  ASSERT_EQ(swml["version"].get<std::string>(), "1.0.0");
-  ASSERT_EQ(swml["transfer"].get<std::string>(), "true");
+  auto action = r.to_json()["action"][0];
+  ASSERT_TRUE(action["SWML"].is_object());
+  ASSERT_EQ(action["SWML"]["version"].get<std::string>(), "1.0.0");
+  ASSERT_FALSE(action["SWML"].contains("transfer"));
+  ASSERT_EQ(action["transfer"].get<std::string>(), "true");
   return true;
 }
 
@@ -792,7 +796,7 @@ TEST(function_result_tap_invalid_direction) {
   try {
     r.tap("wss://x", "", "sideways");
   } catch (const std::invalid_argument& e) {
-    ASSERT_EQ(std::string(e.what()), "direction must be one of ['speak', 'hear', 'both']");
+    ASSERT_EQ(std::string(e.what()), "direction must be one of ['speak', 'listen', 'both']");
     checked = true;
   }
   ASSERT_TRUE(checked);
@@ -827,14 +831,14 @@ TEST(function_result_tap_invalid_rtp_ptime) {
   return true;
 }
 
-TEST(function_result_tap_valid_hear_codec_pcma) {
+TEST(function_result_tap_valid_listen_codec_pcma) {
   // The in-set non-default values must NOT throw and must round-trip.
   FunctionResult r("test");
-  r.tap("rtp://1.2.3.4:5000", "tap-1", "hear", "PCMA", 30, "https://cb/x");
+  r.tap("rtp://1.2.3.4:5000", "tap-1", "listen", "PCMA", 30, "https://cb/x");
   auto verb = r.to_json()["action"][0]["SWML"]["sections"]["main"][0]["tap"];
   ASSERT_EQ(verb["uri"].get<std::string>(), "rtp://1.2.3.4:5000");
   ASSERT_EQ(verb["control_id"].get<std::string>(), "tap-1");
-  ASSERT_EQ(verb["direction"].get<std::string>(), "hear");
+  ASSERT_EQ(verb["direction"].get<std::string>(), "listen");
   ASSERT_EQ(verb["codec"].get<std::string>(), "PCMA");
   ASSERT_EQ(verb["rtp_ptime"].get<int>(), 30);
   ASSERT_EQ(verb["status_url"].get<std::string>(), "https://cb/x");
@@ -1135,5 +1139,118 @@ TEST(tool_definition_default_parameters) {
   ASSERT_EQ(j["parameters"]["type"].get<std::string>(), "object");
   ASSERT_FALSE(j.contains("web_hook_url"));
   ASSERT_FALSE(j.contains("secure"));
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Structured tool response, hold routing, change_voice, RPC global data
+// (signalwire-python core/function_result.py set_tool_response / hold /
+// change_voice / rpc_ai_message / rpc_ai_global_data).
+// ---------------------------------------------------------------------------
+
+TEST(function_result_set_tool_response_object_form) {
+  FunctionResult r;
+  r.set_tool_response(std::string("Balance is $12.50."),
+                      std::string("Read the balance to the caller."));
+  auto j = r.to_json();
+  ASSERT_EQ(j["response"], json({{"tool_result", "Balance is $12.50."},
+                                 {"tool_prompt", "Read the balance to the caller."}}));
+  ASSERT_TRUE(r.response().is_object());
+  return true;
+}
+
+TEST(function_result_set_tool_response_result_only_omits_prompt) {
+  FunctionResult r;
+  r.set_tool_response(std::string("Saved."));
+  ASSERT_EQ(r.to_json()["response"], json({{"tool_result", "Saved."}}));
+  return true;
+}
+
+TEST(function_result_ctor_tool_fields_set_structured_response) {
+  FunctionResult r("", false, std::string("Order 1042 placed."),
+                   std::string("Tell the caller their order number."));
+  ASSERT_EQ(r.to_json()["response"]["tool_result"], json("Order 1042 placed."));
+  ASSERT_EQ(r.to_json()["response"]["tool_prompt"], json("Tell the caller their order number."));
+  return true;
+}
+
+TEST(function_result_hold_int_prompt_is_timeout) {
+  // hold(120) keeps meaning hold(timeout=120).
+  FunctionResult r;
+  r.hold(120);
+  ASSERT_EQ(r.to_json()["action"][0], json({{"hold", 120}}));
+  ASSERT_FALSE(r.to_json().contains("post_process"));
+  return true;
+}
+
+TEST(function_result_hold_prompt_sets_response_and_post_process) {
+  FunctionResult r;
+  r.hold(std::string("Please hold while I check."));
+  auto j = r.to_json();
+  ASSERT_EQ(j["action"][0], json({{"hold", 300}}));
+  ASSERT_EQ(j["response"], json({{"tool_result", "status: on hold"},
+                                 {"tool_prompt", "Please hold while I check."}}));
+  ASSERT_EQ(j["post_process"], json(true));
+  return true;
+}
+
+TEST(function_result_hold_step_and_timeout_step_emit_object_form) {
+  FunctionResult r;
+  r.hold(std::nullopt, 120, std::string("back_with_agent"), std::string("take_a_message"));
+  ASSERT_EQ(
+      r.to_json()["action"][0],
+      json(
+          {{"hold",
+            {{"timeout", 120}, {"step", "back_with_agent"}, {"timeout_step", "take_a_message"}}}}));
+  return true;
+}
+
+TEST(function_result_hold_only_step_and_clamp) {
+  FunctionResult a;
+  a.hold(std::nullopt, 300, std::string("back_with_agent"));
+  ASSERT_EQ(a.to_json()["action"][0],
+            json({{"hold", {{"timeout", 300}, {"step", "back_with_agent"}}}}));
+  FunctionResult b;
+  b.hold(std::nullopt, 5000, std::string("s"));
+  ASSERT_EQ(b.to_json()["action"][0], json({{"hold", {{"timeout", 900}, {"step", "s"}}}}));
+  FunctionResult c;
+  c.hold(60, 300, std::nullopt, std::string("take_a_message"));
+  ASSERT_EQ(c.to_json()["action"][0],
+            json({{"hold", {{"timeout", 60}, {"timeout_step", "take_a_message"}}}}));
+  return true;
+}
+
+TEST(function_result_change_voice_emits_string_form) {
+  FunctionResult r;
+  r.change_voice("elevenlabs.rachel:eleven_turbo_v2");
+  ASSERT_EQ(r.to_json()["action"][0],
+            json({{"change_voice", "elevenlabs.rachel:eleven_turbo_v2"}}));
+  return true;
+}
+
+TEST(function_result_rpc_ai_message_with_global_data) {
+  FunctionResult r;
+  r.rpc_ai_message("call-abc", std::string("The caller is back."), "system",
+                   json({{"status", "returned"}}));
+  auto rpc = rpc_cmd(r);
+  ASSERT_EQ(rpc["method"], json("ai_message"));
+  ASSERT_EQ(rpc["call_id"], json("call-abc"));
+  ASSERT_EQ(rpc["params"], json({{"role", "system"},
+                                 {"message_text", "The caller is back."},
+                                 {"global_data", {{"status", "returned"}}}}));
+  return true;
+}
+
+TEST(function_result_rpc_ai_message_needs_a_payload) {
+  FunctionResult r;
+  ASSERT_THROWS(r.rpc_ai_message("call-abc"));
+  return true;
+}
+
+TEST(function_result_rpc_ai_global_data_is_data_only_message) {
+  FunctionResult r;
+  r.rpc_ai_global_data("call-abc", json({{"order_id", "1042"}}));
+  auto rpc = rpc_cmd(r);
+  ASSERT_EQ(rpc["params"], json({{"global_data", {{"order_id", "1042"}}}}));
   return true;
 }

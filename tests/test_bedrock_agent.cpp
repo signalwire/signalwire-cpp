@@ -75,6 +75,33 @@ TEST(bedrock_prompt_filters_text_model_params) {
   return true;
 }
 
+TEST(bedrock_set_prompt_llm_params_applies_inference_settings) {
+  // temperature / top_p / max_tokens (numbers or numeric strings) update the
+  // inference settings; the call chains.
+  BedrockAgent agent("a", "/a", "", "matthew", 0.7, 0.9, 1024);
+  BedrockAgent& same =
+      agent.set_prompt_llm_params(json::object({{"temperature", 0.3}, {"top_p", "0.5"}}));
+  ASSERT_EQ(&same, &agent);
+  agent.prompt_add_section("Role", "hi");
+  json swml = agent.render_swml();
+  json bedrock = find_verb(swml, "amazon_bedrock");
+  ASSERT_EQ(bedrock["prompt"]["temperature"].get<double>(), 0.3);
+  ASSERT_EQ(bedrock["prompt"]["top_p"].get<double>(), 0.5);
+  return true;
+}
+
+TEST(bedrock_set_prompt_llm_params_refuses_non_numbers_unchanged) {
+  BedrockAgent agent("a", "/a", "", "matthew", 0.7, 0.9, 1024);
+  ASSERT_THROWS(
+      agent.set_prompt_llm_params(json::object({{"temperature", 0.1}, {"top_p", "not-a-number"}})));
+  ASSERT_THROWS(agent.set_prompt_llm_params(json::object({{"max_tokens", 1.5}})));
+  agent.prompt_add_section("Role", "hi");
+  json bedrock = find_verb(agent.render_swml(), "amazon_bedrock");
+  ASSERT_EQ(bedrock["prompt"]["temperature"].get<double>(), 0.7);
+  ASSERT_EQ(bedrock["prompt"]["top_p"].get<double>(), 0.9);
+  return true;
+}
+
 TEST(bedrock_repr_contains_identity) {
   BedrockAgent agent("bot", "/bot", "", "matthew");
   std::string r = agent.repr();

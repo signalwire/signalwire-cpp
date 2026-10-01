@@ -202,20 +202,22 @@ bool SessionManager::validate_token(std::string_view token, std::string_view fun
   }
 
   // base64url-decode the whole token, then split into the 5 dot-fields
-  // {call_id}.{function_name}.{expiry}.{nonce}.{signature}.
+  // {call_id}.{function_name}.{expiry}.{nonce}.{signature} FROM THE RIGHT (the
+  // reference's rsplit(".", 4)): a call_id may itself contain dots (a composed
+  // id such as "root.2"); the other four fields never do.
   std::string decoded = base64url_decode(std::string(token));
   std::vector<std::string> parts;
   {
-    size_t start = 0;
-    while (true) {
-      size_t dot = decoded.find('.', start);
+    std::string rest = decoded;
+    for (int i = 0; i < 4; ++i) {
+      size_t dot = rest.rfind('.');
       if (dot == std::string::npos) {
-        parts.push_back(decoded.substr(start));
         break;
       }
-      parts.push_back(decoded.substr(start, dot - start));
-      start = dot + 1;
+      parts.insert(parts.begin(), rest.substr(dot + 1));
+      rest.erase(dot);
     }
+    parts.insert(parts.begin(), rest);
   }
   if (parts.size() != 5) {
     return false;

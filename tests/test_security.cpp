@@ -24,6 +24,17 @@ TEST(session_manager_create_and_validate_token) {
   return true;
 }
 
+TEST(session_manager_dotted_call_id_round_trips) {
+  // A call_id may itself contain dots (a composed id such as "root.2"); the
+  // token is split from the right, so it still validates — and only for that
+  // exact call_id.
+  SessionManager sm;
+  std::string token = sm.create_token("get_weather", "root.2", 3600);
+  ASSERT_TRUE(sm.validate_token(token, "get_weather", "root.2"));
+  ASSERT_FALSE(sm.validate_token(token, "get_weather", "root"));
+  return true;
+}
+
 TEST(session_manager_wrong_function_name) {
   SessionManager sm;
   std::string token = sm.create_token("get_weather", "call-123", 3600);

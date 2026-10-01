@@ -74,6 +74,19 @@ std::string local_hmac_sha1_hex(const std::string& key, const std::string& msg) 
   return ss.str();
 }
 
+std::string local_hmac_sha256_hex(const std::string& key, const std::string& msg) {
+  unsigned char out[EVP_MAX_MD_SIZE];
+  unsigned int out_len = 0;
+  HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+       reinterpret_cast<const unsigned char*>(msg.data()), msg.size(), out, &out_len);
+  std::ostringstream ss;
+  ss << std::hex << std::setfill('0');
+  for (unsigned int i = 0; i < out_len; ++i) {
+    ss << std::setw(2) << static_cast<int>(out[i]);
+  }
+  return ss.str();
+}
+
 // ---------------------------------------------------------------------------
 // Canonical vectors from porting-sdk/webhooks.md
 // ---------------------------------------------------------------------------
@@ -423,5 +436,78 @@ TEST(webhook_validate_core_empty_signing_key_throws) {
       {"X-SignalWire-Signature", VEC_A_EXPECTED},
   };
   ASSERT_THROWS(Validate("POST", VEC_A_URL, headers, VEC_A_BODY, ""));
+  return true;
+}
+
+// ===========================================================================
+// SHA-256 header — X-SignalWire-Sha256-Signature: hex(HMAC-SHA256(key, url +
+// raw_body)). Ported from signalwire-python tests/unit/security/
+// test_webhook_validator.py TestSchemeASha256 + test_webhook_middleware.py.
+// ===========================================================================
+
+TEST(webhook_sha256_positive_vector) {
+  std::string sig = local_hmac_sha256_hex(VEC_A_KEY, std::string(VEC_A_URL) + VEC_A_BODY);
+  ASSERT_EQ(sig.size(), static_cast<size_t>(64));
+  ASSERT_TRUE(ValidateWebhookSignatureSha256(VEC_A_KEY, sig, VEC_A_URL, VEC_A_BODY));
+  return true;
+}
+
+TEST(webhook_sha256_sha1_signature_not_accepted) {
+  ASSERT_FALSE(ValidateWebhookSignatureSha256(VEC_A_KEY, VEC_A_EXPECTED, VEC_A_URL, VEC_A_BODY));
+  return true;
+}
+
+TEST(webhook_sha256_negative_tampered_body_and_wrong_key) {
+  std::string sig = local_hmac_sha256_hex(VEC_A_KEY, std::string(VEC_A_URL) + VEC_A_BODY);
+  std::string tampered = VEC_A_BODY;
+  auto pos = tampered.find("answered");
+  ASSERT_TRUE(pos != std::string::npos);
+  tampered.replace(pos, 8, "ringing!");
+  ASSERT_FALSE(ValidateWebhookSignatureSha256(VEC_A_KEY, sig, VEC_A_URL, tampered));
+  ASSERT_FALSE(ValidateWebhookSignatureSha256("wrong-key", sig, VEC_A_URL, VEC_A_BODY));
+  return true;
+}
+
+TEST(webhook_sha256_missing_signature_false_missing_key_throws) {
+  ASSERT_FALSE(ValidateWebhookSignatureSha256(VEC_A_KEY, "", VEC_A_URL, VEC_A_BODY));
+  ASSERT_THROWS(ValidateWebhookSignatureSha256("", "deadbeef", VEC_A_URL, VEC_A_BODY));
+  return true;
+}
+
+TEST(webhook_validate_core_sha256_header_passes) {
+  std::map<std::string, std::string> headers{
+      {"X-SignalWire-Sha256-Signature",
+       local_hmac_sha256_hex(VEC_A_KEY, std::string(VEC_A_URL) + VEC_A_BODY)},
+  };
+  ASSERT_FALSE(Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY).has_value());
+  return true;
+}
+
+TEST(webhook_validate_core_bad_sha256_falls_back_to_valid_sha1) {
+  std::map<std::string, std::string> headers{
+      {"X-SignalWire-Sha256-Signature", std::string(64, 'a')},
+      {"X-SignalWire-Signature", VEC_A_EXPECTED},
+  };
+  ASSERT_FALSE(Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY).has_value());
+  return true;
+}
+
+TEST(webhook_validate_core_bad_sha256_without_sha1_rejected) {
+  std::map<std::string, std::string> headers{
+      {"X-SignalWire-Sha256-Signature", std::string(64, 'a')},
+  };
+  auto result = Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY);
+  ASSERT_TRUE(result.has_value());
+  ASSERT_EQ(std::get<0>(*result), 403);
+  return true;
+}
+
+TEST(webhook_validate_core_valid_sha256_preferred_over_bad_sha1) {
+  std::map<std::string, std::string> headers{
+      {"X-SignalWire-Sha256-Signature",
+       local_hmac_sha256_hex(VEC_A_KEY, std::string(VEC_A_URL) + VEC_A_BODY)},
+      {"X-SignalWire-Signature", "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"},
+  };
+  ASSERT_FALSE(Validate("POST", VEC_A_URL, headers, VEC_A_BODY, VEC_A_KEY).has_value());
   return true;
 }

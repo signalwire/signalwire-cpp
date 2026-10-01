@@ -19,6 +19,7 @@
 #include "signalwire/logging.hpp"
 #include "signalwire/pom/pom.hpp"
 #include "signalwire/security/session_manager.hpp"
+#include "signalwire/server/router.hpp"
 #include "signalwire/skills/skill_name.hpp"
 #include "signalwire/swaig/function_result.hpp"
 #include "signalwire/swaig/tool_definition.hpp"
@@ -123,6 +124,10 @@ struct Pronunciation {
 using DynamicConfigCallback = std::function<void(
     const std::map<std::string, std::string>& query_params, const json& body_params,
     const std::map<std::string, std::string>& headers, class AgentBase& agent_copy)>;
+
+/// Call-end handler type: receives the conversation's call log (already
+/// resolved from whichever field carried it) and the complete SWAIG request.
+using CallEndHandler = std::function<void(const json& call_log, const json& raw_data)>;
 
 /// Summary callback type
 using SummaryCallback = std::function<void(const json& summary, const json& raw_data)>;
@@ -576,6 +581,19 @@ class AgentBase : public swml::Service {
   // ========================================================================
 
   AgentBase& set_dynamic_config_callback(DynamicConfigCallback cb);
+  /// Register a per-request configuration callback, KEEPING any already set.
+  /// Same signature and contract as set_dynamic_config_callback, except that
+  /// callbacks accumulate instead of overwriting: they run in registration order
+  /// against the same ephemeral agent, so a later one sees what an earlier one
+  /// configured. Configure the ``agent_copy`` argument, never ``*this``.
+  AgentBase& add_per_call_config(DynamicConfigCallback cb);
+  /// Mount an extra set of routes (e.g. ai_chat::ChatGateway::router()) alongside
+  /// this agent's own, under ``prefix`` (a trailing slash is stripped). Mounted
+  /// routes are registered with the agent's routes when the server is built
+  /// (serve() / as_router()), so mount before serving. ``name`` labels the mount
+  /// in the log.
+  AgentBase& mount(server::Router router, const std::string& prefix = "",
+                   const std::optional<std::string>& name = std::nullopt);
   AgentBase& manual_set_proxy_url(const std::string& url);
   AgentBase& set_webhook_url(const std::string& url);
   AgentBase& set_post_prompt_url_direct(const std::string& url);
@@ -658,6 +676,15 @@ class AgentBase : public swml::Service {
   // ========================================================================
 
   AgentBase& on_summary(SummaryCallback cb);
+  /// Register a handler that runs when the call ends, with the transcript.
+  /// Handlers run in registration order and receive (call_log, raw_data). This
+  /// wraps the platform's reserved ``hangup_hook`` function (fires on hangup,
+  /// never offered to the model) and turns on ``swaig_post_conversation`` --
+  /// without it the hook carries no call_log. An explicit
+  /// ``swaig_post_conversation: false`` is left alone with a warning. Handler
+  /// exceptions are caught and logged so a failing teardown handler cannot fail
+  /// the hangup. Returns the handler.
+  CallEndHandler on_call_end(CallEndHandler handler);
   AgentBase& on_debug_event(DebugEventCallback cb);
 
   // ========================================================================
@@ -853,7 +880,14 @@ class AgentBase : public swml::Service {
   std::map<std::string, json> skill_configs_;
 
   // Web config
-  DynamicConfigCallback dynamic_config_callback_;
+  /// Per-request configuration callbacks, run in registration order
+  /// (set_dynamic_config_callback replaces the chain; add_per_call_config
+  /// appends).
+  std::vector<DynamicConfigCallback> per_call_configs_;
+  /// The call-end handlers, shared with the registered hangup_hook tool.
+  std::shared_ptr<std::vector<CallEndHandler>> call_end_handlers_;
+  /// Extra route sets mounted via mount(): (prefix, router).
+  std::vector<std::pair<std::string, server::Router>> mounts_;
   std::optional<std::string> proxy_url_;
   std::optional<std::string> webhook_url_;
   std::vector<SwaigQueryParam> swaig_query_params_;

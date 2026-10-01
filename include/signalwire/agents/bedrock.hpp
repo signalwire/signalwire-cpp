@@ -44,8 +44,12 @@ class BedrockAgent : public agent::AgentBase {
   /// configured in the engine.)
   void set_post_prompt_llm_params(const json& params = json::object());
 
-  /// Not applicable for Bedrock — use set_inference_params() instead; logs a warning.
-  void set_prompt_llm_params(const json& params = json::object());
+  /// Set the prompt's inference settings: `temperature`, `top_p` and `max_tokens`
+  /// (a number, or a numeric string) update them as set_inference_params() does.
+  /// The platform's Bedrock session reads no other prompt setting, so any other
+  /// key is ignored with a warning. Throws std::invalid_argument when a value is
+  /// not a number (max_tokens: not an integer); nothing changes then.
+  BedrockAgent& set_prompt_llm_params(const json& params = json::object());
 
   /// String representation of this agent, for debugging and logging.
   [[nodiscard]] std::string repr() const;

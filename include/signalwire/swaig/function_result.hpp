@@ -88,12 +88,11 @@ enum class CallbackMethod { Get, Post };
 // normalization point — the enum overload routes its wire string into the
 // EXACT string method, so the emitted SWML is byte-identical.
 //
-// ★ Three direction vocabularies + two codec vocabularies that must NEVER be
-// unified (they are bug generators): record_call's direction is
-// {speak,listen,both}, tap's direction is {speak,hear,both} (`hear`, not
-// `listen`), and tap's codec is the 2-value SWAIG set {PCMU,PCMA} — NOT the
-// wider RELAY connect/stream codec superset. Each set gets its OWN enum,
-// faithfully mirroring the reference's separate validation lists.
+// ★ The direction and codec vocabularies each get their OWN enum, faithfully
+// mirroring the reference's separate validation lists: record_call's and tap's
+// direction are both {speak,listen,both} (the engine accepts no "hear"), and
+// tap's codec is the 2-value SWAIG set {PCMU,PCMA} — NOT the wider RELAY
+// connect/stream codec superset.
 // ===========================================================================
 
 /// Recording container format for `FunctionResult::record_call`.
@@ -102,13 +101,12 @@ enum class RecordFormat { Wav, Mp3, Mp4 };
 
 /// Audio direction for `FunctionResult::record_call`.
 /// The validated set is `direction in {"speak","listen","both"}`.
-/// NOTE: differs from `TapDirection` — record_call uses `listen`, tap uses `hear`.
 enum class RecordDirection { Speak, Listen, Both };
 
 /// Audio direction for `FunctionResult::tap`.
-/// The validated set is `direction in {"speak","hear","both"}`.
-/// NOTE: differs from `RecordDirection` — tap uses `hear`, record_call uses `listen`.
-enum class TapDirection { Speak, Hear, Both };
+/// The validated set is `direction in {"speak","listen","both"}`: what the
+/// party says, what the party hears, or both.
+enum class TapDirection { Speak, Listen, Both };
 
 /// Media codec for `FunctionResult::tap` (SWAIG tap only).
 /// The validated set is `codec in {"PCMU","PCMA"}`. The wire strings are
@@ -141,8 +139,8 @@ enum class Codec { Pcmu, Pcma };
   switch (v) {
     case TapDirection::Speak:
       return "speak";
-    case TapDirection::Hear:
-      return "hear";
+    case TapDirection::Listen:
+      return "listen";
     case TapDirection::Both:
       return "both";
   }
@@ -227,20 +225,32 @@ struct JoinConferenceOptions {
 /// Every method returns *this for chaining.
 class FunctionResult {
  public:
-  explicit FunctionResult(const std::string& response = "", bool post_process = false);
+  /// `response` is a prompt for the model (not speech played to the caller).
+  /// `tool_result` / `tool_prompt`, when either is given, set the structured
+  /// response form instead (see set_tool_response).
+  explicit FunctionResult(const std::string& response = "", bool post_process = false,
+                          std::optional<std::string> tool_result = std::nullopt,
+                          std::optional<std::string> tool_prompt = std::nullopt);
 
   // ========================================================================
   // Core
   // ========================================================================
 
-  /// The spoken/returned text — emitted as the ``response`` key when non-empty.
-  /// Readable back after construction or a ``set_response`` call.
-  [[nodiscard]] const std::string& response() const { return response_; }
+  /// The response — a string, or the structured ``{tool_result, tool_prompt}``
+  /// object set by set_tool_response — emitted as the ``response`` key when
+  /// non-empty. Readable back after construction or a set call.
+  [[nodiscard]] const json& response() const { return response_; }
   /// Whether the AI processes the result before speaking — emitted only
   /// alongside an action.
   [[nodiscard]] bool post_process() const { return post_process_; }
 
   FunctionResult& set_response(const std::string& response);
+  /// Set the structured response form, separating outcome from instruction:
+  /// ``{"tool_result": <what the tool DID>, "tool_prompt": <what to SAY next>}``.
+  /// Either may be omitted (an omitted one is left out of the object). Keeps the
+  /// model from reading a status line aloud.
+  FunctionResult& set_tool_response(std::optional<std::string> tool_result = std::nullopt,
+                                    std::optional<std::string> tool_prompt = std::nullopt);
   FunctionResult& set_post_process(bool pp);
   FunctionResult& add_action(const std::string& name, const json& data);
   FunctionResult& add_actions(const std::vector<json>& actions);
@@ -254,7 +264,16 @@ class FunctionResult {
   FunctionResult& swml_transfer(const std::string& dest, const std::string& ai_response,
                                 bool final = true);
   FunctionResult& hangup();
-  FunctionResult& hold(int timeout = 300);
+  /// Put the call on hold, optionally announcing it and routing what happens next.
+  /// A string `prompt` becomes the structured response (tool_result "status: on
+  /// hold", tool_prompt = prompt) and turns on post_process, so the model speaks
+  /// before the hold lands; an int `prompt` is taken as `timeout`, so `hold(120)`
+  /// keeps working. `timeout` is clamped to 0..900. `step` / `timeout_step` name
+  /// the step to land in when the hold ends / times out; with neither, the bare
+  /// integer form is emitted.
+  FunctionResult& hold(std::optional<std::variant<std::string, int>> prompt = std::nullopt,
+                       int timeout = 300, std::optional<std::string> step = std::nullopt,
+                       std::optional<std::string> timeout_step = std::nullopt);
   FunctionResult& wait_for_user(std::optional<bool> enabled = std::nullopt,
                                 std::optional<int> timeout = std::nullopt,
                                 bool answer_first = false);
@@ -285,6 +304,11 @@ class FunctionResult {
   // ========================================================================
 
   FunctionResult& say(const std::string& text);
+  /// Change the agent's voice for the rest of the call. `voice` is an
+  /// ``engine.voice:model`` spec (the ``engine.`` prefix and ``:model`` suffix are
+  /// optional); it replaces the voice of the language in use at the next speech
+  /// batch boundary.
+  FunctionResult& change_voice(const std::string& voice);
   FunctionResult& play_background_file(const std::string& filename, bool wait = false);
   FunctionResult& stop_background_file();
   FunctionResult& record_call(
@@ -367,7 +391,7 @@ class FunctionResult {
   /// string signature canonical; normalizes the enums via
   /// `tap_direction_value`/`codec_value` and delegates to the std::string
   /// `tap`, so the emitted SWML is byte-identical. NOTE the tap direction set
-  /// is {speak,hear,both} (`hear`, not record_call's `listen`).
+  /// is {speak,listen,both}.
   FunctionResult& tap(const std::string& uri, const std::string& control_id, TapDirection direction,
                       Codec codec, int rtp_ptime = 20, const std::string& status_url = "");
   FunctionResult& stop_tap(const std::string& control_id = "");
@@ -399,8 +423,17 @@ class FunctionResult {
                               const std::string& call_id = "", const std::string& node_id = "");
   FunctionResult& rpc_dial(const std::string& to_number, const std::string& from_number,
                            const std::string& dest_swml, const std::string& device_type = "phone");
-  FunctionResult& rpc_ai_message(const std::string& call_id, const std::string& message_text,
-                                 const std::string& role = "system");
+  /// Send a message and/or global_data to an AI agent on another call: the
+  /// message lands as a conversation turn (with `role`); `global_data` is MERGED
+  /// into the other call's global_data. Throws std::invalid_argument when neither
+  /// is given.
+  FunctionResult& rpc_ai_message(const std::string& call_id,
+                                 std::optional<std::string> message_text = std::nullopt,
+                                 const std::string& role = "system",
+                                 std::optional<json> global_data = std::nullopt);
+  /// Merge `data` into another call's global_data, with no conversation turn
+  /// (rpc_ai_message with only global_data).
+  FunctionResult& rpc_ai_global_data(const std::string& call_id, const json& data);
   FunctionResult& rpc_ai_unhold(const std::string& call_id);
 
   // ========================================================================
@@ -430,7 +463,7 @@ class FunctionResult {
   [[nodiscard]] std::string to_string(int indent = -1) const;
 
  private:
-  std::string response_;
+  json response_;
   std::vector<json> actions_;
   bool post_process_;
 };

@@ -1,5 +1,5 @@
 {
-  "generated_from": "signalwire-cpp @ 657f5afd5c493ae8398cb3f91e81aee1d6ffdd25",
+  "generated_from": "signalwire-cpp @ b6fcd7b22508ce34f0fa25a7fc37a8e9f30ad2ba",
   "modules": {
     "signalwire": {
       "classes": {},
@@ -172,6 +172,7 @@
           "add_language",
           "add_mcp_server",
           "add_pattern_hint",
+          "add_per_call_config",
           "add_post_ai_verb",
           "add_post_answer_verb",
           "add_pre_answer_verb",
@@ -216,7 +217,9 @@
           "list_tools",
           "manual_set_proxy_url",
           "mcp_servers",
+          "mount",
           "native_functions",
+          "on_call_end",
           "on_debug_event",
           "on_function_call",
           "on_summary",
@@ -302,6 +305,14 @@
         ]
       },
       "functions": []
+    },
+    "signalwire.core.capabilities": {
+      "classes": {},
+      "functions": [
+        "declared_capabilities",
+        "has_capability",
+        "user_variables"
+      ]
     },
     "signalwire.core.config_loader": {
       "classes": {
@@ -448,6 +459,7 @@
           "add_action",
           "add_actions",
           "add_dynamic_hints",
+          "change_voice",
           "clear_dynamic_hints",
           "connect",
           "create_payment_action",
@@ -469,6 +481,7 @@
           "remove_metadata",
           "replace_in_history",
           "response",
+          "rpc_ai_global_data",
           "rpc_ai_message",
           "rpc_ai_unhold",
           "rpc_dial",
@@ -479,6 +492,7 @@
           "set_post_process",
           "set_response",
           "set_speech_event_timeout",
+          "set_tool_response",
           "simulate_user_input",
           "sip_refer",
           "stop",
@@ -618,9 +632,11 @@
     "signalwire.core.mixins.web_mixin": {
       "classes": {
         "WebMixin": [
+          "add_per_call_config",
           "as_router",
           "enable_debug_routes",
           "manual_set_proxy_url",
+          "mount",
           "on_request",
           "on_swml_request",
           "register_routing_callback",
@@ -650,6 +666,25 @@
         ]
       },
       "functions": []
+    },
+    "signalwire.core.post_prompt": {
+      "classes": {
+        "NormalizedPostPrompt": [
+          "__init__",
+          "call_id",
+          "conversation_id",
+          "dialogue",
+          "medium",
+          "raw",
+          "summary"
+        ]
+      },
+      "functions": [
+        "dialogue_turns",
+        "normalize_post_prompt",
+        "parse_post_prompt_data",
+        "strip_json_fence"
+      ]
     },
     "signalwire.core.post_prompt_generated": {
       "classes": {
@@ -727,7 +762,8 @@
       "classes": {},
       "functions": [
         "validate_request",
-        "validate_webhook_signature"
+        "validate_webhook_signature",
+        "validate_webhook_signature_sha256"
       ]
     },
     "signalwire.core.security_config": {

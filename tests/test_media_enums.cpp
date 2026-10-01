@@ -9,11 +9,10 @@
 // runtime). Real behavior, no mocks: each test drives the actual method and
 // asserts the serialized SWML via to_json().
 //
-// ★ Three direction vocabularies + two codec vocabularies that must NEVER be
-// unified: record_call direction {speak,listen,both} vs tap direction
-// {speak,hear,both} (`hear`, not `listen`) vs the wider RELAY sets; SWAIG tap
-// codec {PCMU,PCMA} vs the wider RELAY connect codec superset. Each is its own
-// enum — the cross-rejection tests below prove the sets stay distinct.
+// ★ Each direction / codec vocabulary is its own enum: record_call and tap
+// direction are both {speak,listen,both} (the engine accepts no "hear"); SWAIG
+// tap codec {PCMU,PCMA} vs the wider RELAY connect codec superset. The
+// cross-rejection tests below prove the sets stay distinct.
 
 #include "signalwire/swaig/function_result.hpp"
 
@@ -95,23 +94,23 @@ TEST(record_direction_enum_and_string_byte_identical_record_call) {
 
 TEST(record_direction_out_of_set_string_still_rejected) {
   FunctionResult r;
-  // `hear` is valid for TAP but NOT for record_call — must be rejected here.
+  // `hear` is not a direction the engine accepts.
   ASSERT_THROWS(r.record_call("rec1", false, "wav", "hear"));
   return true;
 }
 
-// ── TapDirection {speak, hear, both} ──────────────────────────────────────
+// ── TapDirection {speak, listen, both} ──────────────────────────────────────
 
 TEST(tap_direction_enum_maps_to_wire_string) {
   ASSERT_EQ(tap_direction_value(TapDirection::Speak), std::string("speak"));
-  ASSERT_EQ(tap_direction_value(TapDirection::Hear), std::string("hear"));
+  ASSERT_EQ(tap_direction_value(TapDirection::Listen), std::string("listen"));
   ASSERT_EQ(tap_direction_value(TapDirection::Both), std::string("both"));
-  ASSERT_EQ(to_string(TapDirection::Hear), std::string("hear"));
+  ASSERT_EQ(to_string(TapDirection::Listen), std::string("listen"));
   return true;
 }
 
 TEST(tap_direction_enum_and_string_byte_identical_tap) {
-  for (auto dir : {TapDirection::Speak, TapDirection::Hear, TapDirection::Both}) {
+  for (auto dir : {TapDirection::Speak, TapDirection::Listen, TapDirection::Both}) {
     const std::string wire = tap_direction_value(dir);
 
     FunctionResult from_enum;
@@ -120,21 +119,16 @@ TEST(tap_direction_enum_and_string_byte_identical_tap) {
     from_string.tap("wss://example.com", "t1", wire, "PCMU");
 
     ASSERT_EQ(from_enum.to_json(), from_string.to_json());
-    // tap only emits `direction` when != "both" (the default), so assert
-    // the round-trip through whichever shape the verb takes.
-    if (dir == TapDirection::Both) {
-      ASSERT_FALSE(tap_params(from_enum).contains("direction"));
-    } else {
-      ASSERT_EQ(tap_params(from_enum)["direction"].get<std::string>(), wire);
-    }
+    // direction is always emitted (the verb's own default is "speak").
+    ASSERT_EQ(tap_params(from_enum)["direction"].get<std::string>(), wire);
   }
   return true;
 }
 
 TEST(tap_direction_out_of_set_string_still_rejected) {
   FunctionResult r;
-  // `listen` is valid for record_call but NOT for tap — must be rejected here.
-  ASSERT_THROWS(r.tap("wss://example.com", "t1", "listen", "PCMU"));
+  // `hear` is not a direction the engine accepts.
+  ASSERT_THROWS(r.tap("wss://example.com", "t1", "hear", "PCMU"));
   return true;
 }
 

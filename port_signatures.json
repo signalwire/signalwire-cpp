@@ -1236,7 +1236,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:APIRouter"
+              "returns": "class:signalwire.core.web.HostAppRouter"
             },
             "visible_messages": {
               "params": [
@@ -1451,7 +1451,7 @@
                   "kind": "self"
                 }
               ],
-              "returns": "class:APIRouter"
+              "returns": "class:signalwire.core.web.HostAppRouter"
             },
             "say": {
               "params": [
@@ -6998,7 +6998,7 @@
                 },
                 {
                   "name": "router",
-                  "type": "class:APIRouter",
+                  "type": "class:signalwire.core.web.HostAppRouter",
                   "required": true
                 },
                 {
@@ -7411,7 +7411,8 @@
               "name": "roles",
               "type": "list<string>",
               "required": false,
-              "default": null
+              "default": "DIALOGUE_ROLES",
+              "kind": "keyword"
             },
             {
               "name": "drop_echo",

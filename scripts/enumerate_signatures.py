@@ -458,10 +458,10 @@ def _translate_sdk_class_ref(t: str) -> str:
     # routers return a FastAPI ``APIRouter`` (the app includes it under a
     # prefix); the C++ unit with the same capability is a callable that
     # registers the routes on an httplib::Server under a prefix. Same role,
-    # cpp-httplib's idiom (the as_router/HostAppRouter reconciliation's
-    # sibling), so it records as the reference's class.
+    # cpp-httplib's idiom. The oracle folds a bare ``APIRouter`` to the
+    # host-app router class, so it records as that class (as as_router does).
     if name == "Router" and ns_path.endswith("server"):
-        return "class:APIRouter"
+        return "class:signalwire.core.web.HostAppRouter"
     # Walk progressively-shorter namespace prefixes so we also catch the
     # case where libclang emits the class spelling as
     # ``signalwire::rest::RestClient::AddressesNamespace`` — the rename
@@ -1808,6 +1808,8 @@ def collect(
             "call_id": None,
         },
         ("signalwire.core.post_prompt", None, "dialogue_turns"): {
+            # C++ default ``dialogue_roles()`` is the DIALOGUE_ROLES value.
+            "roles": "DIALOGUE_ROLES",
             "drop_echo": None,
         },
     }

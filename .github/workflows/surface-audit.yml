@@ -51,7 +51,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.14'
+          python-version: '3.15'
       # Install the porting-sdk gate scripts' declared dependencies. NOT optional: the
       # enumerator reaches the reference oracle through generate_rest.py, which needs
       # PyYAML, and a bare `except Exception: return None` turned its absence into an EMPTY
